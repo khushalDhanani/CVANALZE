@@ -1,0 +1,133 @@
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from app.schemas.match import JobMatchResult
+
+
+class QwenCVAnalysis(BaseModel):
+    skill_matches: list[str] = Field(
+        default_factory=list, description="Direct matches for required skills from CV"
+    )
+    inferred_skills: list[str] = Field(
+        default_factory=list, description="Skills inferred from CV content or synonyms"
+    )
+    missing_critical: list[str] = Field(
+        default_factory=list, description="Crucial requirements missing"
+    )
+    semantic_reason: str = Field(
+        ..., description="Explanation of why this candidate fits or lacks fit"
+    )
+
+class DynamicMatchedVacancy(BaseModel):
+    vacancy_id: int
+    semantic_reason: str
+    inferred_skills: list[str] = Field(default_factory=list)
+
+class DynamicMappingResponse(BaseModel):
+    matched_vacancies: list[DynamicMatchedVacancy] = Field(default_factory=list)
+
+
+class OptimizedCandidateProfile(BaseModel):
+    core_skills: list[str] = Field(default_factory=list)
+    inferred_skills: list[str] = Field(default_factory=list)
+    relevant_experience_years: float | None = None
+    education_domains: list[str] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)
+    current_role: str | None = None
+    professional_domains: list[str] = Field(default_factory=list)
+
+
+class OptimizedVacancyMatch(BaseModel):
+    vacancy_id: int | str
+    semantic_reason: str = ""
+    inferred_skills: list[str] = Field(default_factory=list)
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_critical: list[str] = Field(default_factory=list)
+    semantic_fit_score: float = Field(default=0.0, ge=0.0, le=100.0)
+    classified_requirements: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_snippets: dict[str, dict[str, str]] = Field(default_factory=dict)
+    career_transition_detected: bool = False
+    career_transition_note: str | None = None
+
+
+class OptimizedLLMMatchResponse(BaseModel):
+    candidate_profile: OptimizedCandidateProfile = Field(default_factory=OptimizedCandidateProfile)
+    matched_vacancies: list[OptimizedVacancyMatch] = Field(default_factory=list)
+
+
+class PipelineStageMetrics(BaseModel):
+    json_loading_ms: float = 0.0
+    vacancy_retrieval_ms: float = 0.0
+    prefilter_ms: float = 0.0
+    prompt_construction_ms: float = 0.0
+    token_count: int = 0
+    context_char_count: int = 0
+    ollama_request_ms: float = 0.0
+    model_inference_ms: float = 0.0
+    json_validation_ms: float = 0.0
+    scoring_ms: float = 0.0
+    total_execution_ms: float = 0.0
+    vacancies_before_filtering: int = 0
+    vacancies_after_filtering: int = 0
+    cache_hit: bool = False
+    average_cv_processing_ms: float = 0.0
+
+
+
+class EnrichedJobMatchResult(JobMatchResult):
+    llm_reason: str = Field(
+        default="", description="Qwen's semantic explanation of the fit"
+    )
+    inferred_skills: list[str] = Field(
+        default_factory=list, description="Additional skills inferred by Qwen"
+    )
+
+
+class EnrichedCandidateAnalysis(BaseModel):
+    primary_department: str = Field(
+        ..., description="Top recommended department for candidate"
+    )
+    best_match: EnrichedJobMatchResult = Field(
+        ..., description="Top matching job opening"
+    )
+    suitable_openings: list[EnrichedJobMatchResult] = Field(
+        ..., description="All evaluated job openings ranked by match score"
+    )
+    rejection_policy_note: str = Field(
+        default="Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+        description="Policy enforcement note regarding LOW score candidate retention",
+    )
+    llm_skipped: bool = Field(
+        default=False,
+        description="True if the LLM call was bypassed due to an unambiguous rule-based match",
+    )
+
+
+class HRReviewRequest(BaseModel):
+    scan_id: str = Field(..., description="The ID of the scan/analysis result")
+    job_id: str = Field(..., description="The ID of the job being reviewed against")
+    corrected_score: float | None = Field(
+        None, description="HR's corrected score if any"
+    )
+    corrected_classification: str | None = Field(
+        None, description="HR's corrected classification if any"
+    )
+    feedback_notes: str = Field(
+        ...,
+        description="HR notes on why the score/classification was changed or approved",
+    )
+
+
+class TrainingExample(BaseModel):
+    scan_id: str
+    job_id: str
+    cv_text: str
+    job_requirements: dict[str, Any]
+    original_llm_analysis: dict[str, Any]
+    original_score: float
+    original_classification: str
+    hr_corrected_score: float | None
+    hr_corrected_classification: str | None
+    hr_feedback: str
+    timestamp: str

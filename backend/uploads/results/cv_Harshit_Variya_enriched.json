@@ -1,0 +1,4939 @@
+{
+  "id": "cv_Harshit_Variya",
+  "scan_id": "cv_Harshit_Variya",
+  "parsed_at": "2026-07-28T11:09:53.245274+00:00",
+  "candidate_id": null,
+  "cv_id": null,
+  "filename": "Harshit_Variya.pdf",
+  "content_type": "application/pdf",
+  "cv_hash": "cefeafce575488bbd6aa67fc0c0253b999b6dbf8e4b4cbb221f5805d82c6267c",
+  "parser_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "created_at": "2026-07-28T11:09:53.245274+00:00",
+  "updated_at": "2026-07-28T11:09:53.245274+00:00",
+  "scanned_at": "2026-07-28T11:09:53.245274+00:00",
+  "status": "NEW_CV",
+  "characters": 2308,
+  "page_count": 1,
+  "is_scanned": true,
+  "ocr_applied": false,
+  "text": "## HARSHIT VARIYA\n\nWeb Developer | Student\n\n<!-- image -->\n\nLinkedIn\n\n🔗\n\nGitHub\n\n<!-- image -->\n\n🔗\n\n## SKILL\n\n- C / C++\n- HTML,CSS,Media Queries\n- Bootstrap\n- JavaScript/ jQuery\n- MongoDB , MySQL\n- PHP\n- Node.js, Express.js\n- EJS\n- Git and GitHub\n\n## LANGUAGE\n\nEnglish\n\nHindi\n\nGujarati\n\n## ADDITIONAL SKILLS\n\n- Typing Speed : 55WPM\n- Canva\n- Problem Solving\n- Analytical Thinking\n- Quick Learner / Adaptable\n\n## SUMMARY\n\nBCA student currently learning backend development with Node.js and Express.js, aiming to build a strong foundation in server-side technologies. Interested in starting a career as a backend developer and gaining practical experience through real-world projects and professional work.\n\n## PROJECTS\n\n## Post Management Platform -\n\nBuilt a backend-driven post management platform using Node.js, Express.js, and EJS. Implemented JWT-based authentication along with features such as  user  registration,  login,  post  creation,  edit  and  like  functionality  by registered users.\n\n## Premium Bag Shop Web Application -\n\nDeveloped an e-commerce style web application using Node.js, Express.js, EJS,  and  MongoDB.  Implemented  product  listing,  server-side  rendering, routing, and database integration for managing bag products.\n\n## Contact Management System -\n\nDeveloped a backend contact management system using Node.js, Express.js, and MongoDB. Implemented user authentication and CRUD operations for managing contacts with structured REST API routes.\n\n## Banking System REST API -\n\nDeveloped  a backend banking system using Node.js, Express.js,  and MongoDB with secure authentication using JWT. Implemented RESTful API endpoints for account management and transaction operations.\n\n## Patient Appointment Backend System -\n\nDeveloped a backend REST API using Node.js, Express.js, and MongoDB for patient  registration  and  appointment  booking,  with  email  confirmation notifications using Nodemailer.\n\n## EDUCATION\n\n## Bachelor of Computer Applications\n\nLearning web development, database management, and programming fundamentals to build practical IT solutions.\n\n2023 - 2026\n\nV.N.S.G.U.\n\n[Sutex Bank College of Computer Applications And Science]\n\n<!-- image -->\n\n<!-- image -->\n\n<!-- image -->\n\n+91 98252 44737\n\nvariyaharshit@gmail.com\n\nJay Ambe Society, Katargam,\n\nSurat -395004",
+  "markdown": "## HARSHIT VARIYA\n\nWeb Developer | Student\n\n<!-- image -->\n\nLinkedIn\n\n🔗\n\nGitHub\n\n<!-- image -->\n\n🔗\n\n## SKILL\n\n- C / C++\n- HTML,CSS,Media Queries\n- Bootstrap\n- JavaScript/ jQuery\n- MongoDB , MySQL\n- PHP\n- Node.js, Express.js\n- EJS\n- Git and GitHub\n\n## LANGUAGE\n\nEnglish\n\nHindi\n\nGujarati\n\n## ADDITIONAL SKILLS\n\n- Typing Speed : 55WPM\n- Canva\n- Problem Solving\n- Analytical Thinking\n- Quick Learner / Adaptable\n\n## SUMMARY\n\nBCA student currently learning backend development with Node.js and Express.js, aiming to build a strong foundation in server-side technologies. Interested in starting a career as a backend developer and gaining practical experience through real-world projects and professional work.\n\n## PROJECTS\n\n## Post Management Platform -\n\nBuilt a backend-driven post management platform using Node.js, Express.js, and EJS. Implemented JWT-based authentication along with features such as  user  registration,  login,  post  creation,  edit  and  like  functionality  by registered users.\n\n## Premium Bag Shop Web Application -\n\nDeveloped an e-commerce style web application using Node.js, Express.js, EJS,  and  MongoDB.  Implemented  product  listing,  server-side  rendering, routing, and database integration for managing bag products.\n\n## Contact Management System -\n\nDeveloped a backend contact management system using Node.js, Express.js, and MongoDB. Implemented user authentication and CRUD operations for managing contacts with structured REST API routes.\n\n## Banking System REST API -\n\nDeveloped  a backend banking system using Node.js, Express.js,  and MongoDB with secure authentication using JWT. Implemented RESTful API endpoints for account management and transaction operations.\n\n## Patient Appointment Backend System -\n\nDeveloped a backend REST API using Node.js, Express.js, and MongoDB for patient  registration  and  appointment  booking,  with  email  confirmation notifications using Nodemailer.\n\n## EDUCATION\n\n## Bachelor of Computer Applications\n\nLearning web development, database management, and programming fundamentals to build practical IT solutions.\n\n2023 - 2026\n\nV.N.S.G.U.\n\n[Sutex Bank College of Computer Applications And Science]\n\n<!-- image -->\n\n<!-- image -->\n\n<!-- image -->\n\n+91 98252 44737\n\nvariyaharshit@gmail.com\n\nJay Ambe Society, Katargam,\n\nSurat -395004",
+  "structured_doc": {
+    "schema_name": "DoclingDocument",
+    "version": "1.10.0",
+    "name": "Harshit_Variya",
+    "origin": {
+      "mimetype": "application/pdf",
+      "binary_hash": 2447003111660070524,
+      "filename": "Harshit_Variya.pdf"
+    },
+    "furniture": {
+      "self_ref": "#/furniture",
+      "children": [],
+      "content_layer": "furniture",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "body": {
+      "self_ref": "#/body",
+      "children": [
+        {
+          "$ref": "#/texts/0"
+        },
+        {
+          "$ref": "#/texts/1"
+        },
+        {
+          "$ref": "#/pictures/0"
+        },
+        {
+          "$ref": "#/texts/2"
+        },
+        {
+          "$ref": "#/texts/3"
+        },
+        {
+          "$ref": "#/texts/4"
+        },
+        {
+          "$ref": "#/pictures/1"
+        },
+        {
+          "$ref": "#/texts/5"
+        },
+        {
+          "$ref": "#/texts/6"
+        },
+        {
+          "$ref": "#/groups/0"
+        },
+        {
+          "$ref": "#/texts/16"
+        },
+        {
+          "$ref": "#/texts/17"
+        },
+        {
+          "$ref": "#/texts/18"
+        },
+        {
+          "$ref": "#/texts/19"
+        },
+        {
+          "$ref": "#/texts/20"
+        },
+        {
+          "$ref": "#/groups/1"
+        },
+        {
+          "$ref": "#/texts/26"
+        },
+        {
+          "$ref": "#/texts/27"
+        },
+        {
+          "$ref": "#/texts/28"
+        },
+        {
+          "$ref": "#/texts/29"
+        },
+        {
+          "$ref": "#/texts/30"
+        },
+        {
+          "$ref": "#/texts/31"
+        },
+        {
+          "$ref": "#/texts/32"
+        },
+        {
+          "$ref": "#/texts/33"
+        },
+        {
+          "$ref": "#/texts/34"
+        },
+        {
+          "$ref": "#/texts/35"
+        },
+        {
+          "$ref": "#/texts/36"
+        },
+        {
+          "$ref": "#/texts/37"
+        },
+        {
+          "$ref": "#/texts/38"
+        },
+        {
+          "$ref": "#/texts/39"
+        },
+        {
+          "$ref": "#/groups/2"
+        },
+        {
+          "$ref": "#/pictures/2"
+        },
+        {
+          "$ref": "#/pictures/3"
+        },
+        {
+          "$ref": "#/pictures/4"
+        },
+        {
+          "$ref": "#/texts/45"
+        },
+        {
+          "$ref": "#/texts/46"
+        },
+        {
+          "$ref": "#/texts/47"
+        },
+        {
+          "$ref": "#/texts/48"
+        }
+      ],
+      "content_layer": "body",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "groups": [
+      {
+        "self_ref": "#/groups/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/7"
+          },
+          {
+            "$ref": "#/texts/8"
+          },
+          {
+            "$ref": "#/texts/9"
+          },
+          {
+            "$ref": "#/texts/10"
+          },
+          {
+            "$ref": "#/texts/11"
+          },
+          {
+            "$ref": "#/texts/12"
+          },
+          {
+            "$ref": "#/texts/13"
+          },
+          {
+            "$ref": "#/texts/14"
+          },
+          {
+            "$ref": "#/texts/15"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/1",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/21"
+          },
+          {
+            "$ref": "#/texts/22"
+          },
+          {
+            "$ref": "#/texts/23"
+          },
+          {
+            "$ref": "#/texts/24"
+          },
+          {
+            "$ref": "#/texts/25"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/2",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/40"
+          },
+          {
+            "$ref": "#/texts/41"
+          },
+          {
+            "$ref": "#/texts/42"
+          },
+          {
+            "$ref": "#/texts/43"
+          },
+          {
+            "$ref": "#/texts/44"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "key_value_area"
+      }
+    ],
+    "texts": [
+      {
+        "self_ref": "#/texts/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 59.54999751875,
+              "t": 783.8456489399148,
+              "r": 227.0280092649728,
+              "b": 715.8250203789078,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              14
+            ]
+          }
+        ],
+        "orig": "HARSHIT VARIYA",
+        "text": "HARSHIT VARIYA",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/1",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 59.54999751875,
+              "t": 703.9605316773623,
+              "r": 241.0682968126184,
+              "b": 691.7645474617583,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "Web Developer | Student",
+        "text": "Web Developer | Student"
+      },
+      {
+        "self_ref": "#/texts/2",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 76.08480910729949,
+              "t": 681.9897322595915,
+              "r": 122.1467855435239,
+              "b": 671.5322967049472,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              8
+            ]
+          }
+        ],
+        "orig": "LinkedIn",
+        "text": "LinkedIn"
+      },
+      {
+        "self_ref": "#/texts/3",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 122.30925663378076,
+              "t": 683.8924491582317,
+              "r": 134.3137796535923,
+              "b": 671.8879261384201,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              1
+            ]
+          }
+        ],
+        "orig": "🔗",
+        "text": "🔗"
+      },
+      {
+        "self_ref": "#/texts/4",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 169.12670322305374,
+              "t": 681.724117260844,
+              "r": 219.79645184525083,
+              "b": 672.1424920646191,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "GitHub",
+        "text": "GitHub"
+      },
+      {
+        "self_ref": "#/texts/5",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 219.9466322180566,
+              "t": 683.467481595439,
+              "r": 230.94577628490237,
+              "b": 672.4683375285933,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              1
+            ]
+          }
+        ],
+        "orig": "🔗",
+        "text": "🔗"
+      },
+      {
+        "self_ref": "#/texts/6",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 86.5495427937689,
+              "t": 514.0808346069158,
+              "r": 125.24893120629181,
+              "b": 501.07843561108245,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              5
+            ]
+          }
+        ],
+        "orig": "SKILL",
+        "text": "SKILL",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/7",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 479.83466266149054,
+              "r": 124.79176269101069,
+              "b": 473.01056141753475,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              7
+            ]
+          }
+        ],
+        "orig": "C / C++",
+        "text": "C / C++",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/8",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 462.3280520309327,
+              "r": 194.64943949851278,
+              "b": 455.50395078697693,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              22
+            ]
+          }
+        ],
+        "orig": "HTML,CSS,Media Queries",
+        "text": "HTML,CSS,Media Queries",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/9",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 444.82144140037485,
+              "r": 138.46611174267926,
+              "b": 437.99734015641906,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "Bootstrap",
+        "text": "Bootstrap",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/10",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 427.314830769817,
+              "r": 170.3726911619884,
+              "b": 420.4907295258612,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              18
+            ]
+          }
+        ],
+        "orig": "JavaScript/ jQuery",
+        "text": "JavaScript/ jQuery",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/11",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 409.8082201392591,
+              "r": 169.72791644010402,
+              "b": 402.9841188953033,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              15
+            ]
+          }
+        ],
+        "orig": "MongoDB , MySQL",
+        "text": "MongoDB , MySQL",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/12",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 392.3016095087013,
+              "r": 116.86615855955236,
+              "b": 385.47750826474544,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              3
+            ]
+          }
+        ],
+        "orig": "PHP",
+        "text": "PHP",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/13",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 374.7949988781434,
+              "r": 169.74745506803993,
+              "b": 367.9708976341876,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              19
+            ]
+          }
+        ],
+        "orig": "Node.js, Express.js",
+        "text": "Node.js, Express.js",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/14",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 357.28838824758554,
+              "r": 114.69737085866852,
+              "b": 350.46428700362975,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              3
+            ]
+          }
+        ],
+        "orig": "EJS",
+        "text": "EJS",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/15",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 99.29848969793775,
+              "t": 339.78177761702767,
+              "r": 156.21695522243576,
+              "b": 332.9576763730719,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              14
+            ]
+          }
+        ],
+        "orig": "Git and GitHub",
+        "text": "Git and GitHub",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/16",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 86.5495427937689,
+              "t": 322.4309617923275,
+              "r": 169.8173421774409,
+              "b": 309.42856279649413,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              8
+            ]
+          }
+        ],
+        "orig": "LANGUAGE",
+        "text": "LANGUAGE",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/17",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 95.07415523857671,
+              "t": 284.9880827056718,
+              "r": 125.69586390648269,
+              "b": 276.64827772012495,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              7
+            ]
+          }
+        ],
+        "orig": "English",
+        "text": "English"
+      },
+      {
+        "self_ref": "#/texts/18",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 95.07415523857671,
+              "t": 262.47960204352523,
+              "r": 118.16460921047583,
+              "b": 254.1397970579785,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              5
+            ]
+          }
+        ],
+        "orig": "Hindi",
+        "text": "Hindi"
+      },
+      {
+        "self_ref": "#/texts/19",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 95.07415523857671,
+              "t": 239.97112138137868,
+              "r": 129.2809992778363,
+              "b": 231.63131639583185,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              8
+            ]
+          }
+        ],
+        "orig": "Gujarati",
+        "text": "Gujarati"
+      },
+      {
+        "self_ref": "#/texts/20",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 86.5495427937689,
+              "t": 211.5026304143414,
+              "r": 231.56190489055578,
+              "b": 198.50023141850806,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "ADDITIONAL SKILLS",
+        "text": "ADDITIONAL SKILLS",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/21",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 100.44658030472564,
+              "t": 174.87097529388484,
+              "r": 202.74788435120666,
+              "b": 166.531170308338,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              20
+            ]
+          }
+        ],
+        "orig": "Typing Speed : 55WPM",
+        "text": "Typing Speed : 55WPM",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/22",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 100.44658030472564,
+              "t": 151.61221194300003,
+              "r": 129.69658355123315,
+              "b": 143.2724069574533,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              5
+            ]
+          }
+        ],
+        "orig": "Canva",
+        "text": "Canva",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/23",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 100.44658030472564,
+              "t": 128.35344859211523,
+              "r": 170.24289900670055,
+              "b": 120.0136436065684,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              15
+            ]
+          }
+        ],
+        "orig": "Problem Solving",
+        "text": "Problem Solving",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/24",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 100.44658030472564,
+              "t": 105.09468524123042,
+              "r": 184.8658075075154,
+              "b": 96.75488025568359,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              19
+            ]
+          }
+        ],
+        "orig": "Analytical Thinking",
+        "text": "Analytical Thinking",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/25",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 100.44658030472564,
+              "t": 81.83592189034562,
+              "r": 214.6938959152132,
+              "b": 73.49611690479878,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              25
+            ]
+          }
+        ],
+        "orig": "Quick Learner / Adaptable",
+        "text": "Quick Learner / Adaptable",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/26",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 256.8024504398974,
+              "t": 649.824152764144,
+              "r": 338.6896592247466,
+              "b": 635.8238777922887,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              7
+            ]
+          }
+        ],
+        "orig": "SUMMARY",
+        "text": "SUMMARY",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/27",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 59.673278313613295,
+              "t": 605.6580943174091,
+              "r": 536.9915632187058,
+              "b": 569.9355665917291,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              283
+            ]
+          }
+        ],
+        "orig": "BCA student currently learning backend development with Node.js and Express.js, aiming to build a strong foundation in server-side technologies. Interested in starting a career as a backend developer and gaining practical experience through real-world projects and professional work.",
+        "text": "BCA student currently learning backend development with Node.js and Express.js, aiming to build a strong foundation in server-side technologies. Interested in starting a career as a backend developer and gaining practical experience through real-world projects and professional work."
+      },
+      {
+        "self_ref": "#/texts/28",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037200415112,
+              "t": 531.7432162709832,
+              "r": 343.66098256049463,
+              "b": 518.7408172751499,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              8
+            ]
+          }
+        ],
+        "orig": "PROJECTS",
+        "text": "PROJECTS",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/29",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 493.3653831970197,
+              "r": 372.5200111104922,
+              "b": 486.4662097194275,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              26
+            ]
+          }
+        ],
+        "orig": "Post Management Platform -",
+        "text": "Post Management Platform -",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/30",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 482.8495072819012,
+              "r": 530.7738895190457,
+              "b": 444.61778039673794,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              248
+            ]
+          }
+        ],
+        "orig": "Built a backend-driven post management platform using Node.js, Express.js, and EJS. Implemented JWT-based authentication along with features such as  user  registration,  login,  post  creation,  edit  and  like  functionality  by registered users.",
+        "text": "Built a backend-driven post management platform using Node.js, Express.js, and EJS. Implemented JWT-based authentication along with features such as  user  registration,  login,  post  creation,  edit  and  like  functionality  by registered users."
+      },
+      {
+        "self_ref": "#/texts/31",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 424.14111850424416,
+              "r": 403.1685635137379,
+              "b": 417.241945026652,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              34
+            ]
+          }
+        ],
+        "orig": "Premium Bag Shop Web Application -",
+        "text": "Premium Bag Shop Web Application -",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/32",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 413.62524258912566,
+              "r": 530.7719632653973,
+              "b": 385.85837542792655,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              210
+            ]
+          }
+        ],
+        "orig": "Developed an e-commerce style web application using Node.js, Express.js, EJS,  and  MongoDB.  Implemented  product  listing,  server-side  rendering, routing, and database integration for managing bag products.",
+        "text": "Developed an e-commerce style web application using Node.js, Express.js, EJS,  and  MongoDB.  Implemented  product  listing,  server-side  rendering, routing, and database integration for managing bag products."
+      },
+      {
+        "self_ref": "#/texts/33",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 365.6792947684736,
+              "r": 378.1304022732859,
+              "b": 358.7801212908814,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              27
+            ]
+          }
+        ],
+        "orig": "Contact Management System -",
+        "text": "Contact Management System -",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/34",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 355.1634188533551,
+              "r": 530.7679426662913,
+              "b": 327.396551692156,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              192
+            ]
+          }
+        ],
+        "orig": "Developed a backend contact management system using Node.js, Express.js, and MongoDB. Implemented user authentication and CRUD operations for managing contacts with structured REST API routes.",
+        "text": "Developed a backend contact management system using Node.js, Express.js, and MongoDB. Implemented user authentication and CRUD operations for managing contacts with structured REST API routes."
+      },
+      {
+        "self_ref": "#/texts/35",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 303.23696338623745,
+              "r": 363.487202688433,
+              "b": 296.3377899086454,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              25
+            ]
+          }
+        ],
+        "orig": "Banking System REST API -",
+        "text": "Banking System REST API -",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/36",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 292.72108747111906,
+              "r": 530.7734588246626,
+              "b": 264.95422030991995,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              198
+            ]
+          }
+        ],
+        "orig": "Developed  a backend banking system using Node.js, Express.js,  and MongoDB with secure authentication using JWT. Implemented RESTful API endpoints for account management and transaction operations.",
+        "text": "Developed  a backend banking system using Node.js, Express.js,  and MongoDB with secure authentication using JWT. Implemented RESTful API endpoints for account management and transaction operations."
+      },
+      {
+        "self_ref": "#/texts/37",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 241.6753253257059,
+              "r": 407.7672153086874,
+              "b": 234.7761518481136,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              36
+            ]
+          }
+        ],
+        "orig": "Patient Appointment Backend System -",
+        "text": "Patient Appointment Backend System -",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/38",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 231.15944941058729,
+              "r": 530.7703183202594,
+              "b": 203.39258224938817,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              180
+            ]
+          }
+        ],
+        "orig": "Developed a backend REST API using Node.js, Express.js, and MongoDB for patient  registration  and  appointment  booking,  with  email  confirmation notifications using Nodemailer.",
+        "text": "Developed a backend REST API using Node.js, Express.js, and MongoDB for patient  registration  and  appointment  booking,  with  email  confirmation notifications using Nodemailer."
+      },
+      {
+        "self_ref": "#/texts/39",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037200415112,
+              "t": 158.02048064276448,
+              "r": 356.7731552664608,
+              "b": 145.01808164693114,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "EDUCATION",
+        "text": "EDUCATION",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/40",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 365.39854922705985,
+              "t": 133.37545454460064,
+              "r": 492.317757883442,
+              "b": 126.3405683908394,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              33
+            ]
+          }
+        ],
+        "orig": "Bachelor of Computer Applications",
+        "text": "Bachelor of Computer Applications",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/41",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 365.39854922705985,
+              "t": 118.85459323677253,
+              "r": 528.1576932780528,
+              "b": 90.54159618190818,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              108
+            ]
+          }
+        ],
+        "orig": "Learning web development, database management, and programming fundamentals to build practical IT solutions.",
+        "text": "Learning web development, database management, and programming fundamentals to build practical IT solutions."
+      },
+      {
+        "self_ref": "#/texts/42",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 133.32342931548828,
+              "r": 313.6774211969032,
+              "b": 126.35178902617997,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              11
+            ]
+          }
+        ],
+        "orig": "2023 - 2026",
+        "text": "2023 - 2026"
+      },
+      {
+        "self_ref": "#/texts/43",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 118.87461178397041,
+              "r": 304.8490743245362,
+              "b": 111.90301774092404,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              10
+            ]
+          }
+        ],
+        "orig": "V.N.S.G.U.",
+        "text": "V.N.S.G.U."
+      },
+      {
+        "self_ref": "#/texts/44",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 267.8037193095112,
+              "t": 107.43735113569096,
+              "r": 355.74006681478716,
+              "b": 93.20530164254592,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              57
+            ]
+          }
+        ],
+        "orig": "[Sutex Bank College of Computer Applications And Science]",
+        "text": "[Sutex Bank College of Computer Applications And Science]"
+      },
+      {
+        "self_ref": "#/texts/45",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 396.6727850719666,
+              "t": 780.4126830359677,
+              "r": 477.19222419511834,
+              "b": 771.7003321048636,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              15
+            ]
+          }
+        ],
+        "orig": "+91 98252 44737",
+        "text": "+91 98252 44737"
+      },
+      {
+        "self_ref": "#/texts/46",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 396.6727850719666,
+              "t": 759.4047677512975,
+              "r": 505.60211500057807,
+              "b": 750.6924168201934,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "variyaharshit@gmail.com",
+        "text": "variyaharshit@gmail.com"
+      },
+      {
+        "self_ref": "#/texts/47",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 396.6727850719666,
+              "t": 738.3968524666274,
+              "r": 523.5909168745192,
+              "b": 729.6845015355233,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              27
+            ]
+          }
+        ],
+        "orig": "Jay Ambe Society, Katargam,",
+        "text": "Jay Ambe Society, Katargam,"
+      },
+      {
+        "self_ref": "#/texts/48",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 396.6727850719666,
+              "t": 717.3889371819572,
+              "r": 460.94251829099096,
+              "b": 708.6765862508531,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              13
+            ]
+          }
+        ],
+        "orig": "Surat -395004",
+        "text": "Surat -395004"
+      }
+    ],
+    "pictures": [
+      {
+        "self_ref": "#/pictures/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 57.845218658447266,
+              "t": 683.4040222167969,
+              "r": 70.57192993164062,
+              "b": 670.9981842041016,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      },
+      {
+        "self_ref": "#/pictures/1",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 158.814697265625,
+              "t": 684.4044647216797,
+              "r": 172.32106018066406,
+              "b": 670.7341918945312,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      },
+      {
+        "self_ref": "#/pictures/2",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 379.24517822265625,
+              "t": 784.108024597168,
+              "r": 393.19830322265625,
+              "b": 769.7965316772461,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      },
+      {
+        "self_ref": "#/pictures/3",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 379.69677734375,
+              "t": 761.1625671386719,
+              "r": 392.89215087890625,
+              "b": 750.5239791870117,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      },
+      {
+        "self_ref": "#/pictures/4",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 380.4351501464844,
+              "t": 742.5458374023438,
+              "r": 391.8038635253906,
+              "b": 729.6334228515625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      }
+    ],
+    "tables": [],
+    "key_value_items": [],
+    "form_items": [],
+    "pages": {
+      "1": {
+        "size": {
+          "width": 595.5,
+          "height": 842.25
+        },
+        "page_no": 1
+      }
+    }
+  },
+  "dynamic_profile": null,
+  "match_analysis": {
+    "primary_department": "Quality Control  Team",
+    "best_match": {
+      "job_id": "1191",
+      "job_title": "Assistant Lead Analytical Scientist",
+      "department": "Quality Control  Team",
+      "vacancy_id": 1191,
+      "job_profile_id": 242,
+      "company_id": 1,
+      "department_id": 28,
+      "department_name": "Quality Control  Team",
+      "location_id": 14,
+      "score": 22.9,
+      "overall_score": 22.9,
+      "role_score": 50.0,
+      "skills_score": 0.0,
+      "experience_score": 100.0,
+      "education_score": 0.0,
+      "domain_score": 50.0,
+      "technology_score": 0.0,
+      "certification_score": 0.0,
+      "responsibilities_score": 0.0,
+      "coverage": 0.7,
+      "ranking_reason": "Ranked #1 with highest verified score of 22.9%.",
+      "classification": "LOW",
+      "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+      "matched_skills": [],
+      "missing_skills": [
+        "GC/HPLC"
+      ],
+      "matched_keywords": [],
+      "missing_keywords": [
+        "GC/HPLC"
+      ],
+      "mandatory_requirements": [
+        {
+          "requirement_id": "req_skill_gc/hplc",
+          "description": "Skill: GC/HPLC",
+          "tier": "MANDATORY",
+          "status": "FAILED",
+          "evidence": {
+            "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+            "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+            "confidence_score": 1.0
+          },
+          "failure_reason": "Mandatory skill 'GC/HPLC' is not present in CV."
+        }
+      ],
+      "preferred_requirements": [
+        {
+          "requirement_id": "pref_keyword_gc/hplc",
+          "description": "Preferred Keyword: GC/HPLC",
+          "tier": "PREFERRED",
+          "status": "FAILED",
+          "evidence": {
+            "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+            "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+            "confidence_score": 1.0
+          },
+          "failure_reason": "Preferred keyword 'GC/HPLC' not mentioned in CV."
+        }
+      ],
+      "optional_requirements": [],
+      "matched_criteria": [],
+      "missing_criteria": [
+        "Mandatory Skill: GC/HPLC",
+        "Preferred Keyword: GC/HPLC"
+      ],
+      "evidence": {
+        "req_skill_gc/hplc": {
+          "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+          "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_gc/hplc": {
+          "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+          "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+          "confidence_score": 1.0
+        }
+      },
+      "mandatory_failures": [
+        {
+          "requirement_id": "req_skill_gc/hplc",
+          "description": "Skill: GC/HPLC",
+          "reason": "Mandatory skill 'GC/HPLC' is not present in CV.",
+          "score_impact": 20.0
+        }
+      ],
+      "confidence": 1.0,
+      "hr_review_required": true,
+      "reason": "Mandatory requirement failure(s): Skill: GC/HPLC (Mandatory skill 'GC/HPLC' is not present in CV.)",
+      "career_transition_detected": true,
+      "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Assistant Lead Analytical Scientist'.",
+      "llm_reason": "",
+      "inferred_skills": []
+    },
+    "suitable_openings": [
+      {
+        "job_id": "1191",
+        "job_title": "Assistant Lead Analytical Scientist",
+        "department": "Quality Control  Team",
+        "vacancy_id": 1191,
+        "job_profile_id": 242,
+        "company_id": 1,
+        "department_id": 28,
+        "department_name": "Quality Control  Team",
+        "location_id": 14,
+        "score": 22.9,
+        "overall_score": 22.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #1 with highest verified score of 22.9%.",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "GC/HPLC"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "GC/HPLC"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_gc/hplc",
+            "description": "Skill: GC/HPLC",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+              "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'GC/HPLC' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_gc/hplc",
+            "description": "Preferred Keyword: GC/HPLC",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+              "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'GC/HPLC' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: GC/HPLC",
+          "Preferred Keyword: GC/HPLC"
+        ],
+        "evidence": {
+          "req_skill_gc/hplc": {
+            "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+            "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_gc/hplc": {
+            "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+            "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_gc/hplc",
+            "description": "Skill: GC/HPLC",
+            "reason": "Mandatory skill 'GC/HPLC' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: GC/HPLC (Mandatory skill 'GC/HPLC' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Assistant Lead Analytical Scientist'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "921",
+        "job_title": "Head Operation - Production",
+        "department": "Production Team - 1 (Rakesh Modi)",
+        "vacancy_id": 921,
+        "job_profile_id": 291,
+        "company_id": 1,
+        "department_id": 19,
+        "department_name": "Production Team - 1 (Rakesh Modi)",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #2 due to lower score (2.9% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+              "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'having knowledge about Production' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process & Safety' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_having_knowledge_about_production",
+            "description": "Preferred Keyword: having knowledge about Production",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+              "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'having knowledge about Production' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_&_safety",
+            "description": "Preferred Keyword: Process & Safety",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+              "vacancy_evidence": "Preferred Keyword: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process & Safety' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: having knowledge about Production",
+          "Mandatory Skill: Process & Safety",
+          "Preferred Keyword: having knowledge about Production",
+          "Preferred Keyword: Process & Safety"
+        ],
+        "evidence": {
+          "req_skill_having_knowledge_about_production": {
+            "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+            "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_&_safety": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_having_knowledge_about_production": {
+            "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+            "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_&_safety": {
+            "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+            "vacancy_evidence": "Preferred Keyword: Process & Safety",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "reason": "Mandatory skill 'having knowledge about Production' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "reason": "Mandatory skill 'Process & Safety' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: having knowledge about Production (Mandatory skill 'having knowledge about Production' is not present in CV.); Skill: Process & Safety (Mandatory skill 'Process & Safety' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Head Operation - Production'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1064",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 1064,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #3 due to lower score (2.9% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Plant Commission' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process Analysis' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_plant_commission",
+            "description": "Preferred Keyword: Plant Commission",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+              "vacancy_evidence": "Preferred Keyword: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Plant Commission' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_analysis",
+            "description": "Preferred Keyword: Process Analysis",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+              "vacancy_evidence": "Preferred Keyword: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process Analysis' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Plant Commission",
+          "Mandatory Skill: Process Analysis",
+          "Preferred Keyword: Plant Commission",
+          "Preferred Keyword: Process Analysis"
+        ],
+        "evidence": {
+          "req_skill_plant_commission": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_analysis": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_plant_commission": {
+            "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+            "vacancy_evidence": "Preferred Keyword: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_analysis": {
+            "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+            "vacancy_evidence": "Preferred Keyword: Process Analysis",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "reason": "Mandatory skill 'Plant Commission' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "reason": "Mandatory skill 'Process Analysis' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Plant Commission (Mandatory skill 'Plant Commission' is not present in CV.); Skill: Process Analysis (Mandatory skill 'Process Analysis' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "995",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 995,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 1,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #4 due to lower score (0.0% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Project work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+              "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'New Process' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_project_work",
+            "description": "Preferred Keyword: Project work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Project work'",
+              "vacancy_evidence": "Preferred Keyword: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Project work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_work",
+            "description": "Preferred Keyword: Process work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process work'",
+              "vacancy_evidence": "Preferred Keyword: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_new_process",
+            "description": "Preferred Keyword: New Process",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'New Process'",
+              "vacancy_evidence": "Preferred Keyword: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'New Process' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Project work",
+          "Mandatory Skill: Process work",
+          "Mandatory Skill: New Process",
+          "Preferred Keyword: Project work",
+          "Preferred Keyword: Process work",
+          "Preferred Keyword: New Process"
+        ],
+        "evidence": {
+          "req_skill_project_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+            "confidence_score": 1.0
+          },
+          "req_skill_new_process": {
+            "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+            "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_project_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Project work'",
+            "vacancy_evidence": "Preferred Keyword: Project work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Process work'",
+            "vacancy_evidence": "Preferred Keyword: Process work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_new_process": {
+            "cv_evidence": "CV missing preferred keyword: 'New Process'",
+            "vacancy_evidence": "Preferred Keyword: New Process",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "reason": "Mandatory skill 'Project work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "reason": "Mandatory skill 'Process work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "reason": "Mandatory skill 'New Process' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Project work (Mandatory skill 'Project work' is not present in CV.); Skill: Process work (Mandatory skill 'Process work' is not present in CV.); Skill: New Process (Mandatory skill 'New Process' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1065",
+        "job_title": "Flutter Developer",
+        "department": "CIS Team",
+        "vacancy_id": 1065,
+        "job_profile_id": 343,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 5.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [
+          "Git"
+        ],
+        "missing_skills": [
+          "Dart programming language",
+          "the Flutter framework",
+          "widgets",
+          "state management",
+          "e.g",
+          "Provider",
+          "BLoC",
+          "GetX",
+          "Riverpod",
+          "navigation",
+          "RESTful APIs",
+          "JSON",
+          "integrating with backend services",
+          "version control systems",
+          "mobile UI/UX principles",
+          "design patterns",
+          "write unit",
+          "integration tests",
+          "problem-solving"
+        ],
+        "matched_keywords": [
+          "Git"
+        ],
+        "missing_keywords": [
+          "Dart programming language",
+          "the Flutter framework",
+          "widgets",
+          "state management",
+          "e.g",
+          "Provider",
+          "BLoC",
+          "GetX",
+          "Riverpod",
+          "navigation",
+          "RESTful APIs",
+          "JSON",
+          "integrating with backend services",
+          "version control systems",
+          "mobile UI/UX principles",
+          "design patterns",
+          "write unit",
+          "integration tests",
+          "problem-solving"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_dart_programming_language",
+            "description": "Skill: Dart programming language",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Dart programming language'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Dart programming language",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Dart programming language' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_the_flutter_framework",
+            "description": "Skill: the Flutter framework",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'the Flutter framework'",
+              "vacancy_evidence": "Mandatory Skill Requirement: the Flutter framework",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'the Flutter framework' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_widgets",
+            "description": "Skill: widgets",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'widgets'",
+              "vacancy_evidence": "Mandatory Skill Requirement: widgets",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'widgets' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_state_management",
+            "description": "Skill: state management",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'state management'",
+              "vacancy_evidence": "Mandatory Skill Requirement: state management",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'state management' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_e.g",
+            "description": "Skill: e.g",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'e.g'",
+              "vacancy_evidence": "Mandatory Skill Requirement: e.g",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'e.g' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_provider",
+            "description": "Skill: Provider",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Provider'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Provider",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Provider' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_bloc",
+            "description": "Skill: BLoC",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'BLoC'",
+              "vacancy_evidence": "Mandatory Skill Requirement: BLoC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'BLoC' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_getx",
+            "description": "Skill: GetX",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'GetX'",
+              "vacancy_evidence": "Mandatory Skill Requirement: GetX",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'GetX' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_riverpod",
+            "description": "Skill: Riverpod",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Riverpod'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Riverpod",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Riverpod' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_navigation",
+            "description": "Skill: navigation",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'navigation'",
+              "vacancy_evidence": "Mandatory Skill Requirement: navigation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'navigation' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_restful_apis",
+            "description": "Skill: RESTful APIs",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'RESTful APIs'",
+              "vacancy_evidence": "Mandatory Skill Requirement: RESTful APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'RESTful APIs' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_json",
+            "description": "Skill: JSON",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'JSON'",
+              "vacancy_evidence": "Mandatory Skill Requirement: JSON",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'JSON' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_integrating_with_backend_services",
+            "description": "Skill: integrating with backend services",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'integrating with backend services'",
+              "vacancy_evidence": "Mandatory Skill Requirement: integrating with backend services",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'integrating with backend services' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_version_control_systems",
+            "description": "Skill: version control systems",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'version control systems'",
+              "vacancy_evidence": "Mandatory Skill Requirement: version control systems",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'version control systems' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_git",
+            "description": "Skill: Git",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'Git'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Git",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_skill_mobile_ui/ux_principles",
+            "description": "Skill: mobile UI/UX principles",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'mobile UI/UX principles'",
+              "vacancy_evidence": "Mandatory Skill Requirement: mobile UI/UX principles",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'mobile UI/UX principles' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_design_patterns",
+            "description": "Skill: design patterns",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'design patterns'",
+              "vacancy_evidence": "Mandatory Skill Requirement: design patterns",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'design patterns' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_write_unit",
+            "description": "Skill: write unit",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'write unit'",
+              "vacancy_evidence": "Mandatory Skill Requirement: write unit",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'write unit' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_integration_tests",
+            "description": "Skill: integration tests",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'integration tests'",
+              "vacancy_evidence": "Mandatory Skill Requirement: integration tests",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'integration tests' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_problem-solving",
+            "description": "Skill: problem-solving",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'problem-solving'",
+              "vacancy_evidence": "Mandatory Skill Requirement: problem-solving",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'problem-solving' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_dart_programming_language",
+            "description": "Preferred Keyword: Dart programming language",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Dart programming language'",
+              "vacancy_evidence": "Preferred Keyword: Dart programming language",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Dart programming language' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_the_flutter_framework",
+            "description": "Preferred Keyword: the Flutter framework",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'the Flutter framework'",
+              "vacancy_evidence": "Preferred Keyword: the Flutter framework",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'the Flutter framework' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_widgets",
+            "description": "Preferred Keyword: widgets",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'widgets'",
+              "vacancy_evidence": "Preferred Keyword: widgets",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'widgets' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_state_management",
+            "description": "Preferred Keyword: state management",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'state management'",
+              "vacancy_evidence": "Preferred Keyword: state management",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'state management' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_e.g",
+            "description": "Preferred Keyword: e.g",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'e.g'",
+              "vacancy_evidence": "Preferred Keyword: e.g",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'e.g' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_provider",
+            "description": "Preferred Keyword: Provider",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Provider'",
+              "vacancy_evidence": "Preferred Keyword: Provider",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Provider' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_bloc",
+            "description": "Preferred Keyword: BLoC",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'BLoC'",
+              "vacancy_evidence": "Preferred Keyword: BLoC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'BLoC' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_getx",
+            "description": "Preferred Keyword: GetX",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'GetX'",
+              "vacancy_evidence": "Preferred Keyword: GetX",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'GetX' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_riverpod",
+            "description": "Preferred Keyword: Riverpod",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Riverpod'",
+              "vacancy_evidence": "Preferred Keyword: Riverpod",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Riverpod' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_navigation",
+            "description": "Preferred Keyword: navigation",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'navigation'",
+              "vacancy_evidence": "Preferred Keyword: navigation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'navigation' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_restful_apis",
+            "description": "Preferred Keyword: RESTful APIs",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'RESTful APIs'",
+              "vacancy_evidence": "Preferred Keyword: RESTful APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'RESTful APIs' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_json",
+            "description": "Preferred Keyword: JSON",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'JSON'",
+              "vacancy_evidence": "Preferred Keyword: JSON",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'JSON' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_integrating_with_backend_services",
+            "description": "Preferred Keyword: integrating with backend services",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'integrating with backend services'",
+              "vacancy_evidence": "Preferred Keyword: integrating with backend services",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'integrating with backend services' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_version_control_systems",
+            "description": "Preferred Keyword: version control systems",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'version control systems'",
+              "vacancy_evidence": "Preferred Keyword: version control systems",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'version control systems' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_git",
+            "description": "Preferred Keyword: Git",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'Git'",
+              "vacancy_evidence": "Preferred Keyword: Git",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "pref_keyword_mobile_ui/ux_principles",
+            "description": "Preferred Keyword: mobile UI/UX principles",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'mobile UI/UX principles'",
+              "vacancy_evidence": "Preferred Keyword: mobile UI/UX principles",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'mobile UI/UX principles' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_design_patterns",
+            "description": "Preferred Keyword: design patterns",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'design patterns'",
+              "vacancy_evidence": "Preferred Keyword: design patterns",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'design patterns' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_write_unit",
+            "description": "Preferred Keyword: write unit",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'write unit'",
+              "vacancy_evidence": "Preferred Keyword: write unit",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'write unit' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_integration_tests",
+            "description": "Preferred Keyword: integration tests",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'integration tests'",
+              "vacancy_evidence": "Preferred Keyword: integration tests",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'integration tests' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_problem-solving",
+            "description": "Preferred Keyword: problem-solving",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'problem-solving'",
+              "vacancy_evidence": "Preferred Keyword: problem-solving",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'problem-solving' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: Git",
+          "Preferred Keyword: Git"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: Dart programming language",
+          "Mandatory Skill: the Flutter framework",
+          "Mandatory Skill: widgets",
+          "Mandatory Skill: state management",
+          "Mandatory Skill: e.g",
+          "Mandatory Skill: Provider",
+          "Mandatory Skill: BLoC",
+          "Mandatory Skill: GetX",
+          "Mandatory Skill: Riverpod",
+          "Mandatory Skill: navigation",
+          "Mandatory Skill: RESTful APIs",
+          "Mandatory Skill: JSON",
+          "Mandatory Skill: integrating with backend services",
+          "Mandatory Skill: version control systems",
+          "Mandatory Skill: mobile UI/UX principles",
+          "Mandatory Skill: design patterns",
+          "Mandatory Skill: write unit",
+          "Mandatory Skill: integration tests",
+          "Mandatory Skill: problem-solving",
+          "Preferred Keyword: Dart programming language",
+          "Preferred Keyword: the Flutter framework",
+          "Preferred Keyword: widgets",
+          "Preferred Keyword: state management",
+          "Preferred Keyword: e.g",
+          "Preferred Keyword: Provider",
+          "Preferred Keyword: BLoC",
+          "Preferred Keyword: GetX",
+          "Preferred Keyword: Riverpod",
+          "Preferred Keyword: navigation",
+          "Preferred Keyword: RESTful APIs",
+          "Preferred Keyword: JSON",
+          "Preferred Keyword: integrating with backend services",
+          "Preferred Keyword: version control systems",
+          "Preferred Keyword: mobile UI/UX principles",
+          "Preferred Keyword: design patterns",
+          "Preferred Keyword: write unit",
+          "Preferred Keyword: integration tests",
+          "Preferred Keyword: problem-solving"
+        ],
+        "evidence": {
+          "req_skill_dart_programming_language": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Dart programming language'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Dart programming language",
+            "confidence_score": 1.0
+          },
+          "req_skill_the_flutter_framework": {
+            "cv_evidence": "CV missing explicit mention of skill: 'the Flutter framework'",
+            "vacancy_evidence": "Mandatory Skill Requirement: the Flutter framework",
+            "confidence_score": 1.0
+          },
+          "req_skill_widgets": {
+            "cv_evidence": "CV missing explicit mention of skill: 'widgets'",
+            "vacancy_evidence": "Mandatory Skill Requirement: widgets",
+            "confidence_score": 1.0
+          },
+          "req_skill_state_management": {
+            "cv_evidence": "CV missing explicit mention of skill: 'state management'",
+            "vacancy_evidence": "Mandatory Skill Requirement: state management",
+            "confidence_score": 1.0
+          },
+          "req_skill_e.g": {
+            "cv_evidence": "CV missing explicit mention of skill: 'e.g'",
+            "vacancy_evidence": "Mandatory Skill Requirement: e.g",
+            "confidence_score": 1.0
+          },
+          "req_skill_provider": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Provider'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Provider",
+            "confidence_score": 1.0
+          },
+          "req_skill_bloc": {
+            "cv_evidence": "CV missing explicit mention of skill: 'BLoC'",
+            "vacancy_evidence": "Mandatory Skill Requirement: BLoC",
+            "confidence_score": 1.0
+          },
+          "req_skill_getx": {
+            "cv_evidence": "CV missing explicit mention of skill: 'GetX'",
+            "vacancy_evidence": "Mandatory Skill Requirement: GetX",
+            "confidence_score": 1.0
+          },
+          "req_skill_riverpod": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Riverpod'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Riverpod",
+            "confidence_score": 1.0
+          },
+          "req_skill_navigation": {
+            "cv_evidence": "CV missing explicit mention of skill: 'navigation'",
+            "vacancy_evidence": "Mandatory Skill Requirement: navigation",
+            "confidence_score": 1.0
+          },
+          "req_skill_restful_apis": {
+            "cv_evidence": "CV missing explicit mention of skill: 'RESTful APIs'",
+            "vacancy_evidence": "Mandatory Skill Requirement: RESTful APIs",
+            "confidence_score": 1.0
+          },
+          "req_skill_json": {
+            "cv_evidence": "CV missing explicit mention of skill: 'JSON'",
+            "vacancy_evidence": "Mandatory Skill Requirement: JSON",
+            "confidence_score": 1.0
+          },
+          "req_skill_integrating_with_backend_services": {
+            "cv_evidence": "CV missing explicit mention of skill: 'integrating with backend services'",
+            "vacancy_evidence": "Mandatory Skill Requirement: integrating with backend services",
+            "confidence_score": 1.0
+          },
+          "req_skill_version_control_systems": {
+            "cv_evidence": "CV missing explicit mention of skill: 'version control systems'",
+            "vacancy_evidence": "Mandatory Skill Requirement: version control systems",
+            "confidence_score": 1.0
+          },
+          "req_skill_git": {
+            "cv_evidence": "CV contains skill: 'Git'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Git",
+            "confidence_score": 1.0
+          },
+          "req_skill_mobile_ui/ux_principles": {
+            "cv_evidence": "CV missing explicit mention of skill: 'mobile UI/UX principles'",
+            "vacancy_evidence": "Mandatory Skill Requirement: mobile UI/UX principles",
+            "confidence_score": 1.0
+          },
+          "req_skill_design_patterns": {
+            "cv_evidence": "CV missing explicit mention of skill: 'design patterns'",
+            "vacancy_evidence": "Mandatory Skill Requirement: design patterns",
+            "confidence_score": 1.0
+          },
+          "req_skill_write_unit": {
+            "cv_evidence": "CV missing explicit mention of skill: 'write unit'",
+            "vacancy_evidence": "Mandatory Skill Requirement: write unit",
+            "confidence_score": 1.0
+          },
+          "req_skill_integration_tests": {
+            "cv_evidence": "CV missing explicit mention of skill: 'integration tests'",
+            "vacancy_evidence": "Mandatory Skill Requirement: integration tests",
+            "confidence_score": 1.0
+          },
+          "req_skill_problem-solving": {
+            "cv_evidence": "CV missing explicit mention of skill: 'problem-solving'",
+            "vacancy_evidence": "Mandatory Skill Requirement: problem-solving",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_dart_programming_language": {
+            "cv_evidence": "CV missing preferred keyword: 'Dart programming language'",
+            "vacancy_evidence": "Preferred Keyword: Dart programming language",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_the_flutter_framework": {
+            "cv_evidence": "CV missing preferred keyword: 'the Flutter framework'",
+            "vacancy_evidence": "Preferred Keyword: the Flutter framework",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_widgets": {
+            "cv_evidence": "CV missing preferred keyword: 'widgets'",
+            "vacancy_evidence": "Preferred Keyword: widgets",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_state_management": {
+            "cv_evidence": "CV missing preferred keyword: 'state management'",
+            "vacancy_evidence": "Preferred Keyword: state management",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_e.g": {
+            "cv_evidence": "CV missing preferred keyword: 'e.g'",
+            "vacancy_evidence": "Preferred Keyword: e.g",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_provider": {
+            "cv_evidence": "CV missing preferred keyword: 'Provider'",
+            "vacancy_evidence": "Preferred Keyword: Provider",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_bloc": {
+            "cv_evidence": "CV missing preferred keyword: 'BLoC'",
+            "vacancy_evidence": "Preferred Keyword: BLoC",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_getx": {
+            "cv_evidence": "CV missing preferred keyword: 'GetX'",
+            "vacancy_evidence": "Preferred Keyword: GetX",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_riverpod": {
+            "cv_evidence": "CV missing preferred keyword: 'Riverpod'",
+            "vacancy_evidence": "Preferred Keyword: Riverpod",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_navigation": {
+            "cv_evidence": "CV missing preferred keyword: 'navigation'",
+            "vacancy_evidence": "Preferred Keyword: navigation",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_restful_apis": {
+            "cv_evidence": "CV missing preferred keyword: 'RESTful APIs'",
+            "vacancy_evidence": "Preferred Keyword: RESTful APIs",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_json": {
+            "cv_evidence": "CV missing preferred keyword: 'JSON'",
+            "vacancy_evidence": "Preferred Keyword: JSON",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_integrating_with_backend_services": {
+            "cv_evidence": "CV missing preferred keyword: 'integrating with backend services'",
+            "vacancy_evidence": "Preferred Keyword: integrating with backend services",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_version_control_systems": {
+            "cv_evidence": "CV missing preferred keyword: 'version control systems'",
+            "vacancy_evidence": "Preferred Keyword: version control systems",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_git": {
+            "cv_evidence": "CV mentions preferred keyword: 'Git'",
+            "vacancy_evidence": "Preferred Keyword: Git",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_mobile_ui/ux_principles": {
+            "cv_evidence": "CV missing preferred keyword: 'mobile UI/UX principles'",
+            "vacancy_evidence": "Preferred Keyword: mobile UI/UX principles",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_design_patterns": {
+            "cv_evidence": "CV missing preferred keyword: 'design patterns'",
+            "vacancy_evidence": "Preferred Keyword: design patterns",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_write_unit": {
+            "cv_evidence": "CV missing preferred keyword: 'write unit'",
+            "vacancy_evidence": "Preferred Keyword: write unit",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_integration_tests": {
+            "cv_evidence": "CV missing preferred keyword: 'integration tests'",
+            "vacancy_evidence": "Preferred Keyword: integration tests",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_problem-solving": {
+            "cv_evidence": "CV missing preferred keyword: 'problem-solving'",
+            "vacancy_evidence": "Preferred Keyword: problem-solving",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_dart_programming_language",
+            "description": "Skill: Dart programming language",
+            "reason": "Mandatory skill 'Dart programming language' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_the_flutter_framework",
+            "description": "Skill: the Flutter framework",
+            "reason": "Mandatory skill 'the Flutter framework' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_widgets",
+            "description": "Skill: widgets",
+            "reason": "Mandatory skill 'widgets' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_state_management",
+            "description": "Skill: state management",
+            "reason": "Mandatory skill 'state management' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_e.g",
+            "description": "Skill: e.g",
+            "reason": "Mandatory skill 'e.g' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_provider",
+            "description": "Skill: Provider",
+            "reason": "Mandatory skill 'Provider' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_bloc",
+            "description": "Skill: BLoC",
+            "reason": "Mandatory skill 'BLoC' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_getx",
+            "description": "Skill: GetX",
+            "reason": "Mandatory skill 'GetX' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_riverpod",
+            "description": "Skill: Riverpod",
+            "reason": "Mandatory skill 'Riverpod' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_navigation",
+            "description": "Skill: navigation",
+            "reason": "Mandatory skill 'navigation' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_restful_apis",
+            "description": "Skill: RESTful APIs",
+            "reason": "Mandatory skill 'RESTful APIs' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_json",
+            "description": "Skill: JSON",
+            "reason": "Mandatory skill 'JSON' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_integrating_with_backend_services",
+            "description": "Skill: integrating with backend services",
+            "reason": "Mandatory skill 'integrating with backend services' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_version_control_systems",
+            "description": "Skill: version control systems",
+            "reason": "Mandatory skill 'version control systems' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_mobile_ui/ux_principles",
+            "description": "Skill: mobile UI/UX principles",
+            "reason": "Mandatory skill 'mobile UI/UX principles' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_design_patterns",
+            "description": "Skill: design patterns",
+            "reason": "Mandatory skill 'design patterns' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_write_unit",
+            "description": "Skill: write unit",
+            "reason": "Mandatory skill 'write unit' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_integration_tests",
+            "description": "Skill: integration tests",
+            "reason": "Mandatory skill 'integration tests' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_problem-solving",
+            "description": "Skill: problem-solving",
+            "reason": "Mandatory skill 'problem-solving' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Dart programming language (Mandatory skill 'Dart programming language' is not present in CV.); Skill: the Flutter framework (Mandatory skill 'the Flutter framework' is not present in CV.); Skill: widgets (Mandatory skill 'widgets' is not present in CV.); Skill: state management (Mandatory skill 'state management' is not present in CV.); Skill: e.g (Mandatory skill 'e.g' is not present in CV.); Skill: Provider (Mandatory skill 'Provider' is not present in CV.); Skill: BLoC (Mandatory skill 'BLoC' is not present in CV.); Skill: GetX (Mandatory skill 'GetX' is not present in CV.); Skill: Riverpod (Mandatory skill 'Riverpod' is not present in CV.); Skill: navigation (Mandatory skill 'navigation' is not present in CV.); Skill: RESTful APIs (Mandatory skill 'RESTful APIs' is not present in CV.); Skill: JSON (Mandatory skill 'JSON' is not present in CV.); Skill: integrating with backend services (Mandatory skill 'integrating with backend services' is not present in CV.); Skill: version control systems (Mandatory skill 'version control systems' is not present in CV.); Skill: mobile UI/UX principles (Mandatory skill 'mobile UI/UX principles' is not present in CV.); Skill: design patterns (Mandatory skill 'design patterns' is not present in CV.); Skill: write unit (Mandatory skill 'write unit' is not present in CV.); Skill: integration tests (Mandatory skill 'integration tests' is not present in CV.); Skill: problem-solving (Mandatory skill 'problem-solving' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Flutter Developer'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      }
+    ],
+    "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+    "llm_skipped": true
+  },
+  "enriched_match_analysis": {
+    "primary_department": "Quality Control  Team",
+    "best_match": {
+      "job_id": "1191",
+      "job_title": "Assistant Lead Analytical Scientist",
+      "department": "Quality Control  Team",
+      "vacancy_id": 1191,
+      "job_profile_id": 242,
+      "company_id": 1,
+      "department_id": 28,
+      "department_name": "Quality Control  Team",
+      "location_id": 14,
+      "score": 22.9,
+      "overall_score": 22.9,
+      "role_score": 50.0,
+      "skills_score": 0.0,
+      "experience_score": 100.0,
+      "education_score": 0.0,
+      "domain_score": 50.0,
+      "technology_score": 0.0,
+      "certification_score": 0.0,
+      "responsibilities_score": 0.0,
+      "coverage": 0.7,
+      "ranking_reason": "Ranked #1 with highest verified score of 22.9%.",
+      "classification": "LOW",
+      "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+      "matched_skills": [],
+      "missing_skills": [
+        "GC/HPLC"
+      ],
+      "matched_keywords": [],
+      "missing_keywords": [
+        "GC/HPLC"
+      ],
+      "mandatory_requirements": [
+        {
+          "requirement_id": "req_skill_gc/hplc",
+          "description": "Skill: GC/HPLC",
+          "tier": "MANDATORY",
+          "status": "FAILED",
+          "evidence": {
+            "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+            "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+            "confidence_score": 1.0
+          },
+          "failure_reason": "Mandatory skill 'GC/HPLC' is not present in CV."
+        }
+      ],
+      "preferred_requirements": [
+        {
+          "requirement_id": "pref_keyword_gc/hplc",
+          "description": "Preferred Keyword: GC/HPLC",
+          "tier": "PREFERRED",
+          "status": "FAILED",
+          "evidence": {
+            "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+            "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+            "confidence_score": 1.0
+          },
+          "failure_reason": "Preferred keyword 'GC/HPLC' not mentioned in CV."
+        }
+      ],
+      "optional_requirements": [],
+      "matched_criteria": [],
+      "missing_criteria": [
+        "Mandatory Skill: GC/HPLC",
+        "Preferred Keyword: GC/HPLC"
+      ],
+      "evidence": {
+        "req_skill_gc/hplc": {
+          "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+          "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_gc/hplc": {
+          "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+          "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+          "confidence_score": 1.0
+        }
+      },
+      "mandatory_failures": [
+        {
+          "requirement_id": "req_skill_gc/hplc",
+          "description": "Skill: GC/HPLC",
+          "reason": "Mandatory skill 'GC/HPLC' is not present in CV.",
+          "score_impact": 20.0
+        }
+      ],
+      "confidence": 1.0,
+      "hr_review_required": true,
+      "reason": "Mandatory requirement failure(s): Skill: GC/HPLC (Mandatory skill 'GC/HPLC' is not present in CV.)",
+      "career_transition_detected": true,
+      "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Assistant Lead Analytical Scientist'.",
+      "llm_reason": "",
+      "inferred_skills": []
+    },
+    "suitable_openings": [
+      {
+        "job_id": "1191",
+        "job_title": "Assistant Lead Analytical Scientist",
+        "department": "Quality Control  Team",
+        "vacancy_id": 1191,
+        "job_profile_id": 242,
+        "company_id": 1,
+        "department_id": 28,
+        "department_name": "Quality Control  Team",
+        "location_id": 14,
+        "score": 22.9,
+        "overall_score": 22.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #1 with highest verified score of 22.9%.",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "GC/HPLC"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "GC/HPLC"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_gc/hplc",
+            "description": "Skill: GC/HPLC",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+              "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'GC/HPLC' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_gc/hplc",
+            "description": "Preferred Keyword: GC/HPLC",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+              "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'GC/HPLC' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: GC/HPLC",
+          "Preferred Keyword: GC/HPLC"
+        ],
+        "evidence": {
+          "req_skill_gc/hplc": {
+            "cv_evidence": "CV missing explicit mention of skill: 'GC/HPLC'",
+            "vacancy_evidence": "Mandatory Skill Requirement: GC/HPLC",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_gc/hplc": {
+            "cv_evidence": "CV missing preferred keyword: 'GC/HPLC'",
+            "vacancy_evidence": "Preferred Keyword: GC/HPLC",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_gc/hplc",
+            "description": "Skill: GC/HPLC",
+            "reason": "Mandatory skill 'GC/HPLC' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: GC/HPLC (Mandatory skill 'GC/HPLC' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Assistant Lead Analytical Scientist'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "921",
+        "job_title": "Head Operation - Production",
+        "department": "Production Team - 1 (Rakesh Modi)",
+        "vacancy_id": 921,
+        "job_profile_id": 291,
+        "company_id": 1,
+        "department_id": 19,
+        "department_name": "Production Team - 1 (Rakesh Modi)",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #2 due to lower score (2.9% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+              "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'having knowledge about Production' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process & Safety' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_having_knowledge_about_production",
+            "description": "Preferred Keyword: having knowledge about Production",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+              "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'having knowledge about Production' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_&_safety",
+            "description": "Preferred Keyword: Process & Safety",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+              "vacancy_evidence": "Preferred Keyword: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process & Safety' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: having knowledge about Production",
+          "Mandatory Skill: Process & Safety",
+          "Preferred Keyword: having knowledge about Production",
+          "Preferred Keyword: Process & Safety"
+        ],
+        "evidence": {
+          "req_skill_having_knowledge_about_production": {
+            "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+            "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_&_safety": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_having_knowledge_about_production": {
+            "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+            "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_&_safety": {
+            "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+            "vacancy_evidence": "Preferred Keyword: Process & Safety",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "reason": "Mandatory skill 'having knowledge about Production' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "reason": "Mandatory skill 'Process & Safety' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: having knowledge about Production (Mandatory skill 'having knowledge about Production' is not present in CV.); Skill: Process & Safety (Mandatory skill 'Process & Safety' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Head Operation - Production'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1064",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 1064,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #3 due to lower score (2.9% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Plant Commission' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process Analysis' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_plant_commission",
+            "description": "Preferred Keyword: Plant Commission",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+              "vacancy_evidence": "Preferred Keyword: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Plant Commission' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_analysis",
+            "description": "Preferred Keyword: Process Analysis",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+              "vacancy_evidence": "Preferred Keyword: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process Analysis' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Plant Commission",
+          "Mandatory Skill: Process Analysis",
+          "Preferred Keyword: Plant Commission",
+          "Preferred Keyword: Process Analysis"
+        ],
+        "evidence": {
+          "req_skill_plant_commission": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_analysis": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_plant_commission": {
+            "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+            "vacancy_evidence": "Preferred Keyword: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_analysis": {
+            "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+            "vacancy_evidence": "Preferred Keyword: Process Analysis",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "reason": "Mandatory skill 'Plant Commission' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "reason": "Mandatory skill 'Process Analysis' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Plant Commission (Mandatory skill 'Plant Commission' is not present in CV.); Skill: Process Analysis (Mandatory skill 'Process Analysis' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "995",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 995,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 1,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #4 due to lower score (0.0% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Project work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+              "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'New Process' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_project_work",
+            "description": "Preferred Keyword: Project work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Project work'",
+              "vacancy_evidence": "Preferred Keyword: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Project work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_work",
+            "description": "Preferred Keyword: Process work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process work'",
+              "vacancy_evidence": "Preferred Keyword: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_new_process",
+            "description": "Preferred Keyword: New Process",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'New Process'",
+              "vacancy_evidence": "Preferred Keyword: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'New Process' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Project work",
+          "Mandatory Skill: Process work",
+          "Mandatory Skill: New Process",
+          "Preferred Keyword: Project work",
+          "Preferred Keyword: Process work",
+          "Preferred Keyword: New Process"
+        ],
+        "evidence": {
+          "req_skill_project_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+            "confidence_score": 1.0
+          },
+          "req_skill_new_process": {
+            "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+            "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_project_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Project work'",
+            "vacancy_evidence": "Preferred Keyword: Project work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Process work'",
+            "vacancy_evidence": "Preferred Keyword: Process work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_new_process": {
+            "cv_evidence": "CV missing preferred keyword: 'New Process'",
+            "vacancy_evidence": "Preferred Keyword: New Process",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "reason": "Mandatory skill 'Project work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "reason": "Mandatory skill 'Process work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "reason": "Mandatory skill 'New Process' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Project work (Mandatory skill 'Project work' is not present in CV.); Skill: Process work (Mandatory skill 'Process work' is not present in CV.); Skill: New Process (Mandatory skill 'New Process' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1065",
+        "job_title": "Flutter Developer",
+        "department": "CIS Team",
+        "vacancy_id": 1065,
+        "job_profile_id": 343,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 5.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 22.9%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [
+          "Git"
+        ],
+        "missing_skills": [
+          "Dart programming language",
+          "the Flutter framework",
+          "widgets",
+          "state management",
+          "e.g",
+          "Provider",
+          "BLoC",
+          "GetX",
+          "Riverpod",
+          "navigation",
+          "RESTful APIs",
+          "JSON",
+          "integrating with backend services",
+          "version control systems",
+          "mobile UI/UX principles",
+          "design patterns",
+          "write unit",
+          "integration tests",
+          "problem-solving"
+        ],
+        "matched_keywords": [
+          "Git"
+        ],
+        "missing_keywords": [
+          "Dart programming language",
+          "the Flutter framework",
+          "widgets",
+          "state management",
+          "e.g",
+          "Provider",
+          "BLoC",
+          "GetX",
+          "Riverpod",
+          "navigation",
+          "RESTful APIs",
+          "JSON",
+          "integrating with backend services",
+          "version control systems",
+          "mobile UI/UX principles",
+          "design patterns",
+          "write unit",
+          "integration tests",
+          "problem-solving"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_dart_programming_language",
+            "description": "Skill: Dart programming language",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Dart programming language'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Dart programming language",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Dart programming language' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_the_flutter_framework",
+            "description": "Skill: the Flutter framework",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'the Flutter framework'",
+              "vacancy_evidence": "Mandatory Skill Requirement: the Flutter framework",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'the Flutter framework' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_widgets",
+            "description": "Skill: widgets",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'widgets'",
+              "vacancy_evidence": "Mandatory Skill Requirement: widgets",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'widgets' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_state_management",
+            "description": "Skill: state management",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'state management'",
+              "vacancy_evidence": "Mandatory Skill Requirement: state management",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'state management' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_e.g",
+            "description": "Skill: e.g",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'e.g'",
+              "vacancy_evidence": "Mandatory Skill Requirement: e.g",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'e.g' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_provider",
+            "description": "Skill: Provider",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Provider'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Provider",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Provider' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_bloc",
+            "description": "Skill: BLoC",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'BLoC'",
+              "vacancy_evidence": "Mandatory Skill Requirement: BLoC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'BLoC' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_getx",
+            "description": "Skill: GetX",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'GetX'",
+              "vacancy_evidence": "Mandatory Skill Requirement: GetX",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'GetX' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_riverpod",
+            "description": "Skill: Riverpod",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Riverpod'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Riverpod",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Riverpod' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_navigation",
+            "description": "Skill: navigation",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'navigation'",
+              "vacancy_evidence": "Mandatory Skill Requirement: navigation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'navigation' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_restful_apis",
+            "description": "Skill: RESTful APIs",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'RESTful APIs'",
+              "vacancy_evidence": "Mandatory Skill Requirement: RESTful APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'RESTful APIs' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_json",
+            "description": "Skill: JSON",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'JSON'",
+              "vacancy_evidence": "Mandatory Skill Requirement: JSON",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'JSON' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_integrating_with_backend_services",
+            "description": "Skill: integrating with backend services",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'integrating with backend services'",
+              "vacancy_evidence": "Mandatory Skill Requirement: integrating with backend services",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'integrating with backend services' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_version_control_systems",
+            "description": "Skill: version control systems",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'version control systems'",
+              "vacancy_evidence": "Mandatory Skill Requirement: version control systems",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'version control systems' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_git",
+            "description": "Skill: Git",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'Git'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Git",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_skill_mobile_ui/ux_principles",
+            "description": "Skill: mobile UI/UX principles",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'mobile UI/UX principles'",
+              "vacancy_evidence": "Mandatory Skill Requirement: mobile UI/UX principles",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'mobile UI/UX principles' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_design_patterns",
+            "description": "Skill: design patterns",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'design patterns'",
+              "vacancy_evidence": "Mandatory Skill Requirement: design patterns",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'design patterns' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_write_unit",
+            "description": "Skill: write unit",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'write unit'",
+              "vacancy_evidence": "Mandatory Skill Requirement: write unit",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'write unit' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_integration_tests",
+            "description": "Skill: integration tests",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'integration tests'",
+              "vacancy_evidence": "Mandatory Skill Requirement: integration tests",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'integration tests' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_problem-solving",
+            "description": "Skill: problem-solving",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'problem-solving'",
+              "vacancy_evidence": "Mandatory Skill Requirement: problem-solving",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'problem-solving' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_dart_programming_language",
+            "description": "Preferred Keyword: Dart programming language",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Dart programming language'",
+              "vacancy_evidence": "Preferred Keyword: Dart programming language",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Dart programming language' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_the_flutter_framework",
+            "description": "Preferred Keyword: the Flutter framework",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'the Flutter framework'",
+              "vacancy_evidence": "Preferred Keyword: the Flutter framework",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'the Flutter framework' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_widgets",
+            "description": "Preferred Keyword: widgets",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'widgets'",
+              "vacancy_evidence": "Preferred Keyword: widgets",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'widgets' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_state_management",
+            "description": "Preferred Keyword: state management",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'state management'",
+              "vacancy_evidence": "Preferred Keyword: state management",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'state management' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_e.g",
+            "description": "Preferred Keyword: e.g",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'e.g'",
+              "vacancy_evidence": "Preferred Keyword: e.g",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'e.g' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_provider",
+            "description": "Preferred Keyword: Provider",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Provider'",
+              "vacancy_evidence": "Preferred Keyword: Provider",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Provider' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_bloc",
+            "description": "Preferred Keyword: BLoC",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'BLoC'",
+              "vacancy_evidence": "Preferred Keyword: BLoC",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'BLoC' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_getx",
+            "description": "Preferred Keyword: GetX",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'GetX'",
+              "vacancy_evidence": "Preferred Keyword: GetX",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'GetX' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_riverpod",
+            "description": "Preferred Keyword: Riverpod",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Riverpod'",
+              "vacancy_evidence": "Preferred Keyword: Riverpod",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Riverpod' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_navigation",
+            "description": "Preferred Keyword: navigation",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'navigation'",
+              "vacancy_evidence": "Preferred Keyword: navigation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'navigation' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_restful_apis",
+            "description": "Preferred Keyword: RESTful APIs",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'RESTful APIs'",
+              "vacancy_evidence": "Preferred Keyword: RESTful APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'RESTful APIs' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_json",
+            "description": "Preferred Keyword: JSON",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'JSON'",
+              "vacancy_evidence": "Preferred Keyword: JSON",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'JSON' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_integrating_with_backend_services",
+            "description": "Preferred Keyword: integrating with backend services",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'integrating with backend services'",
+              "vacancy_evidence": "Preferred Keyword: integrating with backend services",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'integrating with backend services' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_version_control_systems",
+            "description": "Preferred Keyword: version control systems",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'version control systems'",
+              "vacancy_evidence": "Preferred Keyword: version control systems",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'version control systems' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_git",
+            "description": "Preferred Keyword: Git",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'Git'",
+              "vacancy_evidence": "Preferred Keyword: Git",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "pref_keyword_mobile_ui/ux_principles",
+            "description": "Preferred Keyword: mobile UI/UX principles",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'mobile UI/UX principles'",
+              "vacancy_evidence": "Preferred Keyword: mobile UI/UX principles",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'mobile UI/UX principles' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_design_patterns",
+            "description": "Preferred Keyword: design patterns",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'design patterns'",
+              "vacancy_evidence": "Preferred Keyword: design patterns",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'design patterns' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_write_unit",
+            "description": "Preferred Keyword: write unit",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'write unit'",
+              "vacancy_evidence": "Preferred Keyword: write unit",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'write unit' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_integration_tests",
+            "description": "Preferred Keyword: integration tests",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'integration tests'",
+              "vacancy_evidence": "Preferred Keyword: integration tests",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'integration tests' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_problem-solving",
+            "description": "Preferred Keyword: problem-solving",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'problem-solving'",
+              "vacancy_evidence": "Preferred Keyword: problem-solving",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'problem-solving' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: Git",
+          "Preferred Keyword: Git"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: Dart programming language",
+          "Mandatory Skill: the Flutter framework",
+          "Mandatory Skill: widgets",
+          "Mandatory Skill: state management",
+          "Mandatory Skill: e.g",
+          "Mandatory Skill: Provider",
+          "Mandatory Skill: BLoC",
+          "Mandatory Skill: GetX",
+          "Mandatory Skill: Riverpod",
+          "Mandatory Skill: navigation",
+          "Mandatory Skill: RESTful APIs",
+          "Mandatory Skill: JSON",
+          "Mandatory Skill: integrating with backend services",
+          "Mandatory Skill: version control systems",
+          "Mandatory Skill: mobile UI/UX principles",
+          "Mandatory Skill: design patterns",
+          "Mandatory Skill: write unit",
+          "Mandatory Skill: integration tests",
+          "Mandatory Skill: problem-solving",
+          "Preferred Keyword: Dart programming language",
+          "Preferred Keyword: the Flutter framework",
+          "Preferred Keyword: widgets",
+          "Preferred Keyword: state management",
+          "Preferred Keyword: e.g",
+          "Preferred Keyword: Provider",
+          "Preferred Keyword: BLoC",
+          "Preferred Keyword: GetX",
+          "Preferred Keyword: Riverpod",
+          "Preferred Keyword: navigation",
+          "Preferred Keyword: RESTful APIs",
+          "Preferred Keyword: JSON",
+          "Preferred Keyword: integrating with backend services",
+          "Preferred Keyword: version control systems",
+          "Preferred Keyword: mobile UI/UX principles",
+          "Preferred Keyword: design patterns",
+          "Preferred Keyword: write unit",
+          "Preferred Keyword: integration tests",
+          "Preferred Keyword: problem-solving"
+        ],
+        "evidence": {
+          "req_skill_dart_programming_language": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Dart programming language'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Dart programming language",
+            "confidence_score": 1.0
+          },
+          "req_skill_the_flutter_framework": {
+            "cv_evidence": "CV missing explicit mention of skill: 'the Flutter framework'",
+            "vacancy_evidence": "Mandatory Skill Requirement: the Flutter framework",
+            "confidence_score": 1.0
+          },
+          "req_skill_widgets": {
+            "cv_evidence": "CV missing explicit mention of skill: 'widgets'",
+            "vacancy_evidence": "Mandatory Skill Requirement: widgets",
+            "confidence_score": 1.0
+          },
+          "req_skill_state_management": {
+            "cv_evidence": "CV missing explicit mention of skill: 'state management'",
+            "vacancy_evidence": "Mandatory Skill Requirement: state management",
+            "confidence_score": 1.0
+          },
+          "req_skill_e.g": {
+            "cv_evidence": "CV missing explicit mention of skill: 'e.g'",
+            "vacancy_evidence": "Mandatory Skill Requirement: e.g",
+            "confidence_score": 1.0
+          },
+          "req_skill_provider": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Provider'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Provider",
+            "confidence_score": 1.0
+          },
+          "req_skill_bloc": {
+            "cv_evidence": "CV missing explicit mention of skill: 'BLoC'",
+            "vacancy_evidence": "Mandatory Skill Requirement: BLoC",
+            "confidence_score": 1.0
+          },
+          "req_skill_getx": {
+            "cv_evidence": "CV missing explicit mention of skill: 'GetX'",
+            "vacancy_evidence": "Mandatory Skill Requirement: GetX",
+            "confidence_score": 1.0
+          },
+          "req_skill_riverpod": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Riverpod'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Riverpod",
+            "confidence_score": 1.0
+          },
+          "req_skill_navigation": {
+            "cv_evidence": "CV missing explicit mention of skill: 'navigation'",
+            "vacancy_evidence": "Mandatory Skill Requirement: navigation",
+            "confidence_score": 1.0
+          },
+          "req_skill_restful_apis": {
+            "cv_evidence": "CV missing explicit mention of skill: 'RESTful APIs'",
+            "vacancy_evidence": "Mandatory Skill Requirement: RESTful APIs",
+            "confidence_score": 1.0
+          },
+          "req_skill_json": {
+            "cv_evidence": "CV missing explicit mention of skill: 'JSON'",
+            "vacancy_evidence": "Mandatory Skill Requirement: JSON",
+            "confidence_score": 1.0
+          },
+          "req_skill_integrating_with_backend_services": {
+            "cv_evidence": "CV missing explicit mention of skill: 'integrating with backend services'",
+            "vacancy_evidence": "Mandatory Skill Requirement: integrating with backend services",
+            "confidence_score": 1.0
+          },
+          "req_skill_version_control_systems": {
+            "cv_evidence": "CV missing explicit mention of skill: 'version control systems'",
+            "vacancy_evidence": "Mandatory Skill Requirement: version control systems",
+            "confidence_score": 1.0
+          },
+          "req_skill_git": {
+            "cv_evidence": "CV contains skill: 'Git'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Git",
+            "confidence_score": 1.0
+          },
+          "req_skill_mobile_ui/ux_principles": {
+            "cv_evidence": "CV missing explicit mention of skill: 'mobile UI/UX principles'",
+            "vacancy_evidence": "Mandatory Skill Requirement: mobile UI/UX principles",
+            "confidence_score": 1.0
+          },
+          "req_skill_design_patterns": {
+            "cv_evidence": "CV missing explicit mention of skill: 'design patterns'",
+            "vacancy_evidence": "Mandatory Skill Requirement: design patterns",
+            "confidence_score": 1.0
+          },
+          "req_skill_write_unit": {
+            "cv_evidence": "CV missing explicit mention of skill: 'write unit'",
+            "vacancy_evidence": "Mandatory Skill Requirement: write unit",
+            "confidence_score": 1.0
+          },
+          "req_skill_integration_tests": {
+            "cv_evidence": "CV missing explicit mention of skill: 'integration tests'",
+            "vacancy_evidence": "Mandatory Skill Requirement: integration tests",
+            "confidence_score": 1.0
+          },
+          "req_skill_problem-solving": {
+            "cv_evidence": "CV missing explicit mention of skill: 'problem-solving'",
+            "vacancy_evidence": "Mandatory Skill Requirement: problem-solving",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_dart_programming_language": {
+            "cv_evidence": "CV missing preferred keyword: 'Dart programming language'",
+            "vacancy_evidence": "Preferred Keyword: Dart programming language",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_the_flutter_framework": {
+            "cv_evidence": "CV missing preferred keyword: 'the Flutter framework'",
+            "vacancy_evidence": "Preferred Keyword: the Flutter framework",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_widgets": {
+            "cv_evidence": "CV missing preferred keyword: 'widgets'",
+            "vacancy_evidence": "Preferred Keyword: widgets",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_state_management": {
+            "cv_evidence": "CV missing preferred keyword: 'state management'",
+            "vacancy_evidence": "Preferred Keyword: state management",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_e.g": {
+            "cv_evidence": "CV missing preferred keyword: 'e.g'",
+            "vacancy_evidence": "Preferred Keyword: e.g",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_provider": {
+            "cv_evidence": "CV missing preferred keyword: 'Provider'",
+            "vacancy_evidence": "Preferred Keyword: Provider",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_bloc": {
+            "cv_evidence": "CV missing preferred keyword: 'BLoC'",
+            "vacancy_evidence": "Preferred Keyword: BLoC",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_getx": {
+            "cv_evidence": "CV missing preferred keyword: 'GetX'",
+            "vacancy_evidence": "Preferred Keyword: GetX",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_riverpod": {
+            "cv_evidence": "CV missing preferred keyword: 'Riverpod'",
+            "vacancy_evidence": "Preferred Keyword: Riverpod",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_navigation": {
+            "cv_evidence": "CV missing preferred keyword: 'navigation'",
+            "vacancy_evidence": "Preferred Keyword: navigation",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_restful_apis": {
+            "cv_evidence": "CV missing preferred keyword: 'RESTful APIs'",
+            "vacancy_evidence": "Preferred Keyword: RESTful APIs",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_json": {
+            "cv_evidence": "CV missing preferred keyword: 'JSON'",
+            "vacancy_evidence": "Preferred Keyword: JSON",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_integrating_with_backend_services": {
+            "cv_evidence": "CV missing preferred keyword: 'integrating with backend services'",
+            "vacancy_evidence": "Preferred Keyword: integrating with backend services",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_version_control_systems": {
+            "cv_evidence": "CV missing preferred keyword: 'version control systems'",
+            "vacancy_evidence": "Preferred Keyword: version control systems",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_git": {
+            "cv_evidence": "CV mentions preferred keyword: 'Git'",
+            "vacancy_evidence": "Preferred Keyword: Git",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_mobile_ui/ux_principles": {
+            "cv_evidence": "CV missing preferred keyword: 'mobile UI/UX principles'",
+            "vacancy_evidence": "Preferred Keyword: mobile UI/UX principles",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_design_patterns": {
+            "cv_evidence": "CV missing preferred keyword: 'design patterns'",
+            "vacancy_evidence": "Preferred Keyword: design patterns",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_write_unit": {
+            "cv_evidence": "CV missing preferred keyword: 'write unit'",
+            "vacancy_evidence": "Preferred Keyword: write unit",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_integration_tests": {
+            "cv_evidence": "CV missing preferred keyword: 'integration tests'",
+            "vacancy_evidence": "Preferred Keyword: integration tests",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_problem-solving": {
+            "cv_evidence": "CV missing preferred keyword: 'problem-solving'",
+            "vacancy_evidence": "Preferred Keyword: problem-solving",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_dart_programming_language",
+            "description": "Skill: Dart programming language",
+            "reason": "Mandatory skill 'Dart programming language' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_the_flutter_framework",
+            "description": "Skill: the Flutter framework",
+            "reason": "Mandatory skill 'the Flutter framework' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_widgets",
+            "description": "Skill: widgets",
+            "reason": "Mandatory skill 'widgets' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_state_management",
+            "description": "Skill: state management",
+            "reason": "Mandatory skill 'state management' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_e.g",
+            "description": "Skill: e.g",
+            "reason": "Mandatory skill 'e.g' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_provider",
+            "description": "Skill: Provider",
+            "reason": "Mandatory skill 'Provider' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_bloc",
+            "description": "Skill: BLoC",
+            "reason": "Mandatory skill 'BLoC' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_getx",
+            "description": "Skill: GetX",
+            "reason": "Mandatory skill 'GetX' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_riverpod",
+            "description": "Skill: Riverpod",
+            "reason": "Mandatory skill 'Riverpod' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_navigation",
+            "description": "Skill: navigation",
+            "reason": "Mandatory skill 'navigation' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_restful_apis",
+            "description": "Skill: RESTful APIs",
+            "reason": "Mandatory skill 'RESTful APIs' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_json",
+            "description": "Skill: JSON",
+            "reason": "Mandatory skill 'JSON' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_integrating_with_backend_services",
+            "description": "Skill: integrating with backend services",
+            "reason": "Mandatory skill 'integrating with backend services' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_version_control_systems",
+            "description": "Skill: version control systems",
+            "reason": "Mandatory skill 'version control systems' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_mobile_ui/ux_principles",
+            "description": "Skill: mobile UI/UX principles",
+            "reason": "Mandatory skill 'mobile UI/UX principles' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_design_patterns",
+            "description": "Skill: design patterns",
+            "reason": "Mandatory skill 'design patterns' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_write_unit",
+            "description": "Skill: write unit",
+            "reason": "Mandatory skill 'write unit' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_integration_tests",
+            "description": "Skill: integration tests",
+            "reason": "Mandatory skill 'integration tests' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_problem-solving",
+            "description": "Skill: problem-solving",
+            "reason": "Mandatory skill 'problem-solving' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Dart programming language (Mandatory skill 'Dart programming language' is not present in CV.); Skill: the Flutter framework (Mandatory skill 'the Flutter framework' is not present in CV.); Skill: widgets (Mandatory skill 'widgets' is not present in CV.); Skill: state management (Mandatory skill 'state management' is not present in CV.); Skill: e.g (Mandatory skill 'e.g' is not present in CV.); Skill: Provider (Mandatory skill 'Provider' is not present in CV.); Skill: BLoC (Mandatory skill 'BLoC' is not present in CV.); Skill: GetX (Mandatory skill 'GetX' is not present in CV.); Skill: Riverpod (Mandatory skill 'Riverpod' is not present in CV.); Skill: navigation (Mandatory skill 'navigation' is not present in CV.); Skill: RESTful APIs (Mandatory skill 'RESTful APIs' is not present in CV.); Skill: JSON (Mandatory skill 'JSON' is not present in CV.); Skill: integrating with backend services (Mandatory skill 'integrating with backend services' is not present in CV.); Skill: version control systems (Mandatory skill 'version control systems' is not present in CV.); Skill: mobile UI/UX principles (Mandatory skill 'mobile UI/UX principles' is not present in CV.); Skill: design patterns (Mandatory skill 'design patterns' is not present in CV.); Skill: write unit (Mandatory skill 'write unit' is not present in CV.); Skill: integration tests (Mandatory skill 'integration tests' is not present in CV.); Skill: problem-solving (Mandatory skill 'problem-solving' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'HARSHIT VARIYA' to Target role 'Flutter Developer'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      }
+    ],
+    "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+    "llm_skipped": true
+  }
+}

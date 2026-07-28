@@ -1,0 +1,13 @@
+services:
+  api:
+    build: ./backend
+    container_name: cv_analyzer_api
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_ENABLED=true
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=qwen3:8b
+    volumes:
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped

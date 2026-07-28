@@ -1,0 +1,382 @@
+import json
+import time
+
+import httpx
+from pydantic import ValidationError
+
+from app.core.config import settings
+from app.core.logging import logger
+from app.core.profiler import PipelineProfiler
+from app.repositories.llm_cache import LLMCacheRepository
+from app.schemas.analysis import QwenCVAnalysis, DynamicMappingResponse, OptimizedLLMMatchResponse
+from app.schemas.profile import DynamicCandidateProfile
+
+
+class OllamaLLMService:
+    @staticmethod
+    def extract_candidate_profile(prompt: str, prompt_version: str) -> DynamicCandidateProfile | None:
+        if not settings.LLM_ENABLED:
+            logger.info("LLM semantic analysis is disabled via config.")
+            return None
+
+        model_name = settings.OLLAMA_MODEL
+
+        # Check Cache First
+        cached_result = LLMCacheRepository.get_cached_result(
+            model_name, prompt_version, prompt
+        )
+        if cached_result:
+            logger.info(
+                f"LLM Cache HIT for profile extraction '{model_name}' (v{prompt_version}). Skipping inference."
+            )
+            return cached_result
+
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+        payload = {"model": model_name, "prompt": prompt, "stream": False}
+
+        timeout_cfg = httpx.Timeout(timeout=settings.OLLAMA_REQUEST_TIMEOUT, connect=2.0)
+
+        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
+            start_time = time.time()
+            try:
+                with httpx.Client(timeout=timeout_cfg) as client:
+                    response = client.post(url, json=payload)
+                    response.raise_for_status()
+
+                duration_ms = int((time.time() - start_time) * 1000)
+
+                data = response.json()
+                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                elif response_text.startswith("```"):
+                    response_text = response_text[3:]
+                response_text = response_text.removesuffix("```")
+                response_text = response_text.strip()
+
+                parsed_json = json.loads(response_text)
+                validated_result = DynamicCandidateProfile(**parsed_json)
+
+                logger.info(
+                    f"LLM Profile Extraction SUCCESS: model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
+                )
+
+                LLMCacheRepository.save_result(
+                    model_name, prompt_version, prompt, validated_result
+                )
+
+                return validated_result
+
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
+                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
+                break
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
+            except json.JSONDecodeError as exc:
+                logger.warning(
+                    f"Ollama JSON decode error on attempt {attempt}. Raw: {response_text[:100]}... Error: {exc}"
+                )
+            except ValidationError as exc:
+                logger.warning(
+                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
+                )
+
+            if attempt == settings.OLLAMA_MAX_RETRIES:
+                logger.error(
+                    f"Failed to extract profile from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
+                )
+                return None
+
+        return None
+
+    @staticmethod
+    def call_qwen(prompt: str, prompt_version: str) -> QwenCVAnalysis | None:
+        if not settings.LLM_ENABLED:
+            logger.info("LLM semantic analysis is disabled via config.")
+            return None
+
+        model_name = settings.OLLAMA_MODEL
+
+        # Check Cache First
+        cached_result = LLMCacheRepository.get_cached_result(
+            model_name, prompt_version, prompt
+        )
+        if cached_result:
+            logger.info(
+                f"LLM Cache HIT for model '{model_name}' (v{prompt_version}). Skipping inference."
+            )
+            return cached_result
+
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+        payload = {"model": model_name, "prompt": prompt, "stream": False}
+
+        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
+            start_time = time.time()
+            try:
+                with httpx.Client(timeout=settings.OLLAMA_REQUEST_TIMEOUT) as client:
+                    response = client.post(url, json=payload)
+                    response.raise_for_status()
+
+                duration_ms = int((time.time() - start_time) * 1000)
+
+                data = response.json()
+                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+
+                # Cleanup potential markdown wrapper if Qwen ignored instructions
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                elif response_text.startswith("```"):
+                    response_text = response_text[3:]
+                response_text = response_text.removesuffix("```")
+                response_text = response_text.strip()
+
+                parsed_json = json.loads(response_text)
+                validated_result = QwenCVAnalysis(**parsed_json)
+
+                logger.info(
+                    f"LLM Inference SUCCESS: model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
+                )
+
+                # Save to cache
+                LLMCacheRepository.save_result(
+                    model_name, prompt_version, prompt, validated_result
+                )
+
+                return validated_result
+
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
+                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
+                break
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
+            except json.JSONDecodeError as exc:
+                logger.warning(
+                    f"Ollama JSON decode error on attempt {attempt}. Raw: {response_text[:100]}... Error: {exc}"
+                )
+            except ValidationError as exc:
+                logger.warning(
+                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
+                )
+
+            if attempt == settings.OLLAMA_MAX_RETRIES:
+                logger.error(
+                    f"Failed to get valid response from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
+                )
+                return None
+
+        return None
+
+    @staticmethod
+    def call_qwen_dynamic(prompt: str, prompt_version: str) -> DynamicMappingResponse | None:
+        if not settings.LLM_ENABLED:
+            logger.info("LLM semantic analysis is disabled via config.")
+            return None
+
+        model_name = settings.OLLAMA_MODEL
+
+        # Check Cache First
+        cached_result = LLMCacheRepository.get_cached_result(
+            model_name, prompt_version, prompt
+        )
+        if cached_result:
+            logger.info(
+                f"LLM Cache HIT for dynamic mapping model '{model_name}' (v{prompt_version}). Skipping inference."
+            )
+            return cached_result
+
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+        payload = {"model": model_name, "prompt": prompt, "stream": False}
+
+        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
+            start_time = time.time()
+            try:
+                with httpx.Client(timeout=settings.OLLAMA_REQUEST_TIMEOUT) as client:
+                    response = client.post(url, json=payload)
+                    response.raise_for_status()
+
+                duration_ms = int((time.time() - start_time) * 1000)
+
+                data = response.json()
+                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+
+                # Cleanup potential markdown wrapper if Qwen ignored instructions
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                elif response_text.startswith("```"):
+                    response_text = response_text[3:]
+                response_text = response_text.removesuffix("```")
+                response_text = response_text.strip()
+
+                parsed_json = json.loads(response_text)
+                validated_result = DynamicMappingResponse(**parsed_json)
+
+                logger.info(
+                    f"LLM Inference SUCCESS: dynamic mapping model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
+                )
+
+                # Save to cache
+                LLMCacheRepository.save_result(
+                    model_name, prompt_version, prompt, validated_result
+                )
+
+                return validated_result
+
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
+                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
+                break
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
+            except json.JSONDecodeError as exc:
+                logger.warning(
+                    f"Ollama JSON decode error on attempt {attempt}. Error: {exc}\n"
+                    f"Tail of response: {response_text[-200:] if len(response_text) > 200 else response_text}"
+                )
+            except ValidationError as exc:
+                logger.warning(
+                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
+                )
+
+            if attempt == settings.OLLAMA_MAX_RETRIES:
+                logger.error(
+                    f"Failed to get valid response from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
+                )
+                return None
+
+        return None
+
+    @classmethod
+    def run_optimized_match(
+        cls,
+        prompt: str,
+        prompt_version: str,
+        cache_key: str,
+        profiler: PipelineProfiler | None = None,
+    ) -> OptimizedLLMMatchResponse | None:
+        model_name = settings.OLLAMA_MODEL
+
+        # 1. Check Cache
+        cached_result = LLMCacheRepository.get_cached_object(
+            cache_key, OptimizedLLMMatchResponse
+        )
+        if cached_result:
+            logger.info(
+                f"LLM Cache HIT for optimized match '{model_name}' (v{prompt_version}). Skipping HTTP request."
+            )
+            if profiler:
+                profiler.metrics.cache_hit = True
+            return cached_result
+
+        if not settings.LLM_ENABLED:
+            logger.info("LLM semantic analysis is disabled via config.")
+            return None
+
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+        payload = {
+            "model": model_name,
+            "prompt": prompt,
+            "format": "json",
+            "stream": False,
+            "think": False,
+            "keep_alive": "30m",
+            "options": {
+                "num_predict": 4096,
+                "num_ctx": 8192,
+                "temperature": 0.1,
+                "top_p": 0.9,
+            },
+        }
+
+        timeout_cfg = httpx.Timeout(timeout=settings.OLLAMA_REQUEST_TIMEOUT, connect=5.0)
+
+        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
+            t_req_start = time.perf_counter()
+            logger.info(
+                f"Sending LLM request to Ollama model '{model_name}' (v{prompt_version}) | "
+                f"Prompt: {len(prompt)} chars | Attempt {attempt}/{settings.OLLAMA_MAX_RETRIES}..."
+            )
+            try:
+                with httpx.Client(timeout=timeout_cfg) as client:
+                    response = client.post(url, json=payload)
+                    response.raise_for_status()
+
+                req_duration_ms = round((time.perf_counter() - t_req_start) * 1000.0, 2)
+                data = response.json()
+
+                eval_count = data.get("eval_count", 0)
+                eval_duration_ns = data.get("eval_duration", 0)
+                inference_ms = (
+                    round(eval_duration_ns / 1_000_000.0, 2)
+                    if eval_duration_ns
+                    else req_duration_ms
+                )
+
+                if profiler:
+                    profiler.metrics.ollama_request_ms = req_duration_ms
+                    profiler.metrics.model_inference_ms = inference_ms
+                    if eval_count:
+                        profiler.metrics.token_count = eval_count
+
+                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                elif response_text.startswith("```"):
+                    response_text = response_text[3:]
+                response_text = response_text.removesuffix("```").strip()
+
+                t_val_start = time.perf_counter()
+                parsed_json = json.loads(response_text)
+                validated_result = OptimizedLLMMatchResponse(**parsed_json)
+                val_duration_ms = round((time.perf_counter() - t_val_start) * 1000.0, 2)
+
+                if profiler:
+                    profiler.metrics.json_validation_ms = val_duration_ms
+
+                logger.info(
+                    f"LLM Optimized Match SUCCESS: model '{model_name}' (v{prompt_version}) "
+                    f"req_time={req_duration_ms}ms, inference_time={inference_ms}ms."
+                )
+
+                # Save to Cache
+                LLMCacheRepository.save_cached_object(cache_key, validated_result)
+                return validated_result
+
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
+                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
+                break
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
+            except json.JSONDecodeError as exc:
+                raw_snip = response_text[:500] + ("..." if len(response_text) > 500 else "")
+                logger.warning(
+                    f"Ollama JSON decode error on attempt {attempt}. Raw: {raw_snip}\nError: {exc}"
+                )
+            except ValidationError as exc:
+                logger.warning(
+                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
+                )
+
+            if attempt == settings.OLLAMA_MAX_RETRIES:
+                logger.error(
+                    f"Failed to get valid OptimizedLLMMatchResponse from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
+                )
+                return None
+
+        return None
+

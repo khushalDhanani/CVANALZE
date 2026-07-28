@@ -1,0 +1,3840 @@
+{
+  "id": "cv_1738154230_",
+  "candidate_id": null,
+  "cv_id": null,
+  "filename": "1738154230_.pdf",
+  "content_type": "application/pdf",
+  "cv_hash": "6ff929a2bcc9fb28600d344cb2b31f3318eb1872f3b6ffea7109b529a2013322",
+  "parser_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "created_at": "2026-07-28T11:06:58.395201+00:00",
+  "updated_at": "2026-07-28T11:06:58.395201+00:00",
+  "scanned_at": "2026-07-28T11:06:58.395201+00:00",
+  "status": "NEW_CV",
+  "characters": 1062,
+  "page_count": 1,
+  "is_scanned": true,
+  "ocr_applied": false,
+  "text": "<!-- image -->\n\n## Ajay Vani\n\nPlot - 41 , Someshwar Society  Bhestan , Surat-395023 Mob: 9909363241\n\n## Personal Details\n\nName :\n\nAjay Vani Kishor Vani\n\nFather's Name :\n\nDate of Birth :\n\n27-09-1999\n\nGender :\n\nMale\n\nMarital Status :\n\nMarried\n\nReligion :\n\nHindu\n\nNationality :\n\nIndian\n\nLanguages Known :\n\nHindi, English , Gujarati\n\n## Education Qualification\n\n|   SR.NO. | Exam                      | Board/University   |   Year | Percentage   |\n|----------|---------------------------|--------------------|--------|--------------|\n|        1 | S.S.C                     | GSEB               |   2015 | 53.00%       |\n|        2 | I.T.I Instrument Techanic | GCVT               |   2019 | 69.46%       |\n\n## Technical\n\n-  Basic Computer Knowledge\n\n## Experience\n\n-  Work as a Apprentice in colourtex pvt.ltd Sachin surat  for - 1 yea\n-  Work as a colourtex pvt.ltd  Sachin surat  for - 3 Years\n\n## Declaration\n\nI hereby declare that all the statements mentioned above are true and correct to the best of my knowledge\n\nDate-\n\nYours Faithfull y\n\nPlace-\n\nAjay Vani",
+  "markdown": "<!-- image -->\n\n## Ajay Vani\n\nPlot - 41 , Someshwar Society  Bhestan , Surat-395023 Mob: 9909363241\n\n## Personal Details\n\nName :\n\nAjay Vani Kishor Vani\n\nFather's Name :\n\nDate of Birth :\n\n27-09-1999\n\nGender :\n\nMale\n\nMarital Status :\n\nMarried\n\nReligion :\n\nHindu\n\nNationality :\n\nIndian\n\nLanguages Known :\n\nHindi, English , Gujarati\n\n## Education Qualification\n\n|   SR.NO. | Exam                      | Board/University   |   Year | Percentage   |\n|----------|---------------------------|--------------------|--------|--------------|\n|        1 | S.S.C                     | GSEB               |   2015 | 53.00%       |\n|        2 | I.T.I Instrument Techanic | GCVT               |   2019 | 69.46%       |\n\n## Technical\n\n-  Basic Computer Knowledge\n\n## Experience\n\n-  Work as a Apprentice in colourtex pvt.ltd Sachin surat  for - 1 yea\n-  Work as a colourtex pvt.ltd  Sachin surat  for - 3 Years\n\n## Declaration\n\nI hereby declare that all the statements mentioned above are true and correct to the best of my knowledge\n\nDate-\n\nYours Faithfull y\n\nPlace-\n\nAjay Vani",
+  "structured_doc": {
+    "schema_name": "DoclingDocument",
+    "version": "1.10.0",
+    "name": "1738154230_",
+    "origin": {
+      "mimetype": "application/pdf",
+      "binary_hash": 8145240591492526882,
+      "filename": "1738154230_.pdf"
+    },
+    "furniture": {
+      "self_ref": "#/furniture",
+      "children": [],
+      "content_layer": "furniture",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "body": {
+      "self_ref": "#/body",
+      "children": [
+        {
+          "$ref": "#/pictures/0"
+        },
+        {
+          "$ref": "#/groups/0"
+        },
+        {
+          "$ref": "#/texts/3"
+        },
+        {
+          "$ref": "#/groups/1"
+        },
+        {
+          "$ref": "#/texts/19"
+        },
+        {
+          "$ref": "#/tables/0"
+        },
+        {
+          "$ref": "#/texts/20"
+        },
+        {
+          "$ref": "#/groups/2"
+        },
+        {
+          "$ref": "#/texts/22"
+        },
+        {
+          "$ref": "#/groups/3"
+        },
+        {
+          "$ref": "#/texts/25"
+        },
+        {
+          "$ref": "#/texts/26"
+        },
+        {
+          "$ref": "#/groups/4"
+        }
+      ],
+      "content_layer": "body",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "groups": [
+      {
+        "self_ref": "#/groups/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/1"
+          },
+          {
+            "$ref": "#/texts/2"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "key_value_area"
+      },
+      {
+        "self_ref": "#/groups/1",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/4"
+          },
+          {
+            "$ref": "#/texts/5"
+          },
+          {
+            "$ref": "#/texts/6"
+          },
+          {
+            "$ref": "#/texts/7"
+          },
+          {
+            "$ref": "#/texts/8"
+          },
+          {
+            "$ref": "#/texts/9"
+          },
+          {
+            "$ref": "#/texts/10"
+          },
+          {
+            "$ref": "#/texts/11"
+          },
+          {
+            "$ref": "#/texts/12"
+          },
+          {
+            "$ref": "#/texts/13"
+          },
+          {
+            "$ref": "#/texts/14"
+          },
+          {
+            "$ref": "#/texts/15"
+          },
+          {
+            "$ref": "#/texts/16"
+          },
+          {
+            "$ref": "#/texts/17"
+          },
+          {
+            "$ref": "#/texts/18"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "key_value_area"
+      },
+      {
+        "self_ref": "#/groups/2",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/21"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/3",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/23"
+          },
+          {
+            "$ref": "#/texts/24"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/4",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/27"
+          },
+          {
+            "$ref": "#/texts/28"
+          },
+          {
+            "$ref": "#/texts/29"
+          },
+          {
+            "$ref": "#/texts/30"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "key_value_area"
+      }
+    ],
+    "texts": [
+      {
+        "self_ref": "#/texts/0",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 277.25,
+              "t": 783.2349909101563,
+              "r": 401.026,
+              "b": 762.0376337336858,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "RESUME",
+        "text": "RESUME",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/1",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 754.1831029101563,
+              "r": 99.7128,
+              "b": 740.7074222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "Ajay Vani",
+        "text": "Ajay Vani",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/2",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 737.7431029101564,
+              "r": 363.8788,
+              "b": 707.8274222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              69
+            ]
+          }
+        ],
+        "orig": "Plot - 41 , Someshwar Society  Bhestan , Surat-395023 Mob: 9909363241",
+        "text": "Plot - 41 , Someshwar Society  Bhestan , Surat-395023 Mob: 9909363241"
+      },
+      {
+        "self_ref": "#/texts/3",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 688.4231029101563,
+              "r": 147.1088,
+              "b": 674.9474222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              16
+            ]
+          }
+        ],
+        "orig": "Personal Details",
+        "text": "Personal Details",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/4",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 663.9431029101563,
+              "r": 187.09879999999998,
+              "b": 650.4674222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "Name :",
+        "text": "Name :"
+      },
+      {
+        "self_ref": "#/texts/5",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 216.05,
+              "t": 663.9431029101563,
+              "r": 294.61879999999996,
+              "b": 634.0274222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              21
+            ]
+          }
+        ],
+        "orig": "Ajay Vani Kishor Vani",
+        "text": "Ajay Vani Kishor Vani"
+      },
+      {
+        "self_ref": "#/texts/6",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 647.5031029101564,
+              "r": 187.09879999999998,
+              "b": 634.0274222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              15
+            ]
+          }
+        ],
+        "orig": "Father's Name :",
+        "text": "Father's Name :"
+      },
+      {
+        "self_ref": "#/texts/7",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 631.0631029101563,
+              "r": 187.09879999999998,
+              "b": 617.5874222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              15
+            ]
+          }
+        ],
+        "orig": "Date of Birth :",
+        "text": "Date of Birth :"
+      },
+      {
+        "self_ref": "#/texts/8",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 216.05,
+              "t": 631.0631029101563,
+              "r": 290.4188,
+              "b": 617.5874222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              10
+            ]
+          }
+        ],
+        "orig": "27-09-1999",
+        "text": "27-09-1999"
+      },
+      {
+        "self_ref": "#/texts/9",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 614.6231029101564,
+              "r": 187.09879999999998,
+              "b": 601.1474222364722,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              8
+            ]
+          }
+        ],
+        "orig": "Gender :",
+        "text": "Gender :"
+      },
+      {
+        "self_ref": "#/texts/10",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 216.05,
+              "t": 614.6231029101564,
+              "r": 244.95788,
+              "b": 601.1474222364722,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              4
+            ]
+          }
+        ],
+        "orig": "Male",
+        "text": "Male"
+      },
+      {
+        "self_ref": "#/texts/11",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 598.2731029101564,
+              "r": 183.9512,
+              "b": 584.7974222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              16
+            ]
+          }
+        ],
+        "orig": "Marital Status :",
+        "text": "Marital Status :"
+      },
+      {
+        "self_ref": "#/texts/12",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 216.05,
+              "t": 598.2731029101564,
+              "r": 267.4988,
+              "b": 584.7974222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              7
+            ]
+          }
+        ],
+        "orig": "Married",
+        "text": "Married"
+      },
+      {
+        "self_ref": "#/texts/13",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 581.8331029101563,
+              "r": 183.9512,
+              "b": 568.3574222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              10
+            ]
+          }
+        ],
+        "orig": "Religion :",
+        "text": "Religion :"
+      },
+      {
+        "self_ref": "#/texts/14",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 216.05,
+              "t": 581.8331029101563,
+              "r": 255.97879999999998,
+              "b": 568.3574222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              5
+            ]
+          }
+        ],
+        "orig": "Hindu",
+        "text": "Hindu"
+      },
+      {
+        "self_ref": "#/texts/15",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 565.3931029101564,
+              "r": 187.09879999999998,
+              "b": 551.9174222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              13
+            ]
+          }
+        ],
+        "orig": "Nationality :",
+        "text": "Nationality :"
+      },
+      {
+        "self_ref": "#/texts/16",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 216.05,
+              "t": 565.3931029101564,
+              "r": 257.7788,
+              "b": 551.9174222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "Indian",
+        "text": "Indian"
+      },
+      {
+        "self_ref": "#/texts/17",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 548.9531029101563,
+              "r": 187.09879999999998,
+              "b": 535.4774222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "Languages Known :",
+        "text": "Languages Known :"
+      },
+      {
+        "self_ref": "#/texts/18",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 216.05,
+              "t": 548.9531029101563,
+              "r": 359.4388,
+              "b": 535.4774222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              25
+            ]
+          }
+        ],
+        "orig": "Hindi, English , Gujarati",
+        "text": "Hindi, English , Gujarati"
+      },
+      {
+        "self_ref": "#/texts/19",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 516.0731029101563,
+              "r": 190.3388,
+              "b": 502.5974222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "Education Qualification",
+        "text": "Education Qualification",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/20",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 418.37310291015626,
+              "r": 111.1088,
+              "b": 404.8974222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "Technical",
+        "text": "Technical",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/21",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 65.544,
+              "t": 393.05310291015627,
+              "r": 263.0588,
+              "b": 379.5774222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              26
+            ]
+          }
+        ],
+        "orig": " Basic Computer Knowledge",
+        "text": " Basic Computer Knowledge",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/22",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 368.45310291015625,
+              "r": 111.1088,
+              "b": 354.9774222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              10
+            ]
+          }
+        ],
+        "orig": "Experience",
+        "text": "Experience",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/23",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 90.024,
+              "t": 343.8531029101563,
+              "r": 501.3088,
+              "b": 330.3774222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              69
+            ]
+          }
+        ],
+        "orig": " Work as a Apprentice in colourtex pvt.ltd Sachin surat  for - 1 yea",
+        "text": " Work as a Apprentice in colourtex pvt.ltd Sachin surat  for - 1 yea",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/24",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 90.024,
+              "t": 319.13310291015625,
+              "r": 436.0288,
+              "b": 305.65742223647203,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              58
+            ]
+          }
+        ],
+        "orig": " Work as a colourtex pvt.ltd  Sachin surat  for - 3 Years",
+        "text": " Work as a colourtex pvt.ltd  Sachin surat  for - 3 Years",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/25",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 245.30310291015633,
+              "r": 114.70880000000001,
+              "b": 231.8274222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              11
+            ]
+          }
+        ],
+        "orig": "Declaration",
+        "text": "Declaration",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/26",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 196.10310291015628,
+              "r": 538.5056400000002,
+              "b": 157.90742223647203,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              105
+            ]
+          }
+        ],
+        "orig": "I hereby declare that all the statements mentioned above are true and correct to the best of my knowledge",
+        "text": "I hereby declare that all the statements mentioned above are true and correct to the best of my knowledge"
+      },
+      {
+        "self_ref": "#/texts/27",
+        "parent": {
+          "$ref": "#/groups/4"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 122.18310291015632,
+              "r": 169.97532000000007,
+              "b": 108.7074222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              5
+            ]
+          }
+        ],
+        "orig": "Date-",
+        "text": "Date-"
+      },
+      {
+        "self_ref": "#/texts/28",
+        "parent": {
+          "$ref": "#/groups/4"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 470.86,
+              "t": 120.5959829101563,
+              "r": 551.916,
+              "b": 108.25998291015628,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "Yours Faithfull y",
+        "text": "Yours Faithfull y"
+      },
+      {
+        "self_ref": "#/texts/29",
+        "parent": {
+          "$ref": "#/groups/4"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 36.0,
+              "t": 97.56310291015632,
+              "r": 74.904,
+              "b": 84.0874222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "Place-",
+        "text": "Place-"
+      },
+      {
+        "self_ref": "#/texts/30",
+        "parent": {
+          "$ref": "#/groups/4"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 468.1,
+              "t": 97.56310291015632,
+              "r": 534.9088,
+              "b": 84.0874222364721,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "Ajay Vani",
+        "text": "Ajay Vani"
+      }
+    ],
+    "pictures": [
+      {
+        "self_ref": "#/pictures/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/0"
+          }
+        ],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 179.6710205078125,
+              "t": 809.3849411010742,
+              "r": 492.1186218261719,
+              "b": 762.263053894043,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      }
+    ],
+    "tables": [
+      {
+        "self_ref": "#/tables/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "table",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 29.07367706298828,
+              "t": 494.5618896484375,
+              "r": 547.8847045898438,
+              "b": 431.2831115722656,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "data": {
+          "table_cells": [
+            {
+              "bbox": {
+                "l": 36.36,
+                "t": 352.63399999999996,
+                "r": 72.492,
+                "b": 364.15167578947364,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "SR.NO.",
+              "column_header": true,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 113.3,
+                "t": 352.63399999999996,
+                "r": 143.756,
+                "b": 364.15167578947364,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "Exam",
+              "column_header": true,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 220.01,
+                "t": 352.63399999999996,
+                "r": 317.2939999999999,
+                "b": 364.15167578947364,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 2,
+              "end_col_offset_idx": 3,
+              "text": "Board/University",
+              "column_header": true,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 390.91,
+                "t": 352.63399999999996,
+                "r": 416.47,
+                "b": 364.15167578947364,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 3,
+              "end_col_offset_idx": 4,
+              "text": "Year",
+              "column_header": true,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 467.26,
+                "t": 352.63399999999996,
+                "r": 529.1679999999999,
+                "b": 364.15167578947364,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 4,
+              "end_col_offset_idx": 5,
+              "text": "Percentage",
+              "column_header": true,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 50.88,
+                "t": 370.99399999999997,
+                "r": 57.984,
+                "b": 382.51167578947366,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "1",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 116.78,
+                "t": 370.99399999999997,
+                "r": 140.42000000000002,
+                "b": 382.51167578947366,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "S.S.C",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 254.93,
+                "t": 370.99399999999997,
+                "r": 282.518,
+                "b": 382.51167578947366,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 2,
+              "end_col_offset_idx": 3,
+              "text": "GSEB",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 390.43,
+                "t": 370.99399999999997,
+                "r": 416.99800000000005,
+                "b": 382.51167578947366,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 3,
+              "end_col_offset_idx": 4,
+              "text": "2015",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 478.42,
+                "t": 370.99399999999997,
+                "r": 518.008,
+                "b": 382.51167578947366,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 4,
+              "end_col_offset_idx": 5,
+              "text": "53.00%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 50.88,
+                "t": 392.71399999999994,
+                "r": 57.984,
+                "b": 404.2316757894736,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "2",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 87.864,
+                "t": 387.43399999999997,
+                "r": 167.77099999999996,
+                "b": 409.5662568421052,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "I.T.I Instrument Techanic",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 254.45,
+                "t": 392.71399999999994,
+                "r": 282.8059999999999,
+                "b": 404.2316757894736,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 2,
+              "end_col_offset_idx": 3,
+              "text": "GCVT",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 390.43,
+                "t": 392.71399999999994,
+                "r": 416.9860000000001,
+                "b": 404.2316757894736,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 3,
+              "end_col_offset_idx": 4,
+              "text": "2019",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 478.42,
+                "t": 392.71399999999994,
+                "r": 518.02,
+                "b": 404.2316757894736,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 4,
+              "end_col_offset_idx": 5,
+              "text": "69.46%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ],
+          "num_rows": 3,
+          "num_cols": 5,
+          "orientation": "rot_0",
+          "grid": [
+            [
+              {
+                "bbox": {
+                  "l": 36.36,
+                  "t": 352.63399999999996,
+                  "r": 72.492,
+                  "b": 364.15167578947364,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 0,
+                "end_row_offset_idx": 1,
+                "start_col_offset_idx": 0,
+                "end_col_offset_idx": 1,
+                "text": "SR.NO.",
+                "column_header": true,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 113.3,
+                  "t": 352.63399999999996,
+                  "r": 143.756,
+                  "b": 364.15167578947364,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 0,
+                "end_row_offset_idx": 1,
+                "start_col_offset_idx": 1,
+                "end_col_offset_idx": 2,
+                "text": "Exam",
+                "column_header": true,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 220.01,
+                  "t": 352.63399999999996,
+                  "r": 317.2939999999999,
+                  "b": 364.15167578947364,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 0,
+                "end_row_offset_idx": 1,
+                "start_col_offset_idx": 2,
+                "end_col_offset_idx": 3,
+                "text": "Board/University",
+                "column_header": true,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 390.91,
+                  "t": 352.63399999999996,
+                  "r": 416.47,
+                  "b": 364.15167578947364,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 0,
+                "end_row_offset_idx": 1,
+                "start_col_offset_idx": 3,
+                "end_col_offset_idx": 4,
+                "text": "Year",
+                "column_header": true,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 467.26,
+                  "t": 352.63399999999996,
+                  "r": 529.1679999999999,
+                  "b": 364.15167578947364,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 0,
+                "end_row_offset_idx": 1,
+                "start_col_offset_idx": 4,
+                "end_col_offset_idx": 5,
+                "text": "Percentage",
+                "column_header": true,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              }
+            ],
+            [
+              {
+                "bbox": {
+                  "l": 50.88,
+                  "t": 370.99399999999997,
+                  "r": 57.984,
+                  "b": 382.51167578947366,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 1,
+                "end_row_offset_idx": 2,
+                "start_col_offset_idx": 0,
+                "end_col_offset_idx": 1,
+                "text": "1",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 116.78,
+                  "t": 370.99399999999997,
+                  "r": 140.42000000000002,
+                  "b": 382.51167578947366,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 1,
+                "end_row_offset_idx": 2,
+                "start_col_offset_idx": 1,
+                "end_col_offset_idx": 2,
+                "text": "S.S.C",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 254.93,
+                  "t": 370.99399999999997,
+                  "r": 282.518,
+                  "b": 382.51167578947366,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 1,
+                "end_row_offset_idx": 2,
+                "start_col_offset_idx": 2,
+                "end_col_offset_idx": 3,
+                "text": "GSEB",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 390.43,
+                  "t": 370.99399999999997,
+                  "r": 416.99800000000005,
+                  "b": 382.51167578947366,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 1,
+                "end_row_offset_idx": 2,
+                "start_col_offset_idx": 3,
+                "end_col_offset_idx": 4,
+                "text": "2015",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 478.42,
+                  "t": 370.99399999999997,
+                  "r": 518.008,
+                  "b": 382.51167578947366,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 1,
+                "end_row_offset_idx": 2,
+                "start_col_offset_idx": 4,
+                "end_col_offset_idx": 5,
+                "text": "53.00%",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              }
+            ],
+            [
+              {
+                "bbox": {
+                  "l": 50.88,
+                  "t": 392.71399999999994,
+                  "r": 57.984,
+                  "b": 404.2316757894736,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 2,
+                "end_row_offset_idx": 3,
+                "start_col_offset_idx": 0,
+                "end_col_offset_idx": 1,
+                "text": "2",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 87.864,
+                  "t": 387.43399999999997,
+                  "r": 167.77099999999996,
+                  "b": 409.5662568421052,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 2,
+                "end_row_offset_idx": 3,
+                "start_col_offset_idx": 1,
+                "end_col_offset_idx": 2,
+                "text": "I.T.I Instrument Techanic",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 254.45,
+                  "t": 392.71399999999994,
+                  "r": 282.8059999999999,
+                  "b": 404.2316757894736,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 2,
+                "end_row_offset_idx": 3,
+                "start_col_offset_idx": 2,
+                "end_col_offset_idx": 3,
+                "text": "GCVT",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 390.43,
+                  "t": 392.71399999999994,
+                  "r": 416.9860000000001,
+                  "b": 404.2316757894736,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 2,
+                "end_row_offset_idx": 3,
+                "start_col_offset_idx": 3,
+                "end_col_offset_idx": 4,
+                "text": "2019",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              },
+              {
+                "bbox": {
+                  "l": 478.42,
+                  "t": 392.71399999999994,
+                  "r": 518.02,
+                  "b": 404.2316757894736,
+                  "coord_origin": "TOPLEFT"
+                },
+                "row_span": 1,
+                "col_span": 1,
+                "start_row_offset_idx": 2,
+                "end_row_offset_idx": 3,
+                "start_col_offset_idx": 4,
+                "end_col_offset_idx": 5,
+                "text": "69.46%",
+                "column_header": false,
+                "row_header": false,
+                "row_section": false,
+                "fillable": false
+              }
+            ]
+          ]
+        },
+        "annotations": []
+      }
+    ],
+    "key_value_items": [],
+    "form_items": [],
+    "pages": {
+      "1": {
+        "size": {
+          "width": 595.3200073242188,
+          "height": 841.9199829101562
+        },
+        "page_no": 1
+      }
+    }
+  },
+  "dynamic_profile": null,
+  "match_analysis": {
+    "primary_department": "Production Team - 3 (Kalpesh Patel)",
+    "best_match": {
+      "job_id": "1282",
+      "job_title": "Plant Assistant - II (Production)",
+      "department": "Production Team - 3 (Kalpesh Patel)",
+      "vacancy_id": 1282,
+      "job_profile_id": 79,
+      "company_id": 1,
+      "department_id": 21,
+      "department_name": "Production Team - 3 (Kalpesh Patel)",
+      "location_id": 2,
+      "score": 78.6,
+      "overall_score": 78.6,
+      "role_score": 50.0,
+      "skills_score": 100.0,
+      "experience_score": 100.0,
+      "education_score": 0.0,
+      "domain_score": 50.0,
+      "technology_score": 0.0,
+      "certification_score": 0.0,
+      "responsibilities_score": 0.0,
+      "coverage": 0.7,
+      "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+      "classification": "HIGH",
+      "recommendation": "Strong candidate — proceed to interview.",
+      "matched_skills": [
+        "NO"
+      ],
+      "missing_skills": [],
+      "matched_keywords": [
+        "NO"
+      ],
+      "missing_keywords": [],
+      "mandatory_requirements": [
+        {
+          "requirement_id": "req_skill_no",
+          "description": "Skill: NO",
+          "tier": "MANDATORY",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV contains skill: 'NO'",
+            "vacancy_evidence": "Mandatory Skill Requirement: NO",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "preferred_requirements": [
+        {
+          "requirement_id": "pref_keyword_no",
+          "description": "Preferred Keyword: NO",
+          "tier": "PREFERRED",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV mentions preferred keyword: 'NO'",
+            "vacancy_evidence": "Preferred Keyword: NO",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "optional_requirements": [],
+      "matched_criteria": [
+        "Mandatory Skill: NO",
+        "Preferred Keyword: NO"
+      ],
+      "missing_criteria": [],
+      "evidence": {
+        "req_skill_no": {
+          "cv_evidence": "CV contains skill: 'NO'",
+          "vacancy_evidence": "Mandatory Skill Requirement: NO",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_no": {
+          "cv_evidence": "CV mentions preferred keyword: 'NO'",
+          "vacancy_evidence": "Preferred Keyword: NO",
+          "confidence_score": 1.0
+        }
+      },
+      "mandatory_failures": [],
+      "confidence": 1.0,
+      "hr_review_required": false,
+      "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+      "career_transition_detected": true,
+      "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - II (Production)'.",
+      "llm_reason": "",
+      "inferred_skills": []
+    },
+    "suitable_openings": [
+      {
+        "job_id": "1282",
+        "job_title": "Plant Assistant - II (Production)",
+        "department": "Production Team - 3 (Kalpesh Patel)",
+        "vacancy_id": 1282,
+        "job_profile_id": 79,
+        "company_id": 1,
+        "department_id": 21,
+        "department_name": "Production Team - 3 (Kalpesh Patel)",
+        "location_id": 2,
+        "score": 78.6,
+        "overall_score": 78.6,
+        "role_score": 50.0,
+        "skills_score": 100.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+        "classification": "HIGH",
+        "recommendation": "Strong candidate — proceed to interview.",
+        "matched_skills": [
+          "NO"
+        ],
+        "missing_skills": [],
+        "matched_keywords": [
+          "NO"
+        ],
+        "missing_keywords": [],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_no",
+            "description": "Skill: NO",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'NO'",
+              "vacancy_evidence": "Mandatory Skill Requirement: NO",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_no",
+            "description": "Preferred Keyword: NO",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'NO'",
+              "vacancy_evidence": "Preferred Keyword: NO",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: NO",
+          "Preferred Keyword: NO"
+        ],
+        "missing_criteria": [],
+        "evidence": {
+          "req_skill_no": {
+            "cv_evidence": "CV contains skill: 'NO'",
+            "vacancy_evidence": "Mandatory Skill Requirement: NO",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_no": {
+            "cv_evidence": "CV mentions preferred keyword: 'NO'",
+            "vacancy_evidence": "Preferred Keyword: NO",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [],
+        "confidence": 1.0,
+        "hr_review_required": false,
+        "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - II (Production)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "720",
+        "job_title": "Plant Assistant - II (Maintenance)",
+        "department": "Maintenance Team - 2 (Parag Detroja)",
+        "vacancy_id": 720,
+        "job_profile_id": 82,
+        "company_id": 1,
+        "department_id": 24,
+        "department_name": "Maintenance Team - 2 (Parag Detroja)",
+        "location_id": 2,
+        "score": 22.9,
+        "overall_score": 22.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #2 due to lower score (22.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Chemical plant experience"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Chemical plant experience"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_chemical_plant_experience",
+            "description": "Skill: Chemical plant experience",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Chemical plant experience'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Chemical plant experience",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Chemical plant experience' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_chemical_plant_experience",
+            "description": "Preferred Keyword: Chemical plant experience",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Chemical plant experience'",
+              "vacancy_evidence": "Preferred Keyword: Chemical plant experience",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Chemical plant experience' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Chemical plant experience",
+          "Preferred Keyword: Chemical plant experience"
+        ],
+        "evidence": {
+          "req_skill_chemical_plant_experience": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Chemical plant experience'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Chemical plant experience",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_chemical_plant_experience": {
+            "cv_evidence": "CV missing preferred keyword: 'Chemical plant experience'",
+            "vacancy_evidence": "Preferred Keyword: Chemical plant experience",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_chemical_plant_experience",
+            "description": "Skill: Chemical plant experience",
+            "reason": "Mandatory skill 'Chemical plant experience' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Chemical plant experience (Mandatory skill 'Chemical plant experience' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - II (Maintenance)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "811",
+        "job_title": "Plant Assistant - I (Maintenance)",
+        "department": "Maintenance Team - 1 (Ramesh Maurya)",
+        "vacancy_id": 811,
+        "job_profile_id": 83,
+        "company_id": 1,
+        "department_id": 23,
+        "department_name": "Maintenance Team - 1 (Ramesh Maurya)",
+        "location_id": 1,
+        "score": 22.9,
+        "overall_score": 22.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #3 due to lower score (22.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Maintenance Work"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Maintenance Work"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_maintenance_work",
+            "description": "Skill: Maintenance Work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Maintenance Work' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_maintenance_work",
+            "description": "Preferred Keyword: Maintenance Work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+              "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Maintenance Work' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Maintenance Work",
+          "Preferred Keyword: Maintenance Work"
+        ],
+        "evidence": {
+          "req_skill_maintenance_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_maintenance_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+            "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_maintenance_work",
+            "description": "Skill: Maintenance Work",
+            "reason": "Mandatory skill 'Maintenance Work' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Maintenance Work (Mandatory skill 'Maintenance Work' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - I (Maintenance)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1126",
+        "job_title": "Technical Leader (R & D)",
+        "department": "CIS Team",
+        "vacancy_id": 1126,
+        "job_profile_id": 1,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #4 due to lower score (0.0% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Overall responsible for managing",
+          "MD of the company. Must lead",
+          "oversee the research function",
+          "co-ordinate research",
+          "management of team involved in innovation",
+          "earn greater margins for the company",
+          "Responsible to maintain",
+          "update overall knowledge of the department",
+          "the self by attending tradeshows"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Overall responsible for managing",
+          "MD of the company. Must lead",
+          "oversee the research function",
+          "co-ordinate research",
+          "management of team involved in innovation",
+          "earn greater margins for the company",
+          "Responsible to maintain",
+          "update overall knowledge of the department",
+          "the self by attending tradeshows"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_overall_responsible_for_managing",
+            "description": "Skill: Overall responsible for managing",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Overall responsible for managing'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Overall responsible for managing",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Overall responsible for managing' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_md_of_the_company._must_lead",
+            "description": "Skill: MD of the company. Must lead",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'MD of the company. Must lead'",
+              "vacancy_evidence": "Mandatory Skill Requirement: MD of the company. Must lead",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'MD of the company. Must lead' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_oversee_the_research_function",
+            "description": "Skill: oversee the research function",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'oversee the research function'",
+              "vacancy_evidence": "Mandatory Skill Requirement: oversee the research function",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'oversee the research function' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_co-ordinate_research",
+            "description": "Skill: co-ordinate research",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'co-ordinate research'",
+              "vacancy_evidence": "Mandatory Skill Requirement: co-ordinate research",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'co-ordinate research' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_management_of_team_involved_in_innovation",
+            "description": "Skill: management of team involved in innovation",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'management of team involved in innovation'",
+              "vacancy_evidence": "Mandatory Skill Requirement: management of team involved in innovation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'management of team involved in innovation' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_earn_greater_margins_for_the_company",
+            "description": "Skill: earn greater margins for the company",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'earn greater margins for the company'",
+              "vacancy_evidence": "Mandatory Skill Requirement: earn greater margins for the company",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'earn greater margins for the company' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_responsible_to_maintain",
+            "description": "Skill: Responsible to maintain",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Responsible to maintain'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Responsible to maintain",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Responsible to maintain' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_update_overall_knowledge_of_the_department",
+            "description": "Skill: update overall knowledge of the department",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'update overall knowledge of the department'",
+              "vacancy_evidence": "Mandatory Skill Requirement: update overall knowledge of the department",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'update overall knowledge of the department' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_the_self_by_attending_tradeshows",
+            "description": "Skill: the self by attending tradeshows",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'the self by attending tradeshows'",
+              "vacancy_evidence": "Mandatory Skill Requirement: the self by attending tradeshows",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'the self by attending tradeshows' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_overall_responsible_for_managing",
+            "description": "Preferred Keyword: Overall responsible for managing",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Overall responsible for managing'",
+              "vacancy_evidence": "Preferred Keyword: Overall responsible for managing",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Overall responsible for managing' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_md_of_the_company._must_lead",
+            "description": "Preferred Keyword: MD of the company. Must lead",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'MD of the company. Must lead'",
+              "vacancy_evidence": "Preferred Keyword: MD of the company. Must lead",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'MD of the company. Must lead' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_oversee_the_research_function",
+            "description": "Preferred Keyword: oversee the research function",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'oversee the research function'",
+              "vacancy_evidence": "Preferred Keyword: oversee the research function",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'oversee the research function' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_co-ordinate_research",
+            "description": "Preferred Keyword: co-ordinate research",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'co-ordinate research'",
+              "vacancy_evidence": "Preferred Keyword: co-ordinate research",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'co-ordinate research' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_management_of_team_involved_in_innovation",
+            "description": "Preferred Keyword: management of team involved in innovation",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'management of team involved in innovation'",
+              "vacancy_evidence": "Preferred Keyword: management of team involved in innovation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'management of team involved in innovation' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_earn_greater_margins_for_the_company",
+            "description": "Preferred Keyword: earn greater margins for the company",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'earn greater margins for the company'",
+              "vacancy_evidence": "Preferred Keyword: earn greater margins for the company",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'earn greater margins for the company' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_responsible_to_maintain",
+            "description": "Preferred Keyword: Responsible to maintain",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Responsible to maintain'",
+              "vacancy_evidence": "Preferred Keyword: Responsible to maintain",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Responsible to maintain' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_update_overall_knowledge_of_the_department",
+            "description": "Preferred Keyword: update overall knowledge of the department",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'update overall knowledge of the department'",
+              "vacancy_evidence": "Preferred Keyword: update overall knowledge of the department",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'update overall knowledge of the department' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_the_self_by_attending_tradeshows",
+            "description": "Preferred Keyword: the self by attending tradeshows",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'the self by attending tradeshows'",
+              "vacancy_evidence": "Preferred Keyword: the self by attending tradeshows",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'the self by attending tradeshows' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Overall responsible for managing",
+          "Mandatory Skill: MD of the company. Must lead",
+          "Mandatory Skill: oversee the research function",
+          "Mandatory Skill: co-ordinate research",
+          "Mandatory Skill: management of team involved in innovation",
+          "Mandatory Skill: earn greater margins for the company",
+          "Mandatory Skill: Responsible to maintain",
+          "Mandatory Skill: update overall knowledge of the department",
+          "Mandatory Skill: the self by attending tradeshows",
+          "Preferred Keyword: Overall responsible for managing",
+          "Preferred Keyword: MD of the company. Must lead",
+          "Preferred Keyword: oversee the research function",
+          "Preferred Keyword: co-ordinate research",
+          "Preferred Keyword: management of team involved in innovation",
+          "Preferred Keyword: earn greater margins for the company",
+          "Preferred Keyword: Responsible to maintain",
+          "Preferred Keyword: update overall knowledge of the department",
+          "Preferred Keyword: the self by attending tradeshows"
+        ],
+        "evidence": {
+          "req_skill_overall_responsible_for_managing": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Overall responsible for managing'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Overall responsible for managing",
+            "confidence_score": 1.0
+          },
+          "req_skill_md_of_the_company._must_lead": {
+            "cv_evidence": "CV missing explicit mention of skill: 'MD of the company. Must lead'",
+            "vacancy_evidence": "Mandatory Skill Requirement: MD of the company. Must lead",
+            "confidence_score": 1.0
+          },
+          "req_skill_oversee_the_research_function": {
+            "cv_evidence": "CV missing explicit mention of skill: 'oversee the research function'",
+            "vacancy_evidence": "Mandatory Skill Requirement: oversee the research function",
+            "confidence_score": 1.0
+          },
+          "req_skill_co-ordinate_research": {
+            "cv_evidence": "CV missing explicit mention of skill: 'co-ordinate research'",
+            "vacancy_evidence": "Mandatory Skill Requirement: co-ordinate research",
+            "confidence_score": 1.0
+          },
+          "req_skill_management_of_team_involved_in_innovation": {
+            "cv_evidence": "CV missing explicit mention of skill: 'management of team involved in innovation'",
+            "vacancy_evidence": "Mandatory Skill Requirement: management of team involved in innovation",
+            "confidence_score": 1.0
+          },
+          "req_skill_earn_greater_margins_for_the_company": {
+            "cv_evidence": "CV missing explicit mention of skill: 'earn greater margins for the company'",
+            "vacancy_evidence": "Mandatory Skill Requirement: earn greater margins for the company",
+            "confidence_score": 1.0
+          },
+          "req_skill_responsible_to_maintain": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Responsible to maintain'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Responsible to maintain",
+            "confidence_score": 1.0
+          },
+          "req_skill_update_overall_knowledge_of_the_department": {
+            "cv_evidence": "CV missing explicit mention of skill: 'update overall knowledge of the department'",
+            "vacancy_evidence": "Mandatory Skill Requirement: update overall knowledge of the department",
+            "confidence_score": 1.0
+          },
+          "req_skill_the_self_by_attending_tradeshows": {
+            "cv_evidence": "CV missing explicit mention of skill: 'the self by attending tradeshows'",
+            "vacancy_evidence": "Mandatory Skill Requirement: the self by attending tradeshows",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_overall_responsible_for_managing": {
+            "cv_evidence": "CV missing preferred keyword: 'Overall responsible for managing'",
+            "vacancy_evidence": "Preferred Keyword: Overall responsible for managing",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_md_of_the_company._must_lead": {
+            "cv_evidence": "CV missing preferred keyword: 'MD of the company. Must lead'",
+            "vacancy_evidence": "Preferred Keyword: MD of the company. Must lead",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_oversee_the_research_function": {
+            "cv_evidence": "CV missing preferred keyword: 'oversee the research function'",
+            "vacancy_evidence": "Preferred Keyword: oversee the research function",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_co-ordinate_research": {
+            "cv_evidence": "CV missing preferred keyword: 'co-ordinate research'",
+            "vacancy_evidence": "Preferred Keyword: co-ordinate research",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_management_of_team_involved_in_innovation": {
+            "cv_evidence": "CV missing preferred keyword: 'management of team involved in innovation'",
+            "vacancy_evidence": "Preferred Keyword: management of team involved in innovation",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_earn_greater_margins_for_the_company": {
+            "cv_evidence": "CV missing preferred keyword: 'earn greater margins for the company'",
+            "vacancy_evidence": "Preferred Keyword: earn greater margins for the company",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_responsible_to_maintain": {
+            "cv_evidence": "CV missing preferred keyword: 'Responsible to maintain'",
+            "vacancy_evidence": "Preferred Keyword: Responsible to maintain",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_update_overall_knowledge_of_the_department": {
+            "cv_evidence": "CV missing preferred keyword: 'update overall knowledge of the department'",
+            "vacancy_evidence": "Preferred Keyword: update overall knowledge of the department",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_the_self_by_attending_tradeshows": {
+            "cv_evidence": "CV missing preferred keyword: 'the self by attending tradeshows'",
+            "vacancy_evidence": "Preferred Keyword: the self by attending tradeshows",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_overall_responsible_for_managing",
+            "description": "Skill: Overall responsible for managing",
+            "reason": "Mandatory skill 'Overall responsible for managing' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_md_of_the_company._must_lead",
+            "description": "Skill: MD of the company. Must lead",
+            "reason": "Mandatory skill 'MD of the company. Must lead' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_oversee_the_research_function",
+            "description": "Skill: oversee the research function",
+            "reason": "Mandatory skill 'oversee the research function' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_co-ordinate_research",
+            "description": "Skill: co-ordinate research",
+            "reason": "Mandatory skill 'co-ordinate research' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_management_of_team_involved_in_innovation",
+            "description": "Skill: management of team involved in innovation",
+            "reason": "Mandatory skill 'management of team involved in innovation' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_earn_greater_margins_for_the_company",
+            "description": "Skill: earn greater margins for the company",
+            "reason": "Mandatory skill 'earn greater margins for the company' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_responsible_to_maintain",
+            "description": "Skill: Responsible to maintain",
+            "reason": "Mandatory skill 'Responsible to maintain' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_update_overall_knowledge_of_the_department",
+            "description": "Skill: update overall knowledge of the department",
+            "reason": "Mandatory skill 'update overall knowledge of the department' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_the_self_by_attending_tradeshows",
+            "description": "Skill: the self by attending tradeshows",
+            "reason": "Mandatory skill 'the self by attending tradeshows' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Overall responsible for managing (Mandatory skill 'Overall responsible for managing' is not present in CV.); Skill: MD of the company. Must lead (Mandatory skill 'MD of the company. Must lead' is not present in CV.); Skill: oversee the research function (Mandatory skill 'oversee the research function' is not present in CV.); Skill: co-ordinate research (Mandatory skill 'co-ordinate research' is not present in CV.); Skill: management of team involved in innovation (Mandatory skill 'management of team involved in innovation' is not present in CV.); Skill: earn greater margins for the company (Mandatory skill 'earn greater margins for the company' is not present in CV.); Skill: Responsible to maintain (Mandatory skill 'Responsible to maintain' is not present in CV.); Skill: update overall knowledge of the department (Mandatory skill 'update overall knowledge of the department' is not present in CV.); Skill: the self by attending tradeshows (Mandatory skill 'the self by attending tradeshows' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Technical Leader (R & D)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1275",
+        "job_title": "Sr. Specialist - HR",
+        "department": "HR & IR Team",
+        "vacancy_id": 1275,
+        "job_profile_id": 357,
+        "company_id": 1,
+        "department_id": 10,
+        "department_name": "HR & IR Team",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "HR Operation",
+          "Employee Engagement",
+          "Payroll",
+          "Recruitment"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "HR Operation",
+          "Employee Engagement",
+          "Payroll",
+          "Recruitment"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_hr_operation",
+            "description": "Skill: HR Operation",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'HR Operation'",
+              "vacancy_evidence": "Mandatory Skill Requirement: HR Operation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'HR Operation' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_employee_engagement",
+            "description": "Skill: Employee Engagement",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Employee Engagement'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Employee Engagement",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Employee Engagement' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_payroll",
+            "description": "Skill: Payroll",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Payroll'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Payroll",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Payroll' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_recruitment",
+            "description": "Skill: Recruitment",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Recruitment'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Recruitment",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Recruitment' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_hr_operation",
+            "description": "Preferred Keyword: HR Operation",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'HR Operation'",
+              "vacancy_evidence": "Preferred Keyword: HR Operation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'HR Operation' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_employee_engagement",
+            "description": "Preferred Keyword: Employee Engagement",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Employee Engagement'",
+              "vacancy_evidence": "Preferred Keyword: Employee Engagement",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Employee Engagement' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_payroll",
+            "description": "Preferred Keyword: Payroll",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Payroll'",
+              "vacancy_evidence": "Preferred Keyword: Payroll",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Payroll' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_recruitment",
+            "description": "Preferred Keyword: Recruitment",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Recruitment'",
+              "vacancy_evidence": "Preferred Keyword: Recruitment",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Recruitment' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: HR Operation",
+          "Mandatory Skill: Employee Engagement",
+          "Mandatory Skill: Payroll",
+          "Mandatory Skill: Recruitment",
+          "Preferred Keyword: HR Operation",
+          "Preferred Keyword: Employee Engagement",
+          "Preferred Keyword: Payroll",
+          "Preferred Keyword: Recruitment"
+        ],
+        "evidence": {
+          "req_skill_hr_operation": {
+            "cv_evidence": "CV missing explicit mention of skill: 'HR Operation'",
+            "vacancy_evidence": "Mandatory Skill Requirement: HR Operation",
+            "confidence_score": 1.0
+          },
+          "req_skill_employee_engagement": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Employee Engagement'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Employee Engagement",
+            "confidence_score": 1.0
+          },
+          "req_skill_payroll": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Payroll'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Payroll",
+            "confidence_score": 1.0
+          },
+          "req_skill_recruitment": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Recruitment'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Recruitment",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_hr_operation": {
+            "cv_evidence": "CV missing preferred keyword: 'HR Operation'",
+            "vacancy_evidence": "Preferred Keyword: HR Operation",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_employee_engagement": {
+            "cv_evidence": "CV missing preferred keyword: 'Employee Engagement'",
+            "vacancy_evidence": "Preferred Keyword: Employee Engagement",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_payroll": {
+            "cv_evidence": "CV missing preferred keyword: 'Payroll'",
+            "vacancy_evidence": "Preferred Keyword: Payroll",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_recruitment": {
+            "cv_evidence": "CV missing preferred keyword: 'Recruitment'",
+            "vacancy_evidence": "Preferred Keyword: Recruitment",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_hr_operation",
+            "description": "Skill: HR Operation",
+            "reason": "Mandatory skill 'HR Operation' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_employee_engagement",
+            "description": "Skill: Employee Engagement",
+            "reason": "Mandatory skill 'Employee Engagement' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_payroll",
+            "description": "Skill: Payroll",
+            "reason": "Mandatory skill 'Payroll' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_recruitment",
+            "description": "Skill: Recruitment",
+            "reason": "Mandatory skill 'Recruitment' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: HR Operation (Mandatory skill 'HR Operation' is not present in CV.); Skill: Employee Engagement (Mandatory skill 'Employee Engagement' is not present in CV.); Skill: Payroll (Mandatory skill 'Payroll' is not present in CV.); Skill: Recruitment (Mandatory skill 'Recruitment' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Sr. Specialist - HR'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      }
+    ],
+    "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+    "llm_skipped": true
+  },
+  "enriched_match_analysis": {
+    "primary_department": "Production Team - 3 (Kalpesh Patel)",
+    "best_match": {
+      "job_id": "1282",
+      "job_title": "Plant Assistant - II (Production)",
+      "department": "Production Team - 3 (Kalpesh Patel)",
+      "vacancy_id": 1282,
+      "job_profile_id": 79,
+      "company_id": 1,
+      "department_id": 21,
+      "department_name": "Production Team - 3 (Kalpesh Patel)",
+      "location_id": 2,
+      "score": 78.6,
+      "overall_score": 78.6,
+      "role_score": 50.0,
+      "skills_score": 100.0,
+      "experience_score": 100.0,
+      "education_score": 0.0,
+      "domain_score": 50.0,
+      "technology_score": 0.0,
+      "certification_score": 0.0,
+      "responsibilities_score": 0.0,
+      "coverage": 0.7,
+      "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+      "classification": "HIGH",
+      "recommendation": "Strong candidate — proceed to interview.",
+      "matched_skills": [
+        "NO"
+      ],
+      "missing_skills": [],
+      "matched_keywords": [
+        "NO"
+      ],
+      "missing_keywords": [],
+      "mandatory_requirements": [
+        {
+          "requirement_id": "req_skill_no",
+          "description": "Skill: NO",
+          "tier": "MANDATORY",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV contains skill: 'NO'",
+            "vacancy_evidence": "Mandatory Skill Requirement: NO",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "preferred_requirements": [
+        {
+          "requirement_id": "pref_keyword_no",
+          "description": "Preferred Keyword: NO",
+          "tier": "PREFERRED",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV mentions preferred keyword: 'NO'",
+            "vacancy_evidence": "Preferred Keyword: NO",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "optional_requirements": [],
+      "matched_criteria": [
+        "Mandatory Skill: NO",
+        "Preferred Keyword: NO"
+      ],
+      "missing_criteria": [],
+      "evidence": {
+        "req_skill_no": {
+          "cv_evidence": "CV contains skill: 'NO'",
+          "vacancy_evidence": "Mandatory Skill Requirement: NO",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_no": {
+          "cv_evidence": "CV mentions preferred keyword: 'NO'",
+          "vacancy_evidence": "Preferred Keyword: NO",
+          "confidence_score": 1.0
+        }
+      },
+      "mandatory_failures": [],
+      "confidence": 1.0,
+      "hr_review_required": false,
+      "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+      "career_transition_detected": true,
+      "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - II (Production)'.",
+      "llm_reason": "",
+      "inferred_skills": []
+    },
+    "suitable_openings": [
+      {
+        "job_id": "1282",
+        "job_title": "Plant Assistant - II (Production)",
+        "department": "Production Team - 3 (Kalpesh Patel)",
+        "vacancy_id": 1282,
+        "job_profile_id": 79,
+        "company_id": 1,
+        "department_id": 21,
+        "department_name": "Production Team - 3 (Kalpesh Patel)",
+        "location_id": 2,
+        "score": 78.6,
+        "overall_score": 78.6,
+        "role_score": 50.0,
+        "skills_score": 100.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+        "classification": "HIGH",
+        "recommendation": "Strong candidate — proceed to interview.",
+        "matched_skills": [
+          "NO"
+        ],
+        "missing_skills": [],
+        "matched_keywords": [
+          "NO"
+        ],
+        "missing_keywords": [],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_no",
+            "description": "Skill: NO",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'NO'",
+              "vacancy_evidence": "Mandatory Skill Requirement: NO",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_no",
+            "description": "Preferred Keyword: NO",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'NO'",
+              "vacancy_evidence": "Preferred Keyword: NO",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: NO",
+          "Preferred Keyword: NO"
+        ],
+        "missing_criteria": [],
+        "evidence": {
+          "req_skill_no": {
+            "cv_evidence": "CV contains skill: 'NO'",
+            "vacancy_evidence": "Mandatory Skill Requirement: NO",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_no": {
+            "cv_evidence": "CV mentions preferred keyword: 'NO'",
+            "vacancy_evidence": "Preferred Keyword: NO",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [],
+        "confidence": 1.0,
+        "hr_review_required": false,
+        "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - II (Production)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "720",
+        "job_title": "Plant Assistant - II (Maintenance)",
+        "department": "Maintenance Team - 2 (Parag Detroja)",
+        "vacancy_id": 720,
+        "job_profile_id": 82,
+        "company_id": 1,
+        "department_id": 24,
+        "department_name": "Maintenance Team - 2 (Parag Detroja)",
+        "location_id": 2,
+        "score": 22.9,
+        "overall_score": 22.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #2 due to lower score (22.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Chemical plant experience"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Chemical plant experience"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_chemical_plant_experience",
+            "description": "Skill: Chemical plant experience",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Chemical plant experience'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Chemical plant experience",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Chemical plant experience' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_chemical_plant_experience",
+            "description": "Preferred Keyword: Chemical plant experience",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Chemical plant experience'",
+              "vacancy_evidence": "Preferred Keyword: Chemical plant experience",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Chemical plant experience' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Chemical plant experience",
+          "Preferred Keyword: Chemical plant experience"
+        ],
+        "evidence": {
+          "req_skill_chemical_plant_experience": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Chemical plant experience'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Chemical plant experience",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_chemical_plant_experience": {
+            "cv_evidence": "CV missing preferred keyword: 'Chemical plant experience'",
+            "vacancy_evidence": "Preferred Keyword: Chemical plant experience",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_chemical_plant_experience",
+            "description": "Skill: Chemical plant experience",
+            "reason": "Mandatory skill 'Chemical plant experience' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Chemical plant experience (Mandatory skill 'Chemical plant experience' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - II (Maintenance)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "811",
+        "job_title": "Plant Assistant - I (Maintenance)",
+        "department": "Maintenance Team - 1 (Ramesh Maurya)",
+        "vacancy_id": 811,
+        "job_profile_id": 83,
+        "company_id": 1,
+        "department_id": 23,
+        "department_name": "Maintenance Team - 1 (Ramesh Maurya)",
+        "location_id": 1,
+        "score": 22.9,
+        "overall_score": 22.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #3 due to lower score (22.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Maintenance Work"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Maintenance Work"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_maintenance_work",
+            "description": "Skill: Maintenance Work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Maintenance Work' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_maintenance_work",
+            "description": "Preferred Keyword: Maintenance Work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+              "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Maintenance Work' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Maintenance Work",
+          "Preferred Keyword: Maintenance Work"
+        ],
+        "evidence": {
+          "req_skill_maintenance_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_maintenance_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+            "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_maintenance_work",
+            "description": "Skill: Maintenance Work",
+            "reason": "Mandatory skill 'Maintenance Work' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Maintenance Work (Mandatory skill 'Maintenance Work' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Plant Assistant - I (Maintenance)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1126",
+        "job_title": "Technical Leader (R & D)",
+        "department": "CIS Team",
+        "vacancy_id": 1126,
+        "job_profile_id": 1,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #4 due to lower score (0.0% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Overall responsible for managing",
+          "MD of the company. Must lead",
+          "oversee the research function",
+          "co-ordinate research",
+          "management of team involved in innovation",
+          "earn greater margins for the company",
+          "Responsible to maintain",
+          "update overall knowledge of the department",
+          "the self by attending tradeshows"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Overall responsible for managing",
+          "MD of the company. Must lead",
+          "oversee the research function",
+          "co-ordinate research",
+          "management of team involved in innovation",
+          "earn greater margins for the company",
+          "Responsible to maintain",
+          "update overall knowledge of the department",
+          "the self by attending tradeshows"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_overall_responsible_for_managing",
+            "description": "Skill: Overall responsible for managing",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Overall responsible for managing'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Overall responsible for managing",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Overall responsible for managing' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_md_of_the_company._must_lead",
+            "description": "Skill: MD of the company. Must lead",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'MD of the company. Must lead'",
+              "vacancy_evidence": "Mandatory Skill Requirement: MD of the company. Must lead",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'MD of the company. Must lead' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_oversee_the_research_function",
+            "description": "Skill: oversee the research function",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'oversee the research function'",
+              "vacancy_evidence": "Mandatory Skill Requirement: oversee the research function",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'oversee the research function' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_co-ordinate_research",
+            "description": "Skill: co-ordinate research",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'co-ordinate research'",
+              "vacancy_evidence": "Mandatory Skill Requirement: co-ordinate research",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'co-ordinate research' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_management_of_team_involved_in_innovation",
+            "description": "Skill: management of team involved in innovation",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'management of team involved in innovation'",
+              "vacancy_evidence": "Mandatory Skill Requirement: management of team involved in innovation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'management of team involved in innovation' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_earn_greater_margins_for_the_company",
+            "description": "Skill: earn greater margins for the company",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'earn greater margins for the company'",
+              "vacancy_evidence": "Mandatory Skill Requirement: earn greater margins for the company",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'earn greater margins for the company' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_responsible_to_maintain",
+            "description": "Skill: Responsible to maintain",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Responsible to maintain'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Responsible to maintain",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Responsible to maintain' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_update_overall_knowledge_of_the_department",
+            "description": "Skill: update overall knowledge of the department",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'update overall knowledge of the department'",
+              "vacancy_evidence": "Mandatory Skill Requirement: update overall knowledge of the department",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'update overall knowledge of the department' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_the_self_by_attending_tradeshows",
+            "description": "Skill: the self by attending tradeshows",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'the self by attending tradeshows'",
+              "vacancy_evidence": "Mandatory Skill Requirement: the self by attending tradeshows",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'the self by attending tradeshows' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_overall_responsible_for_managing",
+            "description": "Preferred Keyword: Overall responsible for managing",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Overall responsible for managing'",
+              "vacancy_evidence": "Preferred Keyword: Overall responsible for managing",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Overall responsible for managing' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_md_of_the_company._must_lead",
+            "description": "Preferred Keyword: MD of the company. Must lead",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'MD of the company. Must lead'",
+              "vacancy_evidence": "Preferred Keyword: MD of the company. Must lead",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'MD of the company. Must lead' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_oversee_the_research_function",
+            "description": "Preferred Keyword: oversee the research function",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'oversee the research function'",
+              "vacancy_evidence": "Preferred Keyword: oversee the research function",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'oversee the research function' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_co-ordinate_research",
+            "description": "Preferred Keyword: co-ordinate research",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'co-ordinate research'",
+              "vacancy_evidence": "Preferred Keyword: co-ordinate research",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'co-ordinate research' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_management_of_team_involved_in_innovation",
+            "description": "Preferred Keyword: management of team involved in innovation",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'management of team involved in innovation'",
+              "vacancy_evidence": "Preferred Keyword: management of team involved in innovation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'management of team involved in innovation' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_earn_greater_margins_for_the_company",
+            "description": "Preferred Keyword: earn greater margins for the company",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'earn greater margins for the company'",
+              "vacancy_evidence": "Preferred Keyword: earn greater margins for the company",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'earn greater margins for the company' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_responsible_to_maintain",
+            "description": "Preferred Keyword: Responsible to maintain",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Responsible to maintain'",
+              "vacancy_evidence": "Preferred Keyword: Responsible to maintain",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Responsible to maintain' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_update_overall_knowledge_of_the_department",
+            "description": "Preferred Keyword: update overall knowledge of the department",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'update overall knowledge of the department'",
+              "vacancy_evidence": "Preferred Keyword: update overall knowledge of the department",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'update overall knowledge of the department' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_the_self_by_attending_tradeshows",
+            "description": "Preferred Keyword: the self by attending tradeshows",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'the self by attending tradeshows'",
+              "vacancy_evidence": "Preferred Keyword: the self by attending tradeshows",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'the self by attending tradeshows' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Overall responsible for managing",
+          "Mandatory Skill: MD of the company. Must lead",
+          "Mandatory Skill: oversee the research function",
+          "Mandatory Skill: co-ordinate research",
+          "Mandatory Skill: management of team involved in innovation",
+          "Mandatory Skill: earn greater margins for the company",
+          "Mandatory Skill: Responsible to maintain",
+          "Mandatory Skill: update overall knowledge of the department",
+          "Mandatory Skill: the self by attending tradeshows",
+          "Preferred Keyword: Overall responsible for managing",
+          "Preferred Keyword: MD of the company. Must lead",
+          "Preferred Keyword: oversee the research function",
+          "Preferred Keyword: co-ordinate research",
+          "Preferred Keyword: management of team involved in innovation",
+          "Preferred Keyword: earn greater margins for the company",
+          "Preferred Keyword: Responsible to maintain",
+          "Preferred Keyword: update overall knowledge of the department",
+          "Preferred Keyword: the self by attending tradeshows"
+        ],
+        "evidence": {
+          "req_skill_overall_responsible_for_managing": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Overall responsible for managing'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Overall responsible for managing",
+            "confidence_score": 1.0
+          },
+          "req_skill_md_of_the_company._must_lead": {
+            "cv_evidence": "CV missing explicit mention of skill: 'MD of the company. Must lead'",
+            "vacancy_evidence": "Mandatory Skill Requirement: MD of the company. Must lead",
+            "confidence_score": 1.0
+          },
+          "req_skill_oversee_the_research_function": {
+            "cv_evidence": "CV missing explicit mention of skill: 'oversee the research function'",
+            "vacancy_evidence": "Mandatory Skill Requirement: oversee the research function",
+            "confidence_score": 1.0
+          },
+          "req_skill_co-ordinate_research": {
+            "cv_evidence": "CV missing explicit mention of skill: 'co-ordinate research'",
+            "vacancy_evidence": "Mandatory Skill Requirement: co-ordinate research",
+            "confidence_score": 1.0
+          },
+          "req_skill_management_of_team_involved_in_innovation": {
+            "cv_evidence": "CV missing explicit mention of skill: 'management of team involved in innovation'",
+            "vacancy_evidence": "Mandatory Skill Requirement: management of team involved in innovation",
+            "confidence_score": 1.0
+          },
+          "req_skill_earn_greater_margins_for_the_company": {
+            "cv_evidence": "CV missing explicit mention of skill: 'earn greater margins for the company'",
+            "vacancy_evidence": "Mandatory Skill Requirement: earn greater margins for the company",
+            "confidence_score": 1.0
+          },
+          "req_skill_responsible_to_maintain": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Responsible to maintain'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Responsible to maintain",
+            "confidence_score": 1.0
+          },
+          "req_skill_update_overall_knowledge_of_the_department": {
+            "cv_evidence": "CV missing explicit mention of skill: 'update overall knowledge of the department'",
+            "vacancy_evidence": "Mandatory Skill Requirement: update overall knowledge of the department",
+            "confidence_score": 1.0
+          },
+          "req_skill_the_self_by_attending_tradeshows": {
+            "cv_evidence": "CV missing explicit mention of skill: 'the self by attending tradeshows'",
+            "vacancy_evidence": "Mandatory Skill Requirement: the self by attending tradeshows",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_overall_responsible_for_managing": {
+            "cv_evidence": "CV missing preferred keyword: 'Overall responsible for managing'",
+            "vacancy_evidence": "Preferred Keyword: Overall responsible for managing",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_md_of_the_company._must_lead": {
+            "cv_evidence": "CV missing preferred keyword: 'MD of the company. Must lead'",
+            "vacancy_evidence": "Preferred Keyword: MD of the company. Must lead",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_oversee_the_research_function": {
+            "cv_evidence": "CV missing preferred keyword: 'oversee the research function'",
+            "vacancy_evidence": "Preferred Keyword: oversee the research function",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_co-ordinate_research": {
+            "cv_evidence": "CV missing preferred keyword: 'co-ordinate research'",
+            "vacancy_evidence": "Preferred Keyword: co-ordinate research",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_management_of_team_involved_in_innovation": {
+            "cv_evidence": "CV missing preferred keyword: 'management of team involved in innovation'",
+            "vacancy_evidence": "Preferred Keyword: management of team involved in innovation",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_earn_greater_margins_for_the_company": {
+            "cv_evidence": "CV missing preferred keyword: 'earn greater margins for the company'",
+            "vacancy_evidence": "Preferred Keyword: earn greater margins for the company",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_responsible_to_maintain": {
+            "cv_evidence": "CV missing preferred keyword: 'Responsible to maintain'",
+            "vacancy_evidence": "Preferred Keyword: Responsible to maintain",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_update_overall_knowledge_of_the_department": {
+            "cv_evidence": "CV missing preferred keyword: 'update overall knowledge of the department'",
+            "vacancy_evidence": "Preferred Keyword: update overall knowledge of the department",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_the_self_by_attending_tradeshows": {
+            "cv_evidence": "CV missing preferred keyword: 'the self by attending tradeshows'",
+            "vacancy_evidence": "Preferred Keyword: the self by attending tradeshows",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_overall_responsible_for_managing",
+            "description": "Skill: Overall responsible for managing",
+            "reason": "Mandatory skill 'Overall responsible for managing' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_md_of_the_company._must_lead",
+            "description": "Skill: MD of the company. Must lead",
+            "reason": "Mandatory skill 'MD of the company. Must lead' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_oversee_the_research_function",
+            "description": "Skill: oversee the research function",
+            "reason": "Mandatory skill 'oversee the research function' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_co-ordinate_research",
+            "description": "Skill: co-ordinate research",
+            "reason": "Mandatory skill 'co-ordinate research' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_management_of_team_involved_in_innovation",
+            "description": "Skill: management of team involved in innovation",
+            "reason": "Mandatory skill 'management of team involved in innovation' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_earn_greater_margins_for_the_company",
+            "description": "Skill: earn greater margins for the company",
+            "reason": "Mandatory skill 'earn greater margins for the company' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_responsible_to_maintain",
+            "description": "Skill: Responsible to maintain",
+            "reason": "Mandatory skill 'Responsible to maintain' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_update_overall_knowledge_of_the_department",
+            "description": "Skill: update overall knowledge of the department",
+            "reason": "Mandatory skill 'update overall knowledge of the department' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_the_self_by_attending_tradeshows",
+            "description": "Skill: the self by attending tradeshows",
+            "reason": "Mandatory skill 'the self by attending tradeshows' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Overall responsible for managing (Mandatory skill 'Overall responsible for managing' is not present in CV.); Skill: MD of the company. Must lead (Mandatory skill 'MD of the company. Must lead' is not present in CV.); Skill: oversee the research function (Mandatory skill 'oversee the research function' is not present in CV.); Skill: co-ordinate research (Mandatory skill 'co-ordinate research' is not present in CV.); Skill: management of team involved in innovation (Mandatory skill 'management of team involved in innovation' is not present in CV.); Skill: earn greater margins for the company (Mandatory skill 'earn greater margins for the company' is not present in CV.); Skill: Responsible to maintain (Mandatory skill 'Responsible to maintain' is not present in CV.); Skill: update overall knowledge of the department (Mandatory skill 'update overall knowledge of the department' is not present in CV.); Skill: the self by attending tradeshows (Mandatory skill 'the self by attending tradeshows' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Technical Leader (R & D)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1275",
+        "job_title": "Sr. Specialist - HR",
+        "department": "HR & IR Team",
+        "vacancy_id": 1275,
+        "job_profile_id": 357,
+        "company_id": 1,
+        "department_id": 10,
+        "department_name": "HR & IR Team",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "HR Operation",
+          "Employee Engagement",
+          "Payroll",
+          "Recruitment"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "HR Operation",
+          "Employee Engagement",
+          "Payroll",
+          "Recruitment"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_hr_operation",
+            "description": "Skill: HR Operation",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'HR Operation'",
+              "vacancy_evidence": "Mandatory Skill Requirement: HR Operation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'HR Operation' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_employee_engagement",
+            "description": "Skill: Employee Engagement",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Employee Engagement'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Employee Engagement",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Employee Engagement' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_payroll",
+            "description": "Skill: Payroll",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Payroll'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Payroll",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Payroll' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_recruitment",
+            "description": "Skill: Recruitment",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Recruitment'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Recruitment",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Recruitment' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_hr_operation",
+            "description": "Preferred Keyword: HR Operation",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'HR Operation'",
+              "vacancy_evidence": "Preferred Keyword: HR Operation",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'HR Operation' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_employee_engagement",
+            "description": "Preferred Keyword: Employee Engagement",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Employee Engagement'",
+              "vacancy_evidence": "Preferred Keyword: Employee Engagement",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Employee Engagement' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_payroll",
+            "description": "Preferred Keyword: Payroll",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Payroll'",
+              "vacancy_evidence": "Preferred Keyword: Payroll",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Payroll' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_recruitment",
+            "description": "Preferred Keyword: Recruitment",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Recruitment'",
+              "vacancy_evidence": "Preferred Keyword: Recruitment",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Recruitment' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: HR Operation",
+          "Mandatory Skill: Employee Engagement",
+          "Mandatory Skill: Payroll",
+          "Mandatory Skill: Recruitment",
+          "Preferred Keyword: HR Operation",
+          "Preferred Keyword: Employee Engagement",
+          "Preferred Keyword: Payroll",
+          "Preferred Keyword: Recruitment"
+        ],
+        "evidence": {
+          "req_skill_hr_operation": {
+            "cv_evidence": "CV missing explicit mention of skill: 'HR Operation'",
+            "vacancy_evidence": "Mandatory Skill Requirement: HR Operation",
+            "confidence_score": 1.0
+          },
+          "req_skill_employee_engagement": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Employee Engagement'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Employee Engagement",
+            "confidence_score": 1.0
+          },
+          "req_skill_payroll": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Payroll'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Payroll",
+            "confidence_score": 1.0
+          },
+          "req_skill_recruitment": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Recruitment'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Recruitment",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_hr_operation": {
+            "cv_evidence": "CV missing preferred keyword: 'HR Operation'",
+            "vacancy_evidence": "Preferred Keyword: HR Operation",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_employee_engagement": {
+            "cv_evidence": "CV missing preferred keyword: 'Employee Engagement'",
+            "vacancy_evidence": "Preferred Keyword: Employee Engagement",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_payroll": {
+            "cv_evidence": "CV missing preferred keyword: 'Payroll'",
+            "vacancy_evidence": "Preferred Keyword: Payroll",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_recruitment": {
+            "cv_evidence": "CV missing preferred keyword: 'Recruitment'",
+            "vacancy_evidence": "Preferred Keyword: Recruitment",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_hr_operation",
+            "description": "Skill: HR Operation",
+            "reason": "Mandatory skill 'HR Operation' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_employee_engagement",
+            "description": "Skill: Employee Engagement",
+            "reason": "Mandatory skill 'Employee Engagement' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_payroll",
+            "description": "Skill: Payroll",
+            "reason": "Mandatory skill 'Payroll' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_recruitment",
+            "description": "Skill: Recruitment",
+            "reason": "Mandatory skill 'Recruitment' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: HR Operation (Mandatory skill 'HR Operation' is not present in CV.); Skill: Employee Engagement (Mandatory skill 'Employee Engagement' is not present in CV.); Skill: Payroll (Mandatory skill 'Payroll' is not present in CV.); Skill: Recruitment (Mandatory skill 'Recruitment' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'Ajay Vani' to Target role 'Sr. Specialist - HR'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      }
+    ],
+    "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+    "llm_skipped": true
+  }
+}
