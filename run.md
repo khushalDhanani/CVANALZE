@@ -42,6 +42,7 @@ cd backend
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 *(The API documentation will be available at http://localhost:8000/docs)*
+*(Cache Analytics can be viewed at http://localhost:8000/api/analytics/cache)*
 
 ### C. Run the CLI Batch Processor (Testing)
 If you want to manually trigger a batch scan of the `uploads/` directory from the terminal (instead of calling the FastAPI endpoint), run:
