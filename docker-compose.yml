@@ -15,6 +15,7 @@ services:
     restart: unless-stopped
     depends_on:
       - pgvector
+      - redis
 
   pgvector:
     image: pgvector/pgvector:pg16
@@ -29,5 +30,14 @@ services:
       - pg_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: cv_analyzer_redis
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+
+
 volumes:
   pg_data:
+
