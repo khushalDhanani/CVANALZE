@@ -25,7 +25,7 @@ export interface CVMatchRequest {
 export interface CVProcessingResponse {
   message: string;
   cv_key: string;
-  status: 'processing' | 'completed' | 'failed';
+  status: 'processing' | 'completed' | 'failed' | 'FAILED' | string;
   progress?: number;
 }
 
@@ -215,4 +215,35 @@ export interface CandidateSummary {
     recommendation?: string;
   };
 }
+
+export interface CacheAnalyticsResponse {
+  global_metrics: {
+    total_hits: number;
+    total_misses: number;
+    overall_hit_ratio: number;
+    llm_calls_prevented: number;
+    db_queries_prevented: number;
+  };
+  per_namespace: Record<
+    string,
+    {
+      hits: number;
+      misses: number;
+      hit_ratio: number;
+    }
+  >;
+  system_stats: {
+    redis: {
+      status: string;
+      used_memory_human?: string;
+      used_memory_bytes?: number;
+      total_keys?: number;
+    };
+    memory_cache: {
+      items_count: number;
+      max_size: number;
+    };
+  };
+}
+
 

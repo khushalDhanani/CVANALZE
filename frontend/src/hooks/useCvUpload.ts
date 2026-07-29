@@ -38,7 +38,11 @@ export function useCvUpload() {
         try {
           if (isEnriched) {
             const res = await matchService.getMatchStatus(cvKey);
-            if ('scan_id' in res) {
+            if ('status' in res && (res as CVProcessingResponse).status?.toUpperCase() === 'FAILED') {
+              clearInterval(interval);
+              setUploading(false);
+              setError((res as CVProcessingResponse).message || 'CV processing failed.');
+            } else if ('scan_id' in res) {
               clearInterval(interval);
               setEnrichedResult(res as EnrichedCandidateAnalysis);
               setUploading(false);
@@ -51,7 +55,11 @@ export function useCvUpload() {
             }
           } else {
             const res = await cvService.getCvStatus(cvKey);
-            if ('scan_id' in res) {
+            if ('status' in res && (res as CVProcessingResponse).status?.toUpperCase() === 'FAILED') {
+              clearInterval(interval);
+              setUploading(false);
+              setError((res as CVProcessingResponse).message || 'CV processing failed.');
+            } else if ('scan_id' in res) {
               clearInterval(interval);
               setBasicResult(res as CVUploadResponse);
               setUploading(false);

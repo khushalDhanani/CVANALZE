@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon } from 'lucide-react-native';
+import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3 } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
-import { CVUploadResponse } from '@/types/api';
+import { CVUploadResponse, JobMatchScore } from '@/types/api';
 import { Card, Button, Badge, DenseRow } from '@/components/ui';
 import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
+import { HrReviewModal } from '@/components/ui/HrReviewModal';
+import { COLORS } from '@/constants/colors';
 
 export default function CandidateDetailScreen() {
   const router = useRouter();
@@ -16,8 +18,9 @@ export default function CandidateDetailScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showFullText, setShowFullText] = useState<boolean>(false);
+  const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
 
-  useEffect(() => {
+  const fetchDetail = () => {
     if (!id) return;
     setLoading(true);
     setError(null);
@@ -26,10 +29,15 @@ export default function CandidateDetailScreen() {
       .then((res) => setData(res))
       .catch((err) => setError(err.message || 'Failed to load candidate details.'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDetail();
   }, [id]);
 
   const analysis = data?.enriched_match_analysis || data?.match_analysis;
   const bestMatch = analysis?.best_match;
+  const scanId = data?.scan_id || data?.id || id || '';
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -37,7 +45,7 @@ export default function CandidateDetailScreen() {
       <View className="flex-row items-center justify-between px-3 py-2 bg-surface border-b border-border">
         <View className="flex-row items-center gap-2">
           <Button
-            label=""
+            icon={<ArrowLeft size={18} color={COLORS.primary} />}
             variant="ghost"
             size="sm"
             onPress={() => router.back()}
@@ -52,7 +60,7 @@ export default function CandidateDetailScreen() {
       <ScrollView className="flex-1 px-3 py-4">
         {loading ? (
           <View className="flex-1 justify-center items-center py-16">
-            <ActivityIndicator size="large" color="#4F46E5" />
+            <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">Loading candidate profile...</Text>
           </View>
         ) : error || !data ? (
@@ -70,7 +78,7 @@ export default function CandidateDetailScreen() {
             <Card className="gap-2">
               <View className="flex-row items-center gap-2">
                 <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
-                  <FileText size={20} color="#4F46E5" />
+                  <FileText size={20} color={COLORS.primary} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-sans-bold text-text-primary">
@@ -95,7 +103,7 @@ export default function CandidateDetailScreen() {
                 <View className="flex-row justify-between items-start">
                   <View className="flex-1 pr-2">
                     <View className="flex-row items-center gap-1 mb-1">
-                      <Award size={14} color="#4F46E5" />
+                      <Award size={14} color={COLORS.primary} />
                       <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
                         Top Job Match
                       </Text>
@@ -127,12 +135,22 @@ export default function CandidateDetailScreen() {
 
                 {/* Recommendation */}
                 {!!bestMatch.recommendation && (
-                  <View className="bg-background p-2.5 rounded-sm border border-border">
+                  <View className="bg-background p-2.5 rounded-md border border-border">
                     <Text className="text-xs font-sans text-text-primary">
                       💡 {bestMatch.recommendation}
                     </Text>
                   </View>
                 )}
+
+                <View className="pt-2 border-t border-border flex-row justify-end">
+                  <Button
+                    label="Submit HR Review"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Edit3 size={14} color={COLORS.primary} />}
+                    onPress={() => setReviewModalVisible(true)}
+                  />
+                </View>
               </Card>
             ) : null}
 
@@ -157,9 +175,21 @@ export default function CandidateDetailScreen() {
                 {data.markdown || data.text || 'No text extracted.'}
               </Text>
             </Card>
+
+            {/* HR Review Modal */}
+            {bestMatch && (
+              <HrReviewModal
+                visible={reviewModalVisible}
+                scanId={scanId}
+                job={bestMatch}
+                onClose={() => setReviewModalVisible(false)}
+                onSubmitted={fetchDetail}
+              />
+            )}
           </View>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+

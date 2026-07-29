@@ -5,13 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserCheck, FileText, Search, RefreshCw } from 'lucide-react-native';
 import { useCandidates } from '@/hooks/useCandidates';
 import { CandidateSummary } from '@/types/api';
-import { Card, DenseRow, TextField, Badge, Button, EmptyState } from '@/components/ui';
+import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
+import { COLORS } from '@/constants/colors';
 
 export default function CandidateListScreen() {
   const router = useRouter();
   const { candidates, loading, error, refreshCandidates } = useCandidates();
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterClassification, setFilterClassification] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL');
+  const [filterDept, setFilterDept] = useState<string>('');
 
   const filteredCandidates = (candidates || []).filter((cand) => {
     if (!cand) return false;
@@ -20,7 +23,15 @@ export default function CandidateListScreen() {
     const id = (cand.id || '').toLowerCase();
     const dept = (cand.primary_department || '').toLowerCase();
     const job = (cand.best_match?.job_title || '').toLowerCase();
-    return fname.includes(q) || id.includes(q) || dept.includes(q) || job.includes(q);
+    
+    const matchSearch = fname.includes(q) || id.includes(q) || dept.includes(q) || job.includes(q);
+    
+    const candClassification = cand.best_match?.classification || 'LOW';
+    const matchClassification = filterClassification === 'ALL' || candClassification === filterClassification;
+    
+    const matchDept = filterDept === '' || dept.includes(filterDept.toLowerCase());
+
+    return matchSearch && matchClassification && matchDept;
   });
 
   const renderCandidateRow = ({ item }: { item: CandidateSummary }) => {
@@ -83,10 +94,30 @@ export default function CandidateListScreen() {
           />
         </View>
 
+        {/* Filters */}
+        <View className="mb-4 gap-3">
+          <SegmentedControl
+            options={[
+              { value: 'ALL', label: 'All Matches' },
+              { value: 'HIGH', label: 'High' },
+              { value: 'MEDIUM', label: 'Medium' },
+              { value: 'LOW', label: 'Low' }
+            ]}
+            value={filterClassification}
+            onChange={(val) => setFilterClassification(val as 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW')}
+          />
+          <TextField
+            label=""
+            value={filterDept}
+            onChangeText={setFilterDept}
+            placeholder="Filter by specific department..."
+          />
+        </View>
+
         {/* Loading state */}
         {loading ? (
           <View className="flex-1 justify-center items-center py-12">
-            <ActivityIndicator size="large" color="#4F46E5" />
+            <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">
               Loading candidate directory...
             </Text>

@@ -12,7 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useBatchProgress } from '@/hooks/useBatchProgress';
 import { BatchCandidateResult } from '@/types/api';
-import { Card, Button, DenseRow } from '@/components/ui';
+import { Card, Button, DenseRow, SegmentedControl, EmptyState } from '@/components/ui';
+import { COLORS } from '@/constants/colors';
 
 export default function BatchScreen() {
   const [candidateLimit, setCandidateLimit] = useState<number>(10);
@@ -81,27 +82,16 @@ export default function BatchScreen() {
           <Text className="text-xs font-sans-bold text-text-primary">
             Select Maximum Candidates to Process:
           </Text>
-          <View className="flex-row gap-2">
-            {[5, 10, 20, 30].map((num) => (
-              <Pressable
-                key={num}
-                onPress={() => setCandidateLimit(num)}
-                disabled={running}
-                hitSlop={8}
-                className={`flex-1 py-2.5 rounded-md border items-center ${candidateLimit === num
-                    ? 'bg-primary border-primary active:bg-primary-dark'
-                    : 'bg-surface border-border active:bg-background'
-                  }`}
-              >
-                <Text
-                  className={`text-xs font-sans-bold ${candidateLimit === num ? 'text-text-inverse' : 'text-text-primary'
-                    }`}
-                >
-                  {num}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <SegmentedControl
+            options={[5, 10, 20, 30].map(num => ({
+              value: num,
+              label: String(num),
+              accessibilityLabel: `Limit ${num}`
+            }))}
+            value={candidateLimit}
+            onChange={(val) => setCandidateLimit(val as number)}
+            disabled={running}
+          />
 
           <Button
             label={running ? 'Processing Batch Candidates...' : 'Start Batch Processing'}
@@ -124,12 +114,12 @@ export default function BatchScreen() {
           <Card className="border-primary/40 mb-4 gap-2 shadow-sm">
             <View className="flex-row justify-between items-center">
               <View className="flex-row items-center gap-1.5">
-                <Radio size={14} color="#4F46E5" />
+                <Radio size={14} color={COLORS.primary} />
                 <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
                   Live Pipeline Progress
                 </Text>
               </View>
-              <ActivityIndicator size="small" color="#4F46E5" />
+              <ActivityIndicator size="small" color={COLORS.primary} />
             </View>
 
             <Text className="text-sm font-sans-semibold text-text-primary">
@@ -152,10 +142,18 @@ export default function BatchScreen() {
         )}
 
         {/* Results Section */}
+        {!result && !running && (
+          <View className="mt-8">
+            <EmptyState 
+              title="Ready to Process" 
+              subtitle="Select candidate limit and start batch processing" 
+            />
+          </View>
+        )}
         {result && (
           <View className="mb-6 gap-3">
             <Card className="bg-success/10 border-success/30 flex-row items-center gap-1.5 p-3">
-              <CheckCircle size={14} color="#16A34A" />
+              <CheckCircle size={14} color={COLORS.success} />
               <Text className="text-xs font-sans-bold text-success">
                 {result.message}
               </Text>
@@ -165,12 +163,19 @@ export default function BatchScreen() {
               Batch Match Results ({result.matches?.length || 0})
             </Text>
 
-            <FlatList
-              data={result.matches}
-              keyExtractor={(item, index) => (item?.candidate_id ? String(item.candidate_id) : `candidate-${index}`)}
-              renderItem={renderCandidateCard}
-              scrollEnabled={false}
-            />
+            {(!result.matches || result.matches.length === 0) ? (
+              <EmptyState 
+                title="No Matches Found" 
+                subtitle="No candidates met the threshold criteria for active vacancies" 
+              />
+            ) : (
+              <FlatList
+                data={result.matches}
+                keyExtractor={(item, index) => (item?.candidate_id ? String(item.candidate_id) : `candidate-${index}`)}
+                renderItem={renderCandidateCard}
+                scrollEnabled={false}
+              />
+            )}
           </View>
         )}
       </ScrollView>

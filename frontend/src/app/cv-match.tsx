@@ -16,7 +16,8 @@ import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useCvUpload } from '@/hooks/useCvUpload';
 import { matchService } from '@/services/matchService';
 import { CandidateMatchAnalysis, JobMatchScore, MandatoryFailure } from '@/types/api';
-import { Card, Button, TextField, Badge, DenseRow } from '@/components/ui';
+import { Card, Button, TextField, Badge, DenseRow, SegmentedControl, MatchAnalysisCard } from '@/components/ui';
+import { COLORS } from '@/constants/colors';
 
 export default function CvMatchScreen() {
   const [activeTab, setActiveTab] = useState<'text' | 'file'>('text');
@@ -101,7 +102,7 @@ export default function CvMatchScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView className="flex-1 px-3 py-4">
-        <View className="gap-4 mb-8">
+        <View className="gap-4 mb-4">
           {/* Header */}
           <View>
             <Text className="text-xl font-sans-bold text-text-primary mb-1">
@@ -113,41 +114,14 @@ export default function CvMatchScreen() {
           </View>
 
           {/* Mode Selector Tabs */}
-          <View className="flex-row bg-surface border border-border p-1 rounded-md">
-            <Pressable
-              onPress={() => setActiveTab('text')}
-              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${activeTab === 'text' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
-                }`}
-            >
-              <Edit3
-                size={14}
-                color={activeTab === 'text' ? '#FFFFFF' : '#9CA3AF'}
-              />
-              <Text
-                className={`text-xs font-sans-bold ${activeTab === 'text' ? 'text-text-inverse' : 'text-text-muted'
-                  }`}
-              >
-                Paste Raw CV Text
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setActiveTab('file')}
-              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${activeTab === 'file' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
-                }`}
-            >
-              <FolderIcon
-                size={14}
-                color={activeTab === 'file' ? '#FFFFFF' : '#9CA3AF'}
-              />
-              <Text
-                className={`text-xs font-sans-bold ${activeTab === 'file' ? 'text-text-inverse' : 'text-text-muted'
-                  }`}
-              >
-                Upload CV File
-              </Text>
-            </Pressable>
-          </View>
+          <SegmentedControl
+            options={[
+              { value: 'text', label: 'Paste Raw CV Text', icon: (props) => <Edit3 {...props} />, accessibilityLabel: 'Paste Raw CV Text' },
+              { value: 'file', label: 'Upload CV File', icon: (props) => <FolderIcon {...props} />, accessibilityLabel: 'Upload Resume File' }
+            ]}
+            value={activeTab}
+            onChange={(val) => setActiveTab(val as 'text' | 'file')}
+          />
 
           {/* LLM Enrichment Switch */}
           <Card className="flex-row items-center justify-between">
@@ -196,7 +170,7 @@ export default function CvMatchScreen() {
             <View className="gap-3">
               <View className="bg-surface border-2 border-dashed border-border rounded-md p-6 items-center justify-center">
                 <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-2">
-                  <FileText size={24} color="#4F46E5" />
+                  <FileText size={24} color={COLORS.primary} />
                 </View>
                 <Text className="text-sm font-sans-bold text-text-primary mb-1">
                   Upload Resume File
@@ -216,7 +190,7 @@ export default function CvMatchScreen() {
 
               {!!statusMessage && (
                 <Card className="bg-info/10 border-info/30 flex-row items-center gap-2">
-                  {uploading && <ActivityIndicator size="small" color="#2563EB" />}
+                  {uploading && <ActivityIndicator size="small" color={COLORS.info} />}
                   <Text className="text-xs text-info font-sans-medium">
                     {statusMessage}
                   </Text>
@@ -241,101 +215,13 @@ export default function CvMatchScreen() {
               </Text>
 
               {/* Best Match Card */}
-              {currentAnalysis.best_match ? (
-                <Card className="border-primary/40 shadow-sm gap-3">
-                  <View className="flex-row justify-between items-start">
-                    <View className="flex-1 pr-2">
-                      <View className="flex-row items-center gap-1 mb-1">
-                        <Award size={14} color="#4F46E5" />
-                        <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
-                          Best Matched Job
-                        </Text>
-                      </View>
-                      <Text className="text-lg font-sans-bold text-text-primary">
-                        {currentAnalysis.best_match.job_title}
-                      </Text>
-                      {!!currentAnalysis.best_match.department_name && (
-                        <Text className="text-xs font-sans-medium text-text-muted">
-                          Dept: {currentAnalysis.best_match.department_name}
-                        </Text>
-                      )}
-                    </View>
-                    <ScoreBadge
-                      score={currentAnalysis.best_match.overall_score}
-                      classification={currentAnalysis.best_match.classification}
-                    />
-                  </View>
-
-                  {/* Ranking reason */}
-                  <View className="bg-background p-2.5 rounded-sm border border-border">
-                    <Text className="text-xs font-sans text-text-muted italic">
-                      "{currentAnalysis.best_match.ranking_reason}"
-                    </Text>
-                  </View>
-
-                  {/* LLM Reason if available */}
-                  {!!currentAnalysis.best_match.llm_reason && (
-                    <Card className="bg-info/10 border-info/30 p-3">
-                      <View className="flex-row items-center gap-1.5 mb-1">
-                        <AlertTriangle size={14} color="#2563EB" />
-                        <Text className="text-xs font-sans-bold text-info">
-                          LLM Reasoning & Synthesis:
-                        </Text>
-                      </View>
-                      <Text className="text-xs font-sans text-info">
-                        {currentAnalysis.best_match.llm_reason}
-                      </Text>
-                    </Card>
-                  )}
-
-                  {/* Mandatory Failures */}
-                  {currentAnalysis.best_match.mandatory_fails?.length > 0 && (
-                    <Card className="bg-danger/10 border-danger/30 p-3">
-                      <View className="flex-row items-center gap-1.5 mb-1">
-                        <CpuIcon size={14} color="#DC2626" />
-                        <Text className="text-xs font-sans-bold text-danger">
-                          Mandatory Requirement Failures:
-                        </Text>
-                      </View>
-                      {currentAnalysis.best_match.mandatory_fails.map(
-                        (fail: MandatoryFailure, idx: number) => (
-                          <Text key={idx} className="text-xs font-sans-medium text-danger">
-                            • {fail.requirement}: {fail.details}
-                          </Text>
-                        )
-                      )}
-                    </Card>
-                  )}
-
-                  {/* Component Breakdown */}
-                  {!!currentAnalysis.best_match.component_scores && (
-                    <View>
-                      <Text className="text-xs font-sans-bold text-text-muted mb-1">
-                        Sub-Score Breakdown:
-                      </Text>
-                      <ComponentScoreBar
-                        scores={currentAnalysis.best_match.component_scores}
-                      />
-                    </View>
-                  )}
-
-                  {/* HR Feedback Trigger */}
-                  <Button
-                    label="Submit HR Review & Correction"
-                    variant="secondary"
-                    onPress={() => {
-                      setSelectedJobForReview(currentAnalysis.best_match!);
-                      setReviewModalVisible(true);
-                    }}
-                  />
-                </Card>
-              ) : (
-                <Card>
-                  <Text className="text-xs font-sans text-text-muted text-center">
-                    No matching jobs met the minimum threshold criteria.
-                  </Text>
-                </Card>
-              )}
+              <MatchAnalysisCard
+                bestMatch={currentAnalysis.best_match}
+                onReviewPress={() => {
+                  setSelectedJobForReview(currentAnalysis.best_match!);
+                  setReviewModalVisible(true);
+                }}
+              />
 
               {/* Other Suitable Openings */}
               {currentAnalysis.suitable_openings?.length > 1 && (

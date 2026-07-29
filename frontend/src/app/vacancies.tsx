@@ -11,6 +11,7 @@ import { jobsService } from '@/services/jobsService';
 import { useJobs } from '@/hooks/useJobs';
 import { JobOpening } from '@/types/api';
 import { TextField, Card, Button, Badge, EmptyState } from '@/components/ui';
+import { COLORS } from '@/constants/colors';
 
 export default function VacanciesScreen() {
   const { jobs, loading, error, refreshJobs } = useJobs();
@@ -97,7 +98,7 @@ export default function VacanciesScreen() {
             </Text>
             {dept && (
               <View className="flex-row items-center gap-1 mt-0.5">
-                <Briefcase size={12} color="#6B7280" />
+                <Briefcase size={12} color={COLORS.textMuted} />
                 <Text className="text-xs font-sans-medium text-text-muted">
                   {dept}
                 </Text>
@@ -109,7 +110,7 @@ export default function VacanciesScreen() {
 
         {/* Mandatory Skills */}
         {item.MandatorySkillsReq && (
-          <View className="mb-2 p-2 bg-danger/10 border border-danger/30 rounded-sm">
+          <View className="mb-2 p-2 bg-danger/10 border border-danger/30 rounded-md">
             <Text className="text-[10px] font-sans-bold text-danger uppercase tracking-wider mb-0.5">
               Mandatory Skills
             </Text>
@@ -134,14 +135,14 @@ export default function VacanciesScreen() {
         {/* Salary & Domain */}
         <View className="flex-row justify-between items-center pt-2 border-t border-border mt-1">
           <View className="flex-row items-center gap-1">
-            <IndianRupee size={11} color="#9CA3AF" />
+            <IndianRupee size={11} color={COLORS.textFaint} />
             <Text className="text-[11px] font-sans-medium text-text-muted">
               Salary: {salaryText}
             </Text>
           </View>
           {item.TargetDomainExperience && (
             <View className="flex-row items-center gap-1 truncate max-w-[160px]">
-              <Target size={12} color="#9CA3AF" />
+              <Target size={12} color={COLORS.textFaint} />
               <Text className="text-[11px] font-sans-medium text-text-muted truncate">
                 {item.TargetDomainExperience}
               </Text>
@@ -175,7 +176,7 @@ export default function VacanciesScreen() {
       <View className="flex-1 px-3 pt-3">
         {cacheMessage && (
           <Card className="bg-success/10 border-success/30 flex-row items-center justify-center gap-1.5 mb-3">
-            <CheckCircle size={14} color="#16A34A" />
+            <CheckCircle size={14} color={COLORS.success} />
             <Text className="text-xs font-sans-semibold text-success">
               {cacheMessage}
             </Text>
@@ -195,7 +196,7 @@ export default function VacanciesScreen() {
         {/* Loading state */}
         {loading ? (
           <View className="flex-1 justify-center items-center py-12">
-            <ActivityIndicator size="large" color="#4F46E5" />
+            <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">Fetching job openings from backend...</Text>
           </View>
         ) : error ? (

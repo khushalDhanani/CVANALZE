@@ -11,7 +11,8 @@ import { Sliders, CheckCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMatchConfig } from '@/hooks/useMatchConfig';
 import { MatchComponentWeights } from '@/types/api';
-import { TextField, Card, Button } from '@/components/ui';
+import { Card, Button, TextField, DenseRow, WeightControlRow } from '@/components/ui';
+import { COLORS } from '@/constants/colors';
 
 export default function ConfigScreen() {
   const { config, loading, updating, error, refreshConfig, updateConfig } =
@@ -101,13 +102,13 @@ export default function ConfigScreen() {
       <ScrollView className="flex-1 px-3 pt-4">
         {loading ? (
           <View className="py-12 items-center">
-            <ActivityIndicator size="large" color="#4F46E5" />
+            <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
         ) : (
           <View className="gap-4 mb-8">
             {successMsg && (
                 <Card className="bg-success/10 border-success/30 flex-row items-center justify-center gap-1.5 p-3">
-                  <CheckCircle size={14} color="#16A34A" />
+                  <CheckCircle size={14} color={COLORS.success} />
                   <Text className="text-xs font-sans-semibold text-success">
                     {successMsg}
                   </Text>
@@ -227,20 +228,12 @@ export default function ConfigScreen() {
               {Object.keys(weights).map((key) => {
                 const k = key as keyof MatchComponentWeights;
                 return (
-                  <View key={k} className="flex-row justify-between items-center bg-background p-2 rounded-sm border border-border">
-                    <Text className="text-xs font-sans-medium text-text-primary capitalize">
-                      {k}
-                    </Text>
-                    <View className="w-20">
-                      <TextField
-                        label=""
-                        value={String(weights[k])}
-                        onChangeText={(val) => handleWeightChange(k, val)}
-                        keyboardType="numeric"
-                        style={{ textAlign: 'right', paddingVertical: 4 }}
-                      />
-                    </View>
-                  </View>
+                  <WeightControlRow
+                    key={k}
+                    label={k}
+                    value={String(weights[k])}
+                    onChange={(val) => handleWeightChange(k, val)}
+                  />
                 );
               })}
             </Card>

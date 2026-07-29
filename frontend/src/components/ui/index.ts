@@ -8,3 +8,6 @@ export * from './Card';
 export * from './Badge';
 export * from "./DenseRow";
 export * from "./EmptyState";
+export * from "./SegmentedControl";
+export * from "./MatchAnalysisCard";
+export * from "./WeightControlRow";

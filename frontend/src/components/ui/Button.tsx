@@ -1,4 +1,4 @@
-import { Pressable, Text, ActivityIndicator } from "react-native";
+import { Pressable, Text, ActivityIndicator, View } from "react-native";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
@@ -30,13 +30,15 @@ export function Button({
   size = "sm",
   loading = false,
   disabled = false,
+  icon,
 }: {
-  label: string;
+  label?: string;
   onPress: () => void;
   variant?: Variant;
   size?: Size;
   loading?: boolean;
   disabled?: boolean;
+  icon?: React.ReactNode;
 }) {
   return (
     <Pressable
@@ -44,15 +46,24 @@ export function Button({
       disabled={disabled || loading}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
-      accessibilityLabel={label}
-      className={`rounded-md items-center justify-center flex-row gap-1.5 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${
-        disabled ? "opacity-50" : ""
-      }`}
+      accessibilityLabel={label || "button"}
+      className={`rounded-md items-center justify-center flex-row gap-1.5 ${VARIANT_CLASSES[variant]} ${
+        !label && icon ? "p-2" : SIZE_CLASSES[size]
+      } ${disabled ? "opacity-50" : ""}`}
     >
-      {loading && <ActivityIndicator size="small" />}
-      <Text className={`font-sans-semibold text-sm ${TEXT_CLASSES[variant]}`}>
-        {label}
-      </Text>
+      {loading ? (
+        <ActivityIndicator size="small" />
+      ) : (
+        <>
+          {icon}
+          {!!label && (
+            <Text className={`font-sans-semibold text-sm ${TEXT_CLASSES[variant]}`}>
+              {label}
+            </Text>
+          )}
+        </>
+      )}
     </Pressable>
   );
 }
+

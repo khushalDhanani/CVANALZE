@@ -60,7 +60,7 @@ export function SidebarLayout() {
           <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
             <Text className="text-base font-sans-semibold text-text-primary">CV Analyzer</Text>
             {isMobile && (
-              <Pressable onPress={closeDrawer} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Pressable onPress={closeDrawer} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Close sidebar">
                 <X size={20} color="#6B7280" />
               </Pressable>
             )}
@@ -108,6 +108,7 @@ export function SidebarLayout() {
             className="absolute bottom-6 right-6 bg-primary rounded-full p-3 shadow-lg z-50"
             style={{ elevation: 5 }}
             accessibilityRole="button"
+            accessibilityLabel="Open navigation menu"
           >
              <Layers size={24} color="#FFF" />
           </Pressable>
