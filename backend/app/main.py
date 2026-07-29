@@ -1,5 +1,6 @@
 import httpx
 from fastapi import FastAPI
+from sqlalchemy import text
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analysis import router as match_router
@@ -97,10 +98,11 @@ async def health():
     if engine is not None:
         try:
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             db_status = "online"
         except Exception as exc:
-            db_status = f"offline: {exc}"
+            logger.error(f"Database health check failed: {exc}")
+            db_status = "offline"
 
     ollama_status = "disabled"
     if settings.LLM_ENABLED:
