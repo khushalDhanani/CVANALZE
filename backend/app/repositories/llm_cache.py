@@ -1,87 +1,102 @@
-import hashlib
-import json
-from pathlib import Path
+from dataclasses import asdict, dataclass
 from typing import Any, TypeVar
 
-import redis
-from filelock import FileLock
 from pydantic import BaseModel
 
-from app.core.config import settings
+from app.core.cache import CacheKey, llm_cache_manager
 from app.core.logging import logger
 
 T = TypeVar("T", bound=BaseModel)
 
-_redis_client = None
-if settings.REDIS_URL:
-    try:
-        _redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
-    except Exception as exc:
-        _redis_client = None
+
+@dataclass
+class LLMCacheEntry:
+    """Full LLM inference cache entry with all metadata preserved."""
+    prompt: str
+    raw_response: str
+    structured_data: dict[str, Any]
+    reasoning: str
+    processing_time_ms: float
+    token_count: int
+    inference_time_ms: int
+    model: str
+    prompt_version: str
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["__entry__"] = True
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "LLMCacheEntry":
+        return cls(
+            prompt=data["prompt"],
+            raw_response=data.get("raw_response", ""),
+            structured_data=data.get("structured_data", {}),
+            reasoning=data.get("reasoning", ""),
+            processing_time_ms=data.get("processing_time_ms", 0.0),
+            token_count=data.get("token_count", 0),
+            inference_time_ms=data.get("inference_time_ms", 0),
+            model=data.get("model", ""),
+            prompt_version=data.get("prompt_version", ""),
+        )
 
 
 class LLMCacheRepository:
     """
-    Repository to cache LLM inference results based on composite hashes
-    (CV hash, vacancy set hash, prompt version, and model name).
+    Repository to cache LLM inference results using version-aware,
+    deterministic cache keys composed from document hash, candidate ID,
+    vacancy IDs, prompt version, model version, and extraction/matching
+    version fields — never raw prompt text.
+    Delegates all storage to CacheManager (Redis L2 + File L3).
     """
-
-    @classmethod
-    def _get_cache_dir(cls) -> Path:
-        cache_dir = settings.UPLOADS_DIR / ".llm_cache"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        return cache_dir
 
     @classmethod
     def compute_composite_hash(
         cls,
-        cv_text: str,
-        vacancies: list[dict[str, Any]],
-        prompt_version: str,
-        model_name: str,
+        document_hash: str = "",
+        candidate_id: str = "",
+        vacancy_ids: list[str] | None = None,
+        prompt_version: str = "",
+        model_version: str = "",
+        matching_version: str = "",
     ) -> str:
-        cv_hash = hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
-        vac_ids_and_reqs = [
-            f"{v.get('vacancy_id') or v.get('id')}:{v.get('title')}:{v.get('required_skills')}"
-            for v in vacancies
-        ]
-        vac_hash = hashlib.sha256(json.dumps(sorted(vac_ids_and_reqs)).encode("utf-8")).hexdigest()
-        raw_key = f"{cv_hash}:{vac_hash}:{prompt_version}:{model_name}"
-        return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        return CacheKey.for_llm_match(
+            document_hash=document_hash,
+            candidate_id=candidate_id,
+            vacancy_ids=vacancy_ids,
+            prompt_version=prompt_version,
+            model_version=model_version,
+            matching_version=matching_version,
+        ).to_key()
 
     @classmethod
-    def _compute_hash(
-        cls, model_name: str, prompt_version: str, prompt_text: str
+    def extraction_cache_key(
+        cls,
+        document_hash: str = "",
+        candidate_id: str = "",
+        prompt_version: str = "",
+        model_version: str = "",
+        extraction_version: str = "",
     ) -> str:
-        cache_key_raw = f"{model_name}|{prompt_version}|{prompt_text}"
-        return hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()
-
-    @classmethod
-    def _get_file_path(cls, hash_key: str) -> Path:
-        return cls._get_cache_dir() / f"{hash_key}.json"
+        return CacheKey.for_llm_extraction(
+            document_hash=document_hash,
+            candidate_id=candidate_id,
+            prompt_version=prompt_version,
+            model_version=model_version,
+            extraction_version=extraction_version,
+        ).to_key()
 
     @classmethod
     def get_cached_object(
         cls, hash_key: str, model_class: type[T]
     ) -> T | None:
-        if _redis_client:
+        entry = cls.get_cached_entry(hash_key)
+        if entry is not None:
             try:
-                payload = _redis_client.get(f"llm_cache:{hash_key}")
-                if payload:
-                    data = json.loads(payload)
-                    return model_class(**data)
+                return model_class(**entry.structured_data)
             except Exception as exc:
-                logger.warning(f"Redis cache read failed for {hash_key}: {exc}")
-
-        file_path = cls._get_file_path(hash_key)
-        if file_path.exists():
-            try:
-                lock = FileLock(file_path.with_suffix(".lock"))
-                with lock.acquire(timeout=5.0):
-                    data = json.loads(file_path.read_text(encoding="utf-8"))
-                    return model_class(**data)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(f"Failed to read object from LLM cache ({hash_key}): {exc}")
+                logger.warning(f"Failed to deserialize cached object ({hash_key}): {exc}")
                 return None
         return None
 
@@ -90,60 +105,48 @@ class LLMCacheRepository:
         cls, hash_key: str, object_to_cache: BaseModel | dict[str, Any]
     ) -> None:
         if isinstance(object_to_cache, BaseModel):
-            json_str = object_to_cache.model_dump_json(indent=2)
+            data = object_to_cache.model_dump()
+        elif isinstance(object_to_cache, dict):
+            data = object_to_cache
         else:
-            json_str = json.dumps(object_to_cache, indent=2, ensure_ascii=False)
-            
-        if _redis_client:
-            try:
-                _redis_client.set(f"llm_cache:{hash_key}", json_str)
-                _redis_client.expire(f"llm_cache:{hash_key}", 2592000) # 30 days
-            except Exception as exc:
-                logger.warning(f"Redis cache write failed for {hash_key}: {exc}")
-                
-        file_path = cls._get_file_path(hash_key)
-        try:
-            lock = FileLock(file_path.with_suffix(".lock"))
-            with lock.acquire(timeout=5.0):
-                file_path.write_text(json_str, encoding="utf-8")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"Failed to write object to LLM cache ({hash_key}): {exc}")
+            data = object_to_cache
+        llm_cache_manager.set(hash_key, data)
+
+    @classmethod
+    def get_cached_entry(cls, hash_key: str) -> LLMCacheEntry | None:
+        data = llm_cache_manager.get(hash_key)
+        if data is not None and isinstance(data, dict):
+            if data.get("__entry__"):
+                return LLMCacheEntry.from_dict(data)
+            # Backward compatibility: old-style entry stored by save_cached_object
+            # without __entry__ marker — wrap into LLMCacheEntry.
+            return LLMCacheEntry(
+                prompt="",
+                raw_response="",
+                structured_data=data,
+                reasoning="",
+                processing_time_ms=0.0,
+                token_count=0,
+                inference_time_ms=0,
+                model="",
+                prompt_version="",
+            )
+        return None
+
+    @classmethod
+    def save_cached_entry(cls, hash_key: str, entry: LLMCacheEntry) -> None:
+        llm_cache_manager.set(hash_key, entry.to_dict())
 
     @classmethod
     def get_cached_result(
-        cls, model_name: str, prompt_version: str, prompt_text: str
+        cls, cache_key: str
     ) -> Any | None:
-        hash_key = cls._compute_hash(model_name, prompt_version, prompt_text)
-        
-        if _redis_client:
-            try:
-                payload = _redis_client.get(f"llm_cache:{hash_key}")
-                if payload:
-                    return json.loads(payload)
-            except Exception as exc:
-                logger.warning(f"Redis cache read failed for {hash_key}: {exc}")
-                
-        file_path = cls._get_file_path(hash_key)
-
-        if file_path.exists():
-            try:
-                lock = FileLock(file_path.with_suffix(".lock"))
-                with lock.acquire(timeout=5.0):
-                    data = json.loads(file_path.read_text(encoding="utf-8"))
-                    return data
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(f"Failed to read from LLM cache: {exc}")
-                return None
-
-        return None
+        return llm_cache_manager.get(cache_key)
 
     @classmethod
     def save_result(
         cls,
-        model_name: str,
-        prompt_version: str,
-        prompt_text: str,
+        cache_key: str,
         result: Any,
     ) -> None:
-        hash_key = cls._compute_hash(model_name, prompt_version, prompt_text)
-        cls.save_cached_object(hash_key, result)
+        llm_cache_manager.set(cache_key, result)

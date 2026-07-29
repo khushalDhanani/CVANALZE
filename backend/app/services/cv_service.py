@@ -7,10 +7,12 @@ from typing import Any
 from redis import Redis
 from rq import Queue
 
+from app.core.cache import CacheInvalidator, doc_cache_manager
 from app.core.config import settings
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
-from app.services.document_parser import DocumentParser
+from app.services.document_parser import DocumentParser, ExtractionResult
+from app.services.embedding_service import EmbeddingService
 
 import asyncio
 
@@ -88,6 +90,8 @@ async def process_cv_file(
                 logger.info(
                     f"[CV_CHANGED] CV source content changed for '{cv_key}'. Reprocessing..."
                 )
+                if existing_hash:
+                    CacheInvalidator.invalidate_cv(existing_hash)
             else:
                 logger.info(
                     f"[SCHEMA_CHANGED] Parser or schema version changed for '{cv_key}'. Reprocessing..."
@@ -97,17 +101,38 @@ async def process_cv_file(
         else:
             logger.info(f"[NEW_CV] Initial processing for '{cv_key}'.")
 
-        extraction = await asyncio.to_thread(
-            DocumentParser.parse_with_timeout,
-            filename=filename,
-            content=content,
-            timeout_seconds=timeout_seconds,
+        # Try document cache first (keyed by content hash)
+        cached_doc = doc_cache_manager.get(cv_hash)
+        if cached_doc is not None:
+            extraction = ExtractionResult.from_dict(cached_doc)
+            logger.info(f"[DOC_CACHE_HIT] Reusing Docling output for hash '{cv_hash[:12]}...'.")
+        else:
+            extraction = await asyncio.to_thread(
+                DocumentParser.parse_with_timeout,
+                filename=filename,
+                content=content,
+                timeout_seconds=timeout_seconds,
+            )
+            doc_cache_manager.set(cv_hash, extraction.to_dict())
+            logger.info(f"[DOC_CACHE_SET] Cached Docling output for hash '{cv_hash[:12]}...'.")
+
+        # Generate and cache CV embedding (async to avoid blocking)
+        cv_embedding = await asyncio.to_thread(
+            EmbeddingService.generate_embedding,
+            extraction.markdown[:8000],
+            settings.EMBEDDING_MODEL,
         )
-        
+        if cv_embedding is not None:
+            logger.info(f"[EMBED] CV embedding generated for hash '{cv_hash[:12]}...'.")
+
         # Run optimized LLM pipeline & matching
         from app.services.match_service import MatchService
         
-        match_analysis = await MatchService.analyze_single_cv(extraction.markdown)
+        match_analysis = await MatchService.analyze_single_cv(
+            extraction.markdown,
+            document_hash=cv_hash,
+            candidate_id=str(candidate_id) if candidate_id is not None else "",
+        )
 
         now_iso = datetime.now(UTC).isoformat()
         created_at = (

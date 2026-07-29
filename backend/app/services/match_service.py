@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from app.core.cache import CacheIndex, CacheKey, match_result_cache_manager
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
@@ -83,6 +84,8 @@ class MatchService:
         job_openings: list[dict[str, Any]] | None = None,
         candidate_experience: float | None = None,
         candidate_ctc: float | None = None,
+        document_hash: str = "",
+        candidate_id: str = "",
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
 
@@ -97,7 +100,26 @@ class MatchService:
                 "OCR could not extract any meaningful content."
             )
 
-        # 2. JSON Loading stage timing (parsing CV text input)
+        # 2. Match Result Cache Check (instant repeat searches)
+        vacancy_version = JobRepository.get_vacancy_version()
+        match_cache_key = CacheKey.for_match_result(
+            document_hash=document_hash,
+            candidate_id=candidate_id,
+            vacancy_version=vacancy_version,
+            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
+            matching_version=settings.MATCHING_VERSION,
+        ).to_key()
+
+        if match_cache_key:
+            cached_result = match_result_cache_manager.get(match_cache_key)
+            if cached_result is not None:
+                logger.info(f"[MATCH_CACHE_HIT] Returning cached match result for doc={document_hash[:12]}...")
+                profiler.metrics.cache_hit = True
+                profiler.finish()
+                profiler.log_summary()
+                return EnrichedCandidateAnalysis.model_validate(cached_result)
+
+        # 3. JSON Loading stage timing (parsing CV text input)
         with profiler.time_stage("json_loading"):
             _ = cv_text.strip()
 
@@ -163,12 +185,15 @@ class MatchService:
                 profiler.metrics.token_count = token_est
                 profiler.metrics.context_char_count = char_count
 
-            # Compute Composite Cache Key
+            # Compute version-aware cache key
+            vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in filtered_vacancies]
             cache_key = LLMCacheRepository.compute_composite_hash(
-                cv_text=cv_text,
-                vacancies=filtered_vacancies,
+                document_hash=document_hash,
+                candidate_id=candidate_id,
+                vacancy_ids=vacancy_ids,
                 prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
-                model_name=settings.OLLAMA_MODEL,
+                model_version=settings.OLLAMA_MODEL,
+                matching_version=settings.OPTIMIZED_PROMPT_VERSION,
             )
 
             # 5. Single Optimized LLM Call + Pydantic Validation (with cache check & retries)
@@ -292,12 +317,22 @@ class MatchService:
         else:
             best_match = MatchService._empty_job_match()
 
-        return EnrichedCandidateAnalysis(
+        result = EnrichedCandidateAnalysis(
             primary_department=best_match.department_name or best_match.department,
             best_match=best_match,
             suitable_openings=evaluated_matches,
             llm_skipped=llm_skipped,
         )
+
+        # Cache the match result for instant repeat searches
+        if match_cache_key:
+            match_result_cache_manager.set(match_cache_key, result.model_dump())
+            CacheIndex.add("match_by_doc", document_hash, match_cache_key)
+            if candidate_id:
+                CacheIndex.add("match_by_cand", candidate_id, match_cache_key)
+            logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
+
+        return result
 
     @staticmethod
     def _empty_job_match() -> EnrichedJobMatchResult:
@@ -350,7 +385,13 @@ class MatchService:
         if not cv_text:
             raise ValueError("No markdown text found in the result file.")
 
-        enriched_analysis = await MatchService.analyze_single_cv(cv_text)
+        cv_hash = data.get("cv_hash", "")
+        cand_id = data.get("candidate_id", "")
+        enriched_analysis = await MatchService.analyze_single_cv(
+            cv_text,
+            document_hash=cv_hash,
+            candidate_id=cand_id,
+        )
 
         # Merge back into data
         data["enriched_match_analysis"] = enriched_analysis.model_dump()

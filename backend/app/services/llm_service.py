@@ -7,29 +7,38 @@ from pydantic import ValidationError
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
-from app.repositories.llm_cache import LLMCacheRepository
+from app.repositories.llm_cache import LLMCacheEntry, LLMCacheRepository
 from app.schemas.analysis import QwenCVAnalysis, DynamicMappingResponse, OptimizedLLMMatchResponse
 from app.schemas.profile import DynamicCandidateProfile
 
 
 class OllamaLLMService:
     @staticmethod
-    def extract_candidate_profile(prompt: str, prompt_version: str) -> DynamicCandidateProfile | None:
+    def extract_candidate_profile(
+        prompt: str,
+        prompt_version: str,
+        cache_key: str = "",
+    ) -> DynamicCandidateProfile | None:
         if not settings.LLM_ENABLED:
             logger.info("LLM semantic analysis is disabled via config.")
             return None
 
         model_name = settings.OLLAMA_MODEL
 
-        # Check Cache First
-        cached_result = LLMCacheRepository.get_cached_result(
-            model_name, prompt_version, prompt
-        )
-        if cached_result:
+        if not cache_key:
+            from app.repositories.llm_cache import LLMCacheRepository as LR
+            cache_key = LR.extraction_cache_key(
+                prompt_version=prompt_version,
+                model_version=model_name,
+            )
+
+        # Check Cache First using full entry
+        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
+        if cached_entry is not None:
             logger.info(
                 f"LLM Cache HIT for profile extraction '{model_name}' (v{prompt_version}). Skipping inference."
             )
-            return cached_result
+            return DynamicCandidateProfile(**cached_entry.structured_data)
 
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
         payload = {"model": model_name, "prompt": prompt, "stream": False}
@@ -47,6 +56,8 @@ class OllamaLLMService:
 
                 data = response.json()
                 response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+                reasoning = data.get("thinking", "")
+                raw_response = response_text
 
                 if response_text.startswith("```json"):
                     response_text = response_text[7:]
@@ -62,9 +73,18 @@ class OllamaLLMService:
                     f"LLM Profile Extraction SUCCESS: model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
                 )
 
-                LLMCacheRepository.save_result(
-                    model_name, prompt_version, prompt, validated_result
+                entry = LLMCacheEntry(
+                    prompt=prompt,
+                    raw_response=raw_response,
+                    structured_data=parsed_json,
+                    reasoning=reasoning,
+                    processing_time_ms=duration_ms,
+                    token_count=data.get("eval_count", 0),
+                    inference_time_ms=int(data.get("eval_duration", 0) / 1_000_000),
+                    model=model_name,
+                    prompt_version=prompt_version,
                 )
+                LLMCacheRepository.save_cached_entry(cache_key, entry)
 
                 return validated_result
 
@@ -95,22 +115,31 @@ class OllamaLLMService:
         return None
 
     @staticmethod
-    def call_qwen(prompt: str, prompt_version: str) -> QwenCVAnalysis | None:
+    def call_qwen(
+        prompt: str,
+        prompt_version: str,
+        cache_key: str = "",
+    ) -> QwenCVAnalysis | None:
         if not settings.LLM_ENABLED:
             logger.info("LLM semantic analysis is disabled via config.")
             return None
 
         model_name = settings.OLLAMA_MODEL
 
-        # Check Cache First
-        cached_result = LLMCacheRepository.get_cached_result(
-            model_name, prompt_version, prompt
-        )
-        if cached_result:
+        if not cache_key:
+            from app.repositories.llm_cache import LLMCacheRepository as LR
+            cache_key = LR.extraction_cache_key(
+                prompt_version=prompt_version,
+                model_version=model_name,
+            )
+
+        # Check Cache First using full entry
+        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
+        if cached_entry is not None:
             logger.info(
                 f"LLM Cache HIT for model '{model_name}' (v{prompt_version}). Skipping inference."
             )
-            return cached_result
+            return QwenCVAnalysis(**cached_entry.structured_data)
 
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
         payload = {"model": model_name, "prompt": prompt, "stream": False}
@@ -126,6 +155,8 @@ class OllamaLLMService:
 
                 data = response.json()
                 response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+                reasoning = data.get("thinking", "")
+                raw_response = response_text
 
                 # Cleanup potential markdown wrapper if Qwen ignored instructions
                 if response_text.startswith("```json"):
@@ -142,10 +173,18 @@ class OllamaLLMService:
                     f"LLM Inference SUCCESS: model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
                 )
 
-                # Save to cache
-                LLMCacheRepository.save_result(
-                    model_name, prompt_version, prompt, validated_result
+                entry = LLMCacheEntry(
+                    prompt=prompt,
+                    raw_response=raw_response,
+                    structured_data=parsed_json,
+                    reasoning=reasoning,
+                    processing_time_ms=duration_ms,
+                    token_count=data.get("eval_count", 0),
+                    inference_time_ms=int(data.get("eval_duration", 0) / 1_000_000),
+                    model=model_name,
+                    prompt_version=prompt_version,
                 )
+                LLMCacheRepository.save_cached_entry(cache_key, entry)
 
                 return validated_result
 
@@ -176,22 +215,31 @@ class OllamaLLMService:
         return None
 
     @staticmethod
-    def call_qwen_dynamic(prompt: str, prompt_version: str) -> DynamicMappingResponse | None:
+    def call_qwen_dynamic(
+        prompt: str,
+        prompt_version: str,
+        cache_key: str = "",
+    ) -> DynamicMappingResponse | None:
         if not settings.LLM_ENABLED:
             logger.info("LLM semantic analysis is disabled via config.")
             return None
 
         model_name = settings.OLLAMA_MODEL
 
-        # Check Cache First
-        cached_result = LLMCacheRepository.get_cached_result(
-            model_name, prompt_version, prompt
-        )
-        if cached_result:
+        if not cache_key:
+            from app.repositories.llm_cache import LLMCacheRepository as LR
+            cache_key = LR.extraction_cache_key(
+                prompt_version=prompt_version,
+                model_version=model_name,
+            )
+
+        # Check Cache First using full entry
+        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
+        if cached_entry is not None:
             logger.info(
                 f"LLM Cache HIT for dynamic mapping model '{model_name}' (v{prompt_version}). Skipping inference."
             )
-            return cached_result
+            return DynamicMappingResponse(**cached_entry.structured_data)
 
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
         payload = {"model": model_name, "prompt": prompt, "stream": False}
@@ -207,6 +255,8 @@ class OllamaLLMService:
 
                 data = response.json()
                 response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+                reasoning = data.get("thinking", "")
+                raw_response = response_text
 
                 # Cleanup potential markdown wrapper if Qwen ignored instructions
                 if response_text.startswith("```json"):
@@ -223,10 +273,18 @@ class OllamaLLMService:
                     f"LLM Inference SUCCESS: dynamic mapping model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
                 )
 
-                # Save to cache
-                LLMCacheRepository.save_result(
-                    model_name, prompt_version, prompt, validated_result
+                entry = LLMCacheEntry(
+                    prompt=prompt,
+                    raw_response=raw_response,
+                    structured_data=parsed_json,
+                    reasoning=reasoning,
+                    processing_time_ms=duration_ms,
+                    token_count=data.get("eval_count", 0),
+                    inference_time_ms=int(data.get("eval_duration", 0) / 1_000_000),
+                    model=model_name,
+                    prompt_version=prompt_version,
                 )
+                LLMCacheRepository.save_cached_entry(cache_key, entry)
 
                 return validated_result
 
@@ -267,17 +325,19 @@ class OllamaLLMService:
     ) -> OptimizedLLMMatchResponse | None:
         model_name = settings.OLLAMA_MODEL
 
-        # 1. Check Cache
-        cached_result = LLMCacheRepository.get_cached_object(
-            cache_key, OptimizedLLMMatchResponse
-        )
-        if cached_result:
+        # 1. Check Cache using full entry (preserves metadata on hit)
+        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
+        if cached_entry is not None:
             logger.info(
-                f"LLM Cache HIT for optimized match '{model_name}' (v{prompt_version}). Skipping HTTP request."
+                f"LLM Cache HIT for optimized match '{model_name}' (v{prompt_version}). "
+                f"Skipping HTTP request."
             )
             if profiler:
                 profiler.metrics.cache_hit = True
-            return cached_result
+                profiler.metrics.ollama_request_ms = cached_entry.processing_time_ms
+                profiler.metrics.model_inference_ms = cached_entry.inference_time_ms
+                profiler.metrics.token_count = cached_entry.token_count
+            return OptimizedLLMMatchResponse(**cached_entry.structured_data)
 
         if not settings.LLM_ENABLED:
             logger.info("LLM semantic analysis is disabled via config.")
@@ -330,6 +390,8 @@ class OllamaLLMService:
                         profiler.metrics.token_count = eval_count
 
                 response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
+                reasoning = data.get("thinking", "")
+                raw_response = response_text
                 if response_text.startswith("```json"):
                     response_text = response_text[7:]
                 elif response_text.startswith("```"):
@@ -349,8 +411,19 @@ class OllamaLLMService:
                     f"req_time={req_duration_ms}ms, inference_time={inference_ms}ms."
                 )
 
-                # Save to Cache
-                LLMCacheRepository.save_cached_object(cache_key, validated_result)
+                # Save full cache entry with all metadata
+                entry = LLMCacheEntry(
+                    prompt=prompt,
+                    raw_response=raw_response,
+                    structured_data=parsed_json,
+                    reasoning=reasoning,
+                    processing_time_ms=req_duration_ms,
+                    token_count=eval_count,
+                    inference_time_ms=int(inference_ms) if inference_ms else 0,
+                    model=model_name,
+                    prompt_version=prompt_version,
+                )
+                LLMCacheRepository.save_cached_entry(cache_key, entry)
                 return validated_result
 
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:

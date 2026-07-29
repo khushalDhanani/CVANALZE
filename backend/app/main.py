@@ -8,8 +8,11 @@ from app.api.candidates import router as candidates_router
 from app.api.config import router as config_router
 from app.api.cv import router as cv_router
 from app.api.jobs import router as jobs_router
+from app.api.master_data import router as master_data_router
+from app.api.analytics import router as analytics_router
 from app.core.config import settings
 from app.core.database import engine, init_db
+from app.core.logging import logger
 
 # Initialize database tables if missing
 init_db()
@@ -40,6 +43,10 @@ app.include_router(
     prefix="/api",
 )
 app.include_router(
+    master_data_router,
+    prefix="/api",
+)
+app.include_router(
     batch_router,
     prefix="/api",
 )
@@ -51,7 +58,28 @@ app.include_router(
     candidates_router,
     prefix="/api/v1",
 )
+app.include_router(
+    analytics_router,
+    prefix="/api",
+)
 
+
+def _run_background_warmup() -> None:
+    """Run cache warmup synchronously (called in a daemon thread at startup)."""
+    try:
+        from app.services.cache_warmer import warm_all
+        warm_all()
+    except Exception as exc:
+        logger.warning(f"[WARMUP] Background warmup failed: {exc}")
+
+
+@app.on_event("startup")
+async def start_background_warmup():
+    """Warm the cache in a background thread so startup is not blocked."""
+    import threading
+    thread = threading.Thread(target=_run_background_warmup, daemon=True)
+    thread.start()
+    logger.info("[WARMUP] Background cache warmup thread started.")
 
 
 @app.get("/")

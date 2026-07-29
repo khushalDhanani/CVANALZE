@@ -1,39 +1,26 @@
 import json
 from typing import Any
 
-import redis
 from sqlalchemy.orm import Session
 
+from app.core.cache import config_cache_manager
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.logging import logger
 from app.models.config import SystemConfig
 
-_redis_client = None
-if settings.REDIS_URL:
-    try:
-        _redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
-    except Exception:
-        _redis_client = None
-
 
 class ConfigRepository:
-    CACHE_TTL = 3600  # 1 hour
+    CACHE_TTL = 3600
 
     @classmethod
     def get_setting(
         cls, key: str, default: Any = None, db: Session | None = None
     ) -> Any:
-        # Check Redis first
-        if _redis_client:
-            try:
-                val = _redis_client.get(f"config:{key}")
-                if val is not None:
-                    return json.loads(val)
-            except Exception as exc:
-                logger.warning(f"Failed to read config {key} from Redis: {exc}")
+        cached = config_cache_manager.get(key)
+        if cached is not None:
+            return cached
 
-        # Fallback to DB
         close_session = False
         if db is None and SessionLocal is not None:
             try:
@@ -50,41 +37,24 @@ class ConfigRepository:
                 if record:
                     val = json.loads(record.setting_value)
                 else:
-                    if hasattr(settings, key):
-                        val = getattr(settings, key)
-                        if val is None:
-                            val = default
-                    else:
+                    val = getattr(settings, key, None)
+                    if val is None:
                         val = default
 
-                # update Redis to avoid DB spam even if missing
-                if _redis_client:
-                    try:
-                        _redis_client.setex(f"config:{key}", cls.CACHE_TTL, json.dumps(val))
-                    except Exception:
-                        pass
+                config_cache_manager.set(key, val, ttl=cls.CACHE_TTL)
                 return val
             except Exception as exc:
                 logger.warning(f"Failed to query config {key} from DB: {exc}")
-                
-                # Cache default on error to avoid looping exceptions
                 val = getattr(settings, key, default)
-                if _redis_client:
-                    try:
-                        _redis_client.setex(f"config:{key}", cls.CACHE_TTL, json.dumps(val))
-                    except Exception:
-                        pass
+                config_cache_manager.set(key, val, ttl=cls.CACHE_TTL)
                 return val
             finally:
                 if close_session:
                     db.close()
 
-        # If not in DB or no DB configured, use python settings object if it exists
-        if hasattr(settings, key):
-            val = getattr(settings, key)
-            if val is not None:
-                return val
-
+        val = getattr(settings, key, None)
+        if val is not None:
+            return val
         return default
 
     @classmethod
@@ -114,9 +84,4 @@ class ConfigRepository:
                 if close_session:
                     db.close()
 
-        # Update Redis Cache
-        if _redis_client:
-            try:
-                _redis_client.setex(f"config:{key}", cls.CACHE_TTL, val_str)
-            except Exception as exc:
-                logger.warning(f"Failed to update config {key} in Redis: {exc}")
+        config_cache_manager.set(key, value, ttl=cls.CACHE_TTL)

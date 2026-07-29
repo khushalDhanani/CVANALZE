@@ -26,6 +26,25 @@ class ExtractionResult:
         self.is_scanned = is_scanned
         self.ocr_applied = ocr_applied
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "markdown": self.markdown,
+            "structured_doc": self.structured_doc,
+            "page_count": self.page_count,
+            "is_scanned": self.is_scanned,
+            "ocr_applied": self.ocr_applied,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ExtractionResult":
+        return cls(
+            markdown=data["markdown"],
+            structured_doc=data.get("structured_doc", {}),
+            page_count=data.get("page_count", 1),
+            is_scanned=data.get("is_scanned", False),
+            ocr_applied=data.get("ocr_applied", False),
+        )
+
 
 def _init_fast_converter() -> DocumentConverter:
     pipeline_options = PdfPipelineOptions()

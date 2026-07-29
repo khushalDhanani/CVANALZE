@@ -80,16 +80,36 @@ def test_pipeline_profiler():
 def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
 
-    cv_text = "Python Engineer with 5 years experience."
-    vacancies = [{"id": 101, "title": "Python Dev", "required_skills": ["Python"]}]
+    vacancies = [{"id": 101, "vacancy_id": 101, "title": "Python Dev", "required_skills": ["Python"]}]
 
     key1 = LLMCacheRepository.compute_composite_hash(
-        cv_text, vacancies, "3.0", "qwen3:4b"
+        document_hash="abc123",
+        candidate_id="42",
+        vacancy_ids=["101"],
+        prompt_version="3.0",
+        model_version="qwen3:4b",
+        matching_version="3.0",
     )
     key2 = LLMCacheRepository.compute_composite_hash(
-        cv_text, vacancies, "3.0", "qwen3:4b"
+        document_hash="abc123",
+        candidate_id="42",
+        vacancy_ids=["101"],
+        prompt_version="3.0",
+        model_version="qwen3:4b",
+        matching_version="3.0",
     )
     assert key1 == key2
+
+    # Changing any component produces a different key
+    key3 = LLMCacheRepository.compute_composite_hash(
+        document_hash="abc123",
+        candidate_id="42",
+        vacancy_ids=["101"],
+        prompt_version="3.0",
+        model_version="qwen3:4b",
+        matching_version="3.1",
+    )
+    assert key1 != key3
 
     sample_response = OptimizedLLMMatchResponse(
         candidate_profile=OptimizedCandidateProfile(
