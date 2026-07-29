@@ -86,8 +86,12 @@ class MatchService:
         candidate_ctc: float | None = None,
         document_hash: str = "",
         candidate_id: str = "",
+        upload_ms: float = 0.0,
+        docling_extraction_ms: float = 0.0,
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
+        profiler.metrics.upload_ms = upload_ms
+        profiler.metrics.docling_extraction_ms = docling_extraction_ms
 
         # 1. Validate CV text is meaningful (not just image markers from failed OCR)
         if not cv_text or not cv_text.strip():
@@ -101,6 +105,7 @@ class MatchService:
             )
 
         # 2. Match Result Cache Check (instant repeat searches)
+        t_cache_start = asyncio.get_event_loop().time()
         vacancy_version = JobRepository.get_vacancy_version()
         match_cache_key = CacheKey.for_match_result(
             document_hash=document_hash,
@@ -115,12 +120,14 @@ class MatchService:
             if cached_result is not None:
                 logger.info(f"[MATCH_CACHE_HIT] Returning cached match result for doc={document_hash[:12]}...")
                 profiler.metrics.cache_hit = True
+                profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
                 profiler.finish()
                 profiler.log_summary()
                 return EnrichedCandidateAnalysis.model_validate(cached_result)
+        profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
 
         # 3. JSON Loading stage timing (parsing CV text input)
-        with profiler.time_stage("json_loading"):
+        with profiler.time_stage("resume_json"):
             _ = cv_text.strip()
 
         from fastapi.concurrency import run_in_threadpool

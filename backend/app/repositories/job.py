@@ -175,6 +175,9 @@ class JobRepository:
     @classmethod
     def _cache_vacancy_embeddings(cls, job_dicts: list[dict[str, Any]]) -> None:
         """Generate and cache embeddings for vacancies with ``vac:`` prefix for selective invalidation."""
+        if not settings.EMBEDDING_ENABLED:
+            return
+
         from app.core.cache import embedding_cache_manager as _ecm
         from app.services.embedding_service import EmbeddingService as _es
 

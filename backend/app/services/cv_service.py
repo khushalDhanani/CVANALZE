@@ -101,7 +101,8 @@ async def process_cv_file(
         else:
             logger.info(f"[NEW_CV] Initial processing for '{cv_key}'.")
 
-        # Try document cache first (keyed by content hash)
+        # Docling extraction stage (with timing)
+        t_doc_start = asyncio.get_event_loop().time()
         cached_doc = doc_cache_manager.get(cv_hash)
         if cached_doc is not None:
             extraction = ExtractionResult.from_dict(cached_doc)
@@ -115,15 +116,7 @@ async def process_cv_file(
             )
             doc_cache_manager.set(cv_hash, extraction.to_dict())
             logger.info(f"[DOC_CACHE_SET] Cached Docling output for hash '{cv_hash[:12]}...'.")
-
-        # Generate and cache CV embedding (async to avoid blocking)
-        cv_embedding = await asyncio.to_thread(
-            EmbeddingService.generate_embedding,
-            extraction.markdown[:8000],
-            settings.EMBEDDING_MODEL,
-        )
-        if cv_embedding is not None:
-            logger.info(f"[EMBED] CV embedding generated for hash '{cv_hash[:12]}...'.")
+        docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
 
         # Run optimized LLM pipeline & matching
         from app.services.match_service import MatchService
@@ -132,6 +125,7 @@ async def process_cv_file(
             extraction.markdown,
             document_hash=cv_hash,
             candidate_id=str(candidate_id) if candidate_id is not None else "",
+            docling_extraction_ms=docling_duration_ms,
         )
 
         now_iso = datetime.now(UTC).isoformat()

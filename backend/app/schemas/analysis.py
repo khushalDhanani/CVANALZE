@@ -28,6 +28,19 @@ class DynamicMappingResponse(BaseModel):
     matched_vacancies: list[DynamicMatchedVacancy] = Field(default_factory=list)
 
 
+class ClassifiedRequirementItem(BaseModel):
+    requirement_id: str = Field(..., description="Unique identifier for requirement item")
+    description: str = Field(..., description="Description of requirement")
+    tier: str = Field(default="MANDATORY", description="Tier: MANDATORY, PREFERRED, or OPTIONAL")
+    status: str = Field(default="SATISFIED", description="Status: SATISFIED, PARTIALLY_SATISFIED, or FAILED")
+    failure_reason: str | None = Field(default=None, description="Explanation if requirement failed")
+
+
+class RequirementEvidence(BaseModel):
+    cv_evidence: str = Field(default="", description="Quote or fact from CV text")
+    vacancy_evidence: str = Field(default="", description="Target requirement text from vacancy")
+
+
 class OptimizedCandidateProfile(BaseModel):
     core_skills: list[str] = Field(default_factory=list)
     inferred_skills: list[str] = Field(default_factory=list)
@@ -45,8 +58,8 @@ class OptimizedVacancyMatch(BaseModel):
     matched_skills: list[str] = Field(default_factory=list)
     missing_critical: list[str] = Field(default_factory=list)
     semantic_fit_score: float = Field(default=0.0, ge=0.0, le=100.0)
-    classified_requirements: list[dict[str, Any]] = Field(default_factory=list)
-    evidence_snippets: dict[str, dict[str, str]] = Field(default_factory=dict)
+    classified_requirements: list[ClassifiedRequirementItem] = Field(default_factory=list)
+    evidence_snippets: dict[str, RequirementEvidence] = Field(default_factory=dict)
     career_transition_detected: bool = False
     career_transition_note: str | None = None
 
@@ -57,6 +70,11 @@ class OptimizedLLMMatchResponse(BaseModel):
 
 
 class PipelineStageMetrics(BaseModel):
+    upload_ms: float = 0.0
+    docling_extraction_ms: float = 0.0
+    resume_json_ms: float = 0.0
+    db_query_ms: float = 0.0
+    cache_lookup_ms: float = 0.0
     json_loading_ms: float = 0.0
     vacancy_retrieval_ms: float = 0.0
     prefilter_ms: float = 0.0
@@ -67,6 +85,8 @@ class PipelineStageMetrics(BaseModel):
     model_inference_ms: float = 0.0
     json_validation_ms: float = 0.0
     scoring_ms: float = 0.0
+    matching_ms: float = 0.0
+    response_generation_ms: float = 0.0
     total_execution_ms: float = 0.0
     vacancies_before_filtering: int = 0
     vacancies_after_filtering: int = 0

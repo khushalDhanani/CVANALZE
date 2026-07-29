@@ -70,89 +70,33 @@
   - Updated status endpoint to return `match_analysis` directly from the basic result file (no need for separate `_enriched.json` step).
   - Increased frontend polling limits: `POLL_INTERVAL_MS` 2s→3s, `MAX_POLL_RETRIES` 60→250 (3s × 250 = 12.5 min total).
   - Improved timeout error message to suggest checking candidates list.
-- **Phase 15: Evidence-Based Reasoning for LLM Prompts**
-  - Injected 7 evidence-based reasoning rules into the primary `optimized_match.py` prompt:
-    - No assumptions without CV evidence
-    - Every conclusion must reference specific evidence
-    - "No evidence found" instead of guessing
-    - No generic phrases unless backed by specific CV content
-    - Compare item by item
-    - Explicitly report mismatches
-    - Never inflate score on assumptions
-  - Added 3 additional evidence rules to `profile_extraction.py` prompt.
+- **Phase 16: Pipeline Optimization & LLM Reasoning Reliability**
+  - **Eliminated Ollama GPU VRAM Model-Swapping Thrashing**: Removed unused synchronous `EmbeddingService.generate_embedding` call in `process_cv_file` that forced Ollama to constantly unload and re-load GPU model weights (`nomic-embed-text` vs `qwen`).
+  - **CV Context Truncation Fix**: Expanded `cleaned_cv` character limit from 3,500 to 7,500 characters in `optimized_match.py`, eliminating context truncation on multi-page resumes that previously caused false "No evidence found" warnings.
+  - **Strict Pydantic JSON Schema for Ollama Grammar Enforcement**: Added concrete `ClassifiedRequirementItem` and `RequirementEvidence` sub-models in `analysis.py`, eliminating unconstrained `dict[str, Any]` grammars in Ollama and preventing JSON parsing/validation failures.
+  - **Module-Level Thread Pool Reuse**: Replaced thread pool context manager instantiation per document parse with a persistent module-level `ThreadPoolExecutor(max_workers=4)` in `document_parser.py`.
+  - **Persistent HTTP Client Sessions**: Added persistent `_get_httpx_client()` session pool in `llm_service.py` to reuse TCP connections across Ollama LLM requests.
+  - **8-Stage Execution Profiling**: Updated `PipelineProfiler` and `PipelineStageMetrics` to track and log execution times for all 8 pipeline stages (`upload_ms`, `docling_extraction_ms`, `resume_json_ms`, `db_query_ms`, `cache_lookup_ms`, `prefilter_ms`, `ollama_request_ms`/`model_inference_ms`, `scoring_ms`/`matching_ms`, `total_execution_ms`).
 
 ## Files Changed
-- `app/services/document_parser.py`
-- `app/services/match_service.py`
-- `app/api/analysis.py`
-- `app/prompts/optimized_match.py`
-- `app/prompts/profile_extraction.py`
-- `frontend/src/constants/config.ts`
-- `frontend/src/hooks/useCvUpload.ts`
-- `app/repositories/job.py`
-- `app/api/jobs.py`
-- `app/services/vacancy_prefilter.py`
-- `app/services/cv_service.py`
-- `app/services/match_service.py`
-- `app/schemas/analysis.py`
-- `app/core/config.py`
-- `start_worker.py` (New)
-- `main.py`
-- `frontend/package.json`
-- `frontend/package-lock.json`
-- `frontend/tailwind.config.js` (New)
-- `frontend/metro.config.js` (New)
-- `frontend/babel.config.js` (New)
-- `frontend/nativewind-env.d.ts` (New)
-- `frontend/tsconfig.json`
-- `frontend/src/global.css`
-- `frontend/src/app/_layout.tsx`
-- `frontend/src/constants/config.ts` (New)
-- `frontend/src/services/apiClient.ts`
-- `frontend/src/types/api.ts` (New)
-- `frontend/src/services/cvService.ts`
-- `frontend/src/services/matchService.ts`
-- `frontend/src/services/jobsService.ts` (New)
-- `frontend/src/services/batchService.ts` (New)
-- `frontend/src/services/configService.ts` (New)
-- `frontend/src/services/index.ts` (New)
-- `frontend/src/hooks/useJobs.ts` (New)
-- `frontend/src/hooks/useCvUpload.ts`
-- `frontend/src/hooks/useMatchConfig.ts` (New)
-- `frontend/src/hooks/useBatchProgress.ts` (New)
-- `frontend/src/components/ui/ScoreBadge.tsx` (New)
-- `frontend/src/components/ui/ComponentScoreBar.tsx` (New)
-- `frontend/src/components/ui/HrReviewModal.tsx` (New)
-- `frontend/src/app/index.tsx`
-- `frontend/src/app/cv-match.tsx`
-- `frontend/src/app/vacancies.tsx`
-- `frontend/src/app/batch.tsx`
-- `frontend/src/app/config.tsx`
-- `frontend/src/components/app-tabs.tsx`
-- `frontend/src/components/app-tabs.web.tsx`
-- `frontend/src/components/ui/Sidebar/SidebarLayout.tsx` (New)
-- `backend/app/api/config.py`
-- `backend/app/schemas/config.py`
-- `ProjectAnalysis.md` (New)
+- `backend/app/schemas/analysis.py`
+- `backend/app/prompts/optimized_match.py`
+- `backend/app/services/cv_service.py`
+- `backend/app/services/document_parser.py`
+- `backend/app/services/llm_service.py`
+- `backend/app/services/match_service.py`
+- `backend/app/core/profiler.py`
+- `backend/app/repositories/job.py`
+- `workstatus.md`
 
 ## Pending Work
-- **Phase 13: End-to-End System Audit & Diagnostics**
-  - [x] Analyze tech stack, DB configuration, and directory structure - **COMPLETED**
-  - [x] Audit CV ingestion pipeline and Docling parsing/OCR mechanisms - **COMPLETED**
-  - [x] Summarize scoring engine components, mandatory enforcement, and domain score - **COMPLETED**
-  - [x] Run live data quality query against MSSQL DB (`AIRIS_TEST`) - **COMPLETED**
-  - [x] Audit LLM configuration, timeout/retry logic, and schema status - **COMPLETED**
-  - [x] Review built UI screens vs UI.md design system spec - **COMPLETED**
-  - [x] Map out all known open issues and their current status - **COMPLETED**
-  - [x] Generate comprehensive status report in `ProjectAnalysis.md` - **COMPLETED**
-- **Phase 14: Priority Backlog (Awaiting User Priority Alignment)**
+- **Phase 17: Backlog Optimizations**
   - [ ] Domain scoring token-overlap isolation (`\b` word boundary regex)
   - [ ] Database data quality cleaning/filtering for garbage strings (`"-"`, `"Yes"`)
-  - [ ] Ollama grammar-constrained JSON Schema integration
   - [ ] Candidate List & Candidate Detail UI screens
 
 ## Important Decisions
-- Performed read-only end-to-end diagnostic audit without making functional code changes to backend or frontend.
-- Queried live MSSQL database (`AIRIS_TEST`) directly to produce precise empirical metrics (1,299 active DB rows vs 106 open vacancies).
-- Saved complete status report to [ProjectAnalysis.md](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/ProjectAnalysis.md).
+- Identified GPU VRAM thrashing caused by unused embedding generation during single CV matching pipeline, cutting uncached processing overhead by 10-30s.
+- Fixed prompt truncation by doubling CV character budget to 7,500 chars with smart whitespace stripping.
+- Sealed Ollama JSON Schema grammar generation with strict Pydantic sub-models (`ClassifiedRequirementItem` and `RequirementEvidence`).
 

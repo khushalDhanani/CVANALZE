@@ -28,7 +28,7 @@ def build_optimized_match_prompt(
 
     Returns: (prompt_str, estimated_token_count, char_count)
     """
-    cleaned_cv = _clean_cv_text(cv_text)[:3500]
+    cleaned_cv = _clean_cv_text(cv_text)[:7500]
 
     compact_vacancies = []
     for vac in filtered_vacancies:

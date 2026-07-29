@@ -74,6 +74,9 @@ def _get_ocr_converter() -> DocumentConverter:
     return _ocr_converter_instance
 
 
+_parser_thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="docling_parser")
+
+
 class DocumentParser:
     @classmethod
     def parse(cls, filename: str, content: bytes) -> ExtractionResult:
@@ -193,14 +196,13 @@ class DocumentParser:
             else settings.EXTRACTION_TIMEOUT_SECONDS
         )
 
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(cls.parse, filename, content)
-            try:
-                return future.result(timeout=timeout)
-            except FuturesTimeoutError as exc:
-                logger.error(
-                    f"Extraction timed out after {timeout} seconds for '{filename}'."
-                )
-                raise TimeoutError(
-                    f"Extraction timed out after {timeout} seconds for '{filename}'."
-                ) from exc
+        future = _parser_thread_pool.submit(cls.parse, filename, content)
+        try:
+            return future.result(timeout=timeout)
+        except FuturesTimeoutError as exc:
+            logger.error(
+                f"Extraction timed out after {timeout} seconds for '{filename}'."
+            )
+            raise TimeoutError(
+                f"Extraction timed out after {timeout} seconds for '{filename}'."
+            ) from exc

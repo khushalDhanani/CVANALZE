@@ -12,6 +12,19 @@ from app.schemas.analysis import QwenCVAnalysis, DynamicMappingResponse, Optimiz
 from app.schemas.profile import DynamicCandidateProfile
 
 
+_httpx_client_instance: httpx.Client | None = None
+
+
+def _get_httpx_client(timeout: float = 600.0) -> httpx.Client:
+    global _httpx_client_instance
+    if _httpx_client_instance is None or _httpx_client_instance.is_closed:
+        _httpx_client_instance = httpx.Client(
+            timeout=httpx.Timeout(timeout=timeout, connect=5.0),
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+        )
+    return _httpx_client_instance
+
+
 class OllamaLLMService:
     @staticmethod
     def extract_candidate_profile(
@@ -368,9 +381,9 @@ class OllamaLLMService:
                 f"Prompt: {len(prompt)} chars | Attempt {attempt}/{settings.OLLAMA_MAX_RETRIES}..."
             )
             try:
-                with httpx.Client(timeout=timeout_cfg) as client:
-                    response = client.post(url, json=payload)
-                    response.raise_for_status()
+                client = _get_httpx_client(settings.OLLAMA_REQUEST_TIMEOUT)
+                response = client.post(url, json=payload)
+                response.raise_for_status()
 
                 req_duration_ms = round((time.perf_counter() - t_req_start) * 1000.0, 2)
                 data = response.json()

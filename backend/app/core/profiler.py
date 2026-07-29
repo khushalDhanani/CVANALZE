@@ -36,16 +36,17 @@ class PipelineProfiler:
         llm_time_ms = m.ollama_request_ms + m.model_inference_ms
         cache_str = "HIT" if m.cache_hit else "MISS"
         logger.info(
-            f"=== LLM Pipeline Execution Profile ==="
+            f"=== 8-Stage CV Pipeline Execution Profile ==="
         )
         logger.info(
-            f"Stage Timings (ms): JSON Loading={m.json_loading_ms}ms | Vacancy Retrieval={m.vacancy_retrieval_ms}ms | "
-            f"Python Pre-filter={m.prefilter_ms}ms | Prompt Construction={m.prompt_construction_ms}ms | "
-            f"Ollama Request={m.ollama_request_ms}ms | Model Inference={m.model_inference_ms}ms | "
-            f"JSON Validation={m.json_validation_ms}ms | Scoring={m.scoring_ms}ms | Total Execution={m.total_execution_ms}ms"
+            f"1. Upload & Read={m.upload_ms}ms | 2. Docling Extraction={m.docling_extraction_ms}ms | "
+            f"3. Resume JSON={m.resume_json_ms}ms | 4. DB Vacancy Retrieval={m.vacancy_retrieval_ms}ms | "
+            f"5. Cache Check={m.cache_lookup_ms}ms | 6. Python Pre-filter={m.prefilter_ms}ms | "
+            f"7. LLM Request/Inference={llm_time_ms}ms (req: {m.ollama_request_ms}ms, inf: {m.model_inference_ms}ms, val: {m.json_validation_ms}ms) | "
+            f"8. Scoring & Matching={m.scoring_ms}ms | Total Execution={m.total_execution_ms}ms"
         )
         logger.info(
-            f"Pipeline Stats: LLM Time={llm_time_ms}ms | Tokens={m.token_count} ({m.context_char_count} chars) | "
-            f"Vacancies Before Filter={m.vacancies_before_filtering} | Vacancies After Filter={m.vacancies_after_filtering} | "
-            f"Cache Status={cache_str} | Avg Time per CV={m.average_cv_processing_ms}ms"
+            f"Pipeline Metrics: LLM Tokens={m.token_count} ({m.context_char_count} chars) | "
+            f"Vacancies Pre-filter={m.vacancies_before_filtering} -> Post-filter={m.vacancies_after_filtering} | "
+            f"Cache Status={cache_str} | Total CV Processing Time={m.total_execution_ms}ms"
         )
