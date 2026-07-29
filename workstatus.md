@@ -60,7 +60,23 @@
   - Migrated all icon usages to their `lucide-react-native` equivalents (Feather → lucide-react-native icons).
   - Replaced dollar-sign icon with `FontAwesome5` rupee-sign, then transitioned to `lucide-react-native` IndianRupee icon to maintain Indian Rupee branding.
 
+- **Phase 13: Scanned PDF OCR Failure Guard**
+  - Fixed "No candidate CV text provided" LLM error caused by scanned PDFs where OCR fails to extract text.
+  - Added post-OCR text quality check in `DocumentParser.parse()` to raise `ValueError` when extracted text is just `<!-- image -->` or below a minimum threshold after OCR.
+  - Added early validation in `MatchService.analyze_single_cv()` to reject image-only CV text before reaching the LLM, covering reanalysis paths.
+- **Phase 14: Processing Timeout Fix**
+  - Fixed "Processing timed out" frontend error caused by polling timeout (2 min) shorter than backend processing time (up to 10 min).
+  - Removed duplicate LLM call in `background_upload_and_analyze` — `process_cv_file` already does full LLM analysis, so `analyze_from_result_file` was redundant.
+  - Updated status endpoint to return `match_analysis` directly from the basic result file (no need for separate `_enriched.json` step).
+  - Increased frontend polling limits: `POLL_INTERVAL_MS` 2s→3s, `MAX_POLL_RETRIES` 60→250 (3s × 250 = 12.5 min total).
+  - Improved timeout error message to suggest checking candidates list.
+
 ## Files Changed
+- `app/services/document_parser.py`
+- `app/services/match_service.py`
+- `app/api/analysis.py`
+- `frontend/src/constants/config.ts`
+- `frontend/src/hooks/useCvUpload.ts`
 - `app/repositories/job.py`
 - `app/api/jobs.py`
 - `app/services/vacancy_prefilter.py`

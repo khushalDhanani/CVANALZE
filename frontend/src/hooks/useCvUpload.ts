@@ -31,7 +31,7 @@ export function useCvUpload() {
         if (attempts > API_CONFIG.MAX_POLL_RETRIES) {
           clearInterval(interval);
           setUploading(false);
-          setError('Processing timed out. Please check back later.');
+          setError('Processing is taking longer than expected. The backend may still be working — please check the candidates list later.');
           return;
         }
 

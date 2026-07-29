@@ -120,6 +120,20 @@ class DocumentParser:
                 f"No readable text or content found in CV document '{filename}'."
             )
 
+        min_text_for_llm = max(20, settings.AUTO_OCR_MIN_TEXT_CHARS // 5)
+        text_stripped = markdown_text.strip()
+        if len(text_stripped) < min_text_for_llm and (
+            "<!-- image -->" in text_stripped or ocr_applied
+        ):
+            logger.warning(
+                f"Insufficient text extracted after OCR for '{filename}': {len(text_stripped)} chars. "
+                f"Document may be unreadable (scanned image with failed OCR)."
+            )
+            raise ValueError(
+                f"OCR could not extract meaningful text from '{filename}'. "
+                f"The document may be a low-quality scan or contain only non-text images."
+            )
+
         structured_dict = docling_doc.export_to_dict()
 
         pages_count = (
