@@ -7,7 +7,7 @@ services:
     environment:
       - LLM_ENABLED=true
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_MODEL=qwen3:8b
+      - OLLAMA_MODEL=qwen3:4b
     volumes:
       - ./backend/uploads:/app/uploads
     restart: unless-stopped

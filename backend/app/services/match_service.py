@@ -86,7 +86,18 @@ class MatchService:
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
 
-        # 1. JSON Loading stage timing (parsing CV text input)
+        # 1. Validate CV text is meaningful (not just image markers from failed OCR)
+        if not cv_text or not cv_text.strip():
+            raise ValueError("CV text content cannot be empty.")
+
+        cv_stripped = cv_text.strip()
+        if "<!-- image -->" in cv_stripped and len(cv_stripped) < 50:
+            raise ValueError(
+                "CV document is a scanned image with no extractable text. "
+                "OCR could not extract any meaningful content."
+            )
+
+        # 2. JSON Loading stage timing (parsing CV text input)
         with profiler.time_stage("json_loading"):
             _ = cv_text.strip()
 

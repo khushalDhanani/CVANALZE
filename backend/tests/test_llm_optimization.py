@@ -84,10 +84,10 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
     vacancies = [{"id": 101, "title": "Python Dev", "required_skills": ["Python"]}]
 
     key1 = LLMCacheRepository.compute_composite_hash(
-        cv_text, vacancies, "3.0", "qwen3:8b"
+        cv_text, vacancies, "3.0", "qwen3:4b"
     )
     key2 = LLMCacheRepository.compute_composite_hash(
-        cv_text, vacancies, "3.0", "qwen3:8b"
+        cv_text, vacancies, "3.0", "qwen3:4b"
     )
     assert key1 == key2
 

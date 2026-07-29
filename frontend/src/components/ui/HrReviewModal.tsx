@@ -5,7 +5,7 @@ import {
   Text,
   Pressable
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { X, CheckCircle } from 'lucide-react-native';
 import { matchService } from '@/services/matchService';
 import { JobMatchScore } from '@/types/api';
 import { Button, TextField, Card } from './index';
@@ -82,7 +82,7 @@ export function HrReviewModal({
               HR Review & Correction
             </Text>
             <Pressable onPress={onClose} hitSlop={8}>
-              <Feather name="x" size={20} color="#9CA3AF" />
+              <X size={20} color="#9CA3AF" />
             </Pressable>
           </View>
 
@@ -100,7 +100,7 @@ export function HrReviewModal({
 
           {success && (
             <Card className="bg-success/10 border-success/30 p-3 flex-row items-center gap-1.5">
-              <Feather name="check-circle" size={14} color="#16A34A" />
+              <CheckCircle size={14} color="#16A34A" />
               <Text className="text-xs font-sans-semibold text-success">
                 HR Review saved successfully!
               </Text>

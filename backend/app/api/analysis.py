@@ -61,13 +61,10 @@ async def analyze_cv_text(payload: CVMatchRequest):
 
 async def background_upload_and_analyze(filename: str, content: bytes, content_type: str | None):
     try:
-        basic_result = await process_cv_file(
+        await process_cv_file(
             filename=filename,
             content=content,
             content_type=content_type,
-        )
-        await MatchService.analyze_from_result_file(
-            basic_result["result_file_path"]
         )
     except Exception as exc:
         from app.core.logging import logger
@@ -114,25 +111,23 @@ async def upload_and_analyze(
 @router.get("/status/{cv_key}")
 async def get_match_status(cv_key: str):
     """Get the status or result of an enriched background match job."""
-    result = ResultRepository.read_result_by_filename(f"{cv_key}_enriched.json")
-    if result and "enriched_match_analysis" in result:
-        enriched_data = result["enriched_match_analysis"]
-        enriched_data["scan_id"] = result.get("scan_id", result.get("id"))
-        enriched_data["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
-        return enriched_data
-    
-    # Check if basic processing is done but enrichment is still pending
-    basic_result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
-    if basic_result:
+    result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
+    if result:
+        match_analysis = result.get("match_analysis")
+        if match_analysis:
+            match_analysis["scan_id"] = result.get("scan_id", result.get("id"))
+            match_analysis["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
+            return match_analysis
+        
         return CVProcessingResponse(
-            message="50% - Basic processing complete, LLM enrichment in progress...",
+            message="50% - Parsing complete, matching in progress...",
             cv_key=cv_key,
             status="processing",
             progress=50
         )
         
     return CVProcessingResponse(
-        message="25% - Match is still processing or does not exist...",
+        message="Uploading and parsing CV...",
         cv_key=cv_key,
         status="processing",
         progress=25

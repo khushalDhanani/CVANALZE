@@ -614,8 +614,13 @@ class ScoringEngine:
                 optimized_profile=optimized_profile,
                 llm_match=llm_match,
             )
-            if dept_terms and any(t in domain_candidate_text for t in dept_terms):
-                domain_score = 100.0
+            if dept_terms:
+                matched_dept_terms = []
+                for term in dept_terms:
+                    if re.search(r"\b" + re.escape(term) + r"\b", domain_candidate_text, re.IGNORECASE):
+                        matched_dept_terms.append(term)
+                if matched_dept_terms:
+                    domain_score = 100.0
 
         # Technology Score
         technology_score = None

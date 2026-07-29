@@ -7,7 +7,7 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Feather } from '@expo/vector-icons';
+import { Cpu, CpuIcon } from 'lucide-react-native';
 import { Pressable, View, StyleSheet, Text } from 'react-native';
 
 import { ThemedText } from './themed-text';
@@ -61,7 +61,7 @@ export function CustomTabList(props: TabListProps) {
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
         <View className="flex-row items-center gap-1.5 mr-auto">
-          <Feather name="cpu" size={16} color="#818cf8" />
+          <CpuIcon size={16} color="#818cf8" />
           <Text className="text-indigo-400 font-extrabold text-sm tracking-wide">
             CV ANALYZER
           </Text>

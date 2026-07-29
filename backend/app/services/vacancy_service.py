@@ -50,10 +50,15 @@ class VacancyService:
         else:
             title = f"Vacancy #{vacancy.VacancyRequestID}"
         
-        # Extract skills/keywords from Additional Knowledge
+        # Extract skills/keywords from Additional Knowledge (filtering garbage placeholders)
+        GARBAGE_SKILLS = {"-", ".", "yes", "no", "n/a", "na", "nil", "none", "test", "1", "0", "ok", "good"}
         skills = []
         if vacancy.RequestedAdditionalKnowledge:
-            skills = [s.strip() for s in vacancy.RequestedAdditionalKnowledge.split(",") if s.strip()]
+            raw_skills = [s.strip() for s in vacancy.RequestedAdditionalKnowledge.split(",") if s.strip()]
+            skills = [
+                s for s in raw_skills
+                if len(s) > 1 and s.lower() not in GARBAGE_SKILLS
+            ]
             
         dept_name = vacancy.department.DeptName if vacancy.department else "Unknown Department"
         comp_name = vacancy.company.CompName if vacancy.company else "Unknown Company"

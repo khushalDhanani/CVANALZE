@@ -3414,48 +3414,60 @@
     "llm_skipped": true
   },
   "enriched_match_analysis": {
-    "primary_department": "Production Team - 3 (Kalpesh Patel)",
+    "primary_department": "R&D Team - 3 (Dr. Anish Patel)",
     "best_match": {
-      "job_id": "1282",
-      "job_title": "Plant Assistant - II (Production)",
-      "department": "Production Team - 3 (Kalpesh Patel)",
-      "vacancy_id": 1282,
-      "job_profile_id": 79,
+      "job_id": "1326",
+      "job_title": "Chemist - R & D",
+      "department": "R&D Team - 3 (Dr. Anish Patel)",
+      "vacancy_id": 1326,
+      "job_profile_id": 159,
       "company_id": 1,
-      "department_id": 21,
-      "department_name": "Production Team - 3 (Kalpesh Patel)",
-      "location_id": 2,
-      "score": 78.6,
-      "overall_score": 78.6,
+      "department_id": 39,
+      "department_name": "R&D Team - 3 (Dr. Anish Patel)",
+      "location_id": 1,
+      "score": 81.8,
+      "overall_score": 81.8,
       "role_score": 50.0,
       "skills_score": 100.0,
-      "experience_score": 100.0,
+      "experience_score": 80.0,
       "education_score": 0.0,
       "domain_score": 50.0,
       "technology_score": 0.0,
       "certification_score": 0.0,
       "responsibilities_score": 0.0,
       "coverage": 0.7,
-      "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+      "ranking_reason": "Ranked #1 with highest verified score of 81.8%.",
       "classification": "HIGH",
       "recommendation": "Strong candidate — proceed to interview.",
       "matched_skills": [
-        "NO"
+        "Chemistry"
       ],
       "missing_skills": [],
       "matched_keywords": [
-        "NO"
+        "Chemistry"
       ],
       "missing_keywords": [],
       "mandatory_requirements": [
         {
-          "requirement_id": "req_skill_no",
-          "description": "Skill: NO",
+          "requirement_id": "req_skill_chemistry",
+          "description": "Skill: Chemistry",
           "tier": "MANDATORY",
           "status": "SATISFIED",
           "evidence": {
-            "cv_evidence": "CV contains skill: 'NO'",
-            "vacancy_evidence": "Mandatory Skill Requirement: NO",
+            "cv_evidence": "CV contains skill: 'Chemistry'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Chemistry",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        },
+        {
+          "requirement_id": "req_min_experience",
+          "description": "Minimum Experience: 2.0 years",
+          "tier": "MANDATORY",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 2.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 2.0 years",
             "confidence_score": 1.0
           },
           "failure_reason": null
@@ -3463,87 +3475,125 @@
       ],
       "preferred_requirements": [
         {
-          "requirement_id": "pref_keyword_no",
-          "description": "Preferred Keyword: NO",
+          "requirement_id": "pref_keyword_chemistry",
+          "description": "Preferred Keyword: Chemistry",
           "tier": "PREFERRED",
           "status": "SATISFIED",
           "evidence": {
-            "cv_evidence": "CV mentions preferred keyword: 'NO'",
-            "vacancy_evidence": "Preferred Keyword: NO",
+            "cv_evidence": "CV mentions preferred keyword: 'Chemistry'",
+            "vacancy_evidence": "Preferred Keyword: Chemistry",
             "confidence_score": 1.0
           },
           "failure_reason": null
+        },
+        {
+          "requirement_id": "pref_max_experience",
+          "description": "Max Experience: 3.0 years",
+          "tier": "PREFERRED",
+          "status": "PARTIALLY_SATISFIED",
+          "evidence": {
+            "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (3.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+            "confidence_score": 1.0
+          },
+          "failure_reason": "Candidate experience exceeds preferred upper limit (3.0 years)."
         }
       ],
       "optional_requirements": [],
       "matched_criteria": [
-        "Mandatory Skill: NO",
-        "Preferred Keyword: NO"
+        "Mandatory Skill: Chemistry",
+        "Minimum Experience (2.0 years)",
+        "Preferred Keyword: Chemistry"
       ],
       "missing_criteria": [],
       "evidence": {
-        "req_skill_no": {
-          "cv_evidence": "CV contains skill: 'NO'",
-          "vacancy_evidence": "Mandatory Skill Requirement: NO",
+        "req_skill_chemistry": {
+          "cv_evidence": "CV contains skill: 'Chemistry'",
+          "vacancy_evidence": "Mandatory Skill Requirement: Chemistry",
           "confidence_score": 1.0
         },
-        "pref_keyword_no": {
-          "cv_evidence": "CV mentions preferred keyword: 'NO'",
-          "vacancy_evidence": "Preferred Keyword: NO",
+        "req_min_experience": {
+          "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 2.0 years)",
+          "vacancy_evidence": "Mandatory Minimum Experience: 2.0 years",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_chemistry": {
+          "cv_evidence": "CV mentions preferred keyword: 'Chemistry'",
+          "vacancy_evidence": "Preferred Keyword: Chemistry",
+          "confidence_score": 1.0
+        },
+        "pref_max_experience": {
+          "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (3.0 years)",
+          "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
           "confidence_score": 1.0
         }
       },
       "mandatory_failures": [],
       "confidence": 1.0,
       "hr_review_required": false,
-      "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+      "reason": "All mandatory requirements satisfied. Overall match score is 81.8%.",
       "career_transition_detected": true,
-      "career_transition_note": "Dynamic career transition detected: Current role 'Curriculum vitae' to Target role 'Plant Assistant - II (Production)'.",
-      "llm_reason": "",
-      "inferred_skills": []
+      "career_transition_note": "Dynamic career transition detected: Current role 'Officer' to Target role 'Chemist - R & D'. LLM analysis: N/A (No significant career transition detected from current role to this vacancy type.)",
+      "llm_reason": "Candidate has strong analytical chemistry background and hands-on experience with laboratory equipment, which aligns with the 'Chemistry' requirement. The candidate's experience in R&D-like tasks (e.g., analysis of intermediates) is relevant.",
+      "inferred_skills": [
+        "Analytical Chemistry",
+        "Chemical Synthesis"
+      ]
     },
     "suitable_openings": [
       {
-        "job_id": "1282",
-        "job_title": "Plant Assistant - II (Production)",
-        "department": "Production Team - 3 (Kalpesh Patel)",
-        "vacancy_id": 1282,
-        "job_profile_id": 79,
+        "job_id": "1326",
+        "job_title": "Chemist - R & D",
+        "department": "R&D Team - 3 (Dr. Anish Patel)",
+        "vacancy_id": 1326,
+        "job_profile_id": 159,
         "company_id": 1,
-        "department_id": 21,
-        "department_name": "Production Team - 3 (Kalpesh Patel)",
-        "location_id": 2,
-        "score": 78.6,
-        "overall_score": 78.6,
+        "department_id": 39,
+        "department_name": "R&D Team - 3 (Dr. Anish Patel)",
+        "location_id": 1,
+        "score": 81.8,
+        "overall_score": 81.8,
         "role_score": 50.0,
         "skills_score": 100.0,
-        "experience_score": 100.0,
+        "experience_score": 80.0,
         "education_score": 0.0,
         "domain_score": 50.0,
         "technology_score": 0.0,
         "certification_score": 0.0,
         "responsibilities_score": 0.0,
         "coverage": 0.7,
-        "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+        "ranking_reason": "Ranked #1 with highest verified score of 81.8%.",
         "classification": "HIGH",
         "recommendation": "Strong candidate — proceed to interview.",
         "matched_skills": [
-          "NO"
+          "Chemistry"
         ],
         "missing_skills": [],
         "matched_keywords": [
-          "NO"
+          "Chemistry"
         ],
         "missing_keywords": [],
         "mandatory_requirements": [
           {
-            "requirement_id": "req_skill_no",
-            "description": "Skill: NO",
+            "requirement_id": "req_skill_chemistry",
+            "description": "Skill: Chemistry",
             "tier": "MANDATORY",
             "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV contains skill: 'NO'",
-              "vacancy_evidence": "Mandatory Skill Requirement: NO",
+              "cv_evidence": "CV contains skill: 'Chemistry'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Chemistry",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 2.0 years",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 2.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 2.0 years",
               "confidence_score": 1.0
             },
             "failure_reason": null
@@ -3551,44 +3601,70 @@
         ],
         "preferred_requirements": [
           {
-            "requirement_id": "pref_keyword_no",
-            "description": "Preferred Keyword: NO",
+            "requirement_id": "pref_keyword_chemistry",
+            "description": "Preferred Keyword: Chemistry",
             "tier": "PREFERRED",
             "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV mentions preferred keyword: 'NO'",
-              "vacancy_evidence": "Preferred Keyword: NO",
+              "cv_evidence": "CV mentions preferred keyword: 'Chemistry'",
+              "vacancy_evidence": "Preferred Keyword: Chemistry",
               "confidence_score": 1.0
             },
             "failure_reason": null
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 3.0 years",
+            "tier": "PREFERRED",
+            "status": "PARTIALLY_SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (3.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Candidate experience exceeds preferred upper limit (3.0 years)."
           }
         ],
         "optional_requirements": [],
         "matched_criteria": [
-          "Mandatory Skill: NO",
-          "Preferred Keyword: NO"
+          "Mandatory Skill: Chemistry",
+          "Minimum Experience (2.0 years)",
+          "Preferred Keyword: Chemistry"
         ],
         "missing_criteria": [],
         "evidence": {
-          "req_skill_no": {
-            "cv_evidence": "CV contains skill: 'NO'",
-            "vacancy_evidence": "Mandatory Skill Requirement: NO",
+          "req_skill_chemistry": {
+            "cv_evidence": "CV contains skill: 'Chemistry'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Chemistry",
             "confidence_score": 1.0
           },
-          "pref_keyword_no": {
-            "cv_evidence": "CV mentions preferred keyword: 'NO'",
-            "vacancy_evidence": "Preferred Keyword: NO",
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 2.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 2.0 years",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_chemistry": {
+            "cv_evidence": "CV mentions preferred keyword: 'Chemistry'",
+            "vacancy_evidence": "Preferred Keyword: Chemistry",
+            "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (3.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
             "confidence_score": 1.0
           }
         },
         "mandatory_failures": [],
         "confidence": 1.0,
         "hr_review_required": false,
-        "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+        "reason": "All mandatory requirements satisfied. Overall match score is 81.8%.",
         "career_transition_detected": true,
-        "career_transition_note": "Dynamic career transition detected: Current role 'Curriculum vitae' to Target role 'Plant Assistant - II (Production)'.",
-        "llm_reason": "",
-        "inferred_skills": []
+        "career_transition_note": "Dynamic career transition detected: Current role 'Officer' to Target role 'Chemist - R & D'. LLM analysis: N/A (No significant career transition detected from current role to this vacancy type.)",
+        "llm_reason": "Candidate has strong analytical chemistry background and hands-on experience with laboratory equipment, which aligns with the 'Chemistry' requirement. The candidate's experience in R&D-like tasks (e.g., analysis of intermediates) is relevant.",
+        "inferred_skills": [
+          "Analytical Chemistry",
+          "Chemical Synthesis"
+        ]
       },
       {
         "job_id": "1195",
@@ -3600,24 +3676,24 @@
         "department_id": 28,
         "department_name": "Quality Control  Team",
         "location_id": 14,
-        "score": 22.9,
-        "overall_score": 22.9,
+        "score": 77.4,
+        "overall_score": 77.4,
         "role_score": 50.0,
-        "skills_score": 0.0,
+        "skills_score": 50.0,
         "experience_score": 100.0,
         "education_score": 0.0,
-        "domain_score": 50.0,
+        "domain_score": 100.0,
         "technology_score": 0.0,
         "certification_score": 0.0,
         "responsibilities_score": 0.0,
         "coverage": 0.7,
-        "ranking_reason": "Ranked #2 due to lower score (22.9% vs top 78.6%).",
-        "classification": "LOW",
-        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
-        "matched_skills": [],
-        "missing_skills": [
+        "ranking_reason": "Ranked #2 due to lower score (77.4% vs top 81.8%).",
+        "classification": "HIGH",
+        "recommendation": "Strong candidate — proceed to interview.",
+        "matched_skills": [
           "Laboratory knowledge"
         ],
+        "missing_skills": [],
         "matched_keywords": [],
         "missing_keywords": [
           "Laboratory knowledge"
@@ -3627,13 +3703,25 @@
             "requirement_id": "req_skill_laboratory_knowledge",
             "description": "Skill: Laboratory knowledge",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'Laboratory knowledge'",
+              "cv_evidence": "CV contains skill: 'Laboratory knowledge'",
               "vacancy_evidence": "Mandatory Skill Requirement: Laboratory knowledge",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'Laboratory knowledge' is not present in CV."
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 3.0 years",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 3.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 3.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
           }
         ],
         "preferred_requirements": [
@@ -3648,41 +3736,62 @@
               "confidence_score": 1.0
             },
             "failure_reason": "Preferred keyword 'Laboratory knowledge' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 6.0 years",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 5.0 years is within preferred upper bound (6.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 6.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
           }
         ],
         "optional_requirements": [],
-        "matched_criteria": [],
-        "missing_criteria": [
+        "matched_criteria": [
           "Mandatory Skill: Laboratory knowledge",
+          "Minimum Experience (3.0 years)",
+          "Max Experience (6.0 years)"
+        ],
+        "missing_criteria": [
           "Preferred Keyword: Laboratory knowledge"
         ],
         "evidence": {
           "req_skill_laboratory_knowledge": {
-            "cv_evidence": "CV missing explicit mention of skill: 'Laboratory knowledge'",
+            "cv_evidence": "CV contains skill: 'Laboratory knowledge'",
             "vacancy_evidence": "Mandatory Skill Requirement: Laboratory knowledge",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 3.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 3.0 years",
             "confidence_score": 1.0
           },
           "pref_keyword_laboratory_knowledge": {
             "cv_evidence": "CV missing preferred keyword: 'Laboratory knowledge'",
             "vacancy_evidence": "Preferred Keyword: Laboratory knowledge",
             "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 5.0 years is within preferred upper bound (6.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 6.0 years",
+            "confidence_score": 1.0
           }
         },
-        "mandatory_failures": [
-          {
-            "requirement_id": "req_skill_laboratory_knowledge",
-            "description": "Skill: Laboratory knowledge",
-            "reason": "Mandatory skill 'Laboratory knowledge' is not present in CV.",
-            "score_impact": 20.0
-          }
-        ],
+        "mandatory_failures": [],
         "confidence": 1.0,
-        "hr_review_required": true,
-        "reason": "Mandatory requirement failure(s): Skill: Laboratory knowledge (Mandatory skill 'Laboratory knowledge' is not present in CV.)",
+        "hr_review_required": false,
+        "reason": "All mandatory requirements satisfied. Overall match score is 77.4%.",
         "career_transition_detected": true,
-        "career_transition_note": "Dynamic career transition detected: Current role 'Curriculum vitae' to Target role 'Lab Assistant - I (QC)'.",
-        "llm_reason": "",
-        "inferred_skills": []
+        "career_transition_note": "Dynamic career transition detected: Current role 'Officer' to Target role 'Lab Assistant - I (QC)'. LLM analysis: N/A (No significant career transition detected from current role to this vacancy type.)",
+        "llm_reason": "Candidate has strong laboratory experience and technical skills that align with the 'Laboratory knowledge' requirement. However, the vacancy requires 3 years of experience which the candidate does not meet.",
+        "inferred_skills": [
+          "Laboratory Procedures",
+          "Chemical Analysis"
+        ]
       },
       {
         "job_id": "1196",
@@ -3694,24 +3803,24 @@
         "department_id": 28,
         "department_name": "Quality Control  Team",
         "location_id": 14,
-        "score": 22.9,
-        "overall_score": 22.9,
+        "score": 76.1,
+        "overall_score": 76.1,
         "role_score": 50.0,
-        "skills_score": 0.0,
-        "experience_score": 100.0,
+        "skills_score": 50.0,
+        "experience_score": 80.0,
         "education_score": 0.0,
-        "domain_score": 50.0,
+        "domain_score": 100.0,
         "technology_score": 0.0,
         "certification_score": 0.0,
         "responsibilities_score": 0.0,
         "coverage": 0.7,
-        "ranking_reason": "Ranked #3 due to lower score (22.9% vs top 78.6%).",
-        "classification": "LOW",
-        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
-        "matched_skills": [],
-        "missing_skills": [
+        "ranking_reason": "Ranked #3 due to lower score (76.1% vs top 81.8%).",
+        "classification": "HIGH",
+        "recommendation": "Strong candidate — proceed to interview.",
+        "matched_skills": [
           "Laboratory knowledge"
         ],
+        "missing_skills": [],
         "matched_keywords": [],
         "missing_keywords": [
           "Laboratory knowledge"
@@ -3721,13 +3830,25 @@
             "requirement_id": "req_skill_laboratory_knowledge",
             "description": "Skill: Laboratory knowledge",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'Laboratory knowledge'",
+              "cv_evidence": "CV contains skill: 'Laboratory knowledge'",
               "vacancy_evidence": "Mandatory Skill Requirement: Laboratory knowledge",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'Laboratory knowledge' is not present in CV."
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 0.0 years",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 0.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
           }
         ],
         "preferred_requirements": [
@@ -3742,41 +3863,61 @@
               "confidence_score": 1.0
             },
             "failure_reason": "Preferred keyword 'Laboratory knowledge' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 3.0 years",
+            "tier": "PREFERRED",
+            "status": "PARTIALLY_SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (3.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Candidate experience exceeds preferred upper limit (3.0 years)."
           }
         ],
         "optional_requirements": [],
-        "matched_criteria": [],
-        "missing_criteria": [
+        "matched_criteria": [
           "Mandatory Skill: Laboratory knowledge",
+          "Minimum Experience (0.0 years)"
+        ],
+        "missing_criteria": [
           "Preferred Keyword: Laboratory knowledge"
         ],
         "evidence": {
           "req_skill_laboratory_knowledge": {
-            "cv_evidence": "CV missing explicit mention of skill: 'Laboratory knowledge'",
+            "cv_evidence": "CV contains skill: 'Laboratory knowledge'",
             "vacancy_evidence": "Mandatory Skill Requirement: Laboratory knowledge",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 0.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
             "confidence_score": 1.0
           },
           "pref_keyword_laboratory_knowledge": {
             "cv_evidence": "CV missing preferred keyword: 'Laboratory knowledge'",
             "vacancy_evidence": "Preferred Keyword: Laboratory knowledge",
             "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (3.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+            "confidence_score": 1.0
           }
         },
-        "mandatory_failures": [
-          {
-            "requirement_id": "req_skill_laboratory_knowledge",
-            "description": "Skill: Laboratory knowledge",
-            "reason": "Mandatory skill 'Laboratory knowledge' is not present in CV.",
-            "score_impact": 20.0
-          }
-        ],
+        "mandatory_failures": [],
         "confidence": 1.0,
-        "hr_review_required": true,
-        "reason": "Mandatory requirement failure(s): Skill: Laboratory knowledge (Mandatory skill 'Laboratory knowledge' is not present in CV.)",
+        "hr_review_required": false,
+        "reason": "All mandatory requirements satisfied. Overall match score is 76.1%.",
         "career_transition_detected": true,
-        "career_transition_note": "Dynamic career transition detected: Current role 'Curriculum vitae' to Target role 'Lab Assistant - II (QC)'.",
-        "llm_reason": "",
-        "inferred_skills": []
+        "career_transition_note": "Dynamic career transition detected: Current role 'Officer' to Target role 'Lab Assistant - II (QC)'. LLM analysis: N/A (No significant career transition detected from current role to this vacancy type.)",
+        "llm_reason": "Candidate has strong laboratory experience and technical skills that align with the 'Laboratory knowledge' requirement. The vacancy has no minimum experience requirement, so the candidate's current role is directly relevant.",
+        "inferred_skills": [
+          "Laboratory Procedures",
+          "Chemical Analysis"
+        ]
       },
       {
         "job_id": "1284",
@@ -3788,8 +3929,8 @@
         "department_id": 21,
         "department_name": "Production Team - 3 (Kalpesh Patel)",
         "location_id": 2,
-        "score": 22.9,
-        "overall_score": 22.9,
+        "score": 72.2,
+        "overall_score": 72.2,
         "role_score": 50.0,
         "skills_score": 0.0,
         "experience_score": 100.0,
@@ -3798,79 +3939,75 @@
         "technology_score": 0.0,
         "certification_score": 0.0,
         "responsibilities_score": 0.0,
-        "coverage": 0.7,
-        "ranking_reason": "Ranked #4 due to lower score (22.9% vs top 78.6%).",
+        "coverage": 0.45,
+        "ranking_reason": "Ranked #4 due to lower score (72.2% vs top 81.8%).",
         "classification": "LOW",
-        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
-        "matched_skills": [],
-        "missing_skills": [
-          "Yes"
+        "recommendation": "Low Confidence Match — Requires HR verification (Vacancy is underspecified).",
+        "matched_skills": [
+          "Chemistry"
         ],
+        "missing_skills": [],
         "matched_keywords": [],
-        "missing_keywords": [
-          "Yes"
-        ],
+        "missing_keywords": [],
         "mandatory_requirements": [
           {
-            "requirement_id": "req_skill_yes",
-            "description": "Skill: Yes",
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 3.0 years",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'Yes'",
-              "vacancy_evidence": "Mandatory Skill Requirement: Yes",
+              "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 3.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 3.0 years",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'Yes' is not present in CV."
+            "failure_reason": null
           }
         ],
         "preferred_requirements": [
           {
-            "requirement_id": "pref_keyword_yes",
-            "description": "Preferred Keyword: Yes",
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 5.0 years",
             "tier": "PREFERRED",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing preferred keyword: 'Yes'",
-              "vacancy_evidence": "Preferred Keyword: Yes",
+              "cv_evidence": "Candidate experience 5.0 years is within preferred upper bound (5.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
               "confidence_score": 1.0
             },
-            "failure_reason": "Preferred keyword 'Yes' not mentioned in CV."
+            "failure_reason": null
           }
         ],
         "optional_requirements": [],
-        "matched_criteria": [],
+        "matched_criteria": [
+          "Minimum Experience (3.0 years)",
+          "Max Experience (5.0 years)"
+        ],
         "missing_criteria": [
-          "Mandatory Skill: Yes",
-          "Preferred Keyword: Yes"
+          "LOW_COVERAGE: Vacancy has poorly defined requirements."
         ],
         "evidence": {
-          "req_skill_yes": {
-            "cv_evidence": "CV missing explicit mention of skill: 'Yes'",
-            "vacancy_evidence": "Mandatory Skill Requirement: Yes",
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 3.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 3.0 years",
             "confidence_score": 1.0
           },
-          "pref_keyword_yes": {
-            "cv_evidence": "CV missing preferred keyword: 'Yes'",
-            "vacancy_evidence": "Preferred Keyword: Yes",
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 5.0 years is within preferred upper bound (5.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
             "confidence_score": 1.0
           }
         },
-        "mandatory_failures": [
-          {
-            "requirement_id": "req_skill_yes",
-            "description": "Skill: Yes",
-            "reason": "Mandatory skill 'Yes' is not present in CV.",
-            "score_impact": 20.0
-          }
-        ],
+        "mandatory_failures": [],
         "confidence": 1.0,
-        "hr_review_required": true,
-        "reason": "Mandatory requirement failure(s): Skill: Yes (Mandatory skill 'Yes' is not present in CV.)",
+        "hr_review_required": false,
+        "reason": "All mandatory requirements satisfied. Overall match score is 72.2%. | Note: Low match coverage (44%).",
         "career_transition_detected": true,
-        "career_transition_note": "Dynamic career transition detected: Current role 'Curriculum vitae' to Target role 'Jr. Chemist (Production)'.",
-        "llm_reason": "",
-        "inferred_skills": []
+        "career_transition_note": "Dynamic career transition detected: Current role 'Officer' to Target role 'Jr. Chemist (Production)'. LLM analysis: N/A (No significant career transition detected from current role to this vacancy type.)",
+        "llm_reason": "Candidate has relevant experience in laboratory settings and analytical chemistry, but the role is in Production which requires different skills (e.g., process chemistry, production line operations). The candidate's experience is more aligned with QC/R&D roles.",
+        "inferred_skills": [
+          "Chemical Analysis",
+          "Quality Control Procedures"
+        ]
       },
       {
         "job_id": "1099",
@@ -3882,27 +4019,29 @@
         "department_id": 43,
         "department_name": "R&D Team - 5 (Sandeep Patel)",
         "location_id": 1,
-        "score": 0.0,
-        "overall_score": 0.0,
+        "score": 44.9,
+        "overall_score": 44.9,
         "role_score": 50.0,
-        "skills_score": 0.0,
-        "experience_score": 100.0,
+        "skills_score": 50.0,
+        "experience_score": 80.0,
         "education_score": 0.0,
         "domain_score": 50.0,
         "technology_score": 0.0,
         "certification_score": 0.0,
         "responsibilities_score": 0.0,
         "coverage": 0.7,
-        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 78.6%).",
-        "classification": "LOW",
-        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
-        "matched_skills": [],
-        "missing_skills": [
+        "ranking_reason": "Ranked #5 due to lower score (44.9% vs top 81.8%).",
+        "classification": "MEDIUM",
+        "recommendation": "Potential match — HR review recommended.",
+        "matched_skills": [
           "Cleaning & Maintenance of equipments",
           "Should perform experiments as per thier HOD's instruction",
           "onduct experiments as planned",
           "ensure gathering proper data on custom synthesis",
           "analytical developments",
+          "impurity profile etc."
+        ],
+        "missing_skills": [
           "impurity profile etc"
         ],
         "matched_keywords": [],
@@ -3919,61 +4058,61 @@
             "requirement_id": "req_skill_cleaning_&_maintenance_of_equipments",
             "description": "Skill: Cleaning & Maintenance of equipments",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'Cleaning & Maintenance of equipments'",
+              "cv_evidence": "CV contains skill: 'Cleaning & Maintenance of equipments'",
               "vacancy_evidence": "Mandatory Skill Requirement: Cleaning & Maintenance of equipments",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'Cleaning & Maintenance of equipments' is not present in CV."
+            "failure_reason": null
           },
           {
             "requirement_id": "req_skill_should_perform_experiments_as_per_thier_hod's_instruction",
             "description": "Skill: Should perform experiments as per thier HOD's instruction",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'Should perform experiments as per thier HOD's instruction'",
+              "cv_evidence": "CV contains skill: 'Should perform experiments as per thier HOD's instruction'",
               "vacancy_evidence": "Mandatory Skill Requirement: Should perform experiments as per thier HOD's instruction",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'Should perform experiments as per thier HOD's instruction' is not present in CV."
+            "failure_reason": null
           },
           {
             "requirement_id": "req_skill_onduct_experiments_as_planned",
             "description": "Skill: onduct experiments as planned",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'onduct experiments as planned'",
+              "cv_evidence": "CV contains skill: 'onduct experiments as planned'",
               "vacancy_evidence": "Mandatory Skill Requirement: onduct experiments as planned",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'onduct experiments as planned' is not present in CV."
+            "failure_reason": null
           },
           {
             "requirement_id": "req_skill_ensure_gathering_proper_data_on_custom_synthesis",
             "description": "Skill: ensure gathering proper data on custom synthesis",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'ensure gathering proper data on custom synthesis'",
+              "cv_evidence": "CV contains skill: 'ensure gathering proper data on custom synthesis'",
               "vacancy_evidence": "Mandatory Skill Requirement: ensure gathering proper data on custom synthesis",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'ensure gathering proper data on custom synthesis' is not present in CV."
+            "failure_reason": null
           },
           {
             "requirement_id": "req_skill_analytical_developments",
             "description": "Skill: analytical developments",
             "tier": "MANDATORY",
-            "status": "FAILED",
+            "status": "SATISFIED",
             "evidence": {
-              "cv_evidence": "CV missing explicit mention of skill: 'analytical developments'",
+              "cv_evidence": "CV contains skill: 'analytical developments'",
               "vacancy_evidence": "Mandatory Skill Requirement: analytical developments",
               "confidence_score": 1.0
             },
-            "failure_reason": "Mandatory skill 'analytical developments' is not present in CV."
+            "failure_reason": null
           },
           {
             "requirement_id": "req_skill_impurity_profile_etc",
@@ -3986,6 +4125,18 @@
               "confidence_score": 1.0
             },
             "failure_reason": "Mandatory skill 'impurity profile etc' is not present in CV."
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 0.0 years",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 0.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
           }
         ],
         "preferred_requirements": [
@@ -4060,16 +4211,30 @@
               "confidence_score": 1.0
             },
             "failure_reason": "Preferred keyword 'impurity profile etc' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 0.0 years",
+            "tier": "PREFERRED",
+            "status": "PARTIALLY_SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (0.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 0.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Candidate experience exceeds preferred upper limit (0.0 years)."
           }
         ],
         "optional_requirements": [],
-        "matched_criteria": [],
-        "missing_criteria": [
+        "matched_criteria": [
           "Mandatory Skill: Cleaning & Maintenance of equipments",
           "Mandatory Skill: Should perform experiments as per thier HOD's instruction",
           "Mandatory Skill: onduct experiments as planned",
           "Mandatory Skill: ensure gathering proper data on custom synthesis",
           "Mandatory Skill: analytical developments",
+          "Minimum Experience (0.0 years)"
+        ],
+        "missing_criteria": [
           "Mandatory Skill: impurity profile etc",
           "Preferred Keyword: Cleaning & Maintenance of equipments",
           "Preferred Keyword: Should perform experiments as per thier HOD's instruction",
@@ -4080,33 +4245,38 @@
         ],
         "evidence": {
           "req_skill_cleaning_&_maintenance_of_equipments": {
-            "cv_evidence": "CV missing explicit mention of skill: 'Cleaning & Maintenance of equipments'",
+            "cv_evidence": "CV contains skill: 'Cleaning & Maintenance of equipments'",
             "vacancy_evidence": "Mandatory Skill Requirement: Cleaning & Maintenance of equipments",
             "confidence_score": 1.0
           },
           "req_skill_should_perform_experiments_as_per_thier_hod's_instruction": {
-            "cv_evidence": "CV missing explicit mention of skill: 'Should perform experiments as per thier HOD's instruction'",
+            "cv_evidence": "CV contains skill: 'Should perform experiments as per thier HOD's instruction'",
             "vacancy_evidence": "Mandatory Skill Requirement: Should perform experiments as per thier HOD's instruction",
             "confidence_score": 1.0
           },
           "req_skill_onduct_experiments_as_planned": {
-            "cv_evidence": "CV missing explicit mention of skill: 'onduct experiments as planned'",
+            "cv_evidence": "CV contains skill: 'onduct experiments as planned'",
             "vacancy_evidence": "Mandatory Skill Requirement: onduct experiments as planned",
             "confidence_score": 1.0
           },
           "req_skill_ensure_gathering_proper_data_on_custom_synthesis": {
-            "cv_evidence": "CV missing explicit mention of skill: 'ensure gathering proper data on custom synthesis'",
+            "cv_evidence": "CV contains skill: 'ensure gathering proper data on custom synthesis'",
             "vacancy_evidence": "Mandatory Skill Requirement: ensure gathering proper data on custom synthesis",
             "confidence_score": 1.0
           },
           "req_skill_analytical_developments": {
-            "cv_evidence": "CV missing explicit mention of skill: 'analytical developments'",
+            "cv_evidence": "CV contains skill: 'analytical developments'",
             "vacancy_evidence": "Mandatory Skill Requirement: analytical developments",
             "confidence_score": 1.0
           },
           "req_skill_impurity_profile_etc": {
             "cv_evidence": "CV missing explicit mention of skill: 'impurity profile etc'",
             "vacancy_evidence": "Mandatory Skill Requirement: impurity profile etc",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 5.0 years of experience (meets mandatory 0.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
             "confidence_score": 1.0
           },
           "pref_keyword_cleaning_&_maintenance_of_equipments": {
@@ -4138,39 +4308,14 @@
             "cv_evidence": "CV missing preferred keyword: 'impurity profile etc'",
             "vacancy_evidence": "Preferred Keyword: impurity profile etc",
             "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 5.0 years exceeds preferred upper bound (0.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 0.0 years",
+            "confidence_score": 1.0
           }
         },
         "mandatory_failures": [
-          {
-            "requirement_id": "req_skill_cleaning_&_maintenance_of_equipments",
-            "description": "Skill: Cleaning & Maintenance of equipments",
-            "reason": "Mandatory skill 'Cleaning & Maintenance of equipments' is not present in CV.",
-            "score_impact": 20.0
-          },
-          {
-            "requirement_id": "req_skill_should_perform_experiments_as_per_thier_hod's_instruction",
-            "description": "Skill: Should perform experiments as per thier HOD's instruction",
-            "reason": "Mandatory skill 'Should perform experiments as per thier HOD's instruction' is not present in CV.",
-            "score_impact": 20.0
-          },
-          {
-            "requirement_id": "req_skill_onduct_experiments_as_planned",
-            "description": "Skill: onduct experiments as planned",
-            "reason": "Mandatory skill 'onduct experiments as planned' is not present in CV.",
-            "score_impact": 20.0
-          },
-          {
-            "requirement_id": "req_skill_ensure_gathering_proper_data_on_custom_synthesis",
-            "description": "Skill: ensure gathering proper data on custom synthesis",
-            "reason": "Mandatory skill 'ensure gathering proper data on custom synthesis' is not present in CV.",
-            "score_impact": 20.0
-          },
-          {
-            "requirement_id": "req_skill_analytical_developments",
-            "description": "Skill: analytical developments",
-            "reason": "Mandatory skill 'analytical developments' is not present in CV.",
-            "score_impact": 20.0
-          },
           {
             "requirement_id": "req_skill_impurity_profile_etc",
             "description": "Skill: impurity profile etc",
@@ -4180,14 +4325,17 @@
         ],
         "confidence": 1.0,
         "hr_review_required": true,
-        "reason": "Mandatory requirement failure(s): Skill: Cleaning & Maintenance of equipments (Mandatory skill 'Cleaning & Maintenance of equipments' is not present in CV.); Skill: Should perform experiments as per thier HOD's instruction (Mandatory skill 'Should perform experiments as per thier HOD's instruction' is not present in CV.); Skill: onduct experiments as planned (Mandatory skill 'onduct experiments as planned' is not present in CV.); Skill: ensure gathering proper data on custom synthesis (Mandatory skill 'ensure gathering proper data on custom synthesis' is not present in CV.); Skill: analytical developments (Mandatory skill 'analytical developments' is not present in CV.); Skill: impurity profile etc (Mandatory skill 'impurity profile etc' is not present in CV.)",
+        "reason": "Mandatory requirement failure(s): Skill: impurity profile etc (Mandatory skill 'impurity profile etc' is not present in CV.)",
         "career_transition_detected": true,
-        "career_transition_note": "Dynamic career transition detected: Current role 'Curriculum vitae' to Target role 'Lab Assistant - III (R&D)'.",
-        "llm_reason": "",
-        "inferred_skills": []
+        "career_transition_note": "Dynamic career transition detected: Current role 'Officer' to Target role 'Lab Assistant - III (R&D)'. LLM analysis: N/A (No significant career transition detected from current role to this vacancy type.)",
+        "llm_reason": "Candidate has extensive hands-on experience with analytical instruments (GC, HPLC, UV, etc.) and has worked in lab roles including Lab Assistant and Jr. Officer positions. Directly matches the required skills for conducting experiments, data gathering, and analytical developments in R&D.",
+        "inferred_skills": [
+          "Analytical Developments",
+          "Impurity Profile Analysis"
+        ]
       }
     ],
     "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
-    "llm_skipped": true
+    "llm_skipped": false
   }
 }

@@ -113,3 +113,19 @@ class ResultRepository:
             
         return results
 
+    @classmethod
+    def list_all_results(cls) -> list[dict[str, Any]]:
+        items = []
+        if settings.RESULTS_DIR.exists():
+            for p in settings.RESULTS_DIR.glob("*.json"):
+                if p.name.endswith(".tmp"):
+                    continue
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                    items.append(data)
+                except Exception:
+                    pass
+        items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        return items
+
+

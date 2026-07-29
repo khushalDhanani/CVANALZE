@@ -6,7 +6,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Sliders, CheckCircle } from 'lucide-react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMatchConfig } from '@/hooks/useMatchConfig';
 import { MatchComponentWeights } from '@/types/api';
@@ -105,12 +106,12 @@ export default function ConfigScreen() {
         ) : (
           <View className="gap-4 mb-8">
             {successMsg && (
-              <Card className="bg-success/10 border-success/30 flex-row items-center justify-center gap-1.5 p-3">
-                <Feather name="check-circle" size={14} color="#16A34A" />
-                <Text className="text-xs font-sans-semibold text-success">
-                  {successMsg}
-                </Text>
-              </Card>
+                <Card className="bg-success/10 border-success/30 flex-row items-center justify-center gap-1.5 p-3">
+                  <CheckCircle size={14} color="#16A34A" />
+                  <Text className="text-xs font-sans-semibold text-success">
+                    {successMsg}
+                  </Text>
+                </Card>
             )}
 
             {error && (

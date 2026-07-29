@@ -55,8 +55,28 @@
   - Updated `backend/app/api/config.py` to correctly map these new settings from the `ConfigRepository`.
   - Updated frontend `types/api.ts` to match the newly exposed properties.
   - Revamped `frontend/src/app/config.tsx` by adding a dedicated UI section ("LLM Bypass (Fast-Track) Settings") allowing users to modify the margin and coverage thresholds dynamically.
+- **Phase 12: UI.md Compliance & Vector Icons Migration**
+  - Replaced `@expo/vector-icons` with `lucide-react-native` across all screens and components.
+  - Migrated all icon usages to their `lucide-react-native` equivalents (Feather → lucide-react-native icons).
+  - Replaced dollar-sign icon with `FontAwesome5` rupee-sign, then transitioned to `lucide-react-native` IndianRupee icon to maintain Indian Rupee branding.
+
+- **Phase 13: Scanned PDF OCR Failure Guard**
+  - Fixed "No candidate CV text provided" LLM error caused by scanned PDFs where OCR fails to extract text.
+  - Added post-OCR text quality check in `DocumentParser.parse()` to raise `ValueError` when extracted text is just `<!-- image -->` or below a minimum threshold after OCR.
+  - Added early validation in `MatchService.analyze_single_cv()` to reject image-only CV text before reaching the LLM, covering reanalysis paths.
+- **Phase 14: Processing Timeout Fix**
+  - Fixed "Processing timed out" frontend error caused by polling timeout (2 min) shorter than backend processing time (up to 10 min).
+  - Removed duplicate LLM call in `background_upload_and_analyze` — `process_cv_file` already does full LLM analysis, so `analyze_from_result_file` was redundant.
+  - Updated status endpoint to return `match_analysis` directly from the basic result file (no need for separate `_enriched.json` step).
+  - Increased frontend polling limits: `POLL_INTERVAL_MS` 2s→3s, `MAX_POLL_RETRIES` 60→250 (3s × 250 = 12.5 min total).
+  - Improved timeout error message to suggest checking candidates list.
 
 ## Files Changed
+- `app/services/document_parser.py`
+- `app/services/match_service.py`
+- `app/api/analysis.py`
+- `frontend/src/constants/config.ts`
+- `frontend/src/hooks/useCvUpload.ts`
 - `app/repositories/job.py`
 - `app/api/jobs.py`
 - `app/services/vacancy_prefilter.py`
@@ -101,9 +121,26 @@
 - `frontend/src/components/ui/Sidebar/SidebarLayout.tsx` (New)
 - `backend/app/api/config.py`
 - `backend/app/schemas/config.py`
+- `ProjectAnalysis.md` (New)
 
 ## Pending Work
-- None. All tasks, optimization, frontend Tailwind CSS setup, API integration, vector icon migration, and Rupee icon replacement are 100% complete.
+- **Phase 13: End-to-End System Audit & Diagnostics**
+  - [x] Analyze tech stack, DB configuration, and directory structure - **COMPLETED**
+  - [x] Audit CV ingestion pipeline and Docling parsing/OCR mechanisms - **COMPLETED**
+  - [x] Summarize scoring engine components, mandatory enforcement, and domain score - **COMPLETED**
+  - [x] Run live data quality query against MSSQL DB (`AIRIS_TEST`) - **COMPLETED**
+  - [x] Audit LLM configuration, timeout/retry logic, and schema status - **COMPLETED**
+  - [x] Review built UI screens vs UI.md design system spec - **COMPLETED**
+  - [x] Map out all known open issues and their current status - **COMPLETED**
+  - [x] Generate comprehensive status report in `ProjectAnalysis.md` - **COMPLETED**
+- **Phase 14: Priority Backlog (Awaiting User Priority Alignment)**
+  - [ ] Domain scoring token-overlap isolation (`\b` word boundary regex)
+  - [ ] Database data quality cleaning/filtering for garbage strings (`"-"`, `"Yes"`)
+  - [ ] Ollama grammar-constrained JSON Schema integration
+  - [ ] Candidate List & Candidate Detail UI screens
 
 ## Important Decisions
-- Replaced the dollar sign icon with `FontAwesome5` `rupee-sign` to strictly maintain Indian Rupee (`₹`) visual branding across all salary displays.
+- Performed read-only end-to-end diagnostic audit without making functional code changes to backend or frontend.
+- Queried live MSSQL database (`AIRIS_TEST`) directly to produce precise empirical metrics (1,299 active DB rows vs 106 open vacancies).
+- Saved complete status report to [ProjectAnalysis.md](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/ProjectAnalysis.md).
+

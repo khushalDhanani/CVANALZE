@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Radio, CheckCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useBatchProgress } from '@/hooks/useBatchProgress';
@@ -88,16 +88,14 @@ export default function BatchScreen() {
                 onPress={() => setCandidateLimit(num)}
                 disabled={running}
                 hitSlop={8}
-                className={`flex-1 py-2.5 rounded-md border items-center ${
-                  candidateLimit === num
+                className={`flex-1 py-2.5 rounded-md border items-center ${candidateLimit === num
                     ? 'bg-primary border-primary active:bg-primary-dark'
                     : 'bg-surface border-border active:bg-background'
-                }`}
+                  }`}
               >
                 <Text
-                  className={`text-xs font-sans-bold ${
-                    candidateLimit === num ? 'text-text-inverse' : 'text-text-primary'
-                  }`}
+                  className={`text-xs font-sans-bold ${candidateLimit === num ? 'text-text-inverse' : 'text-text-primary'
+                    }`}
                 >
                   {num}
                 </Text>
@@ -126,7 +124,7 @@ export default function BatchScreen() {
           <Card className="border-primary/40 mb-4 gap-2 shadow-sm">
             <View className="flex-row justify-between items-center">
               <View className="flex-row items-center gap-1.5">
-                <Feather name="radio" size={14} color="#4F46E5" />
+                <Radio size={14} color="#4F46E5" />
                 <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
                   Live Pipeline Progress
                 </Text>
@@ -157,7 +155,7 @@ export default function BatchScreen() {
         {result && (
           <View className="mb-6 gap-3">
             <Card className="bg-success/10 border-success/30 flex-row items-center gap-1.5 p-3">
-              <Feather name="check-circle" size={14} color="#16A34A" />
+              <CheckCircle size={14} color="#16A34A" />
               <Text className="text-xs font-sans-bold text-success">
                 {result.message}
               </Text>

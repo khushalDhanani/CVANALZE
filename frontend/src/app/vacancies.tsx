@@ -5,7 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather, FontAwesome5 } from '@expo/vector-icons';
+import { Briefcase, Target, CheckCircle, IndianRupee } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { jobsService } from '@/services/jobsService';
 import { useJobs } from '@/hooks/useJobs';
@@ -97,7 +97,7 @@ export default function VacanciesScreen() {
             </Text>
             {dept && (
               <View className="flex-row items-center gap-1 mt-0.5">
-                <Feather name="briefcase" size={12} color="#6B7280" />
+                <Briefcase size={12} color="#6B7280" />
                 <Text className="text-xs font-sans-medium text-text-muted">
                   {dept}
                 </Text>
@@ -134,14 +134,14 @@ export default function VacanciesScreen() {
         {/* Salary & Domain */}
         <View className="flex-row justify-between items-center pt-2 border-t border-border mt-1">
           <View className="flex-row items-center gap-1">
-            <FontAwesome5 name="rupee-sign" size={11} color="#9CA3AF" />
+            <IndianRupee size={11} color="#9CA3AF" />
             <Text className="text-[11px] font-sans-medium text-text-muted">
               Salary: {salaryText}
             </Text>
           </View>
           {item.TargetDomainExperience && (
             <View className="flex-row items-center gap-1 truncate max-w-[160px]">
-              <Feather name="target" size={12} color="#9CA3AF" />
+              <Target size={12} color="#9CA3AF" />
               <Text className="text-[11px] font-sans-medium text-text-muted truncate">
                 {item.TargetDomainExperience}
               </Text>
@@ -175,7 +175,7 @@ export default function VacanciesScreen() {
       <View className="flex-1 px-3 pt-3">
         {cacheMessage && (
           <Card className="bg-success/10 border-success/30 flex-row items-center justify-center gap-1.5 mb-3">
-            <Feather name="check-circle" size={14} color="#16A34A" />
+            <CheckCircle size={14} color="#16A34A" />
             <Text className="text-xs font-sans-semibold text-success">
               {cacheMessage}
             </Text>

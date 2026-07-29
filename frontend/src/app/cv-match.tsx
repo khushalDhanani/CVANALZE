@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Edit3, Folder, FileText, Award, AlertTriangle, CpuIcon, FolderIcon } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
@@ -116,19 +116,16 @@ export default function CvMatchScreen() {
           <View className="flex-row bg-surface border border-border p-1 rounded-md">
             <Pressable
               onPress={() => setActiveTab('text')}
-              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${
-                activeTab === 'text' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
-              }`}
+              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${activeTab === 'text' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
+                }`}
             >
-              <Feather
-                name="edit-3"
+              <Edit3
                 size={14}
                 color={activeTab === 'text' ? '#FFFFFF' : '#9CA3AF'}
               />
               <Text
-                className={`text-xs font-sans-bold ${
-                  activeTab === 'text' ? 'text-text-inverse' : 'text-text-muted'
-                }`}
+                className={`text-xs font-sans-bold ${activeTab === 'text' ? 'text-text-inverse' : 'text-text-muted'
+                  }`}
               >
                 Paste Raw CV Text
               </Text>
@@ -136,19 +133,16 @@ export default function CvMatchScreen() {
 
             <Pressable
               onPress={() => setActiveTab('file')}
-              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${
-                activeTab === 'file' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
-              }`}
+              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${activeTab === 'file' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
+                }`}
             >
-              <Feather
-                name="folder"
+              <FolderIcon
                 size={14}
                 color={activeTab === 'file' ? '#FFFFFF' : '#9CA3AF'}
               />
               <Text
-                className={`text-xs font-sans-bold ${
-                  activeTab === 'file' ? 'text-text-inverse' : 'text-text-muted'
-                }`}
+                className={`text-xs font-sans-bold ${activeTab === 'file' ? 'text-text-inverse' : 'text-text-muted'
+                  }`}
               >
                 Upload CV File
               </Text>
@@ -202,7 +196,7 @@ export default function CvMatchScreen() {
             <View className="gap-3">
               <View className="bg-surface border-2 border-dashed border-border rounded-md p-6 items-center justify-center">
                 <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-2">
-                  <Feather name="file-text" size={24} color="#4F46E5" />
+                  <FileText size={24} color="#4F46E5" />
                 </View>
                 <Text className="text-sm font-sans-bold text-text-primary mb-1">
                   Upload Resume File
@@ -222,7 +216,7 @@ export default function CvMatchScreen() {
 
               {!!statusMessage && (
                 <Card className="bg-info/10 border-info/30 flex-row items-center gap-2">
-                  <ActivityIndicator size="small" color="#2563EB" />
+                  {uploading && <ActivityIndicator size="small" color="#2563EB" />}
                   <Text className="text-xs text-info font-sans-medium">
                     {statusMessage}
                   </Text>
@@ -252,7 +246,7 @@ export default function CvMatchScreen() {
                   <View className="flex-row justify-between items-start">
                     <View className="flex-1 pr-2">
                       <View className="flex-row items-center gap-1 mb-1">
-                        <Feather name="award" size={14} color="#4F46E5" />
+                        <Award size={14} color="#4F46E5" />
                         <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
                           Best Matched Job
                         </Text>
@@ -283,7 +277,7 @@ export default function CvMatchScreen() {
                   {!!currentAnalysis.best_match.llm_reason && (
                     <Card className="bg-info/10 border-info/30 p-3">
                       <View className="flex-row items-center gap-1.5 mb-1">
-                        <Feather name="cpu" size={14} color="#2563EB" />
+                        <AlertTriangle size={14} color="#2563EB" />
                         <Text className="text-xs font-sans-bold text-info">
                           LLM Reasoning & Synthesis:
                         </Text>
@@ -298,7 +292,7 @@ export default function CvMatchScreen() {
                   {currentAnalysis.best_match.mandatory_fails?.length > 0 && (
                     <Card className="bg-danger/10 border-danger/30 p-3">
                       <View className="flex-row items-center gap-1.5 mb-1">
-                        <Feather name="alert-triangle" size={14} color="#DC2626" />
+                        <CpuIcon size={14} color="#DC2626" />
                         <Text className="text-xs font-sans-bold text-danger">
                           Mandatory Requirement Failures:
                         </Text>

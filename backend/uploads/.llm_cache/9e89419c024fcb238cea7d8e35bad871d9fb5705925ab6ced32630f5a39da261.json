@@ -1,0 +1,145 @@
+{
+  "candidate_profile": {
+    "core_skills": [
+      "Analysis of RM, FG intermediates and In-process sample",
+      "Sampling and analysis of Finished Product and Raw Material as per specification",
+      "Preparation and standardization of Volumetric Solution Standard solution and indicator as per SOP",
+      "Gas chromatography (Shimadzu GC 2010, GC2014, Nexis2030)",
+      "Gas chromatograph (Agilent 8860, 7890A, 7890B)",
+      "UFLC (Shimadzu LC-20AD)",
+      "HPLC (2050c i-series, Shimadzu LC-2014 CHT, Agilent 1260 infinity-ll)",
+      "Melting point Apparatus (Veego)",
+      "Karl fischer (Veego), Metrohm",
+      "UV (Shimadzu 1800)",
+      "Softening Point (Veego)",
+      "Auto Titrator (Metrohm)",
+      "Moisture Analyzer",
+      "PH meter"
+    ],
+    "inferred_skills": [
+      "Analytical Chemistry",
+      "Quality Control Procedures",
+      "Laboratory Equipment Maintenance",
+      "Chemical Analysis",
+      "Data Interpretation",
+      "Standardization of Chemical Solutions"
+    ],
+    "relevant_experience_years": 5.0,
+    "education_domains": [
+      "B.Sc (Chemistry)",
+      "M.Sc (Organic Chemistry)"
+    ],
+    "certifications": [],
+    "current_role": "Officer",
+    "professional_domains": [
+      "Chemistry",
+      "Quality Control",
+      "Analytical Chemistry",
+      "Laboratory Operations"
+    ]
+  },
+  "matched_vacancies": [
+    {
+      "vacancy_id": 1099,
+      "semantic_reason": "Candidate has extensive hands-on experience with analytical instruments (GC, HPLC, UV, etc.) and has worked in lab roles including Lab Assistant and Jr. Officer positions. Directly matches the required skills for conducting experiments, data gathering, and analytical developments in R&D.",
+      "inferred_skills": [
+        "Analytical Developments",
+        "Impurity Profile Analysis"
+      ],
+      "matched_skills": [
+        "Cleaning & Maintenance of equipments",
+        "Should perform experiments as per thier HOD's instruction",
+        "onduct experiments as planned",
+        "ensure gathering proper data on custom synthesis",
+        "analytical developments",
+        "impurity profile etc."
+      ],
+      "missing_critical": [
+        "Experience with specific impurity profiling techniques"
+      ],
+      "semantic_fit_score": 85.0,
+      "classified_requirements": [],
+      "evidence_snippets": {},
+      "career_transition_detected": false,
+      "career_transition_note": "N/A (No significant career transition detected from current role to this vacancy type.)"
+    },
+    {
+      "vacancy_id": 1195,
+      "semantic_reason": "Candidate has strong laboratory experience and technical skills that align with the 'Laboratory knowledge' requirement. However, the vacancy requires 3 years of experience which the candidate does not meet.",
+      "inferred_skills": [
+        "Laboratory Procedures",
+        "Chemical Analysis"
+      ],
+      "matched_skills": [
+        "Laboratory knowledge"
+      ],
+      "missing_critical": [
+        "3 years of relevant work experience"
+      ],
+      "semantic_fit_score": 60.0,
+      "classified_requirements": [],
+      "evidence_snippets": {},
+      "career_transition_detected": false,
+      "career_transition_note": "N/A (No significant career transition detected from current role to this vacancy type.)"
+    },
+    {
+      "vacancy_id": 1196,
+      "semantic_reason": "Candidate has strong laboratory experience and technical skills that align with the 'Laboratory knowledge' requirement. The vacancy has no minimum experience requirement, so the candidate's current role is directly relevant.",
+      "inferred_skills": [
+        "Laboratory Procedures",
+        "Chemical Analysis"
+      ],
+      "matched_skills": [
+        "Laboratory knowledge"
+      ],
+      "missing_critical": [
+        "No critical requirements missing"
+      ],
+      "semantic_fit_score": 90.0,
+      "classified_requirements": [],
+      "evidence_snippets": {},
+      "career_transition_detected": false,
+      "career_transition_note": "N/A (No significant career transition detected from current role to this vacancy type.)"
+    },
+    {
+      "vacancy_id": 1284,
+      "semantic_reason": "Candidate has relevant experience in laboratory settings and analytical chemistry, but the role is in Production which requires different skills (e.g., process chemistry, production line operations). The candidate's experience is more aligned with QC/R&D roles.",
+      "inferred_skills": [
+        "Chemical Analysis",
+        "Quality Control Procedures"
+      ],
+      "matched_skills": [
+        "Chemistry"
+      ],
+      "missing_critical": [
+        "Production process knowledge",
+        "Process optimization skills"
+      ],
+      "semantic_fit_score": 55.0,
+      "classified_requirements": [],
+      "evidence_snippets": {},
+      "career_transition_detected": false,
+      "career_transition_note": "N/A (No significant career transition detected from current role to this vacancy type.)"
+    },
+    {
+      "vacancy_id": 1326,
+      "semantic_reason": "Candidate has strong analytical chemistry background and hands-on experience with laboratory equipment, which aligns with the 'Chemistry' requirement. The candidate's experience in R&D-like tasks (e.g., analysis of intermediates) is relevant.",
+      "inferred_skills": [
+        "Analytical Chemistry",
+        "Chemical Synthesis"
+      ],
+      "matched_skills": [
+        "Chemistry"
+      ],
+      "missing_critical": [
+        "Advanced research experience",
+        "Specific R&D project management skills"
+      ],
+      "semantic_fit_score": 75.0,
+      "classified_requirements": [],
+      "evidence_snippets": {},
+      "career_transition_detected": false,
+      "career_transition_note": "N/A (No significant career transition detected from current role to this vacancy type.)"
+    }
+  ]
+}
