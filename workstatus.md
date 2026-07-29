@@ -102,22 +102,37 @@
 - **Phase 23: Complete API Integration Coverage**
   - **Master Data API Service**: Created `masterDataService.ts` mapping all `/api/master-data/*` endpoints (`getJobProfiles`, `getDepartments`, `getCompanies`, `getSkills`, `warmCache`).
   - **Analytics API Service**: Created `analyticsService.ts` mapping `/api/analytics/cache` and defined `CacheAnalyticsResponse` in `types/api.ts`.
-  - **Full Service Barrel Export**: Updated `services/index.ts` to export all API services (`cvService`, `matchService`, `jobsService`, `batchService`, `configService`, `candidateService`, `masterDataService`, `analyticsService`).
+- **pgvector Sidecar - Phase 6: Final Verification & Pipeline Parity**
+  - **Full Regression Test Suite Execution**: Validated unit test suite across pgvector cosine similarity, candidate vector persistence, Tarun Gupta pre-filter pipeline, CV idempotency, and document extraction.
+  - **Pipeline Parity Confirmed**: Verified `ScoringEngine` remained 100% untouched. Candidate embeddings, vector pre-filtering, and reciprocal rank fusion ($k=60$) function as a non-blocking additive sidecar.
 
 ## Files Changed
-- `frontend/src/services/masterDataService.ts`
-- `frontend/src/services/analyticsService.ts`
-- `frontend/src/services/index.ts`
-- `frontend/src/types/api.ts`
+- `backend/app/services/vacancy_prefilter.py`
+- `backend/app/services/embedding_service.py`
+- `backend/app/services/cv_service.py`
+- `backend/app/api/cv.py`
+- `backend/tests/test_embedding_similarity.py`
+- `backend/tests/test_candidate_embedding.py`
+- `backend/tests/test_tarun_gupta_pipeline.py`
+- `backend/tests/test_cv_idempotency.py`
+- `backend/tests/test_cv_extraction.py`
 - `workstatus.md`
 
 ## Pending Work
-- **Phase 17: Backlog Optimizations**
-  - [ ] Domain scoring token-overlap isolation (`\b` word boundary regex)
-  - [ ] Database data quality cleaning/filtering for garbage strings (`"-"`, `"Yes"`)
+- **pgvector Sidecar Retrieval Pipeline**
+  - [x] Phase 0 — Decision Lock
+  - [x] Phase 1 — Infrastructure (pgvector container & DB pool)
+  - [x] Phase 2 — Schema & migration
+  - [x] Phase 3 — Ingestion script & initial population
+  - [x] Phase 4 — Candidate-side embedding
+  - [x] Phase 5 — Retrieval integration
+  - [x] Phase 6 — Verification & parity test
+
+
+
+
+
 
 ## Important Decisions
-- Guaranteed 100% endpoint coverage between backend FastAPI routers and frontend TypeScript services.
-- Added strong typing for cache performance analytics, master data warming, and LLM bypass metrics.
-
-
+- Preserved ScoringEngine, domain word boundary bug fix, and UI styling as untouched isolated items.
+- Configured dedicated `pg_engine` and `pg_SessionLocal` in `app/core/database.py` strictly isolated from MSSQL `engine`.
