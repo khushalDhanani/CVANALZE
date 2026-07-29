@@ -3,6 +3,7 @@ import { Slot, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Search, Briefcase, Layers, Settings, Users, X } from 'lucide-react-native';
 import { useState } from 'react';
+import { COLORS } from '@/constants/colors';
 
 type SidebarNavItem = {
   name: string;
@@ -45,27 +46,27 @@ export function SidebarLayout() {
     <View className="flex-1 flex-row bg-background">
       {/* Mobile Backdrop */}
       {isMobile && drawerOpen && (
-        <Pressable 
-          className="absolute inset-0 bg-black/50 z-40" 
-          onPress={closeDrawer} 
+        <Pressable
+          className="absolute inset-0 bg-black/50 z-40"
+          onPress={closeDrawer}
         />
       )}
 
       {/* Sidebar */}
       {(drawerOpen || !isMobile) && (
-        <View 
+        <View
           className={`bg-surface border-r border-border z-50 ${isMobile ? 'absolute left-0 top-0 bottom-0 w-64' : 'w-64'}`}
           style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         >
           <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-            <Text className="text-base font-sans-semibold text-text-primary">CV Analyzer</Text>
+            <Text className="text-base font-sans-semibold text-text-primary">AIRIS</Text>
             {isMobile && (
               <Pressable onPress={closeDrawer} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Close sidebar">
-                <X size={20} color="#6B7280" />
+                <X size={20} color={COLORS.textMuted} />
               </Pressable>
             )}
           </View>
-          
+
           <View className="flex-1 py-4 gap-2 px-3">
             {NAV_ITEMS.map((item) => {
               const isActive = pathname === item.route;
@@ -75,18 +76,16 @@ export function SidebarLayout() {
                 <Pressable
                   key={item.route}
                   onPress={() => handleSelect(item.route)}
-                  className={`flex-row items-center gap-3 px-3 py-2 rounded-md ${
-                    isActive ? 'bg-primary/10' : 'active:bg-background'
-                  }`}
+                  className={`flex-row items-center gap-3 px-3 py-2 rounded-md ${isActive ? 'bg-primary/10' : 'active:bg-background'
+                    }`}
                   accessibilityRole="button"
                 >
-                  <Icon size={20} color={isActive ? '#4F46E5' : '#6B7280'} />
+                  <Icon size={20} color={isActive ? COLORS.primary : COLORS.textMuted} />
                   <Text
-                    className={`text-sm ${
-                      isActive
+                    className={`text-sm ${isActive
                         ? 'font-sans-semibold text-primary'
                         : 'font-sans text-text-muted'
-                    }`}
+                      }`}
                   >
                     {item.name}
                   </Text>
@@ -100,17 +99,17 @@ export function SidebarLayout() {
       {/* Main Content Area */}
       <View className="flex-1 relative">
         <Slot />
-        
+
         {/* Mobile menu toggle (if needed, this can be managed within headers inside Slot screens, but here is a simple toggle just in case) */}
         {isMobile && !drawerOpen && (
-          <Pressable 
+          <Pressable
             onPress={() => setDrawerOpen(true)}
             className="absolute bottom-6 right-6 bg-primary rounded-full p-3 shadow-lg z-50"
             style={{ elevation: 5 }}
             accessibilityRole="button"
             accessibilityLabel="Open navigation menu"
           >
-             <Layers size={24} color="#FFF" />
+            <Layers size={24} color={COLORS.textInverse} />
           </Pressable>
         )}
       </View>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
+import { COLORS } from '@/constants/colors';
 
 export function ErrorBanner({ 
   title = 'An error occurred', 
@@ -12,7 +13,7 @@ export function ErrorBanner({
   return (
     <View className="bg-danger/10 border border-danger/30 rounded-md p-3 mb-4 flex-row items-start gap-2">
       <View className="mt-0.5">
-        <AlertCircle size={16} color="#DC2626" />
+        <AlertCircle size={16} color={COLORS.danger} />
       </View>
       <View className="flex-1 gap-0.5">
         <Text className="text-sm font-sans-bold text-danger">{title}</Text>

@@ -6,6 +6,7 @@ import {
   Pressable
 } from 'react-native';
 import { X, CheckCircle } from 'lucide-react-native';
+import { COLORS } from '@/constants/colors';
 import { matchService } from '@/services/matchService';
 import { JobMatchScore } from '@/types/api';
 import { Button } from './Button';
@@ -84,7 +85,7 @@ export function HrReviewModal({
               HR Review & Correction
             </Text>
             <Pressable onPress={onClose} hitSlop={8}>
-              <X size={20} color="#9CA3AF" />
+              <X size={20} color={COLORS.textFaint} />
             </Pressable>
           </View>
 
@@ -102,7 +103,7 @@ export function HrReviewModal({
 
           {success && (
             <Card className="bg-success/10 border-success/30 p-3 flex-row items-center gap-1.5">
-              <CheckCircle size={14} color="#16A34A" />
+              <CheckCircle size={14} color={COLORS.success} />
               <Text className="text-xs font-sans-semibold text-success">
                 HR Review saved successfully!
               </Text>

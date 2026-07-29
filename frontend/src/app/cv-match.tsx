@@ -136,8 +136,8 @@ export default function CvMatchScreen() {
             <Switch
               value={useLlmEnrichment}
               onValueChange={setUseLlmEnrichment}
-              trackColor={{ false: '#E5E7EB', true: '#818CF8' }}
-              thumbColor={useLlmEnrichment ? '#4F46E5' : '#9CA3AF'}
+              trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+              thumbColor={useLlmEnrichment ? COLORS.primary : COLORS.textFaint}
             />
           </Card>
 

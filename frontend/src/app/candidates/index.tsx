@@ -13,7 +13,7 @@ export default function CandidateListScreen() {
   const router = useRouter();
   const { candidates, loading, error, refreshCandidates } = useCandidates();
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterClassification, setFilterClassification] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL');
+  const [filterClassification, setFilterClassification] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED'>('ALL');
   const [filterDept, setFilterDept] = useState<string>('');
 
   const filteredCandidates = (candidates || []).filter((cand) => {
@@ -26,8 +26,11 @@ export default function CandidateListScreen() {
     
     const matchSearch = fname.includes(q) || id.includes(q) || dept.includes(q) || job.includes(q);
     
-    const candClassification = cand.best_match?.classification || 'LOW';
-    const matchClassification = filterClassification === 'ALL' || candClassification === filterClassification;
+    const candClassification = cand.best_match?.classification;
+    const matchClassification = 
+      filterClassification === 'ALL' || 
+      (filterClassification === 'UNMATCHED' && !candClassification) ||
+      candClassification === filterClassification;
     
     const matchDept = filterDept === '' || dept.includes(filterDept.toLowerCase());
 
@@ -101,10 +104,11 @@ export default function CandidateListScreen() {
               { value: 'ALL', label: 'All Matches' },
               { value: 'HIGH', label: 'High' },
               { value: 'MEDIUM', label: 'Medium' },
-              { value: 'LOW', label: 'Low' }
+              { value: 'LOW', label: 'Low' },
+              { value: 'UNMATCHED', label: 'Unmatched' }
             ]}
             value={filterClassification}
-            onChange={(val) => setFilterClassification(val as 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW')}
+            onChange={(val) => setFilterClassification(val as 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED')}
           />
           <TextField
             label=""

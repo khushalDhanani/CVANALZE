@@ -1,4 +1,5 @@
 import { View, Text, TextInput } from "react-native";
+import { COLORS } from '@/constants/colors';
 
 export function TextField({
   label,
@@ -13,7 +14,7 @@ export function TextField({
         className={`rounded-md border px-3 py-2.5 text-sm font-sans text-text-primary bg-surface ${
           error ? "border-danger" : "border-border"
         }`}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor={COLORS.textFaint}
         {...inputProps}
       />
       {error ? (
