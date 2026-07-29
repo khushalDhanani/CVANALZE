@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { Award, AlertTriangle, CpuIcon } from 'lucide-react-native';
 import { Card } from './Card';
 import { Button } from './Button';
+import { Badge } from './Badge';
 import { ScoreBadge } from './ScoreBadge';
 import { ComponentScoreBar } from './ComponentScoreBar';
 import { COLORS } from '@/constants/colors';
@@ -13,17 +14,33 @@ interface MatchAnalysisCardProps {
   onReviewPress?: () => void;
 }
 
+const getRetrievalBadge = (source?: string) => {
+  if (!source) return null;
+  const s = source.toLowerCase();
+  if (s === 'both' || s === 'hybrid') return { label: 'Hybrid (Keyword + Vector)', tone: 'success' as const };
+  if (s === 'vector' || s === 'pgvector') return { label: 'pgvector Match', tone: 'info' as const };
+  if (s === 'keyword') return { label: 'Keyword Match', tone: 'neutral' as const };
+  return { label: source, tone: 'neutral' as const };
+};
+
 export function MatchAnalysisCard({ bestMatch, onReviewPress }: MatchAnalysisCardProps) {
   if (!bestMatch) return null;
+  const retrievalBadge = getRetrievalBadge(bestMatch.retrieval_source);
+
   return (
     <Card className="border-primary/40 shadow-sm gap-3">
       <View className="flex-row justify-between items-start">
         <View className="flex-1 pr-2">
-          <View className="flex-row items-center gap-1 mb-1">
-            <Award size={14} color={COLORS.primary} />
-            <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
-              Best Matched Job
-            </Text>
+          <View className="flex-row items-center gap-2 mb-1 flex-wrap">
+            <View className="flex-row items-center gap-1">
+              <Award size={14} color={COLORS.primary} />
+              <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
+                Best Matched Job
+              </Text>
+            </View>
+            {retrievalBadge && (
+              <Badge label={retrievalBadge.label} tone={retrievalBadge.tone} />
+            )}
           </View>
           <Text className="text-lg font-sans-bold text-text-primary">
             {bestMatch.job_title}

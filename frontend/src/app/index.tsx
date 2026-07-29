@@ -87,7 +87,7 @@ export default function HomeScreen() {
           </View>
 
           {/* Quick Stats Grid */}
-          <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard
               label="Active Vacancies"
               value={jobsLoading ? undefined : jobs.length}
@@ -101,10 +101,16 @@ export default function HomeScreen() {
               tone={llmHealth?.status === 'online' ? 'success' : 'warning'}
             />
             <StatCard
-              label="Database"
+              label="MSSQL Primary DB"
               value={health?.database?.toUpperCase() || 'ONLINE'}
-              sublabel="SQLite / PostgreSQL"
+              sublabel="Relational Store"
               tone={health?.database === 'online' ? 'success' : 'neutral'}
+            />
+            <StatCard
+              label="pgvector DB"
+              value={health?.pg_database?.toUpperCase() || 'ONLINE'}
+              sublabel="PostgreSQL Vectors"
+              tone={health?.pg_database === 'online' ? 'success' : 'warning'}
             />
           </View>
 
@@ -266,6 +272,16 @@ export default function HomeScreen() {
                   <Badge
                     label={health?.status === 'offline' ? 'Offline (Start Server)' : 'Operational'}
                     tone={health?.status === 'offline' ? 'warning' : 'success'}
+                  />
+                }
+              />
+              <DenseRow
+                className="h-full"
+                title="MSSQL Primary DB"
+                trailing={
+                  <Badge
+                    label={health?.database === 'offline' ? 'Offline' : 'Operational'}
+                    tone={health?.database === 'offline' ? 'warning' : 'success'}
                   />
                 }
               />

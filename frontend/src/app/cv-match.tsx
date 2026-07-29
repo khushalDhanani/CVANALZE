@@ -240,10 +240,30 @@ export default function CvMatchScreen() {
                         title={job.job_title}
                         subtitle={job.ranking_reason}
                         trailing={
-                          <ScoreBadge
-                            score={job.overall_score}
-                            classification={job.classification}
-                          />
+                          <View className="flex-row items-center gap-1.5">
+                            {!!job.retrieval_source && (
+                              <Badge
+                                label={
+                                  job.retrieval_source === 'both' || job.retrieval_source === 'hybrid'
+                                    ? 'Hybrid'
+                                    : job.retrieval_source === 'vector'
+                                      ? 'pgvector'
+                                      : 'Keyword'
+                                }
+                                tone={
+                                  job.retrieval_source === 'both' || job.retrieval_source === 'hybrid'
+                                    ? 'success'
+                                    : job.retrieval_source === 'vector'
+                                      ? 'info'
+                                      : 'neutral'
+                                }
+                              />
+                            )}
+                            <ScoreBadge
+                              score={job.overall_score}
+                              classification={job.classification}
+                            />
+                          </View>
                         }
                         onPress={() => {
                           setSelectedJobForReview(job);

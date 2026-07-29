@@ -67,6 +67,8 @@ export interface JobMatchScore {
   llm_reason?: string | null;
   inferred_skills?: string[];
   classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  retrieval_source?: 'keyword' | 'vector' | 'both' | string;
+  vector_score?: number | null;
 }
 
 
@@ -83,6 +85,8 @@ export interface EnrichedJobEvaluation extends JobMatchScore {
   inferred_skills: string[];
   semantic_score_boost: number;
   classification: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  retrieval_source?: 'keyword' | 'vector' | 'both' | string;
+  vector_score?: number | null;
 }
 
 export interface EnrichedCandidateAnalysis {

@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useBatchProgress } from '@/hooks/useBatchProgress';
 import { BatchCandidateResult } from '@/types/api';
-import { Card, Button, DenseRow, SegmentedControl, EmptyState } from '@/components/ui';
+import { Card, Button, DenseRow, SegmentedControl, EmptyState, Badge } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 export default function BatchScreen() {
@@ -44,9 +44,29 @@ export default function BatchScreen() {
         <View className="px-3 pb-3">
           {bestMatch ? (
             <View className="bg-background p-3 rounded-md border border-border mt-2">
-              <Text className="text-[10px] font-sans-bold text-primary uppercase tracking-wider mb-0.5">
-                Top Matched Vacancy
-              </Text>
+              <View className="flex-row items-center justify-between mb-0.5">
+                <Text className="text-[10px] font-sans-bold text-primary uppercase tracking-wider">
+                  Top Matched Vacancy
+                </Text>
+                {!!bestMatch.retrieval_source && (
+                  <Badge
+                    label={
+                      bestMatch.retrieval_source === 'both' || bestMatch.retrieval_source === 'hybrid'
+                        ? 'Hybrid (Keyword + Vector)'
+                        : bestMatch.retrieval_source === 'vector'
+                          ? 'pgvector'
+                          : 'Keyword'
+                    }
+                    tone={
+                      bestMatch.retrieval_source === 'both' || bestMatch.retrieval_source === 'hybrid'
+                        ? 'success'
+                        : bestMatch.retrieval_source === 'vector'
+                          ? 'info'
+                          : 'neutral'
+                    }
+                  />
+                )}
+              </View>
               <Text className="text-sm font-sans-bold text-text-primary mb-1">
                 {bestMatch.job_title}
               </Text>

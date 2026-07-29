@@ -102,11 +102,31 @@ export default function CandidateDetailScreen() {
               <Card className="border-primary/40 gap-3">
                 <View className="flex-row justify-between items-start">
                   <View className="flex-1 pr-2">
-                    <View className="flex-row items-center gap-1 mb-1">
-                      <Award size={14} color={COLORS.primary} />
-                      <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
-                        Top Job Match
-                      </Text>
+                    <View className="flex-row items-center gap-2 mb-1 flex-wrap">
+                      <View className="flex-row items-center gap-1">
+                        <Award size={14} color={COLORS.primary} />
+                        <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
+                          Top Job Match
+                        </Text>
+                      </View>
+                      {!!bestMatch.retrieval_source && (
+                        <Badge
+                          label={
+                            bestMatch.retrieval_source === 'both' || bestMatch.retrieval_source === 'hybrid'
+                              ? 'Hybrid (Keyword + Vector)'
+                              : bestMatch.retrieval_source === 'vector'
+                                ? 'pgvector Match'
+                                : 'Keyword Match'
+                          }
+                          tone={
+                            bestMatch.retrieval_source === 'both' || bestMatch.retrieval_source === 'hybrid'
+                              ? 'success'
+                              : bestMatch.retrieval_source === 'vector'
+                                ? 'info'
+                                : 'neutral'
+                          }
+                        />
+                      )}
                     </View>
                     <Text className="text-lg font-sans-bold text-text-primary">
                       {bestMatch.job_title}
