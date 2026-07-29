@@ -8,6 +8,26 @@ services:
       - LLM_ENABLED=true
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - OLLAMA_MODEL=qwen3:4b
+      - DB_URL=postgresql://postgres:postgres@pgvector:5432/cv_analyzer
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend/uploads:/app/uploads
     restart: unless-stopped
+    depends_on:
+      - pgvector
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: cv_analyzer_pgvector
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=cv_analyzer
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pg_data:

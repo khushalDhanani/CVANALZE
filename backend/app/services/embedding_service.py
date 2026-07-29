@@ -31,11 +31,12 @@ class EmbeddingService:
         cls,
         text: str,
         model_version: str | None = None,
+        identifier: str | None = None,
     ) -> list[float] | None:
         if not settings.EMBEDDING_ENABLED:
             return None
         model = model_version or settings.EMBEDDING_MODEL
-        content_hash = cls._content_hash(text)
+        content_hash = identifier or cls._content_hash(text)
         cache_key = cls._cache_key(content_hash, model)
 
         cached = embedding_cache_manager.get(cache_key)

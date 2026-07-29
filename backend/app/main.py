@@ -103,6 +103,17 @@ async def health():
         except Exception as exc:
             logger.error(f"Database health check failed: {exc}")
             db_status = "offline"
+            
+    pg_status = "disabled"
+    from app.core.database import pg_engine
+    if pg_engine is not None:
+        try:
+            with pg_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            pg_status = "online"
+        except Exception as exc:
+            logger.error(f"PG Database health check failed: {exc}")
+            pg_status = "offline"
 
     ollama_status = "disabled"
     if settings.LLM_ENABLED:
@@ -121,5 +132,6 @@ async def health():
         "status": "ok",
         "version": settings.VERSION,
         "database": db_status,
+        "pg_database": pg_status,
         "ollama_llm": ollama_status,
     }

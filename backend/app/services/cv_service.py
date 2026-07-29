@@ -119,14 +119,24 @@ async def process_cv_file(
                 logger.info(f"[DOC_CACHE_SET] Cached Docling output for hash '{cv_hash[:12]}...'.")
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
 
-            # Run optimized LLM pipeline & matching
+            # Run optimized LLM pipeline & matching concurrently with embedding generation
             from app.services.match_service import MatchService
             
-            match_analysis = await MatchService.analyze_single_cv(
+            embedding_task = asyncio.to_thread(
+                EmbeddingService.generate_embedding,
                 extraction.markdown,
-                document_hash=cv_hash,
-                candidate_id=str(candidate_id) if candidate_id is not None else "",
-                docling_extraction_ms=docling_duration_ms,
+                None,
+                cv_key
+            )
+            
+            match_analysis, _ = await asyncio.gather(
+                MatchService.analyze_single_cv(
+                    extraction.markdown,
+                    document_hash=cv_hash,
+                    candidate_id=str(candidate_id) if candidate_id is not None else "",
+                    docling_extraction_ms=docling_duration_ms,
+                ),
+                embedding_task
             )
 
             now_iso = datetime.now(UTC).isoformat()

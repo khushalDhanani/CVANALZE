@@ -27,6 +27,7 @@ export default function HomeScreen() {
           status: 'offline',
           version: '1.0.0',
           database: 'offline',
+          pg_database: 'offline',
           ollama_llm: 'offline',
         })),
         matchService.getLlmHealth().catch(() => ({
@@ -37,10 +38,11 @@ export default function HomeScreen() {
       setHealth(sysRes);
       setLlmHealth(llmRes);
     } catch (err) {
-      setHealth({
+        setHealth({
         status: 'offline',
         version: '1.0.0',
         database: 'offline',
+        pg_database: 'offline',
         ollama_llm: 'offline',
       });
       setLlmHealth({
@@ -264,6 +266,16 @@ export default function HomeScreen() {
                   <Badge
                     label={health?.status === 'offline' ? 'Offline (Start Server)' : 'Operational'}
                     tone={health?.status === 'offline' ? 'warning' : 'success'}
+                  />
+                }
+              />
+              <DenseRow
+                className="h-full"
+                title="PostgreSQL (Vector DB)"
+                trailing={
+                  <Badge
+                    label={health?.pg_database === 'offline' ? 'Offline' : 'Operational'}
+                    tone={health?.pg_database === 'offline' ? 'warning' : 'success'}
                   />
                 }
               />

@@ -1,8 +1,12 @@
+import asyncio
+from sqlalchemy import text
 from app.core.database import SessionLocal
-from app.services.vacancy_service import VacancyService
-db = SessionLocal()
-svc = VacancyService(db)
-vacancies = svc.get_active_vacancies()
-ids = [v.id for v in vacancies]
-print("Total rows:", len(ids))
-print("Unique rows:", len(set(ids)))
+
+def run_query():
+    with SessionLocal() as db:
+        res = db.execute(text("SELECT TOP 5 * FROM CandidateCV WHERE CVID = 'ut1765894215' OR CandidateID = 'ut1765894215'")).mappings().all()
+        for r in res:
+            print(r.get('CVID'), r.get('CandidateID'))
+
+if __name__ == "__main__":
+    run_query()

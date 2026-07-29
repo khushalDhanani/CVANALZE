@@ -18,7 +18,12 @@ async def list_jobs():
 async def invalidate_jobs_cache():
     """Clear the job repository cache (to be called on create/update/close events)."""
     await run_in_threadpool(JobRepository.invalidate_cache)
-    return {"message": "Job cache invalidated successfully"}
+    
+    # Hook into vacancy create/update path for ongoing sync
+    from app.core.tasks import sync_all_vacancies
+    await run_in_threadpool(sync_all_vacancies)
+    
+    return {"message": "Job cache invalidated and embedding sync enqueued successfully"}
 
 
 @router.get("/{job_id}", response_model=JobOpening)

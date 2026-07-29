@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     DB_ENCRYPT: bool = True
     DB_TRUST_CERT: bool = True
     
+    # Database Configuration (Postgres)
+    PG_DB_URL: str = "postgresql://postgres:postgres@localhost:5432/cv_analyzer"
+
     @property
     def DB_URL(self) -> str:
         if not self.DB_NAME:
