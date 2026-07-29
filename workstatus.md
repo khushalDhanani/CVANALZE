@@ -102,20 +102,22 @@
 - **Phase 23: Complete API Integration Coverage**
   - **Master Data API Service**: Created `masterDataService.ts` mapping all `/api/master-data/*` endpoints (`getJobProfiles`, `getDepartments`, `getCompanies`, `getSkills`, `warmCache`).
   - **Analytics API Service**: Created `analyticsService.ts` mapping `/api/analytics/cache` and defined `CacheAnalyticsResponse` in `types/api.ts`.
-- **pgvector Sidecar - Phase 6: Final Verification & Pipeline Parity**
-  - **Full Regression Test Suite Execution**: Validated unit test suite across pgvector cosine similarity, candidate vector persistence, Tarun Gupta pre-filter pipeline, CV idempotency, and document extraction.
-  - **Pipeline Parity Confirmed**: Verified `ScoringEngine` remained 100% untouched. Candidate embeddings, vector pre-filtering, and reciprocal rank fusion ($k=60$) function as a non-blocking additive sidecar.
+- **Phase 25: Frontend pgvector Integration Implementation**
+  - **Types Update**: Extended `JobMatchScore` and `EnrichedJobEvaluation` in `types/api.ts` with `retrieval_source` (`"keyword" | "vector" | "both"`) and optional `vector_score`.
+  - **Match Analysis UI**: Added visual badges (`Hybrid (Keyword + Vector)`, `pgvector Match`, `Keyword Match`) in `MatchAnalysisCard.tsx` header.
+  - **CV Match Screen**: Added `retrieval_source` badges to candidate match list items in `cv-match.tsx`.
+  - **Batch Screen**: Added `retrieval_source` badges to candidate results in `batch.tsx`.
+  - **Candidate Detail Profile**: Added `retrieval_source` badges to candidate detail profile match card in `candidates/[id].tsx`.
+  - **Home Screen System Health**: Separated top `StatCard` grid into distinct cards for **MSSQL Primary DB** and **pgvector DB**, and added explicit MSSQL Primary DB row alongside PostgreSQL (Vector DB) in `index.tsx`.
+  - **Verification**: Verified zero TypeScript errors across the frontend codebase via `npx tsc --noEmit`.
 
 ## Files Changed
-- `backend/app/services/vacancy_prefilter.py`
-- `backend/app/services/embedding_service.py`
-- `backend/app/services/cv_service.py`
-- `backend/app/api/cv.py`
-- `backend/tests/test_embedding_similarity.py`
-- `backend/tests/test_candidate_embedding.py`
-- `backend/tests/test_tarun_gupta_pipeline.py`
-- `backend/tests/test_cv_idempotency.py`
-- `backend/tests/test_cv_extraction.py`
+- `frontend/src/types/api.ts`
+- `frontend/src/components/ui/MatchAnalysisCard.tsx`
+- `frontend/src/app/cv-match.tsx`
+- `frontend/src/app/batch.tsx`
+- `frontend/src/app/candidates/[id].tsx`
+- `frontend/src/app/index.tsx`
 - `workstatus.md`
 
 ## Pending Work
@@ -127,10 +129,8 @@
   - [x] Phase 4 — Candidate-side embedding
   - [x] Phase 5 — Retrieval integration
   - [x] Phase 6 — Verification & parity test
-
-
-
-
+  - [x] Phase 7 — Frontend Audit & Diagnostic Table
+  - [x] Phase 8 — Frontend Integration Implementation
 
 
 ## Important Decisions
