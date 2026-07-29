@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { FileText, Upload, Plus, CpuIcon, FolderIcon, SlidersIcon } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiClient } from '@/services/apiClient';
@@ -57,13 +57,13 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView className="flex-1 px-3">
         <View className="gap-4 py-4">
-          
+
           {/* Hero Section */}
           <Card className="bg-primary border-primary">
             <View className="flex-row items-center justify-between mb-2">
               <View className="flex-row items-center gap-2">
                 <View className="w-8 h-8 rounded-lg bg-surface/20 items-center justify-center">
-                  <Feather name="cpu" size={18} color="#FFFFFF" />
+                  <CpuIcon size={18} color="#FFFFFF" />
                 </View>
                 <Text className="text-xl font-sans-bold text-text-inverse tracking-wide">
                   CV ANALYZER PRO
@@ -99,11 +99,10 @@ export default function HomeScreen() {
                 LLM Engine
               </Text>
               <Text
-                className={`text-2xl font-sans-bold ${
-                  llmHealth?.status === 'online'
-                    ? 'text-success'
-                    : 'text-warning'
-                }`}
+                className={`text-2xl font-sans-bold ${llmHealth?.status === 'online'
+                  ? 'text-success'
+                  : 'text-warning'
+                  }`}
               >
                 {llmHealth?.status === 'online' ? 'ONLINE' : 'BYPASS'}
               </Text>
@@ -117,11 +116,10 @@ export default function HomeScreen() {
                 Database
               </Text>
               <Text
-                className={`text-2xl font-sans-bold ${
-                  health?.database === 'online'
-                    ? 'text-success'
-                    : 'text-text-muted'
-                }`}
+                className={`text-2xl font-sans-bold ${health?.database === 'online'
+                  ? 'text-success'
+                  : 'text-text-muted'
+                  }`}
               >
                 {health?.database?.toUpperCase() || 'ONLINE'}
               </Text>
@@ -143,7 +141,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/cv-match')}
                 trailing={
                   <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-1">
-                    <Feather name="file-text" size={16} color="#4F46E5" />
+                    <FileText size={16} color="#4F46E5" />
                   </View>
                 }
               />
@@ -153,7 +151,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/vacancies')}
                 trailing={
                   <View className="w-8 h-8 rounded-full bg-success/10 items-center justify-center mr-1">
-                    <Feather name="briefcase" size={16} color="#16A34A" />
+                    <FolderIcon size={16} color="#16A34A" />
                   </View>
                 }
               />
@@ -163,7 +161,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/batch')}
                 trailing={
                   <View className="w-8 h-8 rounded-full bg-warning/10 items-center justify-center mr-1">
-                    <Feather name="zap" size={16} color="#D97706" />
+                    <Plus size={16} color="#D97706" />
                   </View>
                 }
               />
@@ -173,7 +171,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/config')}
                 trailing={
                   <View className="w-8 h-8 rounded-full bg-info/10 items-center justify-center mr-1">
-                    <Feather name="sliders" size={16} color="#2563EB" />
+                    <SlidersIcon size={16} color="#2563EB" />
                   </View>
                 }
               />
@@ -186,39 +184,39 @@ export default function HomeScreen() {
               <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">
                 System Health & Services
               </Text>
-              <Button 
-                label={healthLoading ? 'Refreshing...' : 'Refresh'} 
-                variant="ghost" 
-                size="sm" 
-                onPress={fetchHealth} 
-                disabled={healthLoading} 
+              <Button
+                label={healthLoading ? 'Refreshing...' : 'Refresh'}
+                variant="ghost"
+                size="sm"
+                onPress={fetchHealth}
+                disabled={healthLoading}
               />
             </View>
 
             <View className="gap-2">
               <View className="flex-row justify-between items-center py-1 border-b border-border">
                 <Text className="text-xs font-sans text-text-primary">FastAPI Server</Text>
-                <Badge 
-                  label={health?.status === 'offline' ? 'Offline (Start Server)' : 'Operational'} 
-                  tone={health?.status === 'offline' ? 'warning' : 'success'} 
+                <Badge
+                  label={health?.status === 'offline' ? 'Offline (Start Server)' : 'Operational'}
+                  tone={health?.status === 'offline' ? 'warning' : 'success'}
                 />
               </View>
               <View className="flex-row justify-between items-center py-1 border-b border-border">
                 <Text className="text-xs font-sans text-text-primary">Ollama LLM Model</Text>
-                <Badge 
+                <Badge
                   label={
                     llmHealth?.status === 'online'
                       ? llmHealth.model_configured || 'Connected'
                       : llmHealth?.status === 'disabled'
-                      ? 'Disabled (Confidence Gated)'
-                      : 'Offline'
+                        ? 'Disabled (Confidence Gated)'
+                        : 'Offline'
                   }
                   tone={
                     llmHealth?.status === 'online'
                       ? 'success'
                       : llmHealth?.status === 'disabled'
-                      ? 'info'
-                      : 'warning'
+                        ? 'info'
+                        : 'warning'
                   }
                 />
               </View>
@@ -228,8 +226,8 @@ export default function HomeScreen() {
                   {llmHealth?.status === 'online'
                     ? llmHealth.available_models?.join(', ') || 'None found'
                     : llmHealth?.status === 'disabled'
-                    ? 'Bypass (Fast-Track Rule Engine)'
-                    : 'Ollama Unreachable'}
+                      ? 'Bypass (Fast-Track Rule Engine)'
+                      : 'Ollama Unreachable'}
                 </Text>
               </View>
             </View>

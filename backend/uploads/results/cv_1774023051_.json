@@ -1,0 +1,3936 @@
+{
+  "id": "cv_1774023051_",
+  "scan_id": "cv_1774023051_",
+  "parsed_at": "2026-07-29T04:32:30.664566+00:00",
+  "candidate_id": null,
+  "cv_id": null,
+  "filename": "1774023051_.pdf",
+  "content_type": "application/pdf",
+  "cv_hash": "0d2237536eb1c1560405174e57f4373831a622ce646d5eb858edebdc268dc257",
+  "parser_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "created_at": "2026-07-29T04:32:30.664566+00:00",
+  "updated_at": "2026-07-29T04:32:30.664566+00:00",
+  "scanned_at": "2026-07-29T04:32:30.664566+00:00",
+  "status": "NEW_CV",
+  "characters": 14,
+  "page_count": 1,
+  "is_scanned": true,
+  "ocr_applied": true,
+  "text": "<!-- image -->",
+  "markdown": "<!-- image -->",
+  "structured_doc": {
+    "schema_name": "DoclingDocument",
+    "version": "1.10.0",
+    "name": "1774023051_",
+    "origin": {
+      "mimetype": "application/pdf",
+      "binary_hash": 6408037175590240855,
+      "filename": "1774023051_.pdf"
+    },
+    "furniture": {
+      "self_ref": "#/furniture",
+      "children": [],
+      "content_layer": "furniture",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "body": {
+      "self_ref": "#/body",
+      "children": [
+        {
+          "$ref": "#/pictures/0"
+        }
+      ],
+      "content_layer": "body",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "groups": [
+      {
+        "self_ref": "#/groups/0",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/23"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/1",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/25"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/2",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/26"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/3",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/34"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/4",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/36"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/5",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/38"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/6",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/44"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/7",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/47"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/8",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/49"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/9",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/50"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/10",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/56"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/11",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/57"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/12",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/59"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/13",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/65"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/14",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/67"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/15",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/68"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "list"
+      }
+    ],
+    "texts": [
+      {
+        "self_ref": "#/texts/0",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1471.6228434244792,
+              "r": 495.7626953125,
+              "b": 1458.6186421712239,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              13
+            ]
+          }
+        ],
+        "orig": "PERSONAL INFO",
+        "text": "PERSONAL INFO",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/1",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 618.5592854817709,
+              "t": 1466.2681681315105,
+              "r": 913.728759765625,
+              "b": 1448.6742502848308,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              24
+            ]
+          }
+        ],
+        "orig": "ABHISHEK DILIPBHAI PATEL",
+        "text": "ABHISHEK DILIPBHAI PATEL",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/2",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1437.9649098714192,
+              "r": 431.6949055989583,
+              "b": 1424.1957600911458,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "Email:",
+        "text": "Email:"
+      },
+      {
+        "self_ref": "#/texts/3",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 1434.1401468912761,
+              "r": 945.0,
+              "b": 1419.6060384114583,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              68
+            ]
+          }
+        ],
+        "orig": "Electronics & Instrumentation Engineer | Automation & PLC Specialist",
+        "text": "Electronics & Instrumentation Engineer | Automation & PLC Specialist"
+      },
+      {
+        "self_ref": "#/texts/4",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 397.3728841145833,
+              "t": 1421.1359456380208,
+              "r": 504.9152425130208,
+              "b": 1404.3069763183594,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              19
+            ]
+          }
+        ],
+        "orig": "ABHIP6694@gmail.com",
+        "text": "ABHIP6694@gmail.com"
+      },
+      {
+        "self_ref": "#/texts/5",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 397.3728841145833,
+              "t": 1396.657450358073,
+              "r": 474.4067789713542,
+              "b": 1363.7644755045574,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              21
+            ]
+          }
+        ],
+        "orig": "Phone: +91 9978277237",
+        "text": "Phone: +91 9978277237"
+      },
+      {
+        "self_ref": "#/texts/6",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 1378.2985738118489,
+              "r": 784.0677897135416,
+              "b": 1362.9995218912761,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              20
+            ]
+          }
+        ],
+        "orig": "PROFESSIONAL SUMMARY",
+        "text": "PROFESSIONAL SUMMARY",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/7",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1354.5850321451824,
+              "r": 445.4237060546875,
+              "b": 1341.580830891927,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "Location:",
+        "text": "Location:"
+      },
+      {
+        "self_ref": "#/texts/8",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1337.7560628255208,
+              "r": 551.440673828125,
+              "b": 1324.7518717447917,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              32
+            ]
+          }
+        ],
+        "orig": "Kosamba, Surat, Gujarat – 394120",
+        "text": "Kosamba, Surat, Gujarat – 394120"
+      },
+      {
+        "self_ref": "#/texts/9",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 1340.8158772786458,
+              "r": 1024.322021484375,
+              "b": 1211.538818359375,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              458
+            ]
+          }
+        ],
+        "orig": "Results-driven Electronics and Instrumentation Engineer with 8+ years of hands-on experience in industrial automation, PLC programming, and equipment maintenance. Proven expertise in commissioning instrumentation systems, troubleshooting automation panels, and optimizing industrial processes across manufacturing and energy sectors. Strong technical foundation with a passion for learning emerging technologies and delivering reliable engineering solutions.",
+        "text": "Results-driven Electronics and Instrumentation Engineer with 8+ years of hands-on experience in industrial automation, PLC programming, and equipment maintenance. Proven expertise in commissioning instrumentation systems, troubleshooting automation panels, and optimizing industrial processes across manufacturing and energy sectors. Strong technical foundation with a passion for learning emerging technologies and delivering reliable engineering solutions."
+      },
+      {
+        "self_ref": "#/texts/10",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1314.8074747721355,
+              "r": 427.11865234375,
+              "b": 1300.2733764648438,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              4
+            ]
+          }
+        ],
+        "orig": "DOB:",
+        "text": "DOB:"
+      },
+      {
+        "self_ref": "#/texts/11",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.1355794270833,
+              "t": 1297.978515625,
+              "r": 456.1016845703125,
+              "b": 1282.679463704427,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              11
+            ]
+          }
+        ],
+        "orig": "06 Jun 1994",
+        "text": "06 Jun 1994"
+      },
+      {
+        "self_ref": "#/texts/12",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1271.9701131184895,
+              "r": 455.3389892578125,
+              "b": 1258.9659220377605,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              10
+            ]
+          }
+        ],
+        "orig": "Languages:",
+        "text": "Languages:"
+      },
+      {
+        "self_ref": "#/texts/13",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 1255.1411539713542,
+              "r": 500.3389485677083,
+              "b": 1242.136942545573,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              24
+            ]
+          }
+        ],
+        "orig": "English, Hindi, Gujarati",
+        "text": "English, Hindi, Gujarati"
+      },
+      {
+        "self_ref": "#/texts/14",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.1355794270833,
+              "t": 1221.4832153320312,
+              "r": 443.8982747395833,
+              "b": 1205.419209798177,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "SKILLS",
+        "text": "SKILLS",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/15",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 1185.5304361979167,
+              "r": 564.4067789713541,
+              "b": 1172.5262451171875,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              35
+            ]
+          }
+        ],
+        "orig": "Programmable Logic Controller (PLC)",
+        "text": "Programmable Logic Controller (PLC)"
+      },
+      {
+        "self_ref": "#/texts/16",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 1187.0603434244792,
+              "r": 716.1864420572916,
+              "b": 1174.05615234375,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "WORK HISTORY",
+        "text": "WORK HISTORY",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/17",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 1161.81689453125,
+              "r": 501.1016845703125,
+              "b": 1148.8127034505208,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "Electrical Panel Design",
+        "text": "Electrical Panel Design"
+      },
+      {
+        "self_ref": "#/texts/18",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 615.5084635416666,
+              "t": 1153.4023844401042,
+              "r": 732.203369140625,
+              "b": 1137.33837890625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              20
+            ]
+          }
+        ],
+        "orig": "Maintenance Engineer",
+        "text": "Maintenance Engineer",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/19",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 1138.8682861328125,
+              "r": 521.6949055989584,
+              "b": 1125.8640950520833,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              27
+            ]
+          }
+        ],
+        "orig": "Smart Plant Instrumentation",
+        "text": "Smart Plant Instrumentation"
+      },
+      {
+        "self_ref": "#/texts/20",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 615.5084635416666,
+              "t": 1137.33837890625,
+              "r": 700.9322102864584,
+              "b": 1102.1505533854167,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              35
+            ]
+          }
+        ],
+        "orig": "Solex Energy Ltd Aug 2025 – Present",
+        "text": "Solex Energy Ltd Aug 2025 – Present"
+      },
+      {
+        "self_ref": "#/texts/21",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.1355794270833,
+              "t": 1115.9197184244792,
+              "r": 457.6271158854167,
+              "b": 1100.6206461588542,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "Panel Wiring",
+        "text": "Panel Wiring"
+      },
+      {
+        "self_ref": "#/texts/22",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1091.4412027994792,
+              "r": 478.9830322265625,
+              "b": 1078.43701171875,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              16
+            ]
+          }
+        ],
+        "orig": "Network Switches",
+        "text": "Network Switches"
+      },
+      {
+        "self_ref": "#/texts/23",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 1095.2659912109375,
+              "r": 973.2202962239584,
+              "b": 1079.2019449869792,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              77
+            ]
+          }
+        ],
+        "orig": "Maintain and optimize instrumentation systems for renewable energy operations",
+        "text": "Maintain and optimize instrumentation systems for renewable energy operations",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/24",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 1067.7276611328125,
+              "r": 551.440673828125,
+              "b": 1055.4884033203125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              33
+            ]
+          }
+        ],
+        "orig": "Instrumentation & Control Systems",
+        "text": "Instrumentation & Control Systems"
+      },
+      {
+        "self_ref": "#/texts/25",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.7965901692709,
+              "t": 1073.8472900390625,
+              "r": 910.677978515625,
+              "b": 1061.6080322265625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              62
+            ]
+          }
+        ],
+        "orig": "Oversee installation and commissioning of automation equipment",
+        "text": "Oversee installation and commissioning of automation equipment",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/26",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 1057.7832845052083,
+              "r": 1005.2542317708334,
+              "b": 1043.2491861979167,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              87
+            ]
+          }
+        ],
+        "orig": "Troubleshoot and resolve technical issues in real-time to support continuous operations",
+        "text": "Troubleshoot and resolve technical issues in real-time to support continuous operations",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/27",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 1044.0141194661458,
+              "r": 531.6101481119791,
+              "b": 1031.0099283854167,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              27
+            ]
+          }
+        ],
+        "orig": "Computer Network Operations",
+        "text": "Computer Network Operations"
+      },
+      {
+        "self_ref": "#/texts/28",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 1021.0655517578125,
+              "r": 528.559326171875,
+              "b": 1008.0613199869792,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              26
+            ]
+          }
+        ],
+        "orig": "Networking & Communication",
+        "text": "Networking & Communication"
+      },
+      {
+        "self_ref": "#/texts/29",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 1026.4202067057292,
+              "r": 865.677978515625,
+              "b": 1013.416015625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              45
+            ]
+          }
+        ],
+        "orig": "IT Executive – Networking & PLC Communication",
+        "text": "IT Executive – Networking & PLC Communication",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/30",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 1009.5912272135417,
+              "r": 736.0169270833334,
+              "b": 996.5870361328125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              26
+            ]
+          }
+        ],
+        "orig": "Credence Ecofibre Pvt. Ltd",
+        "text": "Credence Ecofibre Pvt. Ltd"
+      },
+      {
+        "self_ref": "#/texts/31",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 997.3520100911459,
+              "r": 514.0677897135416,
+              "b": 984.3477783203125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              26
+            ]
+          }
+        ],
+        "orig": "Industrial Drives & Motors",
+        "text": "Industrial Drives & Motors"
+      },
+      {
+        "self_ref": "#/texts/32",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 990.4674072265625,
+              "r": 703.2202962239584,
+              "b": 977.4632161458334,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              19
+            ]
+          }
+        ],
+        "orig": "Feb 2025 – Jul 2025",
+        "text": "Feb 2025 – Jul 2025"
+      },
+      {
+        "self_ref": "#/texts/33",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 973.6384684244791,
+              "r": 522.4576009114584,
+              "b": 960.6342366536459,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "SCADA/HMI Commissioning",
+        "text": "SCADA/HMI Commissioning"
+      },
+      {
+        "self_ref": "#/texts/34",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 967.5188395182291,
+              "r": 916.7796223958334,
+              "b": 954.5146484375,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              62
+            ]
+          }
+        ],
+        "orig": "Managed network infrastructure and PLC communication protocols",
+        "text": "Managed network infrastructure and PLC communication protocols",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/35",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 949.1599527994791,
+              "r": 536.1864420572916,
+              "b": 936.15576171875,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              30
+            ]
+          }
+        ],
+        "orig": "Proactive Maintenance Strategy",
+        "text": "Proactive Maintenance Strategy"
+      },
+      {
+        "self_ref": "#/texts/36",
+        "parent": {
+          "$ref": "#/groups/4"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 949.1599527994791,
+              "r": 889.322021484375,
+              "b": 935.3907877604166,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              60
+            ]
+          }
+        ],
+        "orig": "Provided technical support for industrial automation systems",
+        "text": "Provided technical support for industrial automation systems",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/37",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 400.4237060546875,
+              "t": 926.2113850911459,
+              "r": 549.9152425130209,
+              "b": 913.2071533203125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              32
+            ]
+          }
+        ],
+        "orig": "Equipment Reliability Management",
+        "text": "Equipment Reliability Management"
+      },
+      {
+        "self_ref": "#/texts/38",
+        "parent": {
+          "$ref": "#/groups/5"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 930.8010660807291,
+              "r": 981.610107421875,
+              "b": 918.5618489583334,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              83
+            ]
+          }
+        ],
+        "orig": "Coordinated with cross-functional teams for system integration and fault resolution",
+        "text": "Coordinated with cross-functional teams for system integration and fault resolution",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/39",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 903.2627766927084,
+              "r": 521.6949055989584,
+              "b": 890.2585856119791,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              25
+            ]
+          }
+        ],
+        "orig": "Root Cause Analysis (RCA)",
+        "text": "Root Cause Analysis (RCA)"
+      },
+      {
+        "self_ref": "#/texts/40",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 900.2029622395834,
+              "r": 889.322021484375,
+              "b": 887.1987711588541,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              52
+            ]
+          }
+        ],
+        "orig": "Maintenance Engineer (Electronics & Instrumentation)",
+        "text": "Maintenance Engineer (Electronics & Instrumentation)",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/41",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 879.5492350260416,
+              "r": 491.1864420572917,
+              "b": 866.5450439453125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              20
+            ]
+          }
+        ],
+        "orig": "8D Corrective Action",
+        "text": "8D Corrective Action"
+      },
+      {
+        "self_ref": "#/texts/42",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 884.9038899739584,
+              "r": 890.847412109375,
+              "b": 852.0109456380209,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              81
+            ]
+          }
+        ],
+        "orig": "Sumul Dairy, Navi Pardi (Shivam Agro Vet – 3rd Party Contract) Feb 2019 – Present",
+        "text": "Sumul Dairy, Navi Pardi (Shivam Agro Vet – 3rd Party Contract) Feb 2019 – Present"
+      },
+      {
+        "self_ref": "#/texts/43",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 400.4237060546875,
+              "t": 855.835693359375,
+              "r": 568.9830322265625,
+              "b": 842.8315022786459,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              37
+            ]
+          }
+        ],
+        "orig": "Overall Equipment Effectiveness (OEE)",
+        "text": "Overall Equipment Effectiveness (OEE)"
+      },
+      {
+        "self_ref": "#/texts/44",
+        "parent": {
+          "$ref": "#/groups/6"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 615.5084635416666,
+              "t": 843.596435546875,
+              "r": 1005.2542317708334,
+              "b": 815.293212890625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              97
+            ]
+          }
+        ],
+        "orig": "Maintain critical instrumentation including pressure transmitters, level sensors, and flow meters",
+        "text": "Maintain critical instrumentation including pressure transmitters, level sensors, and flow meters",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/45",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.1355794270833,
+              "t": 834.4169921875,
+              "r": 473.64404296875,
+              "b": 817.5880533854166,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              16
+            ]
+          }
+        ],
+        "orig": "Project Engineer",
+        "text": "Project Engineer"
+      },
+      {
+        "self_ref": "#/texts/46",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 808.4086100260416,
+              "r": 545.3389485677084,
+              "b": 795.4043782552084,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              31
+            ]
+          }
+        ],
+        "orig": "Problem Solving & Quick Learner",
+        "text": "Problem Solving & Quick Learner"
+      },
+      {
+        "self_ref": "#/texts/47",
+        "parent": {
+          "$ref": "#/groups/7"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 809.173583984375,
+              "r": 973.2202962239584,
+              "b": 793.1095377604166,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              79
+            ]
+          }
+        ],
+        "orig": "Oversee installation and commissioning of field devices per P&ID specifications",
+        "text": "Oversee installation and commissioning of field devices per P&ID specifications",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/48",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 400.4237060546875,
+              "t": 785.4600423177084,
+              "r": 509.4914957682292,
+              "b": 772.455810546875,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "Technical Documentation",
+        "text": "Technical Documentation"
+      },
+      {
+        "self_ref": "#/texts/49",
+        "parent": {
+          "$ref": "#/groups/8"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.7965901692709,
+              "t": 787.7548828125,
+              "r": 984.6609700520834,
+              "b": 775.515625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              80
+            ]
+          }
+        ],
+        "orig": "Execute preventive and corrective maintenance on electrical equipment and drives",
+        "text": "Execute preventive and corrective maintenance on electrical equipment and drives",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/50",
+        "parent": {
+          "$ref": "#/groups/9"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.7965901692709,
+              "t": 770.9259440104166,
+              "r": 915.2542317708334,
+              "b": 758.6866861979166,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              62
+            ]
+          }
+        ],
+        "orig": "Support production operations by ensuring 99% equipment uptime",
+        "text": "Support production operations by ensuring 99% equipment uptime",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/51",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 399.6610107421875,
+              "t": 749.5072428385416,
+              "r": 485.084716796875,
+              "b": 736.5030110677084,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "CERTIFICATES",
+        "text": "CERTIFICATES",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/52",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 741.857666015625,
+              "r": 890.084716796875,
+              "b": 726.5586751302084,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              52
+            ]
+          }
+        ],
+        "orig": "Maintenance Engineer (Electronics & Instrumentation)",
+        "text": "Maintenance Engineer (Electronics & Instrumentation)",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/53",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 615.5084635416666,
+              "t": 725.0287272135416,
+              "r": 681.8643798828125,
+              "b": 709.7296549479166,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              13
+            ]
+          }
+        ],
+        "orig": "Piramal Glass",
+        "text": "Piramal Glass"
+      },
+      {
+        "self_ref": "#/texts/54",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 715.8492838541666,
+              "r": 528.559326171875,
+              "b": 662.3025716145834,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              78
+            ]
+          }
+        ],
+        "orig": "Diploma in Electronics & Communication – GTU (2014) PLC & Automation Certified",
+        "text": "Diploma in Electronics & Communication – GTU (2014) PLC & Automation Certified"
+      },
+      {
+        "self_ref": "#/texts/55",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 615.5084635416666,
+              "t": 706.6698404947916,
+              "r": 704.7457682291666,
+              "b": 691.3707682291666,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              19
+            ]
+          }
+        ],
+        "orig": "Jul 2018 – Dec 2018",
+        "text": "Jul 2018 – Dec 2018"
+      },
+      {
+        "self_ref": "#/texts/56",
+        "parent": {
+          "$ref": "#/groups/10"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 683.7212727864584,
+              "r": 1003.728759765625,
+              "b": 669.1871744791666,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              85
+            ]
+          }
+        ],
+        "orig": "Performed preventive maintenance on industrial instrumentation and electrical systems",
+        "text": "Performed preventive maintenance on industrial instrumentation and electrical systems",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/57",
+        "parent": {
+          "$ref": "#/groups/11"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 662.3025716145834,
+              "r": 932.0338541666666,
+              "b": 650.0633138020834,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              70
+            ]
+          }
+        ],
+        "orig": "Assisted in installation of pressure and temperature control equipment",
+        "text": "Assisted in installation of pressure and temperature control equipment",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/58",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 649.2984212239584,
+              "r": 561.3559163411459,
+              "b": 615.6404622395834,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              56
+            ]
+          }
+        ],
+        "orig": "AutoCAD 2D – Industrial Applications S.S.C – GSEB (2009)",
+        "text": "AutoCAD 2D – Industrial Applications S.S.C – GSEB (2009)"
+      },
+      {
+        "self_ref": "#/texts/59",
+        "parent": {
+          "$ref": "#/groups/12"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 643.9436848958334,
+              "r": 909.9152018229166,
+              "b": 630.174560546875,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              62
+            ]
+          }
+        ],
+        "orig": "Documented maintenance activities and equipment specifications",
+        "text": "Documented maintenance activities and equipment specifications",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/60",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 616.4054361979166,
+              "r": 700.9322102864584,
+              "b": 601.1063639322916,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              15
+            ]
+          }
+        ],
+        "orig": "Junior Engineer",
+        "text": "Junior Engineer",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/61",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.1355794270833,
+              "t": 593.456787109375,
+              "r": 466.7796630859375,
+              "b": 578.1577962239584,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "INTERESTS",
+        "text": "INTERESTS",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/62",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 599.576416015625,
+              "r": 758.8982747395834,
+              "b": 584.2774251302084,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              32
+            ]
+          }
+        ],
+        "orig": "Sarin Technologies India Pvt Ltd",
+        "text": "Sarin Technologies India Pvt Ltd"
+      },
+      {
+        "self_ref": "#/texts/63",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 580.45263671875,
+              "r": 710.847412109375,
+              "b": 565.153564453125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              19
+            ]
+          }
+        ],
+        "orig": "May 2016 - May 2018",
+        "text": "May 2016 - May 2018"
+      },
+      {
+        "self_ref": "#/texts/64",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 560.5638834635416,
+              "r": 448.4745686848958,
+              "b": 543.73486328125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              10
+            ]
+          }
+        ],
+        "orig": "Networking",
+        "text": "Networking"
+      },
+      {
+        "self_ref": "#/texts/65",
+        "parent": {
+          "$ref": "#/groups/13"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.7965901692709,
+              "t": 556.7390950520834,
+              "r": 961.0169270833334,
+              "b": 544.4998372395834,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              80
+            ]
+          }
+        ],
+        "orig": "Designed and installed electrical control panels with circuit protection devices",
+        "text": "Designed and installed electrical control panels with circuit protection devices",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/66",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 536.0853678385416,
+              "r": 507.9661051432292,
+              "b": 519.25634765625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "Technology & Innovation",
+        "text": "Technology & Innovation"
+      },
+      {
+        "self_ref": "#/texts/67",
+        "parent": {
+          "$ref": "#/groups/14"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.7965901692709,
+              "t": 536.0853678385416,
+              "r": 915.2542317708334,
+              "b": 523.0811360677084,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              64
+            ]
+          }
+        ],
+        "orig": "Performed wiring and programming of motor drives and controllers",
+        "text": "Performed wiring and programming of motor drives and controllers",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/68",
+        "parent": {
+          "$ref": "#/groups/15"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.7965901692709,
+              "t": 520.0213216145834,
+              "r": 857.2880859375,
+              "b": 507.01717122395837,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              51
+            ]
+          }
+        ],
+        "orig": "Supported automation system integration and testing",
+        "text": "Supported automation system integration and testing",
+        "enumerated": false,
+        "marker": ""
+      },
+      {
+        "self_ref": "#/texts/69",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 512.371826171875,
+              "r": 437.7965901692708,
+              "b": 496.30777994791663,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "Gaming",
+        "text": "Gaming"
+      },
+      {
+        "self_ref": "#/texts/70",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 398.8982747395833,
+              "t": 489.42317708333326,
+              "r": 441.6101481119792,
+              "b": 471.82926432291674,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "Traveling",
+        "text": "Traveling"
+      },
+      {
+        "self_ref": "#/texts/71",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 485.59847005208326,
+              "r": 691.7796223958334,
+              "b": 470.29939778645826,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "EDUCATION",
+        "text": "EDUCATION",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/72",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 449.64567057291674,
+              "r": 867.203369140625,
+              "b": 436.64143880208326,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              50
+            ]
+          }
+        ],
+        "orig": "Diploma in Electronics & Communication Engineering",
+        "text": "Diploma in Electronics & Communication Engineering",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/73",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 435.87654622395826,
+              "r": 845.847412109375,
+              "b": 407.5732421875,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              82
+            ]
+          }
+        ],
+        "orig": "A.Y.D. Kosamba, Gujarat Technological University (GTU) Graduated 2014 | CGPA: 5.58",
+        "text": "A.Y.D. Kosamba, Gujarat Technological University (GTU) Graduated 2014 | CGPA: 5.58"
+      },
+      {
+        "self_ref": "#/texts/74",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 395.333984375,
+              "r": 787.88134765625,
+              "b": 382.329833984375,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              36
+            ]
+          }
+        ],
+        "orig": "Secondary School Certificate (S.S.C)",
+        "text": "Secondary School Certificate (S.S.C)",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/75",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 380.79988606770826,
+              "r": 740.5931803385416,
+              "b": 368.56062825520826,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              28
+            ]
+          }
+        ],
+        "orig": "V.S. Patel High School, GSEB",
+        "text": "V.S. Patel High School, GSEB"
+      },
+      {
+        "self_ref": "#/texts/76",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 364.73592122395826,
+              "r": 761.9491373697916,
+              "b": 351.731689453125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              32
+            ]
+          }
+        ],
+        "orig": "Passed 2009 | Percentage: 64.59%",
+        "text": "Passed 2009 | Percentage: 64.59%"
+      },
+      {
+        "self_ref": "#/texts/77",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.7965901692709,
+              "t": 328.78312174479174,
+              "r": 763.4745279947916,
+              "b": 315.77888997395826,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              19
+            ]
+          }
+        ],
+        "orig": "TECHNICAL EXPERTISE",
+        "text": "TECHNICAL EXPERTISE",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/78",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 295.89013671875,
+              "r": 706.2711588541666,
+              "b": 282.88590494791674,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "PLC & Automation:",
+        "text": "PLC & Automation:",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/79",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 276.76627604166674,
+              "r": 1022.0338541666666,
+              "b": 246.93310546875,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              160
+            ]
+          }
+        ],
+        "orig": "Allen Bradley PLC programming | Siemens PLC | Delta PLC | SCADA/HMI Systems | RS LogIX 500 | Micrologix 1000/1100/1400 | Communication: RS-232, Ethernet, DH-485",
+        "text": "Allen Bradley PLC programming | Siemens PLC | Delta PLC | SCADA/HMI Systems | RS LogIX 500 | Micrologix 1000/1100/1400 | Communication: RS-232, Ethernet, DH-485"
+      },
+      {
+        "self_ref": "#/texts/80",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 233.16398111979174,
+              "r": 742.11865234375,
+              "b": 220.92472330729174,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              26
+            ]
+          }
+        ],
+        "orig": "Instrumentation & Control:",
+        "text": "Instrumentation & Control:",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/81",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 616.2711588541666,
+              "t": 214.80509440104174,
+              "r": 1017.4576009114584,
+              "b": 185.73689778645826,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              139
+            ]
+          }
+        ],
+        "orig": "Pressure & Temperature Transmitters | Flow & Level Measurement | DP Transmitters | Sensor Integration | Panel Design | Single-line Diagrams",
+        "text": "Pressure & Temperature Transmitters | Flow & Level Measurement | DP Transmitters | Sensor Integration | Panel Design | Single-line Diagrams"
+      },
+      {
+        "self_ref": "#/texts/82",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 171.96769205729174,
+              "r": 697.11865234375,
+              "b": 158.96354166666674,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              16
+            ]
+          }
+        ],
+        "orig": "Drives & Motors:",
+        "text": "Drives & Motors:",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/83",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 615.5084635416666,
+              "t": 154.373779296875,
+              "r": 1006.0169270833334,
+              "b": 123.77571614583326,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              113
+            ]
+          }
+        ],
+        "orig": "Allen Bradley | Danfoss | Delta | Siemens | Omron Drive Programming | Motor Control | Soft Starters | E300 Drives",
+        "text": "Allen Bradley | Danfoss | Delta | Siemens | Omron Drive Programming | Motor Control | Soft Starters | E300 Drives"
+      },
+      {
+        "self_ref": "#/texts/84",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 617.0338948567709,
+              "t": 110.00651041666674,
+              "r": 701.6949055989584,
+              "b": 97.00227864583326,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "Software & Tools:",
+        "text": "Software & Tools:",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/85",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 615.5084635416666,
+              "t": 92.41259765625,
+              "r": 994.5762532552084,
+              "b": 62.57942708333326,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              115
+            ]
+          }
+        ],
+        "orig": "Microsoft Office Suite (Excel, Word, PowerPoint) | AutoCAD 2D | Network Configuration | Industrial Control Software",
+        "text": "Microsoft Office Suite (Excel, Word, PowerPoint) | AutoCAD 2D | Network Configuration | Industrial Control Software"
+      }
+    ],
+    "pictures": [
+      {
+        "self_ref": "#/pictures/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/0"
+          },
+          {
+            "$ref": "#/texts/1"
+          },
+          {
+            "$ref": "#/texts/2"
+          },
+          {
+            "$ref": "#/texts/3"
+          },
+          {
+            "$ref": "#/texts/4"
+          },
+          {
+            "$ref": "#/texts/5"
+          },
+          {
+            "$ref": "#/texts/6"
+          },
+          {
+            "$ref": "#/texts/7"
+          },
+          {
+            "$ref": "#/texts/8"
+          },
+          {
+            "$ref": "#/texts/9"
+          },
+          {
+            "$ref": "#/texts/10"
+          },
+          {
+            "$ref": "#/texts/11"
+          },
+          {
+            "$ref": "#/texts/12"
+          },
+          {
+            "$ref": "#/texts/13"
+          },
+          {
+            "$ref": "#/texts/14"
+          },
+          {
+            "$ref": "#/texts/15"
+          },
+          {
+            "$ref": "#/texts/16"
+          },
+          {
+            "$ref": "#/texts/17"
+          },
+          {
+            "$ref": "#/texts/18"
+          },
+          {
+            "$ref": "#/texts/19"
+          },
+          {
+            "$ref": "#/texts/20"
+          },
+          {
+            "$ref": "#/texts/21"
+          },
+          {
+            "$ref": "#/texts/22"
+          },
+          {
+            "$ref": "#/groups/0"
+          },
+          {
+            "$ref": "#/texts/24"
+          },
+          {
+            "$ref": "#/groups/1"
+          },
+          {
+            "$ref": "#/groups/2"
+          },
+          {
+            "$ref": "#/texts/27"
+          },
+          {
+            "$ref": "#/texts/28"
+          },
+          {
+            "$ref": "#/texts/29"
+          },
+          {
+            "$ref": "#/texts/30"
+          },
+          {
+            "$ref": "#/texts/31"
+          },
+          {
+            "$ref": "#/texts/32"
+          },
+          {
+            "$ref": "#/texts/33"
+          },
+          {
+            "$ref": "#/groups/3"
+          },
+          {
+            "$ref": "#/texts/35"
+          },
+          {
+            "$ref": "#/groups/4"
+          },
+          {
+            "$ref": "#/texts/37"
+          },
+          {
+            "$ref": "#/groups/5"
+          },
+          {
+            "$ref": "#/texts/39"
+          },
+          {
+            "$ref": "#/texts/40"
+          },
+          {
+            "$ref": "#/texts/41"
+          },
+          {
+            "$ref": "#/texts/42"
+          },
+          {
+            "$ref": "#/texts/43"
+          },
+          {
+            "$ref": "#/groups/6"
+          },
+          {
+            "$ref": "#/texts/45"
+          },
+          {
+            "$ref": "#/texts/46"
+          },
+          {
+            "$ref": "#/groups/7"
+          },
+          {
+            "$ref": "#/texts/48"
+          },
+          {
+            "$ref": "#/groups/8"
+          },
+          {
+            "$ref": "#/groups/9"
+          },
+          {
+            "$ref": "#/texts/51"
+          },
+          {
+            "$ref": "#/texts/52"
+          },
+          {
+            "$ref": "#/texts/53"
+          },
+          {
+            "$ref": "#/texts/54"
+          },
+          {
+            "$ref": "#/texts/55"
+          },
+          {
+            "$ref": "#/groups/10"
+          },
+          {
+            "$ref": "#/groups/11"
+          },
+          {
+            "$ref": "#/texts/58"
+          },
+          {
+            "$ref": "#/groups/12"
+          },
+          {
+            "$ref": "#/texts/60"
+          },
+          {
+            "$ref": "#/texts/61"
+          },
+          {
+            "$ref": "#/texts/62"
+          },
+          {
+            "$ref": "#/texts/63"
+          },
+          {
+            "$ref": "#/texts/64"
+          },
+          {
+            "$ref": "#/groups/13"
+          },
+          {
+            "$ref": "#/texts/66"
+          },
+          {
+            "$ref": "#/groups/14"
+          },
+          {
+            "$ref": "#/groups/15"
+          },
+          {
+            "$ref": "#/texts/69"
+          },
+          {
+            "$ref": "#/texts/70"
+          },
+          {
+            "$ref": "#/texts/71"
+          },
+          {
+            "$ref": "#/texts/72"
+          },
+          {
+            "$ref": "#/texts/73"
+          },
+          {
+            "$ref": "#/texts/74"
+          },
+          {
+            "$ref": "#/texts/75"
+          },
+          {
+            "$ref": "#/texts/76"
+          },
+          {
+            "$ref": "#/texts/77"
+          },
+          {
+            "$ref": "#/texts/78"
+          },
+          {
+            "$ref": "#/texts/79"
+          },
+          {
+            "$ref": "#/texts/80"
+          },
+          {
+            "$ref": "#/texts/81"
+          },
+          {
+            "$ref": "#/texts/82"
+          },
+          {
+            "$ref": "#/texts/83"
+          },
+          {
+            "$ref": "#/texts/84"
+          },
+          {
+            "$ref": "#/texts/85"
+          }
+        ],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 375.37591552734375,
+              "t": 1510.2658882141113,
+              "r": 1065.6865234375,
+              "b": 17.3048095703125,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      }
+    ],
+    "tables": [],
+    "key_value_items": [],
+    "form_items": [],
+    "pages": {
+      "1": {
+        "size": {
+          "width": 1440.0,
+          "height": 1517.52001953125
+        },
+        "page_no": 1
+      }
+    }
+  },
+  "dynamic_profile": null,
+  "match_analysis": {
+    "primary_department": "Maintenance Team - 1 (Ramesh Maurya)",
+    "best_match": {
+      "job_id": "811",
+      "job_title": "Plant Assistant - I (Maintenance)",
+      "department": "Maintenance Team - 1 (Ramesh Maurya)",
+      "vacancy_id": 811,
+      "job_profile_id": 83,
+      "company_id": 1,
+      "department_id": 23,
+      "department_name": "Maintenance Team - 1 (Ramesh Maurya)",
+      "location_id": 1,
+      "score": 33.6,
+      "overall_score": 33.6,
+      "role_score": 100.0,
+      "skills_score": 0.0,
+      "experience_score": 100.0,
+      "education_score": 0.0,
+      "domain_score": 50.0,
+      "technology_score": 0.0,
+      "certification_score": 0.0,
+      "responsibilities_score": 0.0,
+      "coverage": 0.7,
+      "ranking_reason": "Ranked #1 with highest verified score of 33.6%.",
+      "classification": "LOW",
+      "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+      "matched_skills": [],
+      "missing_skills": [
+        "Maintenance Work"
+      ],
+      "matched_keywords": [],
+      "missing_keywords": [
+        "Maintenance Work"
+      ],
+      "mandatory_requirements": [
+        {
+          "requirement_id": "req_skill_maintenance_work",
+          "description": "Skill: Maintenance Work",
+          "tier": "MANDATORY",
+          "status": "FAILED",
+          "evidence": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+            "confidence_score": 1.0
+          },
+          "failure_reason": "Mandatory skill 'Maintenance Work' is not present in CV."
+        },
+        {
+          "requirement_id": "req_min_experience",
+          "description": "Minimum Experience: 0.0 years",
+          "tier": "MANDATORY",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "preferred_requirements": [
+        {
+          "requirement_id": "pref_keyword_maintenance_work",
+          "description": "Preferred Keyword: Maintenance Work",
+          "tier": "PREFERRED",
+          "status": "FAILED",
+          "evidence": {
+            "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+            "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+            "confidence_score": 1.0
+          },
+          "failure_reason": "Preferred keyword 'Maintenance Work' not mentioned in CV."
+        },
+        {
+          "requirement_id": "pref_max_experience",
+          "description": "Max Experience: 5.0 years",
+          "tier": "PREFERRED",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "optional_requirements": [],
+      "matched_criteria": [
+        "Minimum Experience (0.0 years)",
+        "Max Experience (5.0 years)"
+      ],
+      "missing_criteria": [
+        "Mandatory Skill: Maintenance Work",
+        "Preferred Keyword: Maintenance Work"
+      ],
+      "evidence": {
+        "req_skill_maintenance_work": {
+          "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+          "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+          "confidence_score": 1.0
+        },
+        "req_min_experience": {
+          "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+          "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_maintenance_work": {
+          "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+          "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+          "confidence_score": 1.0
+        },
+        "pref_max_experience": {
+          "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+          "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+          "confidence_score": 1.0
+        }
+      },
+      "mandatory_failures": [
+        {
+          "requirement_id": "req_skill_maintenance_work",
+          "description": "Skill: Maintenance Work",
+          "reason": "Mandatory skill 'Maintenance Work' is not present in CV.",
+          "score_impact": 20.0
+        }
+      ],
+      "confidence": 1.0,
+      "hr_review_required": true,
+      "reason": "Mandatory requirement failure(s): Skill: Maintenance Work (Mandatory skill 'Maintenance Work' is not present in CV.)",
+      "career_transition_detected": false,
+      "career_transition_note": null,
+      "llm_reason": "No candidate CV text provided, so semantic fit cannot be assessed",
+      "inferred_skills": []
+    },
+    "suitable_openings": [
+      {
+        "job_id": "811",
+        "job_title": "Plant Assistant - I (Maintenance)",
+        "department": "Maintenance Team - 1 (Ramesh Maurya)",
+        "vacancy_id": 811,
+        "job_profile_id": 83,
+        "company_id": 1,
+        "department_id": 23,
+        "department_name": "Maintenance Team - 1 (Ramesh Maurya)",
+        "location_id": 1,
+        "score": 33.6,
+        "overall_score": 33.6,
+        "role_score": 100.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #1 with highest verified score of 33.6%.",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Maintenance Work"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Maintenance Work"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_maintenance_work",
+            "description": "Skill: Maintenance Work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Maintenance Work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 0.0 years",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_maintenance_work",
+            "description": "Preferred Keyword: Maintenance Work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+              "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Maintenance Work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 5.0 years",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Minimum Experience (0.0 years)",
+          "Max Experience (5.0 years)"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: Maintenance Work",
+          "Preferred Keyword: Maintenance Work"
+        ],
+        "evidence": {
+          "req_skill_maintenance_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Maintenance Work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Maintenance Work",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_maintenance_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Maintenance Work'",
+            "vacancy_evidence": "Preferred Keyword: Maintenance Work",
+            "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_maintenance_work",
+            "description": "Skill: Maintenance Work",
+            "reason": "Mandatory skill 'Maintenance Work' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Maintenance Work (Mandatory skill 'Maintenance Work' is not present in CV.)",
+        "career_transition_detected": false,
+        "career_transition_note": null,
+        "llm_reason": "No candidate CV text provided, so semantic fit cannot be assessed",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "720",
+        "job_title": "Plant Assistant - II (Maintenance)",
+        "department": "Maintenance Team - 2 (Parag Detroja)",
+        "vacancy_id": 720,
+        "job_profile_id": 82,
+        "company_id": 1,
+        "department_id": 24,
+        "department_name": "Maintenance Team - 2 (Parag Detroja)",
+        "location_id": 2,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 100.0,
+        "skills_score": 0.0,
+        "experience_score": 0.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #2 due to lower score (0.0% vs top 33.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Chemical plant experience"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Chemical plant experience"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_chemical_plant_experience",
+            "description": "Skill: Chemical plant experience",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Chemical plant experience'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Chemical plant experience",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Chemical plant experience' is not present in CV."
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 1.0 years",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "Candidate has 0.0 years of experience (below mandatory 1.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 1.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Candidate experience (0.0 yrs) is below mandatory minimum (1.0 yrs)."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_chemical_plant_experience",
+            "description": "Preferred Keyword: Chemical plant experience",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Chemical plant experience'",
+              "vacancy_evidence": "Preferred Keyword: Chemical plant experience",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Chemical plant experience' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 3.0 years",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (3.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Max Experience (3.0 years)"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: Chemical plant experience",
+          "Minimum Experience (1.0 years)",
+          "Preferred Keyword: Chemical plant experience"
+        ],
+        "evidence": {
+          "req_skill_chemical_plant_experience": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Chemical plant experience'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Chemical plant experience",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 0.0 years of experience (below mandatory 1.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 1.0 years",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_chemical_plant_experience": {
+            "cv_evidence": "CV missing preferred keyword: 'Chemical plant experience'",
+            "vacancy_evidence": "Preferred Keyword: Chemical plant experience",
+            "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (3.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_chemical_plant_experience",
+            "description": "Skill: Chemical plant experience",
+            "reason": "Mandatory skill 'Chemical plant experience' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 1.0 years",
+            "reason": "Candidate experience (0.0 yrs) is below mandatory minimum (1.0 yrs).",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Chemical plant experience (Mandatory skill 'Chemical plant experience' is not present in CV.); Minimum Experience: 1.0 years (Candidate experience (0.0 yrs) is below mandatory minimum (1.0 yrs).)",
+        "career_transition_detected": false,
+        "career_transition_note": null,
+        "llm_reason": "No candidate CV text provided, so semantic fit cannot be assessed",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "840",
+        "job_title": "Plant Assistant - I (Maintenance)",
+        "department": "Maintenance Team - 1 (Ramesh Maurya)",
+        "vacancy_id": 840,
+        "job_profile_id": 83,
+        "company_id": 1,
+        "department_id": 23,
+        "department_name": "Maintenance Team - 1 (Ramesh Maurya)",
+        "location_id": 1,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 100.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #3 due to lower score (0.0% vs top 33.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Plant Maintenance",
+          "Fitter",
+          "Utility"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Plant Maintenance",
+          "Fitter",
+          "Utility"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_plant_maintenance",
+            "description": "Skill: Plant Maintenance",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Plant Maintenance'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Plant Maintenance",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Plant Maintenance' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_fitter",
+            "description": "Skill: Fitter",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Fitter'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Fitter",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Fitter' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_utility",
+            "description": "Skill: Utility",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Utility'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Utility",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Utility' is not present in CV."
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 0.0 years",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_plant_maintenance",
+            "description": "Preferred Keyword: Plant Maintenance",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Plant Maintenance'",
+              "vacancy_evidence": "Preferred Keyword: Plant Maintenance",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Plant Maintenance' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_fitter",
+            "description": "Preferred Keyword: Fitter",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Fitter'",
+              "vacancy_evidence": "Preferred Keyword: Fitter",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Fitter' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_utility",
+            "description": "Preferred Keyword: Utility",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Utility'",
+              "vacancy_evidence": "Preferred Keyword: Utility",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Utility' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 5.0 years",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Minimum Experience (0.0 years)",
+          "Max Experience (5.0 years)"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: Plant Maintenance",
+          "Mandatory Skill: Fitter",
+          "Mandatory Skill: Utility",
+          "Preferred Keyword: Plant Maintenance",
+          "Preferred Keyword: Fitter",
+          "Preferred Keyword: Utility"
+        ],
+        "evidence": {
+          "req_skill_plant_maintenance": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Plant Maintenance'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Plant Maintenance",
+            "confidence_score": 1.0
+          },
+          "req_skill_fitter": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Fitter'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Fitter",
+            "confidence_score": 1.0
+          },
+          "req_skill_utility": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Utility'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Utility",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_plant_maintenance": {
+            "cv_evidence": "CV missing preferred keyword: 'Plant Maintenance'",
+            "vacancy_evidence": "Preferred Keyword: Plant Maintenance",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_fitter": {
+            "cv_evidence": "CV missing preferred keyword: 'Fitter'",
+            "vacancy_evidence": "Preferred Keyword: Fitter",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_utility": {
+            "cv_evidence": "CV missing preferred keyword: 'Utility'",
+            "vacancy_evidence": "Preferred Keyword: Utility",
+            "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_plant_maintenance",
+            "description": "Skill: Plant Maintenance",
+            "reason": "Mandatory skill 'Plant Maintenance' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_fitter",
+            "description": "Skill: Fitter",
+            "reason": "Mandatory skill 'Fitter' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_utility",
+            "description": "Skill: Utility",
+            "reason": "Mandatory skill 'Utility' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Plant Maintenance (Mandatory skill 'Plant Maintenance' is not present in CV.); Skill: Fitter (Mandatory skill 'Fitter' is not present in CV.); Skill: Utility (Mandatory skill 'Utility' is not present in CV.)",
+        "career_transition_detected": false,
+        "career_transition_note": null,
+        "llm_reason": "No candidate CV text provided, so semantic fit cannot be assessed",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "850",
+        "job_title": "Executive Creative",
+        "department": "Creative Team",
+        "vacancy_id": 850,
+        "job_profile_id": 303,
+        "company_id": 1,
+        "department_id": 25,
+        "department_name": "Creative Team",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 100.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #4 due to lower score (0.0% vs top 33.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "designing",
+          "creativity",
+          "graphic designer"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "designing",
+          "creativity",
+          "graphic designer"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_designing",
+            "description": "Skill: designing",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'designing'",
+              "vacancy_evidence": "Mandatory Skill Requirement: designing",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'designing' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_creativity",
+            "description": "Skill: creativity",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'creativity'",
+              "vacancy_evidence": "Mandatory Skill Requirement: creativity",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'creativity' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_graphic_designer",
+            "description": "Skill: graphic designer",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'graphic designer'",
+              "vacancy_evidence": "Mandatory Skill Requirement: graphic designer",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'graphic designer' is not present in CV."
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 0.0 years",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_designing",
+            "description": "Preferred Keyword: designing",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'designing'",
+              "vacancy_evidence": "Preferred Keyword: designing",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'designing' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_creativity",
+            "description": "Preferred Keyword: creativity",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'creativity'",
+              "vacancy_evidence": "Preferred Keyword: creativity",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'creativity' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_graphic_designer",
+            "description": "Preferred Keyword: graphic designer",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'graphic designer'",
+              "vacancy_evidence": "Preferred Keyword: graphic designer",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'graphic designer' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 5.0 years",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Minimum Experience (0.0 years)",
+          "Max Experience (5.0 years)"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: designing",
+          "Mandatory Skill: creativity",
+          "Mandatory Skill: graphic designer",
+          "Preferred Keyword: designing",
+          "Preferred Keyword: creativity",
+          "Preferred Keyword: graphic designer"
+        ],
+        "evidence": {
+          "req_skill_designing": {
+            "cv_evidence": "CV missing explicit mention of skill: 'designing'",
+            "vacancy_evidence": "Mandatory Skill Requirement: designing",
+            "confidence_score": 1.0
+          },
+          "req_skill_creativity": {
+            "cv_evidence": "CV missing explicit mention of skill: 'creativity'",
+            "vacancy_evidence": "Mandatory Skill Requirement: creativity",
+            "confidence_score": 1.0
+          },
+          "req_skill_graphic_designer": {
+            "cv_evidence": "CV missing explicit mention of skill: 'graphic designer'",
+            "vacancy_evidence": "Mandatory Skill Requirement: graphic designer",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 0.0 years of experience (meets mandatory 0.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 0.0 years",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_designing": {
+            "cv_evidence": "CV missing preferred keyword: 'designing'",
+            "vacancy_evidence": "Preferred Keyword: designing",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_creativity": {
+            "cv_evidence": "CV missing preferred keyword: 'creativity'",
+            "vacancy_evidence": "Preferred Keyword: creativity",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_graphic_designer": {
+            "cv_evidence": "CV missing preferred keyword: 'graphic designer'",
+            "vacancy_evidence": "Preferred Keyword: graphic designer",
+            "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (5.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 5.0 years",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_designing",
+            "description": "Skill: designing",
+            "reason": "Mandatory skill 'designing' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_creativity",
+            "description": "Skill: creativity",
+            "reason": "Mandatory skill 'creativity' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_graphic_designer",
+            "description": "Skill: graphic designer",
+            "reason": "Mandatory skill 'graphic designer' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: designing (Mandatory skill 'designing' is not present in CV.); Skill: creativity (Mandatory skill 'creativity' is not present in CV.); Skill: graphic designer (Mandatory skill 'graphic designer' is not present in CV.)",
+        "career_transition_detected": false,
+        "career_transition_note": null,
+        "llm_reason": "No candidate CV text provided, so semantic fit cannot be assessed",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "912",
+        "job_title": "Chemist (Production)",
+        "department": "Production Team - 1 (Rakesh Modi)",
+        "vacancy_id": 912,
+        "job_profile_id": 21,
+        "company_id": 1,
+        "department_id": 19,
+        "department_name": "Production Team - 1 (Rakesh Modi)",
+        "location_id": 8,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 100.0,
+        "skills_score": 0.0,
+        "experience_score": 0.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 33.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "2 to 3 years of experience in field."
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "2 to 3 years of experience in field."
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_2_to_3_years_of_experience_in_field.",
+            "description": "Skill: 2 to 3 years of experience in field.",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: '2 to 3 years of experience in field.'",
+              "vacancy_evidence": "Mandatory Skill Requirement: 2 to 3 years of experience in field.",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill '2 to 3 years of experience in field.' is not present in CV."
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 2.0 years",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "Candidate has 0.0 years of experience (below mandatory 2.0 years)",
+              "vacancy_evidence": "Mandatory Minimum Experience: 2.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Candidate experience (0.0 yrs) is below mandatory minimum (2.0 yrs)."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_2_to_3_years_of_experience_in_field.",
+            "description": "Preferred Keyword: 2 to 3 years of experience in field.",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: '2 to 3 years of experience in field.'",
+              "vacancy_evidence": "Preferred Keyword: 2 to 3 years of experience in field.",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword '2 to 3 years of experience in field.' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_max_experience",
+            "description": "Max Experience: 3.0 years",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (3.0 years)",
+              "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Max Experience (3.0 years)"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: 2 to 3 years of experience in field.",
+          "Minimum Experience (2.0 years)",
+          "Preferred Keyword: 2 to 3 years of experience in field."
+        ],
+        "evidence": {
+          "req_skill_2_to_3_years_of_experience_in_field.": {
+            "cv_evidence": "CV missing explicit mention of skill: '2 to 3 years of experience in field.'",
+            "vacancy_evidence": "Mandatory Skill Requirement: 2 to 3 years of experience in field.",
+            "confidence_score": 1.0
+          },
+          "req_min_experience": {
+            "cv_evidence": "Candidate has 0.0 years of experience (below mandatory 2.0 years)",
+            "vacancy_evidence": "Mandatory Minimum Experience: 2.0 years",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_2_to_3_years_of_experience_in_field.": {
+            "cv_evidence": "CV missing preferred keyword: '2 to 3 years of experience in field.'",
+            "vacancy_evidence": "Preferred Keyword: 2 to 3 years of experience in field.",
+            "confidence_score": 1.0
+          },
+          "pref_max_experience": {
+            "cv_evidence": "Candidate experience 0.0 years is within preferred upper bound (3.0 years)",
+            "vacancy_evidence": "Preferred Upper Bound Experience: 3.0 years",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_2_to_3_years_of_experience_in_field.",
+            "description": "Skill: 2 to 3 years of experience in field.",
+            "reason": "Mandatory skill '2 to 3 years of experience in field.' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_min_experience",
+            "description": "Minimum Experience: 2.0 years",
+            "reason": "Candidate experience (0.0 yrs) is below mandatory minimum (2.0 yrs).",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: 2 to 3 years of experience in field. (Mandatory skill '2 to 3 years of experience in field.' is not present in CV.); Minimum Experience: 2.0 years (Candidate experience (0.0 yrs) is below mandatory minimum (2.0 yrs).)",
+        "career_transition_detected": false,
+        "career_transition_note": null,
+        "llm_reason": "No candidate CV text provided, so semantic fit cannot be assessed",
+        "inferred_skills": []
+      }
+    ],
+    "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+    "llm_skipped": false
+  }
+}

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen3:8b"  # or qwen2.5:3b etc based on what's available
+    OLLAMA_MODEL: str = "qwen3:4b"  # or qwen2.5:3b etc based on what's available
     OLLAMA_REQUEST_TIMEOUT: float = 600.0
     OLLAMA_MAX_RETRIES: int = 3
     LLM_BOOST_WEIGHT: float = 0.10

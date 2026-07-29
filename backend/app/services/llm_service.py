@@ -287,7 +287,7 @@ class OllamaLLMService:
         payload = {
             "model": model_name,
             "prompt": prompt,
-            "format": "json",
+            "format": OptimizedLLMMatchResponse.model_json_schema(),
             "stream": False,
             "think": False,
             "keep_alive": "30m",

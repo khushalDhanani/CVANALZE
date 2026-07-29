@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analysis import router as match_router
 from app.api.batch import router as batch_router
+from app.api.candidates import router as candidates_router
 from app.api.config import router as config_router
 from app.api.cv import router as cv_router
 from app.api.jobs import router as jobs_router
@@ -46,6 +47,11 @@ app.include_router(
     config_router,
     prefix="/api",
 )
+app.include_router(
+    candidates_router,
+    prefix="/api/v1",
+)
+
 
 
 @app.get("/")

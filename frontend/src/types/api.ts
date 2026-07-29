@@ -58,6 +58,8 @@ export interface JobMatchScore {
   job_title: string;
   department_name?: string | null;
   overall_score: number;
+  score?: number;
+  recommendation?: string | null;
   component_scores: ComponentBreakdown;
   mandatory_fails: MandatoryFailure[];
   requirement_evaluations: RequirementEvaluation[];
@@ -66,6 +68,7 @@ export interface JobMatchScore {
   inferred_skills?: string[];
   classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
 }
+
 
 export interface CandidateMatchAnalysis {
   scan_id: string;
@@ -195,3 +198,21 @@ export interface LlmHealthResponse {
   message?: string;
   error?: string;
 }
+
+export interface CandidateSummary {
+  id: string;
+  filename: string;
+  parsed_at?: string;
+  page_count?: number;
+  is_scanned?: boolean;
+  ocr_applied?: boolean;
+  primary_department?: string | null;
+  best_match?: {
+    job_title?: string;
+    department?: string;
+    score?: number;
+    classification?: string;
+    recommendation?: string;
+  };
+}
+

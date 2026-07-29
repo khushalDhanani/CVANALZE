@@ -1,7 +1,7 @@
 import { View, Text, Pressable, useWindowDimensions } from 'react-native';
 import { Slot, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, Search, Briefcase, Layers, Settings, X } from 'lucide-react-native';
+import { Home, Search, Briefcase, Layers, Settings, Users, X } from 'lucide-react-native';
 import { useState } from 'react';
 
 type SidebarNavItem = {
@@ -13,10 +13,12 @@ type SidebarNavItem = {
 const NAV_ITEMS: SidebarNavItem[] = [
   { name: 'Home', route: '/', icon: Home },
   { name: 'Match', route: '/cv-match', icon: Search },
+  { name: 'Candidates', route: '/candidates', icon: Users },
   { name: 'Jobs', route: '/vacancies', icon: Briefcase },
   { name: 'Batch', route: '/batch', icon: Layers },
   { name: 'Config', route: '/config', icon: Settings },
 ];
+
 
 export function SidebarLayout() {
   const { width } = useWindowDimensions();

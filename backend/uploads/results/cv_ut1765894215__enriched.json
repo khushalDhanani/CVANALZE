@@ -1,0 +1,3938 @@
+{
+  "id": "cv_ut1765894215_",
+  "scan_id": "cv_ut1765894215_",
+  "parsed_at": "2026-07-28T12:45:13.092142+00:00",
+  "candidate_id": null,
+  "cv_id": null,
+  "filename": "ut1765894215_.pdf",
+  "content_type": "application/pdf",
+  "cv_hash": "e20185dbb4ac4f34e18158c8d171b7bdf0c588304f3d4f67e5e2e0873f388f83",
+  "parser_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "created_at": "2026-07-28T12:45:13.092142+00:00",
+  "updated_at": "2026-07-28T12:45:13.092142+00:00",
+  "scanned_at": "2026-07-28T12:45:13.092142+00:00",
+  "status": "NEW_CV",
+  "characters": 3667,
+  "page_count": 2,
+  "is_scanned": true,
+  "ocr_applied": false,
+  "text": "<!-- image -->\n\nSkilled ASP.Net developer with 3+ years of expertise creating software, integrating third-party tools into the.Net framework, and effectively leading the team on projects. Advanced knowledge of ASP .NET Core MVC, Web APIs, HTML, CSS, Bootstrap, JS, and C#.\n\n<!-- image -->\n\ncodewithprogrammer@gmail.com\n\n- [x] 9870059553\n\n- [x] Surat, India\n\n- [x] https://www.linkedin.com/in/utk-patil\n\n## WORK EXPERIENCE ASP .NET Developer\n\nPulse Software Solutions LLC\n\n07/2021 - Present\n\nProjects/Tasks\n\n- Team Locum (Healthcare Recruitment Agency): Migrated a Ruby on Rails project to ASP.NET Core, with R&amp;D, and integrated MongoDB, Azure Blob, and Hangfire.\n- Migration from Ruby on Rails to ASP.NET Core , conducting R&amp;D for seamless transition.\n- Managed database operations with MongoDB and handled static files via Azure Blob . File upload via FTP.\n- Implemented Hangfire to automated emails (SendGrid API) and created webhooks for syncing with CARAS.\n- Created a website and secured APIs for mobile applications.\n- Send FCM notifications to mobile devices.\n- Provide: Implemented role-based authorization and managed database operations.\n- Set up role-based authorization and Azure B2C login for the website; handled static files using Azure Blob .\n- Managed database operations using MS SQL .\n- BIVDA API: Developed secure APIs and managed database operations.\n- Created APIs and webhooks with JWT authorization , integrating third-party APIs .\n- Managed database operations using MS SQL .\n- Skull Unlimited: Integrated AI and email solutions to enhance operational efficiency.\n- Integrated ChatGPT API to process Excel files.\n- Used Azure Communication Email for email delivery.\n- Solomon Labs (CQM): Developed data upload and reporting tools for lab research.\n- Implemented bulk data upload via Excel and generated comparison reports using Chart.js and Highcharts.js .\n- CWD: Developed reporting tools and migrated ColdFusion functionality to ASP.NET Core.\n- Migrated ColdFusion functionality to ASP.NET Core for generating monthly reports using Hangfire for background processing.\n- Performed manual deployments via IIS server using RDP\n- Loadchief:\n- Integrated AngularJS frontend, enhanced API layer, implemented FCM for multiple devices , and synced driver insurance credentials with A4DD.\n- Harrison Energy &amp; Mechanical Resource Group (2 Projects):\n- Developed drag-and-drop functionality in Angular and added tab functionality using the Tab key for editable controls.\n- Streamlined CRUD operations for manufacturers and fixed calculation errors for quote lines to enhance efficiency and accuracy.\n\n## SKILLS\n\n## Skills\n\n- Programming Language:\n\nC/C++, C#, JavaScript\n\n- Frontend Technologies: HTML5, CSS3, jQuery, Bootstrap, AngularJS, Angular\n- Frameworks: ASP.NET Core, ASP.NET MVC, Entity Framework Core, SingleR\n- Databases: SQL Server, MySQL, PostgreSQL, MongoDB\n- Version Control: Beanstalk, GitHub, Bitbucket\n- Cloud Platform: Microsoft Azure Blob, AWS Bucket\n- APIs: REST APIs, OAuth2\n- Security: SSL/TLS, JWT, Identity Server, OWASP Best Practices\n\n## EDUCATION\n\nEducation\n\n## Bachelor of Science (Computer Science)\n\nShree Ramkrishna Institute of Comp. Education &amp; Applied Science. (VNSGU)\n\n06/2017 - 07/2020\n\nMaster of Science (Information &amp; Communication Technology)\n\nJ.P. Dawer institute of Information Science and Technology (VNSGU)\n\n<!-- image -->\n\n<!-- image -->\n\nSurat, India\n\n## ACHIEVEMENTS\n\nAchievements\n\n- 1st Prize Winner in Spring Puzzle at the Impetus 2019 Tech Competition , Shri Shambhu Bhai V. Patel College (VNSGU).\n- 3rd Prize Winner in Mind Storm 2019 Tech Competition , C. B. Patel College (VNSGU).",
+  "markdown": "<!-- image -->\n\nSkilled ASP.Net developer with 3+ years of expertise creating software, integrating third-party tools into the.Net framework, and effectively leading the team on projects. Advanced knowledge of ASP .NET Core MVC, Web APIs, HTML, CSS, Bootstrap, JS, and C#.\n\n<!-- image -->\n\ncodewithprogrammer@gmail.com\n\n- [x] 9870059553\n\n- [x] Surat, India\n\n- [x] https://www.linkedin.com/in/utk-patil\n\n## WORK EXPERIENCE ASP .NET Developer\n\nPulse Software Solutions LLC\n\n07/2021 - Present\n\nProjects/Tasks\n\n- Team Locum (Healthcare Recruitment Agency): Migrated a Ruby on Rails project to ASP.NET Core, with R&amp;D, and integrated MongoDB, Azure Blob, and Hangfire.\n- Migration from Ruby on Rails to ASP.NET Core , conducting R&amp;D for seamless transition.\n- Managed database operations with MongoDB and handled static files via Azure Blob . File upload via FTP.\n- Implemented Hangfire to automated emails (SendGrid API) and created webhooks for syncing with CARAS.\n- Created a website and secured APIs for mobile applications.\n- Send FCM notifications to mobile devices.\n- Provide: Implemented role-based authorization and managed database operations.\n- Set up role-based authorization and Azure B2C login for the website; handled static files using Azure Blob .\n- Managed database operations using MS SQL .\n- BIVDA API: Developed secure APIs and managed database operations.\n- Created APIs and webhooks with JWT authorization , integrating third-party APIs .\n- Managed database operations using MS SQL .\n- Skull Unlimited: Integrated AI and email solutions to enhance operational efficiency.\n- Integrated ChatGPT API to process Excel files.\n- Used Azure Communication Email for email delivery.\n- Solomon Labs (CQM): Developed data upload and reporting tools for lab research.\n- Implemented bulk data upload via Excel and generated comparison reports using Chart.js and Highcharts.js .\n- CWD: Developed reporting tools and migrated ColdFusion functionality to ASP.NET Core.\n- Migrated ColdFusion functionality to ASP.NET Core for generating monthly reports using Hangfire for background processing.\n- Performed manual deployments via IIS server using RDP\n- Loadchief:\n- Integrated AngularJS frontend, enhanced API layer, implemented FCM for multiple devices , and synced driver insurance credentials with A4DD.\n- Harrison Energy &amp; Mechanical Resource Group (2 Projects):\n- Developed drag-and-drop functionality in Angular and added tab functionality using the Tab key for editable controls.\n- Streamlined CRUD operations for manufacturers and fixed calculation errors for quote lines to enhance efficiency and accuracy.\n\n## SKILLS\n\n## Skills\n\n- Programming Language:\n\nC/C++, C#, JavaScript\n\n- Frontend Technologies: HTML5, CSS3, jQuery, Bootstrap, AngularJS, Angular\n- Frameworks: ASP.NET Core, ASP.NET MVC, Entity Framework Core, SingleR\n- Databases: SQL Server, MySQL, PostgreSQL, MongoDB\n- Version Control: Beanstalk, GitHub, Bitbucket\n- Cloud Platform: Microsoft Azure Blob, AWS Bucket\n- APIs: REST APIs, OAuth2\n- Security: SSL/TLS, JWT, Identity Server, OWASP Best Practices\n\n## EDUCATION\n\nEducation\n\n## Bachelor of Science (Computer Science)\n\nShree Ramkrishna Institute of Comp. Education &amp; Applied Science. (VNSGU)\n\n06/2017 - 07/2020\n\nMaster of Science (Information &amp; Communication Technology)\n\nJ.P. Dawer institute of Information Science and Technology (VNSGU)\n\n<!-- image -->\n\n<!-- image -->\n\nSurat, India\n\n## ACHIEVEMENTS\n\nAchievements\n\n- 1st Prize Winner in Spring Puzzle at the Impetus 2019 Tech Competition , Shri Shambhu Bhai V. Patel College (VNSGU).\n- 3rd Prize Winner in Mind Storm 2019 Tech Competition , C. B. Patel College (VNSGU).",
+  "structured_doc": {
+    "schema_name": "DoclingDocument",
+    "version": "1.10.0",
+    "name": "ut1765894215_",
+    "origin": {
+      "mimetype": "application/pdf",
+      "binary_hash": 16565049250907983747,
+      "filename": "ut1765894215_.pdf"
+    },
+    "furniture": {
+      "self_ref": "#/furniture",
+      "children": [],
+      "content_layer": "furniture",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "body": {
+      "self_ref": "#/body",
+      "children": [
+        {
+          "$ref": "#/pictures/0"
+        },
+        {
+          "$ref": "#/texts/2"
+        },
+        {
+          "$ref": "#/pictures/1"
+        },
+        {
+          "$ref": "#/groups/0"
+        },
+        {
+          "$ref": "#/texts/7"
+        },
+        {
+          "$ref": "#/texts/8"
+        },
+        {
+          "$ref": "#/texts/9"
+        },
+        {
+          "$ref": "#/texts/10"
+        },
+        {
+          "$ref": "#/groups/1"
+        },
+        {
+          "$ref": "#/texts/36"
+        },
+        {
+          "$ref": "#/texts/37"
+        },
+        {
+          "$ref": "#/groups/2"
+        },
+        {
+          "$ref": "#/texts/39"
+        },
+        {
+          "$ref": "#/groups/3"
+        },
+        {
+          "$ref": "#/texts/47"
+        },
+        {
+          "$ref": "#/texts/48"
+        },
+        {
+          "$ref": "#/texts/49"
+        },
+        {
+          "$ref": "#/texts/50"
+        },
+        {
+          "$ref": "#/texts/51"
+        },
+        {
+          "$ref": "#/texts/52"
+        },
+        {
+          "$ref": "#/texts/53"
+        },
+        {
+          "$ref": "#/pictures/2"
+        },
+        {
+          "$ref": "#/pictures/3"
+        },
+        {
+          "$ref": "#/texts/54"
+        },
+        {
+          "$ref": "#/texts/55"
+        },
+        {
+          "$ref": "#/texts/56"
+        },
+        {
+          "$ref": "#/texts/57"
+        },
+        {
+          "$ref": "#/groups/4"
+        }
+      ],
+      "content_layer": "body",
+      "name": "_root_",
+      "label": "unspecified"
+    },
+    "groups": [
+      {
+        "self_ref": "#/groups/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/3"
+          },
+          {
+            "$ref": "#/texts/4"
+          },
+          {
+            "$ref": "#/texts/5"
+          },
+          {
+            "$ref": "#/texts/6"
+          }
+        ],
+        "content_layer": "body",
+        "name": "group",
+        "label": "form_area"
+      },
+      {
+        "self_ref": "#/groups/1",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/11"
+          },
+          {
+            "$ref": "#/texts/12"
+          },
+          {
+            "$ref": "#/texts/13"
+          },
+          {
+            "$ref": "#/texts/14"
+          },
+          {
+            "$ref": "#/texts/15"
+          },
+          {
+            "$ref": "#/texts/16"
+          },
+          {
+            "$ref": "#/texts/17"
+          },
+          {
+            "$ref": "#/texts/18"
+          },
+          {
+            "$ref": "#/texts/19"
+          },
+          {
+            "$ref": "#/texts/20"
+          },
+          {
+            "$ref": "#/texts/21"
+          },
+          {
+            "$ref": "#/texts/22"
+          },
+          {
+            "$ref": "#/texts/23"
+          },
+          {
+            "$ref": "#/texts/24"
+          },
+          {
+            "$ref": "#/texts/25"
+          },
+          {
+            "$ref": "#/texts/26"
+          },
+          {
+            "$ref": "#/texts/27"
+          },
+          {
+            "$ref": "#/texts/28"
+          },
+          {
+            "$ref": "#/texts/29"
+          },
+          {
+            "$ref": "#/texts/30"
+          },
+          {
+            "$ref": "#/texts/31"
+          },
+          {
+            "$ref": "#/texts/32"
+          },
+          {
+            "$ref": "#/texts/33"
+          },
+          {
+            "$ref": "#/texts/34"
+          },
+          {
+            "$ref": "#/texts/35"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/2",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/38"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/3",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/40"
+          },
+          {
+            "$ref": "#/texts/41"
+          },
+          {
+            "$ref": "#/texts/42"
+          },
+          {
+            "$ref": "#/texts/43"
+          },
+          {
+            "$ref": "#/texts/44"
+          },
+          {
+            "$ref": "#/texts/45"
+          },
+          {
+            "$ref": "#/texts/46"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      },
+      {
+        "self_ref": "#/groups/4",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/58"
+          },
+          {
+            "$ref": "#/texts/59"
+          }
+        ],
+        "content_layer": "body",
+        "name": "list",
+        "label": "list"
+      }
+    ],
+    "texts": [
+      {
+        "self_ref": "#/texts/0",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.0,
+              "t": 815.76796909,
+              "r": 166.71094122,
+              "b": 794.5667151772872,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              13
+            ]
+          }
+        ],
+        "orig": "Utkarsh Patil",
+        "text": "Utkarsh Patil",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/1",
+        "parent": {
+          "$ref": "#/pictures/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 789.536326145,
+              "r": 140.79492186000002,
+              "b": 778.9356991886436,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              18
+            ]
+          }
+        ],
+        "orig": "ASP .NET Developer",
+        "text": "ASP .NET Developer",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/2",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 771.85400654,
+              "r": 574.4443382700001,
+              "b": 752.6969058199276,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              256
+            ]
+          }
+        ],
+        "orig": "Skilled ASP.Net developer with 3+ years of expertise creating software, integrating third-party tools into the.Net framework, and effectively leading the team on projects. Advanced knowledge of ASP .NET Core MVC, Web APIs, HTML, CSS, Bootstrap, JS, and C#.",
+        "text": "Skilled ASP.Net developer with 3+ years of expertise creating software, integrating third-party tools into the.Net framework, and effectively leading the team on projects. Advanced knowledge of ASP .NET Core MVC, Web APIs, HTML, CSS, Bootstrap, JS, and C#."
+      },
+      {
+        "self_ref": "#/texts/3",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 62.25,
+              "t": 734.349023308955,
+              "r": 186.29107450945799,
+              "b": 727.2819384505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              28
+            ]
+          }
+        ],
+        "orig": "codewithprogrammer@gmail.com",
+        "text": "codewithprogrammer@gmail.com"
+      },
+      {
+        "self_ref": "#/texts/4",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "checkbox_selected",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 210.74999775,
+              "t": 734.349023308955,
+              "r": 257.42139205945796,
+              "b": 727.2819384505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              10
+            ]
+          }
+        ],
+        "orig": "9870059553",
+        "text": "9870059553"
+      },
+      {
+        "self_ref": "#/texts/5",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "checkbox_selected",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 293.99999775000003,
+              "t": 734.349023308955,
+              "r": 337.09676380945797,
+              "b": 727.2819384505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "Surat, India",
+        "text": "Surat, India"
+      },
+      {
+        "self_ref": "#/texts/6",
+        "parent": {
+          "$ref": "#/groups/0"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "checkbox_selected",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 372.0,
+              "t": 734.349023308955,
+              "r": 500.37234130945797,
+              "b": 727.2819384505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              37
+            ]
+          }
+        ],
+        "orig": "https://www.linkedin.com/in/utk-patil",
+        "text": "https://www.linkedin.com/in/utk-patil"
+      },
+      {
+        "self_ref": "#/texts/7",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 700.6675749320899,
+              "r": 167.024293281084,
+              "b": 674.4126483886437,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              34
+            ]
+          }
+        ],
+        "orig": "WORK EXPERIENCE ASP .NET Developer",
+        "text": "WORK EXPERIENCE ASP .NET Developer",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/8",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 671.0644444874999,
+              "r": 186.83789436,
+              "b": 660.4638175311436,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              28
+            ]
+          }
+        ],
+        "orig": "Pulse Software Solutions LLC",
+        "text": "Pulse Software Solutions LLC"
+      },
+      {
+        "self_ref": "#/texts/9",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 655.876463966045,
+              "r": 82.31179414054199,
+              "b": 649.6927651290167,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "07/2021 - Present",
+        "text": "07/2021 - Present"
+      },
+      {
+        "self_ref": "#/texts/10",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 643.9771438160449,
+              "r": 71.92657864054199,
+              "b": 637.7934449790167,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              14
+            ]
+          }
+        ],
+        "orig": "Projects/Tasks",
+        "text": "Projects/Tasks"
+      },
+      {
+        "self_ref": "#/texts/11",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 633.7056564089551,
+              "r": 565.2888613094581,
+              "b": 617.4393528005377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              155
+            ]
+          }
+        ],
+        "orig": "● Team Locum (Healthcare Recruitment Agency): Migrated a Ruby on Rails project to ASP.NET Core, with R&D, and integrated MongoDB, Azure Blob, and Hangfire.",
+        "text": "Team Locum (Healthcare Recruitment Agency): Migrated a Ruby on Rails project to ASP.NET Core, with R&D, and integrated MongoDB, Azure Blob, and Hangfire.",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/12",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 613.3072164089551,
+              "r": 410.97645880945794,
+              "b": 606.2401315505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              88
+            ]
+          }
+        ],
+        "orig": "○ Migration from Ruby on Rails to ASP.NET Core , conducting R&D for seamless transition.",
+        "text": "Migration from Ruby on Rails to ASP.NET Core , conducting R&D for seamless transition.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/13",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 602.1080164089551,
+              "r": 469.208618509458,
+              "b": 595.0409315505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              105
+            ]
+          }
+        ],
+        "orig": "○ Managed database operations with MongoDB and handled static files via Azure Blob . File upload via FTP.",
+        "text": "Managed database operations with MongoDB and handled static files via Azure Blob . File upload via FTP.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/14",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 590.9087864089552,
+              "r": 481.31495380945796,
+              "b": 583.8417015505378,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              102
+            ]
+          }
+        ],
+        "orig": "○ Implemented Hangfire to automated emails (SendGrid API) and created webhooks for syncing with CARAS.",
+        "text": "Implemented Hangfire to automated emails (SendGrid API) and created webhooks for syncing with CARAS.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/15",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 579.7095664089552,
+              "r": 305.908291309458,
+              "b": 572.6424815505378,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              61
+            ]
+          }
+        ],
+        "orig": "○ Created a website and secured APIs for mobile applications.",
+        "text": "Created a website and secured APIs for mobile applications.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/16",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 568.5103764089552,
+              "r": 246.33762880945798,
+              "b": 561.4432915505378,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              43
+            ]
+          }
+        ],
+        "orig": "○ Send FCM notifications to mobile devices.",
+        "text": "Send FCM notifications to mobile devices.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/17",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 546.1119064089551,
+              "r": 343.561876309458,
+              "b": 539.0448215505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              80
+            ]
+          }
+        ],
+        "orig": "● Provide: Implemented role-based authorization and managed database operations.",
+        "text": "Provide: Implemented role-based authorization and managed database operations.",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/18",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 534.9127164089551,
+              "r": 470.712053809458,
+              "b": 527.8456315505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              110
+            ]
+          }
+        ],
+        "orig": "○ Set up role-based authorization and Azure B2C login for the website; handled static files using Azure Blob .",
+        "text": "Set up role-based authorization and Azure B2C login for the website; handled static files using Azure Blob .",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/19",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 523.7134664089551,
+              "r": 256.604941309458,
+              "b": 516.6463815505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              44
+            ]
+          }
+        ],
+        "orig": "○ Managed database operations using MS SQL .",
+        "text": "Managed database operations using MS SQL .",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/20",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 501.31506640895503,
+              "r": 301.786317709458,
+              "b": 494.2479815505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              67
+            ]
+          }
+        ],
+        "orig": "● BIVDA API: Developed secure APIs and managed database operations.",
+        "text": "BIVDA API: Developed secure APIs and managed database operations.",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/21",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 490.1158164089551,
+              "r": 389.346278809458,
+              "b": 483.04873155053775,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              83
+            ]
+          }
+        ],
+        "orig": "○ Created APIs and webhooks with JWT authorization , integrating third-party APIs .",
+        "text": "Created APIs and webhooks with JWT authorization , integrating third-party APIs .",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/22",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 478.91659640895506,
+              "r": 254.384453809458,
+              "b": 471.8495115505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              44
+            ]
+          }
+        ],
+        "orig": "○ Managed database operations using MS SQL .",
+        "text": "Managed database operations using MS SQL .",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/23",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 456.51815640895506,
+              "r": 346.792381309458,
+              "b": 449.45107155053773,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              87
+            ]
+          }
+        ],
+        "orig": "● Skull Unlimited: Integrated AI and email solutions to enhance operational efficiency.",
+        "text": "Skull Unlimited: Integrated AI and email solutions to enhance operational efficiency.",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/24",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 445.31890640895506,
+              "r": 259.676153809458,
+              "b": 438.2518215505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              48
+            ]
+          }
+        ],
+        "orig": "○ Integrated ChatGPT API to process Excel files.",
+        "text": "Integrated ChatGPT API to process Excel files.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/25",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 434.11974640895505,
+              "r": 285.708713809458,
+              "b": 427.0526615505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              52
+            ]
+          }
+        ],
+        "orig": "○ Used Azure Communication Email for email delivery.",
+        "text": "Used Azure Communication Email for email delivery.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/26",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 411.72125640895507,
+              "r": 343.952116309458,
+              "b": 404.65417155053774,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              81
+            ]
+          }
+        ],
+        "orig": "● Solomon Labs (CQM): Developed data upload and reporting tools for lab research.",
+        "text": "Solomon Labs (CQM): Developed data upload and reporting tools for lab research.",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/27",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 400.52209640895506,
+              "r": 481.8300763094579,
+              "b": 393.45501155053773,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              108
+            ]
+          }
+        ],
+        "orig": "○ Implemented bulk data upload via Excel and generated comparison reports using Chart.js and Highcharts.js .",
+        "text": "Implemented bulk data upload via Excel and generated comparison reports using Chart.js and Highcharts.js .",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/28",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 378.12359640895505,
+              "r": 364.247686309458,
+              "b": 371.0565115505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              87
+            ]
+          }
+        ],
+        "orig": "● CWD: Developed reporting tools and migrated ColdFusion functionality to ASP.NET Core.",
+        "text": "CWD: Developed reporting tools and migrated ColdFusion functionality to ASP.NET Core.",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/29",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 366.92443640895505,
+              "r": 542.484631309458,
+              "b": 359.8573515505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              124
+            ]
+          }
+        ],
+        "orig": "○ Migrated ColdFusion functionality to ASP.NET Core for generating monthly reports using Hangfire for background processing.",
+        "text": "Migrated ColdFusion functionality to ASP.NET Core for generating monthly reports using Hangfire for background processing.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/30",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 355.72518640895504,
+              "r": 296.573671309458,
+              "b": 348.6581015505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              55
+            ]
+          }
+        ],
+        "orig": "○ Performed manual deployments via IIS server using RDP",
+        "text": "Performed manual deployments via IIS server using RDP",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/31",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 333.32678640895506,
+              "r": 85.40841683825195,
+              "b": 326.2597015505378,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "● Loadchief:",
+        "text": "Loadchief:",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/32",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 322.1275664089551,
+              "r": 567.983716309458,
+              "b": 305.86120280053774,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              142
+            ]
+          }
+        ],
+        "orig": "○ Integrated AngularJS frontend, enhanced API layer, implemented FCM for multiple devices , and synced driver insurance credentials with A4DD.",
+        "text": "Integrated AngularJS frontend, enhanced API layer, implemented FCM for multiple devices , and synced driver insurance credentials with A4DD.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/33",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 290.52990640895496,
+              "r": 273.73214311325194,
+              "b": 283.4628215505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              59
+            ]
+          }
+        ],
+        "orig": "● Harrison Energy & Mechanical Resource Group (2 Projects):",
+        "text": "Harrison Energy & Mechanical Resource Group (2 Projects):",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/34",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 279.330686408955,
+              "r": 507.17164630945797,
+              "b": 272.2636015505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              119
+            ]
+          }
+        ],
+        "orig": "○ Developed drag-and-drop functionality in Angular and added tab functionality using the Tab key for editable controls.",
+        "text": "Developed drag-and-drop functionality in Angular and added tab functionality using the Tab key for editable controls.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/35",
+        "parent": {
+          "$ref": "#/groups/1"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 72.0,
+              "t": 268.1314064089552,
+              "r": 546.804916309458,
+              "b": 261.0643215505378,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              128
+            ]
+          }
+        ],
+        "orig": "○ Streamlined CRUD operations for manufacturers and fixed calculation errors for quote lines to enhance efficiency and accuracy.",
+        "text": "Streamlined CRUD operations for manufacturers and fixed calculation errors for quote lines to enhance efficiency and accuracy.",
+        "enumerated": false,
+        "marker": "○"
+      },
+      {
+        "self_ref": "#/texts/36",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 247.7992379320899,
+              "r": 78.39116678108398,
+              "b": 235.4318402580335,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "SKILLS",
+        "text": "SKILLS",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/37",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 229.40579381604493,
+              "r": 41.077327575,
+              "b": 223.22209497901667,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              6
+            ]
+          }
+        ],
+        "orig": "Skills",
+        "text": "Skills",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/38",
+        "parent": {
+          "$ref": "#/groups/2"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 219.1342764089551,
+              "r": 141.80598055945802,
+              "b": 212.0671915505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              23
+            ]
+          }
+        ],
+        "orig": "● Programming Language:",
+        "text": "Programming Language:",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/39",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 141.80381025,
+              "t": 219.1342764089551,
+              "r": 223.534681309458,
+              "b": 212.0671915505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              21
+            ]
+          }
+        ],
+        "orig": "C/C++, C#, JavaScript",
+        "text": "C/C++, C#, JavaScript"
+      },
+      {
+        "self_ref": "#/texts/40",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 207.93505640895512,
+              "r": 330.729526309458,
+              "b": 200.86797155053773,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              75
+            ]
+          }
+        ],
+        "orig": "● Frontend Technologies: HTML5, CSS3, jQuery, Bootstrap, AngularJS, Angular",
+        "text": "Frontend Technologies: HTML5, CSS3, jQuery, Bootstrap, AngularJS, Angular",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/41",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 196.73583640895515,
+              "r": 328.07499880945795,
+              "b": 189.66875155053776,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              71
+            ]
+          }
+        ],
+        "orig": "● Frameworks: ASP.NET Core, ASP.NET MVC, Entity Framework Core, SingleR",
+        "text": "Frameworks: ASP.NET Core, ASP.NET MVC, Entity Framework Core, SingleR",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/42",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 185.53661640895507,
+              "r": 252.44349130945795,
+              "b": 178.46953155053768,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              51
+            ]
+          }
+        ],
+        "orig": "● Databases: SQL Server, MySQL, PostgreSQL, MongoDB",
+        "text": "Databases: SQL Server, MySQL, PostgreSQL, MongoDB",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/43",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 174.33740640895508,
+              "r": 213.337186309458,
+              "b": 167.2703215505377,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              47
+            ]
+          }
+        ],
+        "orig": "● Version Control: Beanstalk, GitHub, Bitbucket",
+        "text": "Version Control: Beanstalk, GitHub, Bitbucket",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/44",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 163.1381864089551,
+              "r": 232.115851309458,
+              "b": 156.07110155053772,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              50
+            ]
+          }
+        ],
+        "orig": "● Cloud Platform: Microsoft Azure Blob, AWS Bucket",
+        "text": "Cloud Platform: Microsoft Azure Blob, AWS Bucket",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/45",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 151.93896640895514,
+              "r": 141.829395559458,
+              "b": 144.87188155053775,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              25
+            ]
+          }
+        ],
+        "orig": "● APIs: REST APIs, OAuth2",
+        "text": "APIs: REST APIs, OAuth2",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/46",
+        "parent": {
+          "$ref": "#/groups/3"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 27.0,
+              "t": 140.73974640895517,
+              "r": 278.327183809458,
+              "b": 133.67266155053778,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              63
+            ]
+          }
+        ],
+        "orig": "● Security: SSL/TLS, JWT, Identity Server, OWASP Best Practices",
+        "text": "Security: SSL/TLS, JWT, Identity Server, OWASP Best Practices",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/47",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 116.15810710708979,
+              "r": 110.77484528108398,
+              "b": 103.7907094330335,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "EDUCATION",
+        "text": "EDUCATION",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/48",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 97.76468381604491,
+              "r": 55.86910986596192,
+              "b": 91.58098497901676,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              9
+            ]
+          }
+        ],
+        "orig": "Education",
+        "text": "Education"
+      },
+      {
+        "self_ref": "#/texts/49",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 89.04882987354483,
+              "r": 220.28521273054199,
+              "b": 80.2149742974276,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              38
+            ]
+          }
+        ],
+        "orig": "Bachelor of Science (Computer Science)",
+        "text": "Bachelor of Science (Computer Science)",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/50",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 77.84413607395504,
+              "r": 301.052386309458,
+              "b": 70.77705121553777,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              72
+            ]
+          }
+        ],
+        "orig": "Shree Ramkrishna Institute of Comp. Education & Applied Science. (VNSGU)",
+        "text": "Shree Ramkrishna Institute of Comp. Education & Applied Science. (VNSGU)"
+      },
+      {
+        "self_ref": "#/texts/51",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 68.71712388854485,
+              "r": 81.54769461596192,
+              "b": 62.5334250515167,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "06/2017 - 07/2020",
+        "text": "06/2017 - 07/2020"
+      },
+      {
+        "self_ref": "#/texts/52",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 52.42692991604497,
+              "r": 323.735930230542,
+              "b": 43.593074339927625,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              58
+            ]
+          }
+        ],
+        "orig": "Master of Science (Information & Communication Technology)",
+        "text": "Master of Science (Information & Communication Technology)"
+      },
+      {
+        "self_ref": "#/texts/53",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 41.22219607395505,
+              "r": 270.70128130945795,
+              "b": 34.15511121553777,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              66
+            ]
+          }
+        ],
+        "orig": "J.P. Dawer institute of Information Science and Technology (VNSGU)",
+        "text": "J.P. Dawer institute of Information Science and Technology (VNSGU)"
+      },
+      {
+        "self_ref": "#/texts/54",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 291.0,
+              "t": 655.876463966045,
+              "r": 550.311734140542,
+              "b": 649.6927651290167,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "Surat, India",
+        "text": "Surat, India"
+      },
+      {
+        "self_ref": "#/texts/55",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "furniture",
+        "label": "page_footer",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 24.75,
+              "t": 32.09524388854493,
+              "r": 83.490352390542,
+              "b": 25.911545051516782,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              17
+            ]
+          }
+        ],
+        "orig": "06/2021 - 06/2023",
+        "text": "06/2021 - 06/2023"
+      },
+      {
+        "self_ref": "#/texts/56",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "section_header",
+        "prov": [
+          {
+            "page_no": 2,
+            "bbox": {
+              "l": 24.75,
+              "t": 819.8896471920898,
+              "r": 135.9275128765039,
+              "b": 807.5222495180335,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "ACHIEVEMENTS",
+        "text": "ACHIEVEMENTS",
+        "level": 1
+      },
+      {
+        "self_ref": "#/texts/57",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "text",
+        "prov": [
+          {
+            "page_no": 2,
+            "bbox": {
+              "l": 24.75,
+              "t": 805.196190888545,
+              "r": 70.635662140542,
+              "b": 799.0124920515168,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              12
+            ]
+          }
+        ],
+        "orig": "Achievements",
+        "text": "Achievements"
+      },
+      {
+        "self_ref": "#/texts/58",
+        "parent": {
+          "$ref": "#/groups/4"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 2,
+            "bbox": {
+              "l": 27.0,
+              "t": 796.9246826439552,
+              "r": 489.09012130945797,
+              "b": 789.8575977855378,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              118
+            ]
+          }
+        ],
+        "orig": "● 1st Prize Winner in Spring Puzzle at the Impetus 2019 Tech Competition , Shri Shambhu Bhai V. Patel College (VNSGU).",
+        "text": "1st Prize Winner in Spring Puzzle at the Impetus 2019 Tech Competition , Shri Shambhu Bhai V. Patel College (VNSGU).",
+        "enumerated": false,
+        "marker": "●"
+      },
+      {
+        "self_ref": "#/texts/59",
+        "parent": {
+          "$ref": "#/groups/4"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "list_item",
+        "prov": [
+          {
+            "page_no": 2,
+            "bbox": {
+              "l": 27.0,
+              "t": 787.1121826439552,
+              "r": 364.095848809458,
+              "b": 780.0450977855378,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              85
+            ]
+          }
+        ],
+        "orig": "● 3rd Prize Winner in Mind Storm 2019 Tech Competition , C. B. Patel College (VNSGU).",
+        "text": "3rd Prize Winner in Mind Storm 2019 Tech Competition , C. B. Patel College (VNSGU).",
+        "enumerated": false,
+        "marker": "●"
+      }
+    ],
+    "pictures": [
+      {
+        "self_ref": "#/pictures/0",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [
+          {
+            "$ref": "#/texts/0"
+          },
+          {
+            "$ref": "#/texts/1"
+          }
+        ],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 23.944236755371094,
+              "t": 817.3778285980225,
+              "r": 158.6862030029297,
+              "b": 778.7036781311035,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      },
+      {
+        "self_ref": "#/pictures/1",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 43.41325759887695,
+              "t": 737.0148696899414,
+              "r": 58.11497116088867,
+              "b": 726.2472076416016,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      },
+      {
+        "self_ref": "#/pictures/2",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 279.63897705078125,
+              "t": 738.4859466552734,
+              "r": 288.1253967285156,
+              "b": 725.4956130981445,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      },
+      {
+        "self_ref": "#/pictures/3",
+        "parent": {
+          "$ref": "#/body"
+        },
+        "children": [],
+        "content_layer": "body",
+        "label": "picture",
+        "prov": [
+          {
+            "page_no": 1,
+            "bbox": {
+              "l": 354.6188659667969,
+              "t": 737.3664093017578,
+              "r": 366.2069396972656,
+              "b": 726.036247253418,
+              "coord_origin": "BOTTOMLEFT"
+            },
+            "charspan": [
+              0,
+              0
+            ]
+          }
+        ],
+        "captions": [],
+        "references": [],
+        "footnotes": [],
+        "annotations": []
+      }
+    ],
+    "tables": [],
+    "key_value_items": [],
+    "form_items": [],
+    "pages": {
+      "1": {
+        "size": {
+          "width": 596.0,
+          "height": 842.0
+        },
+        "page_no": 1
+      },
+      "2": {
+        "size": {
+          "width": 596.0,
+          "height": 842.0
+        },
+        "page_no": 2
+      }
+    }
+  },
+  "dynamic_profile": null,
+  "match_analysis": {
+    "primary_department": "CIS Team",
+    "best_match": {
+      "job_id": "1066",
+      "job_title": "Software Developer",
+      "department": "CIS Team",
+      "vacancy_id": 1066,
+      "job_profile_id": 163,
+      "company_id": 1,
+      "department_id": 9,
+      "department_name": "CIS Team",
+      "location_id": 8,
+      "score": 78.6,
+      "overall_score": 78.6,
+      "role_score": 50.0,
+      "skills_score": 100.0,
+      "experience_score": 100.0,
+      "education_score": 0.0,
+      "domain_score": 50.0,
+      "technology_score": 0.0,
+      "certification_score": 0.0,
+      "responsibilities_score": 0.0,
+      "coverage": 0.7,
+      "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+      "classification": "HIGH",
+      "recommendation": "Strong candidate — proceed to interview.",
+      "matched_skills": [
+        ".net Developer"
+      ],
+      "missing_skills": [],
+      "matched_keywords": [
+        ".net Developer"
+      ],
+      "missing_keywords": [],
+      "mandatory_requirements": [
+        {
+          "requirement_id": "req_skill_.net_developer",
+          "description": "Skill: .net Developer",
+          "tier": "MANDATORY",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV contains skill: '.net Developer'",
+            "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "preferred_requirements": [
+        {
+          "requirement_id": "pref_keyword_.net_developer",
+          "description": "Preferred Keyword: .net Developer",
+          "tier": "PREFERRED",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+            "vacancy_evidence": "Preferred Keyword: .net Developer",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "optional_requirements": [],
+      "matched_criteria": [
+        "Mandatory Skill: .net Developer",
+        "Preferred Keyword: .net Developer"
+      ],
+      "missing_criteria": [],
+      "evidence": {
+        "req_skill_.net_developer": {
+          "cv_evidence": "CV contains skill: '.net Developer'",
+          "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_.net_developer": {
+          "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+          "vacancy_evidence": "Preferred Keyword: .net Developer",
+          "confidence_score": 1.0
+        }
+      },
+      "mandatory_failures": [],
+      "confidence": 1.0,
+      "hr_review_required": false,
+      "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+      "career_transition_detected": true,
+      "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Software Developer'.",
+      "llm_reason": "",
+      "inferred_skills": []
+    },
+    "suitable_openings": [
+      {
+        "job_id": "1066",
+        "job_title": "Software Developer",
+        "department": "CIS Team",
+        "vacancy_id": 1066,
+        "job_profile_id": 163,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 78.6,
+        "overall_score": 78.6,
+        "role_score": 50.0,
+        "skills_score": 100.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+        "classification": "HIGH",
+        "recommendation": "Strong candidate — proceed to interview.",
+        "matched_skills": [
+          ".net Developer"
+        ],
+        "missing_skills": [],
+        "matched_keywords": [
+          ".net Developer"
+        ],
+        "missing_keywords": [],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_.net_developer",
+            "description": "Skill: .net Developer",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: '.net Developer'",
+              "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_.net_developer",
+            "description": "Preferred Keyword: .net Developer",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+              "vacancy_evidence": "Preferred Keyword: .net Developer",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: .net Developer",
+          "Preferred Keyword: .net Developer"
+        ],
+        "missing_criteria": [],
+        "evidence": {
+          "req_skill_.net_developer": {
+            "cv_evidence": "CV contains skill: '.net Developer'",
+            "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_.net_developer": {
+            "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+            "vacancy_evidence": "Preferred Keyword: .net Developer",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [],
+        "confidence": 1.0,
+        "hr_review_required": false,
+        "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Software Developer'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1334",
+        "job_title": "Software Developer",
+        "department": "CIS Team",
+        "vacancy_id": 1334,
+        "job_profile_id": 163,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 24.3,
+        "overall_score": 24.3,
+        "role_score": 50.0,
+        "skills_score": 60.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #2 due to lower score (24.3% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [
+          ".NET Core",
+          "APIs",
+          "SQL"
+        ],
+        "missing_skills": [
+          "LINQ",
+          "ADO.NET"
+        ],
+        "matched_keywords": [
+          ".NET Core",
+          "APIs",
+          "SQL"
+        ],
+        "missing_keywords": [
+          "LINQ",
+          "ADO.NET"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_.net_core",
+            "description": "Skill: .NET Core",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: '.NET Core'",
+              "vacancy_evidence": "Mandatory Skill Requirement: .NET Core",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_skill_linq",
+            "description": "Skill: LINQ",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'LINQ'",
+              "vacancy_evidence": "Mandatory Skill Requirement: LINQ",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'LINQ' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_ado.net",
+            "description": "Skill: ADO.NET",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'ADO.NET'",
+              "vacancy_evidence": "Mandatory Skill Requirement: ADO.NET",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'ADO.NET' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_apis",
+            "description": "Skill: APIs",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'APIs'",
+              "vacancy_evidence": "Mandatory Skill Requirement: APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_skill_sql",
+            "description": "Skill: SQL",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'SQL'",
+              "vacancy_evidence": "Mandatory Skill Requirement: SQL",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_.net_core",
+            "description": "Preferred Keyword: .NET Core",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: '.NET Core'",
+              "vacancy_evidence": "Preferred Keyword: .NET Core",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "pref_keyword_linq",
+            "description": "Preferred Keyword: LINQ",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'LINQ'",
+              "vacancy_evidence": "Preferred Keyword: LINQ",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'LINQ' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_ado.net",
+            "description": "Preferred Keyword: ADO.NET",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'ADO.NET'",
+              "vacancy_evidence": "Preferred Keyword: ADO.NET",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'ADO.NET' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_apis",
+            "description": "Preferred Keyword: APIs",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'APIs'",
+              "vacancy_evidence": "Preferred Keyword: APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "pref_keyword_sql",
+            "description": "Preferred Keyword: SQL",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'SQL'",
+              "vacancy_evidence": "Preferred Keyword: SQL",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: .NET Core",
+          "Mandatory Skill: APIs",
+          "Mandatory Skill: SQL",
+          "Preferred Keyword: .NET Core",
+          "Preferred Keyword: APIs",
+          "Preferred Keyword: SQL"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: LINQ",
+          "Mandatory Skill: ADO.NET",
+          "Preferred Keyword: LINQ",
+          "Preferred Keyword: ADO.NET"
+        ],
+        "evidence": {
+          "req_skill_.net_core": {
+            "cv_evidence": "CV contains skill: '.NET Core'",
+            "vacancy_evidence": "Mandatory Skill Requirement: .NET Core",
+            "confidence_score": 1.0
+          },
+          "req_skill_linq": {
+            "cv_evidence": "CV missing explicit mention of skill: 'LINQ'",
+            "vacancy_evidence": "Mandatory Skill Requirement: LINQ",
+            "confidence_score": 1.0
+          },
+          "req_skill_ado.net": {
+            "cv_evidence": "CV missing explicit mention of skill: 'ADO.NET'",
+            "vacancy_evidence": "Mandatory Skill Requirement: ADO.NET",
+            "confidence_score": 1.0
+          },
+          "req_skill_apis": {
+            "cv_evidence": "CV contains skill: 'APIs'",
+            "vacancy_evidence": "Mandatory Skill Requirement: APIs",
+            "confidence_score": 1.0
+          },
+          "req_skill_sql": {
+            "cv_evidence": "CV contains skill: 'SQL'",
+            "vacancy_evidence": "Mandatory Skill Requirement: SQL",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_.net_core": {
+            "cv_evidence": "CV mentions preferred keyword: '.NET Core'",
+            "vacancy_evidence": "Preferred Keyword: .NET Core",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_linq": {
+            "cv_evidence": "CV missing preferred keyword: 'LINQ'",
+            "vacancy_evidence": "Preferred Keyword: LINQ",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_ado.net": {
+            "cv_evidence": "CV missing preferred keyword: 'ADO.NET'",
+            "vacancy_evidence": "Preferred Keyword: ADO.NET",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_apis": {
+            "cv_evidence": "CV mentions preferred keyword: 'APIs'",
+            "vacancy_evidence": "Preferred Keyword: APIs",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_sql": {
+            "cv_evidence": "CV mentions preferred keyword: 'SQL'",
+            "vacancy_evidence": "Preferred Keyword: SQL",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_linq",
+            "description": "Skill: LINQ",
+            "reason": "Mandatory skill 'LINQ' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_ado.net",
+            "description": "Skill: ADO.NET",
+            "reason": "Mandatory skill 'ADO.NET' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: LINQ (Mandatory skill 'LINQ' is not present in CV.); Skill: ADO.NET (Mandatory skill 'ADO.NET' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Software Developer'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1064",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 1064,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #3 due to lower score (2.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Plant Commission' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process Analysis' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_plant_commission",
+            "description": "Preferred Keyword: Plant Commission",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+              "vacancy_evidence": "Preferred Keyword: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Plant Commission' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_analysis",
+            "description": "Preferred Keyword: Process Analysis",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+              "vacancy_evidence": "Preferred Keyword: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process Analysis' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Plant Commission",
+          "Mandatory Skill: Process Analysis",
+          "Preferred Keyword: Plant Commission",
+          "Preferred Keyword: Process Analysis"
+        ],
+        "evidence": {
+          "req_skill_plant_commission": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_analysis": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_plant_commission": {
+            "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+            "vacancy_evidence": "Preferred Keyword: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_analysis": {
+            "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+            "vacancy_evidence": "Preferred Keyword: Process Analysis",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "reason": "Mandatory skill 'Plant Commission' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "reason": "Mandatory skill 'Process Analysis' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Plant Commission (Mandatory skill 'Plant Commission' is not present in CV.); Skill: Process Analysis (Mandatory skill 'Process Analysis' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "921",
+        "job_title": "Head Operation - Production",
+        "department": "Production Team - 1 (Rakesh Modi)",
+        "vacancy_id": 921,
+        "job_profile_id": 291,
+        "company_id": 1,
+        "department_id": 19,
+        "department_name": "Production Team - 1 (Rakesh Modi)",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #4 due to lower score (2.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+              "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'having knowledge about Production' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process & Safety' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_having_knowledge_about_production",
+            "description": "Preferred Keyword: having knowledge about Production",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+              "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'having knowledge about Production' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_&_safety",
+            "description": "Preferred Keyword: Process & Safety",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+              "vacancy_evidence": "Preferred Keyword: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process & Safety' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: having knowledge about Production",
+          "Mandatory Skill: Process & Safety",
+          "Preferred Keyword: having knowledge about Production",
+          "Preferred Keyword: Process & Safety"
+        ],
+        "evidence": {
+          "req_skill_having_knowledge_about_production": {
+            "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+            "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_&_safety": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_having_knowledge_about_production": {
+            "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+            "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_&_safety": {
+            "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+            "vacancy_evidence": "Preferred Keyword: Process & Safety",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "reason": "Mandatory skill 'having knowledge about Production' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "reason": "Mandatory skill 'Process & Safety' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: having knowledge about Production (Mandatory skill 'having knowledge about Production' is not present in CV.); Skill: Process & Safety (Mandatory skill 'Process & Safety' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Head Operation - Production'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "995",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 995,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 1,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Project work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+              "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'New Process' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_project_work",
+            "description": "Preferred Keyword: Project work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Project work'",
+              "vacancy_evidence": "Preferred Keyword: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Project work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_work",
+            "description": "Preferred Keyword: Process work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process work'",
+              "vacancy_evidence": "Preferred Keyword: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_new_process",
+            "description": "Preferred Keyword: New Process",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'New Process'",
+              "vacancy_evidence": "Preferred Keyword: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'New Process' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Project work",
+          "Mandatory Skill: Process work",
+          "Mandatory Skill: New Process",
+          "Preferred Keyword: Project work",
+          "Preferred Keyword: Process work",
+          "Preferred Keyword: New Process"
+        ],
+        "evidence": {
+          "req_skill_project_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+            "confidence_score": 1.0
+          },
+          "req_skill_new_process": {
+            "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+            "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_project_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Project work'",
+            "vacancy_evidence": "Preferred Keyword: Project work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Process work'",
+            "vacancy_evidence": "Preferred Keyword: Process work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_new_process": {
+            "cv_evidence": "CV missing preferred keyword: 'New Process'",
+            "vacancy_evidence": "Preferred Keyword: New Process",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "reason": "Mandatory skill 'Project work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "reason": "Mandatory skill 'Process work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "reason": "Mandatory skill 'New Process' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Project work (Mandatory skill 'Project work' is not present in CV.); Skill: Process work (Mandatory skill 'Process work' is not present in CV.); Skill: New Process (Mandatory skill 'New Process' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      }
+    ],
+    "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+    "llm_skipped": true
+  },
+  "enriched_match_analysis": {
+    "primary_department": "CIS Team",
+    "best_match": {
+      "job_id": "1066",
+      "job_title": "Software Developer",
+      "department": "CIS Team",
+      "vacancy_id": 1066,
+      "job_profile_id": 163,
+      "company_id": 1,
+      "department_id": 9,
+      "department_name": "CIS Team",
+      "location_id": 8,
+      "score": 78.6,
+      "overall_score": 78.6,
+      "role_score": 50.0,
+      "skills_score": 100.0,
+      "experience_score": 100.0,
+      "education_score": 0.0,
+      "domain_score": 50.0,
+      "technology_score": 0.0,
+      "certification_score": 0.0,
+      "responsibilities_score": 0.0,
+      "coverage": 0.7,
+      "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+      "classification": "HIGH",
+      "recommendation": "Strong candidate — proceed to interview.",
+      "matched_skills": [
+        ".net Developer"
+      ],
+      "missing_skills": [],
+      "matched_keywords": [
+        ".net Developer"
+      ],
+      "missing_keywords": [],
+      "mandatory_requirements": [
+        {
+          "requirement_id": "req_skill_.net_developer",
+          "description": "Skill: .net Developer",
+          "tier": "MANDATORY",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV contains skill: '.net Developer'",
+            "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "preferred_requirements": [
+        {
+          "requirement_id": "pref_keyword_.net_developer",
+          "description": "Preferred Keyword: .net Developer",
+          "tier": "PREFERRED",
+          "status": "SATISFIED",
+          "evidence": {
+            "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+            "vacancy_evidence": "Preferred Keyword: .net Developer",
+            "confidence_score": 1.0
+          },
+          "failure_reason": null
+        }
+      ],
+      "optional_requirements": [],
+      "matched_criteria": [
+        "Mandatory Skill: .net Developer",
+        "Preferred Keyword: .net Developer"
+      ],
+      "missing_criteria": [],
+      "evidence": {
+        "req_skill_.net_developer": {
+          "cv_evidence": "CV contains skill: '.net Developer'",
+          "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+          "confidence_score": 1.0
+        },
+        "pref_keyword_.net_developer": {
+          "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+          "vacancy_evidence": "Preferred Keyword: .net Developer",
+          "confidence_score": 1.0
+        }
+      },
+      "mandatory_failures": [],
+      "confidence": 1.0,
+      "hr_review_required": false,
+      "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+      "career_transition_detected": true,
+      "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Software Developer'.",
+      "llm_reason": "",
+      "inferred_skills": []
+    },
+    "suitable_openings": [
+      {
+        "job_id": "1066",
+        "job_title": "Software Developer",
+        "department": "CIS Team",
+        "vacancy_id": 1066,
+        "job_profile_id": 163,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 78.6,
+        "overall_score": 78.6,
+        "role_score": 50.0,
+        "skills_score": 100.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #1 with highest verified score of 78.6%.",
+        "classification": "HIGH",
+        "recommendation": "Strong candidate — proceed to interview.",
+        "matched_skills": [
+          ".net Developer"
+        ],
+        "missing_skills": [],
+        "matched_keywords": [
+          ".net Developer"
+        ],
+        "missing_keywords": [],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_.net_developer",
+            "description": "Skill: .net Developer",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: '.net Developer'",
+              "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_.net_developer",
+            "description": "Preferred Keyword: .net Developer",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+              "vacancy_evidence": "Preferred Keyword: .net Developer",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: .net Developer",
+          "Preferred Keyword: .net Developer"
+        ],
+        "missing_criteria": [],
+        "evidence": {
+          "req_skill_.net_developer": {
+            "cv_evidence": "CV contains skill: '.net Developer'",
+            "vacancy_evidence": "Mandatory Skill Requirement: .net Developer",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_.net_developer": {
+            "cv_evidence": "CV mentions preferred keyword: '.net Developer'",
+            "vacancy_evidence": "Preferred Keyword: .net Developer",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [],
+        "confidence": 1.0,
+        "hr_review_required": false,
+        "reason": "All mandatory requirements satisfied. Overall match score is 78.6%.",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Software Developer'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1334",
+        "job_title": "Software Developer",
+        "department": "CIS Team",
+        "vacancy_id": 1334,
+        "job_profile_id": 163,
+        "company_id": 1,
+        "department_id": 9,
+        "department_name": "CIS Team",
+        "location_id": 8,
+        "score": 24.3,
+        "overall_score": 24.3,
+        "role_score": 50.0,
+        "skills_score": 60.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #2 due to lower score (24.3% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [
+          ".NET Core",
+          "APIs",
+          "SQL"
+        ],
+        "missing_skills": [
+          "LINQ",
+          "ADO.NET"
+        ],
+        "matched_keywords": [
+          ".NET Core",
+          "APIs",
+          "SQL"
+        ],
+        "missing_keywords": [
+          "LINQ",
+          "ADO.NET"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_.net_core",
+            "description": "Skill: .NET Core",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: '.NET Core'",
+              "vacancy_evidence": "Mandatory Skill Requirement: .NET Core",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_skill_linq",
+            "description": "Skill: LINQ",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'LINQ'",
+              "vacancy_evidence": "Mandatory Skill Requirement: LINQ",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'LINQ' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_ado.net",
+            "description": "Skill: ADO.NET",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'ADO.NET'",
+              "vacancy_evidence": "Mandatory Skill Requirement: ADO.NET",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'ADO.NET' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_apis",
+            "description": "Skill: APIs",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'APIs'",
+              "vacancy_evidence": "Mandatory Skill Requirement: APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "req_skill_sql",
+            "description": "Skill: SQL",
+            "tier": "MANDATORY",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV contains skill: 'SQL'",
+              "vacancy_evidence": "Mandatory Skill Requirement: SQL",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_.net_core",
+            "description": "Preferred Keyword: .NET Core",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: '.NET Core'",
+              "vacancy_evidence": "Preferred Keyword: .NET Core",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "pref_keyword_linq",
+            "description": "Preferred Keyword: LINQ",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'LINQ'",
+              "vacancy_evidence": "Preferred Keyword: LINQ",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'LINQ' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_ado.net",
+            "description": "Preferred Keyword: ADO.NET",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'ADO.NET'",
+              "vacancy_evidence": "Preferred Keyword: ADO.NET",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'ADO.NET' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_apis",
+            "description": "Preferred Keyword: APIs",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'APIs'",
+              "vacancy_evidence": "Preferred Keyword: APIs",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          },
+          {
+            "requirement_id": "pref_keyword_sql",
+            "description": "Preferred Keyword: SQL",
+            "tier": "PREFERRED",
+            "status": "SATISFIED",
+            "evidence": {
+              "cv_evidence": "CV mentions preferred keyword: 'SQL'",
+              "vacancy_evidence": "Preferred Keyword: SQL",
+              "confidence_score": 1.0
+            },
+            "failure_reason": null
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [
+          "Mandatory Skill: .NET Core",
+          "Mandatory Skill: APIs",
+          "Mandatory Skill: SQL",
+          "Preferred Keyword: .NET Core",
+          "Preferred Keyword: APIs",
+          "Preferred Keyword: SQL"
+        ],
+        "missing_criteria": [
+          "Mandatory Skill: LINQ",
+          "Mandatory Skill: ADO.NET",
+          "Preferred Keyword: LINQ",
+          "Preferred Keyword: ADO.NET"
+        ],
+        "evidence": {
+          "req_skill_.net_core": {
+            "cv_evidence": "CV contains skill: '.NET Core'",
+            "vacancy_evidence": "Mandatory Skill Requirement: .NET Core",
+            "confidence_score": 1.0
+          },
+          "req_skill_linq": {
+            "cv_evidence": "CV missing explicit mention of skill: 'LINQ'",
+            "vacancy_evidence": "Mandatory Skill Requirement: LINQ",
+            "confidence_score": 1.0
+          },
+          "req_skill_ado.net": {
+            "cv_evidence": "CV missing explicit mention of skill: 'ADO.NET'",
+            "vacancy_evidence": "Mandatory Skill Requirement: ADO.NET",
+            "confidence_score": 1.0
+          },
+          "req_skill_apis": {
+            "cv_evidence": "CV contains skill: 'APIs'",
+            "vacancy_evidence": "Mandatory Skill Requirement: APIs",
+            "confidence_score": 1.0
+          },
+          "req_skill_sql": {
+            "cv_evidence": "CV contains skill: 'SQL'",
+            "vacancy_evidence": "Mandatory Skill Requirement: SQL",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_.net_core": {
+            "cv_evidence": "CV mentions preferred keyword: '.NET Core'",
+            "vacancy_evidence": "Preferred Keyword: .NET Core",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_linq": {
+            "cv_evidence": "CV missing preferred keyword: 'LINQ'",
+            "vacancy_evidence": "Preferred Keyword: LINQ",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_ado.net": {
+            "cv_evidence": "CV missing preferred keyword: 'ADO.NET'",
+            "vacancy_evidence": "Preferred Keyword: ADO.NET",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_apis": {
+            "cv_evidence": "CV mentions preferred keyword: 'APIs'",
+            "vacancy_evidence": "Preferred Keyword: APIs",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_sql": {
+            "cv_evidence": "CV mentions preferred keyword: 'SQL'",
+            "vacancy_evidence": "Preferred Keyword: SQL",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_linq",
+            "description": "Skill: LINQ",
+            "reason": "Mandatory skill 'LINQ' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_ado.net",
+            "description": "Skill: ADO.NET",
+            "reason": "Mandatory skill 'ADO.NET' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: LINQ (Mandatory skill 'LINQ' is not present in CV.); Skill: ADO.NET (Mandatory skill 'ADO.NET' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Software Developer'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "1064",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 1064,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #3 due to lower score (2.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Plant Commission",
+          "Process Analysis"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Plant Commission' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process Analysis' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_plant_commission",
+            "description": "Preferred Keyword: Plant Commission",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+              "vacancy_evidence": "Preferred Keyword: Plant Commission",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Plant Commission' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_analysis",
+            "description": "Preferred Keyword: Process Analysis",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+              "vacancy_evidence": "Preferred Keyword: Process Analysis",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process Analysis' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Plant Commission",
+          "Mandatory Skill: Process Analysis",
+          "Preferred Keyword: Plant Commission",
+          "Preferred Keyword: Process Analysis"
+        ],
+        "evidence": {
+          "req_skill_plant_commission": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Plant Commission'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_analysis": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process Analysis'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process Analysis",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_plant_commission": {
+            "cv_evidence": "CV missing preferred keyword: 'Plant Commission'",
+            "vacancy_evidence": "Preferred Keyword: Plant Commission",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_analysis": {
+            "cv_evidence": "CV missing preferred keyword: 'Process Analysis'",
+            "vacancy_evidence": "Preferred Keyword: Process Analysis",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_plant_commission",
+            "description": "Skill: Plant Commission",
+            "reason": "Mandatory skill 'Plant Commission' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_analysis",
+            "description": "Skill: Process Analysis",
+            "reason": "Mandatory skill 'Process Analysis' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Plant Commission (Mandatory skill 'Plant Commission' is not present in CV.); Skill: Process Analysis (Mandatory skill 'Process Analysis' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "921",
+        "job_title": "Head Operation - Production",
+        "department": "Production Team - 1 (Rakesh Modi)",
+        "vacancy_id": 921,
+        "job_profile_id": 291,
+        "company_id": 1,
+        "department_id": 19,
+        "department_name": "Production Team - 1 (Rakesh Modi)",
+        "location_id": 2,
+        "score": 2.9,
+        "overall_score": 2.9,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #4 due to lower score (2.9% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "having knowledge about Production",
+          "Process & Safety"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+              "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'having knowledge about Production' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process & Safety' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_having_knowledge_about_production",
+            "description": "Preferred Keyword: having knowledge about Production",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+              "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'having knowledge about Production' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_&_safety",
+            "description": "Preferred Keyword: Process & Safety",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+              "vacancy_evidence": "Preferred Keyword: Process & Safety",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process & Safety' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: having knowledge about Production",
+          "Mandatory Skill: Process & Safety",
+          "Preferred Keyword: having knowledge about Production",
+          "Preferred Keyword: Process & Safety"
+        ],
+        "evidence": {
+          "req_skill_having_knowledge_about_production": {
+            "cv_evidence": "CV missing explicit mention of skill: 'having knowledge about Production'",
+            "vacancy_evidence": "Mandatory Skill Requirement: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_&_safety": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process & Safety'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process & Safety",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_having_knowledge_about_production": {
+            "cv_evidence": "CV missing preferred keyword: 'having knowledge about Production'",
+            "vacancy_evidence": "Preferred Keyword: having knowledge about Production",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_&_safety": {
+            "cv_evidence": "CV missing preferred keyword: 'Process & Safety'",
+            "vacancy_evidence": "Preferred Keyword: Process & Safety",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_having_knowledge_about_production",
+            "description": "Skill: having knowledge about Production",
+            "reason": "Mandatory skill 'having knowledge about Production' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_&_safety",
+            "description": "Skill: Process & Safety",
+            "reason": "Mandatory skill 'Process & Safety' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: having knowledge about Production (Mandatory skill 'having knowledge about Production' is not present in CV.); Skill: Process & Safety (Mandatory skill 'Process & Safety' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Head Operation - Production'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      },
+      {
+        "job_id": "995",
+        "job_title": "Engineer (Process and Project)",
+        "department": "Process & Project Team",
+        "vacancy_id": 995,
+        "job_profile_id": 277,
+        "company_id": 1,
+        "department_id": 32,
+        "department_name": "Process & Project Team",
+        "location_id": 1,
+        "score": 0.0,
+        "overall_score": 0.0,
+        "role_score": 50.0,
+        "skills_score": 0.0,
+        "experience_score": 100.0,
+        "education_score": 0.0,
+        "domain_score": 50.0,
+        "technology_score": 0.0,
+        "certification_score": 0.0,
+        "responsibilities_score": 0.0,
+        "coverage": 0.7,
+        "ranking_reason": "Ranked #5 due to lower score (0.0% vs top 78.6%).",
+        "classification": "LOW",
+        "recommendation": "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        "matched_skills": [],
+        "missing_skills": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "matched_keywords": [],
+        "missing_keywords": [
+          "Project work",
+          "Process work",
+          "New Process"
+        ],
+        "mandatory_requirements": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Project work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+              "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'Process work' is not present in CV."
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "tier": "MANDATORY",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+              "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Mandatory skill 'New Process' is not present in CV."
+          }
+        ],
+        "preferred_requirements": [
+          {
+            "requirement_id": "pref_keyword_project_work",
+            "description": "Preferred Keyword: Project work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Project work'",
+              "vacancy_evidence": "Preferred Keyword: Project work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Project work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_process_work",
+            "description": "Preferred Keyword: Process work",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'Process work'",
+              "vacancy_evidence": "Preferred Keyword: Process work",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'Process work' not mentioned in CV."
+          },
+          {
+            "requirement_id": "pref_keyword_new_process",
+            "description": "Preferred Keyword: New Process",
+            "tier": "PREFERRED",
+            "status": "FAILED",
+            "evidence": {
+              "cv_evidence": "CV missing preferred keyword: 'New Process'",
+              "vacancy_evidence": "Preferred Keyword: New Process",
+              "confidence_score": 1.0
+            },
+            "failure_reason": "Preferred keyword 'New Process' not mentioned in CV."
+          }
+        ],
+        "optional_requirements": [],
+        "matched_criteria": [],
+        "missing_criteria": [
+          "Mandatory Skill: Project work",
+          "Mandatory Skill: Process work",
+          "Mandatory Skill: New Process",
+          "Preferred Keyword: Project work",
+          "Preferred Keyword: Process work",
+          "Preferred Keyword: New Process"
+        ],
+        "evidence": {
+          "req_skill_project_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Project work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Project work",
+            "confidence_score": 1.0
+          },
+          "req_skill_process_work": {
+            "cv_evidence": "CV missing explicit mention of skill: 'Process work'",
+            "vacancy_evidence": "Mandatory Skill Requirement: Process work",
+            "confidence_score": 1.0
+          },
+          "req_skill_new_process": {
+            "cv_evidence": "CV missing explicit mention of skill: 'New Process'",
+            "vacancy_evidence": "Mandatory Skill Requirement: New Process",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_project_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Project work'",
+            "vacancy_evidence": "Preferred Keyword: Project work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_process_work": {
+            "cv_evidence": "CV missing preferred keyword: 'Process work'",
+            "vacancy_evidence": "Preferred Keyword: Process work",
+            "confidence_score": 1.0
+          },
+          "pref_keyword_new_process": {
+            "cv_evidence": "CV missing preferred keyword: 'New Process'",
+            "vacancy_evidence": "Preferred Keyword: New Process",
+            "confidence_score": 1.0
+          }
+        },
+        "mandatory_failures": [
+          {
+            "requirement_id": "req_skill_project_work",
+            "description": "Skill: Project work",
+            "reason": "Mandatory skill 'Project work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_process_work",
+            "description": "Skill: Process work",
+            "reason": "Mandatory skill 'Process work' is not present in CV.",
+            "score_impact": 20.0
+          },
+          {
+            "requirement_id": "req_skill_new_process",
+            "description": "Skill: New Process",
+            "reason": "Mandatory skill 'New Process' is not present in CV.",
+            "score_impact": 20.0
+          }
+        ],
+        "confidence": 1.0,
+        "hr_review_required": true,
+        "reason": "Mandatory requirement failure(s): Skill: Project work (Mandatory skill 'Project work' is not present in CV.); Skill: Process work (Mandatory skill 'Process work' is not present in CV.); Skill: New Process (Mandatory skill 'New Process' is not present in CV.)",
+        "career_transition_detected": true,
+        "career_transition_note": "Dynamic career transition detected: Current role 'WORK EXPERIENCE ASP .NET Developer' to Target role 'Engineer (Process and Project)'.",
+        "llm_reason": "",
+        "inferred_skills": []
+      }
+    ],
+    "rejection_policy_note": "Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
+    "llm_skipped": true
+  }
+}

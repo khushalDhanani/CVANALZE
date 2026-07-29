@@ -43,6 +43,7 @@ export function useCvUpload() {
               setEnrichedResult(res as EnrichedCandidateAnalysis);
               setUploading(false);
               setStatusMessage('Enriched analysis complete!');
+              setTimeout(() => setStatusMessage(null), 3000);
             } else {
               setStatusMessage(
                 (res as CVProcessingResponse).message || 'Processing LLM match...'
@@ -55,6 +56,7 @@ export function useCvUpload() {
               setBasicResult(res as CVUploadResponse);
               setUploading(false);
               setStatusMessage('CV parsing complete!');
+              setTimeout(() => setStatusMessage(null), 3000);
             } else {
               setStatusMessage(
                 (res as CVProcessingResponse).message || 'Parsing CV...'
