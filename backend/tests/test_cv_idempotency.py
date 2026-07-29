@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -11,8 +11,17 @@ from app.services.document_parser import DocumentParser, ExtractionResult
 from app.services.scoring_engine import ScoringEngine
 
 
+@pytest.fixture(autouse=True)
+def clear_caches():
+    from app.core.cache import cv_result_cache_manager, doc_cache_manager, embedding_cache_manager
+    cv_result_cache_manager.clear()
+    doc_cache_manager.clear()
+    embedding_cache_manager.clear()
+
+
 @pytest.fixture
 def mock_parser_and_engine(monkeypatch):
+
     extraction_mock = ExtractionResult(
         markdown="# Jane Doe\nSoftware Engineer with Python skills.",
         structured_doc={"name": "Jane Doe"},
@@ -48,14 +57,15 @@ def test_get_stable_cv_key():
     assert get_stable_cv_key("john_doe_cv.pdf") == "cv_john_doe_cv"
 
 
-def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mock_parser_and_engine):
+@pytest.mark.asyncio
+async def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mock_parser_and_engine):
     monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
 
     cv_bytes = b"Dummy CV file content for Jane Doe"
     filename = "jane_doe.pdf"
 
     # First run: initial processing
-    res1 = process_cv_file(
+    res1 = await process_cv_file(
         filename=filename,
         content=cv_bytes,
         candidate_id="user_123",
@@ -77,7 +87,7 @@ def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mock_par
     ScoringEngine.analyze_cv.reset_mock()
 
     # Second run: identical file & config -> CACHE_HIT
-    res2 = process_cv_file(
+    res2 = await process_cv_file(
         filename=filename,
         content=cv_bytes,
         candidate_id="user_123",
@@ -97,19 +107,20 @@ def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mock_par
     assert json_files[0].name == "cand_user_123_cv_cv_456.json"
 
 
-def test_cv_content_change_reprocesses(tmp_path, monkeypatch, mock_parser_and_engine):
+@pytest.mark.asyncio
+async def test_cv_content_change_reprocesses(tmp_path, monkeypatch, mock_parser_and_engine):
     monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
 
     cv_bytes_v1 = b"Original CV content"
     cv_bytes_v2 = b"Updated CV content with new experience"
     filename = "resume.pdf"
 
-    res1 = process_cv_file(filename=filename, content=cv_bytes_v1, candidate_id="777")
+    res1 = await process_cv_file(filename=filename, content=cv_bytes_v1, candidate_id="777")
     created_at_v1 = res1["created_at"]
     hash_v1 = res1["cv_hash"]
 
     # Run with changed content
-    res2 = process_cv_file(filename=filename, content=cv_bytes_v2, candidate_id="777")
+    res2 = await process_cv_file(filename=filename, content=cv_bytes_v2, candidate_id="777")
 
     assert res2["status"] == "REPROCESSED"
     assert res2["cv_hash"] != hash_v1
@@ -121,19 +132,20 @@ def test_cv_content_change_reprocesses(tmp_path, monkeypatch, mock_parser_and_en
     assert json_files[0].name == "cand_777_resume.json"
 
 
-def test_schema_version_change_reprocesses(tmp_path, monkeypatch, mock_parser_and_engine):
+@pytest.mark.asyncio
+async def test_schema_version_change_reprocesses(tmp_path, monkeypatch, mock_parser_and_engine):
     monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
 
     cv_bytes = b"CV content"
     filename = "resume.pdf"
 
-    res1 = process_cv_file(filename=filename, content=cv_bytes, candidate_id="888")
+    res1 = await process_cv_file(filename=filename, content=cv_bytes, candidate_id="888")
     assert res1["status"] == "NEW_CV"
 
     # Simulate schema version upgrade
     monkeypatch.setattr(settings, "EXTRACTION_SCHEMA_VERSION", "2.0.0")
 
-    res2 = process_cv_file(filename=filename, content=cv_bytes, candidate_id="888")
+    res2 = await process_cv_file(filename=filename, content=cv_bytes, candidate_id="888")
     assert res2["status"] == "REPROCESSED"
     assert res2["schema_version"] == "2.0.0"
 
@@ -141,26 +153,26 @@ def test_schema_version_change_reprocesses(tmp_path, monkeypatch, mock_parser_an
     assert len(json_files) == 1
 
 
-def test_concurrent_processing_protection(tmp_path, monkeypatch, mock_parser_and_engine):
+@pytest.mark.asyncio
+async def test_concurrent_processing_protection(tmp_path, monkeypatch, mock_parser_and_engine):
     monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
 
     cv_bytes = b"Shared CV content for concurrent processing"
     filename = "concurrent_resume.pdf"
 
-    def run_worker():
-        return process_cv_file(
+    async def run_worker():
+        return await process_cv_file(
             filename=filename,
             content=cv_bytes,
             candidate_id="c_concurrent",
             cv_id="cv_concurrent",
         )
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(run_worker) for _ in range(5)]
-        results = [f.result() for f in futures]
+    results = await asyncio.gather(*[run_worker() for _ in range(5)])
 
     assert len(results) == 5
     # Exactly 1 JSON file created
     json_files = list(tmp_path.glob("*.json"))
     assert len(json_files) == 1
     assert json_files[0].name == "cand_c_concurrent_cv_cv_concurrent.json"
+

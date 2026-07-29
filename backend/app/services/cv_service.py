@@ -119,16 +119,22 @@ async def process_cv_file(
                 logger.info(f"[DOC_CACHE_SET] Cached Docling output for hash '{cv_hash[:12]}...'.")
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
 
-            # Run optimized LLM pipeline & matching concurrently with embedding generation
+            # Run optimized LLM pipeline & matching concurrently with embedding generation & persistence
             from app.services.match_service import MatchService
-            
-            embedding_task = asyncio.to_thread(
-                EmbeddingService.generate_embedding,
-                extraction.markdown,
-                None,
-                cv_key
-            )
-            
+            from app.services.embedding_service import save_candidate_embedding
+
+            def _generate_and_store_embedding():
+                emb = EmbeddingService.generate_embedding(
+                    extraction.markdown,
+                    None,
+                    cv_key,
+                )
+                if emb:
+                    save_candidate_embedding(cv_key, emb, cv_hash)
+                return emb
+
+            embedding_task = asyncio.to_thread(_generate_and_store_embedding)
+
             match_analysis, _ = await asyncio.gather(
                 MatchService.analyze_single_cv(
                     extraction.markdown,
@@ -136,8 +142,9 @@ async def process_cv_file(
                     candidate_id=str(candidate_id) if candidate_id is not None else "",
                     docling_extraction_ms=docling_duration_ms,
                 ),
-                embedding_task
+                embedding_task,
             )
+
 
             now_iso = datetime.now(UTC).isoformat()
             created_at = (
@@ -347,9 +354,23 @@ async def scan_uploads_directory(
                         
             await asyncio.sleep(0.1)
     finally:
-        await pubsub.unsubscribe("cv_processing_progress")
-        await pubsub.close()
-        await async_redis.aclose()
+        try:
+            await pubsub.unsubscribe("cv_processing_progress")
+        except Exception:
+            pass
+        try:
+            if hasattr(pubsub, "close"):
+                res = pubsub.close()
+                if asyncio.iscoroutine(res):
+                    await res
+        except Exception:
+            pass
+        try:
+            if hasattr(async_redis, "aclose"):
+                await async_redis.aclose()
+        except Exception:
+            pass
+
 
     print()
     return results

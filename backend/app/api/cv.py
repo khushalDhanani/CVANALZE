@@ -1,5 +1,6 @@
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, BackgroundTasks
 
+from app.core.config import settings
 from app.schemas.cv import CVMatchRequest, CVUploadResponse, CVProcessingResponse
 from app.schemas.match import CandidateMatchAnalysis
 from app.services.cv_service import process_cv_file, get_stable_cv_key
@@ -7,6 +8,7 @@ from app.repositories.result import ResultRepository
 from app.services.scoring_engine import ScoringEngine
 
 router = APIRouter(prefix="/cv", tags=["CV"])
+
 
 
 async def background_process_cv(*args, **kwargs):
@@ -29,6 +31,15 @@ async def upload_cv(
             status_code=400,
             detail="Filename is required.",
         )
+
+    from pathlib import Path
+    ext = Path(file.filename).suffix.lower().lstrip(".")
+    if ext not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file extension '.{ext}'. Allowed formats: docx, pdf.",
+        )
+
 
     try:
         content = await file.read()

@@ -48,27 +48,27 @@ def test_document_parser_rejects_invalid_extension():
 
 
 def test_api_upload_cv_endpoint(sample_docx_bytes: bytes):
+    from unittest.mock import patch
     client = TestClient(app)
-    response = client.post(
-        "/api/cv/upload",
-        files={
-            "file": (
-                "alex_johnson_cv.docx",
-                sample_docx_bytes,
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            )
-        },
-    )
+    with patch("app.api.cv.background_process_cv"):
+        response = client.post(
+            "/api/cv/upload",
+            files={
+                "file": (
+                    "alex_johnson_cv.docx",
+                    sample_docx_bytes,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
 
-    assert response.status_code == 200
-    data = response.json()
-    assert "id" in data
-    assert data["filename"] == "alex_johnson_cv.docx"
-    assert data["characters"] > 0
-    assert "Alex Johnson" in data["markdown"]
-    assert "structured_doc" in data
-    assert "match_analysis" in data
-    assert data["result_file_path"].endswith(".json")
+        assert response.status_code == 200
+        data = response.json()
+        assert "cv_key" in data
+        assert data["status"] == "processing"
+        assert "message" in data
+
+
 
 
 def test_api_upload_rejects_invalid_file_extension():

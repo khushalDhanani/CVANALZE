@@ -10,13 +10,46 @@ from app.core.config import settings
 from app.core.logging import logger
 
 
+def get_embedding(text: str, model_name: str | None = None) -> list[float]:
+    """
+    Generate vector embedding for given text using Ollama /api/embeddings endpoint with nomic-embed-text.
+    """
+    model = model_name or settings.EMBEDDING_MODEL
+    url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embeddings"
+    payload = {"model": model, "prompt": text}
+    try:
+        with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
+            resp = client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            embedding = data.get("embedding")
+            if embedding and isinstance(embedding, list):
+                return embedding
+            # Fallback to /api/embed if /api/embeddings didn't return 'embedding' key
+            embed_url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
+            resp2 = client.post(embed_url, json={"model": model, "input": text})
+            resp2.raise_for_status()
+            data2 = resp2.json()
+            embs = data2.get("embeddings")
+            if embs and len(embs) > 0:
+                return embs[0]
+            raise ValueError(f"Empty embedding returned for model {model}")
+    except Exception as exc:
+        logger.error(f"get_embedding failed for text '{text[:40]}...': {exc}")
+        raise exc
+
+
 class EmbeddingService:
     """
-    Generates text embeddings via Ollama /api/embed with Redis L2 + File L3 caching.
+    Generates text embeddings via Ollama /api/embed or /api/embeddings with Redis L2 + File L3 caching.
     Cache key = ``embed:{model_version}:{sha256(text)}``.
     """
 
     _BATCH_SIZE = 10
+
+    @classmethod
+    def get_embedding(cls, text: str, model_version: str | None = None) -> list[float]:
+        return get_embedding(text, model_name=model_version)
 
     @classmethod
     def _content_hash(cls, text: str) -> str:
@@ -43,10 +76,14 @@ class EmbeddingService:
         if cached is not None:
             return cached
 
-        embedding = cls._call_ollama_embed(model, text)
-        if embedding is not None:
-            embedding_cache_manager.set(cache_key, embedding)
-        return embedding
+        try:
+            embedding = cls._call_ollama_embed(model, text)
+            if embedding is not None:
+                embedding_cache_manager.set(cache_key, embedding)
+            return embedding
+        except Exception:
+            return None
+
 
     @classmethod
     def generate_batch_embeddings(
@@ -82,17 +119,8 @@ class EmbeddingService:
 
     @classmethod
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
         try:
-            with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
-                resp = client.post(url, json={"model": model, "input": text})
-                resp.raise_for_status()
-                data = resp.json()
-                embeddings = data.get("embeddings")
-                if embeddings and len(embeddings) > 0:
-                    return embeddings[0]
-                logger.warning(f"Ollama embed returned empty embeddings for model {model}")
-                return None
+            return get_embedding(text, model_name=model)
         except Exception as exc:
             logger.warning(f"Embedding generation failed for model {model}: {exc}")
             return None
@@ -137,3 +165,76 @@ class EmbeddingService:
         if norm_a == 0.0 or norm_b == 0.0:
             return 0.0
         return dot / (norm_a * norm_b)
+
+
+def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: str | None = None) -> bool:
+    """
+    Upsert candidate embedding into PostgreSQL candidate_embeddings table keyed by cv_key.
+    """
+    from app.core.database import pg_SessionLocal
+
+    if pg_SessionLocal is None:
+        return False
+
+    pg_db = pg_SessionLocal()
+    try:
+        from sqlalchemy import func
+        from sqlalchemy.dialects.postgresql import insert
+        from app.models.pg import CandidateEmbedding
+
+        stmt = insert(CandidateEmbedding).values(
+            cv_key=cv_key,
+            embedding=embedding,
+            embedding_model_version=settings.EMBEDDING_MODEL,
+            content_hash=content_hash,
+            updated_at=func.now(),
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["cv_key"],
+            set_={
+                "embedding": stmt.excluded.embedding,
+                "embedding_model_version": stmt.excluded.embedding_model_version,
+                "content_hash": stmt.excluded.content_hash,
+                "updated_at": func.now(),
+            },
+        )
+        pg_db.execute(stmt)
+        pg_db.commit()
+        # Also cache in L2/L3 cache manager under cv_key
+        cache_key = f"{settings.EMBEDDING_MODEL}:{cv_key}"
+        embedding_cache_manager.set(cache_key, embedding)
+        return True
+    except Exception as exc:
+        pg_db.rollback()
+        logger.error(f"save_candidate_embedding failed for cv_key={cv_key}: {exc}")
+        return False
+    finally:
+        pg_db.close()
+
+
+def get_candidate_embedding(cv_key: str) -> list[float] | None:
+    """
+    Retrieve candidate vector embedding by cv_key from PostgreSQL or cache.
+    """
+    from app.core.database import pg_SessionLocal
+
+    if pg_SessionLocal is not None:
+        pg_db = pg_SessionLocal()
+        try:
+            from app.models.pg import CandidateEmbedding
+
+            rec = pg_db.query(CandidateEmbedding).filter(CandidateEmbedding.cv_key == cv_key).first()
+            if rec and rec.embedding is not None:
+                return [float(x) for x in list(rec.embedding)]
+        except Exception as exc:
+            logger.warning(f"get_candidate_embedding PG query error for cv_key={cv_key}: {exc}")
+        finally:
+            pg_db.close()
+
+    cache_key = f"{settings.EMBEDDING_MODEL}:{cv_key}"
+    cached = embedding_cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
+    return None
+
+
