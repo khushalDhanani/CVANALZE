@@ -8,7 +8,9 @@ import {
 import { X, CheckCircle } from 'lucide-react-native';
 import { matchService } from '@/services/matchService';
 import { JobMatchScore } from '@/types/api';
-import { Button, TextField, Card } from './index';
+import { Button } from './Button';
+import { TextField } from './TextField';
+import { Card } from './Card';
 
 interface HrReviewModalProps {
   visible: boolean;

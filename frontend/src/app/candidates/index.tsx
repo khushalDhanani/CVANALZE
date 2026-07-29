@@ -101,7 +101,7 @@ export default function CandidateListScreen() {
         ) : (
           <FlatList
             data={filteredCandidates}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
             renderItem={renderCandidateRow}
             contentContainerStyle={{ paddingBottom: 24 }}
             onRefresh={() => refreshCandidates(searchQuery)}
