@@ -25,18 +25,23 @@ class ResultRepository:
     def atomic_save_result(cls, filename: str, data: dict[str, Any]) -> Path | str:
         cv_result_cache_manager.set(filename, data, ttl=cls.CACHE_TTL_SECONDS)
 
-        if _REDIS_CLIENT:
-            redis_key = f"cv_result:{filename}"
-            logger.info(f"Saved result to Redis '{redis_key}'.")
-            return f"redis://{redis_key}"
-
         settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         result_path = (settings.RESULTS_DIR / filename).resolve()
 
         if not result_path.is_relative_to(settings.RESULTS_DIR.resolve()):
             raise ValueError(f"Invalid filename prevents saving outside results directory: {filename}")
 
-        logger.info(f"Atomically saved result to '{result_path}'.")
+        tmp_path = result_path.with_suffix(".tmp")
+        tmp_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp_path.replace(result_path)
+
+        logger.info(f"Atomically saved result to disk '{result_path}'.")
+
+        if _REDIS_CLIENT:
+            redis_key = f"cv_result:{filename}"
+            logger.info(f"Saved result to Redis '{redis_key}'.")
+            return f"redis://{redis_key}"
+
         return result_path
 
     @classmethod
@@ -63,6 +68,14 @@ class ResultRepository:
         result = cv_result_cache_manager.get(filename)
         if result is not None:
             return result
+        path = settings.RESULTS_DIR / filename
+        if path.exists() and path.is_file():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                cv_result_cache_manager.set(filename, data, ttl=cls.CACHE_TTL_SECONDS)
+                return data
+            except Exception as exc:
+                logger.warning(f"Failed reading result file {path}: {exc}")
         return None
 
     @classmethod

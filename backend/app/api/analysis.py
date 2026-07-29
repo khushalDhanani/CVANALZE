@@ -113,6 +113,13 @@ async def get_match_status(cv_key: str):
     """Get the status or result of an enriched background match job."""
     result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
     if result:
+        if result.get("status") == "FAILED":
+            return CVProcessingResponse(
+                message=result.get("message") or result.get("error") or "CV processing failed.",
+                cv_key=cv_key,
+                status="FAILED",
+                progress=100,
+            )
         match_analysis = result.get("match_analysis")
         if match_analysis:
             match_analysis["scan_id"] = result.get("scan_id", result.get("id"))

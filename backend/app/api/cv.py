@@ -89,6 +89,13 @@ async def get_cv_status(cv_key: str):
     """Get the status or result of a background CV processing job."""
     result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
     if result:
+        if result.get("status") == "FAILED":
+            return CVProcessingResponse(
+                message=result.get("message") or result.get("error") or "CV processing failed.",
+                cv_key=cv_key,
+                status="FAILED",
+                progress=100,
+            )
         if "scan_id" not in result and "id" in result:
             result["scan_id"] = result["id"]
         if "parsed_at" not in result and "scanned_at" in result:

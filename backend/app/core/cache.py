@@ -331,11 +331,23 @@ class FileCache(CacheProvider):
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._key_prefix = key_prefix
 
+    def _sanitize_key(self, key: str) -> str:
+        clean_key = key.split(":", 1)[1] if ":" in key else key
+        if self._key_prefix and clean_key.startswith(self._key_prefix):
+            clean_key = clean_key[len(self._key_prefix):]
+        if clean_key.endswith(".json"):
+            return clean_key
+        return f"{clean_key}.json"
+
     def _path(self, key: str) -> Path:
-        return self._cache_dir / f"{self._key_prefix}{key}.json"
+        filename = self._sanitize_key(key)
+        if self._key_prefix and not filename.startswith(self._key_prefix):
+            filename = f"{self._key_prefix}{filename}"
+        return self._cache_dir / filename
 
     def _lock_path(self, key: str) -> Path:
-        return self._cache_dir / f"{self._key_prefix}{key}.lock"
+        path = self._path(key)
+        return path.with_suffix(".lock")
 
     def get(self, key: str) -> Any | None:
         path = self._path(key)
@@ -372,7 +384,12 @@ class FileCache(CacheProvider):
 
     def delete_by_pattern(self, pattern: str) -> int:
         count = 0
-        glob_pat = f"{self._key_prefix}{pattern}.json"
+        clean_pat = pattern.split(":", 1)[1] if ":" in pattern else pattern
+        glob_pat = f"{self._key_prefix}{clean_pat}"
+        if not glob_pat.endswith(".json") and "*" not in glob_pat:
+            glob_pat = f"{glob_pat}.json"
+        elif not glob_pat.endswith(".json") and not glob_pat.endswith("*"):
+            glob_pat = f"{glob_pat}.json"
         for f in self._cache_dir.glob(glob_pat):
             try:
                 f.unlink()

@@ -63,111 +63,150 @@ async def process_cv_file(
     lock = _get_cv_lock(cv_key)
 
     async with lock:
-        existing_data = ResultRepository.read_result_by_filename(result_filename)
+        try:
+            existing_data = ResultRepository.read_result_by_filename(result_filename)
 
-        if existing_data and not force_reprocess:
-            existing_hash = existing_data.get("cv_hash")
-            existing_parser_version = existing_data.get("parser_version")
-            existing_schema_version = existing_data.get("schema_version")
+            if existing_data and not force_reprocess and existing_data.get("status") != "FAILED":
+                existing_hash = existing_data.get("cv_hash")
+                existing_parser_version = existing_data.get("parser_version")
+                existing_schema_version = existing_data.get("schema_version")
 
-            hash_matches = existing_hash == cv_hash
-            parser_matches = (
-                existing_parser_version == settings.EXTRACTION_PARSER_VERSION
-            )
-            schema_matches = (
-                existing_schema_version == settings.EXTRACTION_SCHEMA_VERSION
-            )
-
-            if hash_matches and parser_matches and schema_matches:
-                logger.info(
-                    f"[CACHE_HIT] Reusing existing JSON for '{cv_key}' ({result_filename})."
+                hash_matches = existing_hash == cv_hash
+                parser_matches = (
+                    existing_parser_version == settings.EXTRACTION_PARSER_VERSION
                 )
-                existing_data["status"] = "CACHE_HIT"
-                existing_data["result_file_path"] = str(result_path)
-                return existing_data
-
-            if not hash_matches:
-                logger.info(
-                    f"[CV_CHANGED] CV source content changed for '{cv_key}'. Reprocessing..."
+                schema_matches = (
+                    existing_schema_version == settings.EXTRACTION_SCHEMA_VERSION
                 )
-                if existing_hash:
-                    CacheInvalidator.invalidate_cv(existing_hash)
+
+                if hash_matches and parser_matches and schema_matches:
+                    logger.info(
+                        f"[CACHE_HIT] Reusing existing JSON for '{cv_key}' ({result_filename})."
+                    )
+                    existing_data["status"] = "CACHE_HIT"
+                    existing_data["result_file_path"] = str(result_path)
+                    return existing_data
+
+                if not hash_matches:
+                    logger.info(
+                        f"[CV_CHANGED] CV source content changed for '{cv_key}'. Reprocessing..."
+                    )
+                    if existing_hash:
+                        CacheInvalidator.invalidate_cv(existing_hash)
+                else:
+                    logger.info(
+                        f"[SCHEMA_CHANGED] Parser or schema version changed for '{cv_key}'. Reprocessing..."
+                    )
+            elif existing_data and force_reprocess:
+                logger.info(f"[REPROCESSED] Force reprocessing requested for '{cv_key}'.")
             else:
-                logger.info(
-                    f"[SCHEMA_CHANGED] Parser or schema version changed for '{cv_key}'. Reprocessing..."
+                logger.info(f"[NEW_CV] Initial processing for '{cv_key}'.")
+
+            # Docling extraction stage (with timing)
+            t_doc_start = asyncio.get_event_loop().time()
+            cached_doc = doc_cache_manager.get(cv_hash)
+            if cached_doc is not None:
+                extraction = ExtractionResult.from_dict(cached_doc)
+                logger.info(f"[DOC_CACHE_HIT] Reusing Docling output for hash '{cv_hash[:12]}...'.")
+            else:
+                extraction = await asyncio.to_thread(
+                    DocumentParser.parse_with_timeout,
+                    filename=filename,
+                    content=content,
+                    timeout_seconds=timeout_seconds,
                 )
-        elif existing_data and force_reprocess:
-            logger.info(f"[REPROCESSED] Force reprocessing requested for '{cv_key}'.")
-        else:
-            logger.info(f"[NEW_CV] Initial processing for '{cv_key}'.")
+                doc_cache_manager.set(cv_hash, extraction.to_dict())
+                logger.info(f"[DOC_CACHE_SET] Cached Docling output for hash '{cv_hash[:12]}...'.")
+            docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
 
-        # Docling extraction stage (with timing)
-        t_doc_start = asyncio.get_event_loop().time()
-        cached_doc = doc_cache_manager.get(cv_hash)
-        if cached_doc is not None:
-            extraction = ExtractionResult.from_dict(cached_doc)
-            logger.info(f"[DOC_CACHE_HIT] Reusing Docling output for hash '{cv_hash[:12]}...'.")
-        else:
-            extraction = await asyncio.to_thread(
-                DocumentParser.parse_with_timeout,
-                filename=filename,
-                content=content,
-                timeout_seconds=timeout_seconds,
+            # Run optimized LLM pipeline & matching
+            from app.services.match_service import MatchService
+            
+            match_analysis = await MatchService.analyze_single_cv(
+                extraction.markdown,
+                document_hash=cv_hash,
+                candidate_id=str(candidate_id) if candidate_id is not None else "",
+                docling_extraction_ms=docling_duration_ms,
             )
-            doc_cache_manager.set(cv_hash, extraction.to_dict())
-            logger.info(f"[DOC_CACHE_SET] Cached Docling output for hash '{cv_hash[:12]}...'.")
-        docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
 
-        # Run optimized LLM pipeline & matching
-        from app.services.match_service import MatchService
-        
-        match_analysis = await MatchService.analyze_single_cv(
-            extraction.markdown,
-            document_hash=cv_hash,
-            candidate_id=str(candidate_id) if candidate_id is not None else "",
-            docling_extraction_ms=docling_duration_ms,
-        )
+            now_iso = datetime.now(UTC).isoformat()
+            created_at = (
+                existing_data.get("created_at")
+                if existing_data and existing_data.get("created_at")
+                else now_iso
+            )
+            updated_at = now_iso
 
-        now_iso = datetime.now(UTC).isoformat()
-        created_at = (
-            existing_data.get("created_at")
-            if existing_data and existing_data.get("created_at")
-            else now_iso
-        )
-        updated_at = now_iso
+            status = "REPROCESSED" if existing_data else "NEW_CV"
+            logger.info(f"[{status}] Extraction complete for '{cv_key}'.")
 
-        status = "REPROCESSED" if existing_data else "NEW_CV"
-        logger.info(f"[{status}] Extraction complete for '{cv_key}'.")
+            result_data = {
+                "id": cv_key,
+                "scan_id": cv_key,
+                "parsed_at": now_iso,
+                "candidate_id": str(candidate_id) if candidate_id is not None else None,
+                "cv_id": str(cv_id) if cv_id is not None else None,
+                "filename": filename,
+                "content_type": content_type,
+                "cv_hash": cv_hash,
+                "parser_version": settings.EXTRACTION_PARSER_VERSION,
+                "schema_version": settings.EXTRACTION_SCHEMA_VERSION,
+                "created_at": created_at,
+                "updated_at": updated_at,
+                "scanned_at": now_iso,
+                "status": status,
+                "pdf_type": getattr(extraction, "pdf_type", "NON_PDF"),
+                "parser_used": getattr(extraction, "parser_used", "docling_fast"),
+                "ocr_decision": getattr(extraction, "ocr_decision", "SKIPPED_TEXT_PRESENT"),
+                "stage_metrics": getattr(extraction, "stage_metrics", {}),
+                "characters": len(extraction.markdown),
+                "page_count": extraction.page_count,
+                "is_scanned": extraction.is_scanned,
+                "ocr_applied": extraction.ocr_applied,
+                "text": extraction.markdown,
+                "markdown": extraction.markdown,
+                "structured_doc": extraction.structured_doc,
+                "dynamic_profile": None,
+                "match_analysis": match_analysis.model_dump(),
+            }
 
-        result_data = {
-            "id": cv_key,
-            "scan_id": cv_key,
-            "parsed_at": now_iso,
-            "candidate_id": str(candidate_id) if candidate_id is not None else None,
-            "cv_id": str(cv_id) if cv_id is not None else None,
-            "filename": filename,
-            "content_type": content_type,
-            "cv_hash": cv_hash,
-            "parser_version": settings.EXTRACTION_PARSER_VERSION,
-            "schema_version": settings.EXTRACTION_SCHEMA_VERSION,
-            "created_at": created_at,
-            "updated_at": updated_at,
-            "scanned_at": now_iso,
-            "status": status,
-            "characters": len(extraction.markdown),
-            "page_count": extraction.page_count,
-            "is_scanned": extraction.is_scanned,
-            "ocr_applied": extraction.ocr_applied,
-            "text": extraction.markdown,
-            "markdown": extraction.markdown,
-            "structured_doc": extraction.structured_doc,
-            "dynamic_profile": None,
-            "match_analysis": match_analysis.model_dump(),
-        }
+            saved_path = ResultRepository.atomic_save_result(result_filename, result_data)
+            result_data["result_file_path"] = str(saved_path)
+            return result_data
 
-        saved_path = ResultRepository.atomic_save_result(result_filename, result_data)
-        result_data["result_file_path"] = str(saved_path)
-        return result_data
+        except Exception as exc:
+            logger.exception(f"CV processing failed for '{cv_key}': {exc}")
+            now_iso = datetime.now(UTC).isoformat()
+            err_msg = str(exc)
+            failure_data = {
+                "id": cv_key,
+                "scan_id": cv_key,
+                "filename": filename,
+                "content_type": content_type,
+                "candidate_id": str(candidate_id) if candidate_id is not None else None,
+                "cv_id": str(cv_id) if cv_id is not None else None,
+                "parsed_at": now_iso,
+                "created_at": now_iso,
+                "updated_at": now_iso,
+                "scanned_at": now_iso,
+                "status": "FAILED",
+                "error": err_msg,
+                "message": f"CV processing failed: {err_msg}",
+                "characters": 0,
+                "page_count": 0,
+                "is_scanned": False,
+                "ocr_applied": False,
+                "text": "",
+                "markdown": "",
+                "structured_doc": {},
+                "dynamic_profile": None,
+                "match_analysis": None,
+            }
+            try:
+                ResultRepository.atomic_save_result(result_filename, failure_data)
+            except Exception as save_exc:
+                logger.error(f"Failed to persist failure status result for '{cv_key}': {save_exc}")
+            raise
 
 
 def process_cv_task_sync(file_path: str) -> dict[str, Any]:
@@ -187,8 +226,8 @@ def process_cv_task_sync(file_path: str) -> dict[str, Any]:
         payload = {
             "filename": filename,
             "status": result.get("status", "OK"),
-            "best_match": result.get("match_analysis", {}).get("best_match", {}),
-            "llm_skipped": result.get("match_analysis", {}).get("llm_skipped", False),
+            "best_match": result.get("match_analysis", {}).get("best_match", {}) if result.get("match_analysis") else {},
+            "llm_skipped": result.get("match_analysis", {}).get("llm_skipped", False) if result.get("match_analysis") else False,
             "result_file_path": result.get("result_file_path")
         }
         conn.publish("cv_processing_progress", json.dumps(payload))
@@ -199,7 +238,10 @@ def process_cv_task_sync(file_path: str) -> dict[str, Any]:
             "status": "FAILED",
             "error": str(e)
         }
-        conn.publish("cv_processing_progress", json.dumps(payload))
+        try:
+            conn.publish("cv_processing_progress", json.dumps(payload))
+        except Exception:
+            pass
         raise
 
 

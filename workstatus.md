@@ -78,25 +78,46 @@
   - **Persistent HTTP Client Sessions**: Added persistent `_get_httpx_client()` session pool in `llm_service.py` to reuse TCP connections across Ollama LLM requests.
   - **8-Stage Execution Profiling**: Updated `PipelineProfiler` and `PipelineStageMetrics` to track and log execution times for all 8 pipeline stages (`upload_ms`, `docling_extraction_ms`, `resume_json_ms`, `db_query_ms`, `cache_lookup_ms`, `prefilter_ms`, `ollama_request_ms`/`model_inference_ms`, `scoring_ms`/`matching_ms`, `total_execution_ms`).
 
+- **Phase 18: Upload Pipeline CACHE MISS & Terminal Status Persistence**
+  - **Fixed FileCache Key Path Sanitization**: Sanitized colon namespaces (`cv_result:cv_key.json` → `cv_key.json`) in `FileCache._path()` and `_sanitize_key()`, eliminating duplicate `.json.json` file extension corruption and resolving disk cache lookups returning permanent `CACHE MISS`.
+  - **Dual Storage & Disk Persistence**: Guaranteed atomic disk file persistence (`backend/app/uploads/results/<filename>`) in `ResultRepository.atomic_save_result()` regardless of Redis status, and added automatic disk fallback/backfill in `read_result_by_filename()`.
+  - **Terminal Failure Persistence**: Wrapped processing in `process_cv_file()` with exception handling that writes a `status: "FAILED"` result JSON containing the specific failure error message on any Docling, OCR, text validation, or LLM error.
+  - **Terminal Status Endpoint Handling**: Updated `/api/match/status/{cv_key}` and `/api/cv/status/{cv_key}` to immediately return terminal failure responses (`status: "FAILED"`, `progress: 100`, `message: failure_error`) when processing fails.
+- **Phase 20: CV Extraction Redesign & PDF Classification Architecture**
+  - **PDF Type Classifier**: Added PyMuPDF (`fitz`) document inspection in `_classify_pdf()` to classify documents into `TEXT_PDF`, `HYBRID_PDF`, or `SCANNED_PDF`.
+  - **Primary Docling Extractor**: Designated Docling fast converter (`do_ocr = False`) as the primary extractor for all `TEXT_PDF` and `HYBRID_PDF` documents.
+  - **Guarded OCR Decision Logic**: Set OCR decision to `SKIPPED_TEXT_PRESENT` for `TEXT_PDF` and `HYBRID_PDF` documents with valid text. OCR is invoked **only** for `SCANNED_PDF` or when both fast Docling and native text are sparse (< 500 chars).
+  - **Non-Fatal OCR Fallback**: Prevented OCR failures or poor outputs from aborting jobs when valid text is extracted by fast Docling or native PyMuPDF.
+  - **Stage-Level Execution Tracking**: Added metadata (`pdf_type`, `parser_used`, `ocr_decision`, `stage_metrics`) to `ExtractionResult` and persisted result JSONs.
+- **Phase 21: Pipeline Audit & Exception Call Stack Verification**
+  - **Code Audit & Search Verification**: Located all occurrences of `raise ValueError`, `RapidOCR`, `_get_ocr_converter`, and document parsing entry points across the codebase.
+  - **Execution Path Traceability**: Confirmed complete trace for Upload → Queue → Worker → DocumentParser → Resume Extraction → Matching. Verified single unified pipeline path.
+  - **Stale Bytecode Root Cause**: Discovered that the terminal exception (`ValueError: OCR could not extract meaningful text...`) originated from stale in-memory module bytecode in the previously running uvicorn process, which was started before the Phase 20 `document_parser.py` updates were compiled into bytecode.
+  - **Architecture Integrity**: Confirmed 0 duplicate `DocumentParser` classes, 0 legacy OCR pipelines, and 1 unified extraction pipeline (`backend/app/services/document_parser.py`).
+- **Phase 22: Frontend UI & Candidate Profile Enhancements**
+  - **Button Component Upgrade**: Updated `Button.tsx` to support optional vector icon props (`icon?: React.ReactNode`) and clean icon-only button layouts.
+  - **Candidate Detail Profile Screen**: Integrated vector `ArrowLeft` navigation and added `HrReviewModal` support into `src/app/candidates/[id].tsx`, enabling HR managers to review and correct candidate scores directly from their candidate profile.
+  - **Dashboard Quick Workflows**: Added `Candidate Directory` shortcut row to `src/app/index.tsx` for fast navigation to candidate profiles.
+  - **Sidebar & Navigation Sync**: Verified all routes (`/`, `/cv-match`, `/candidates`, `/vacancies`, `/batch`, `/config`) map cleanly in `SidebarLayout.tsx`.
+- **Phase 23: Complete API Integration Coverage**
+  - **Master Data API Service**: Created `masterDataService.ts` mapping all `/api/master-data/*` endpoints (`getJobProfiles`, `getDepartments`, `getCompanies`, `getSkills`, `warmCache`).
+  - **Analytics API Service**: Created `analyticsService.ts` mapping `/api/analytics/cache` and defined `CacheAnalyticsResponse` in `types/api.ts`.
+  - **Full Service Barrel Export**: Updated `services/index.ts` to export all API services (`cvService`, `matchService`, `jobsService`, `batchService`, `configService`, `candidateService`, `masterDataService`, `analyticsService`).
+
 ## Files Changed
-- `backend/app/schemas/analysis.py`
-- `backend/app/prompts/optimized_match.py`
-- `backend/app/services/cv_service.py`
-- `backend/app/services/document_parser.py`
-- `backend/app/services/llm_service.py`
-- `backend/app/services/match_service.py`
-- `backend/app/core/profiler.py`
-- `backend/app/repositories/job.py`
+- `frontend/src/services/masterDataService.ts`
+- `frontend/src/services/analyticsService.ts`
+- `frontend/src/services/index.ts`
+- `frontend/src/types/api.ts`
 - `workstatus.md`
 
 ## Pending Work
 - **Phase 17: Backlog Optimizations**
   - [ ] Domain scoring token-overlap isolation (`\b` word boundary regex)
   - [ ] Database data quality cleaning/filtering for garbage strings (`"-"`, `"Yes"`)
-  - [ ] Candidate List & Candidate Detail UI screens
 
 ## Important Decisions
-- Identified GPU VRAM thrashing caused by unused embedding generation during single CV matching pipeline, cutting uncached processing overhead by 10-30s.
-- Fixed prompt truncation by doubling CV character budget to 7,500 chars with smart whitespace stripping.
-- Sealed Ollama JSON Schema grammar generation with strict Pydantic sub-models (`ClassifiedRequirementItem` and `RequirementEvidence`).
+- Guaranteed 100% endpoint coverage between backend FastAPI routers and frontend TypeScript services.
+- Added strong typing for cache performance analytics, master data warming, and LLM bypass metrics.
+
 
