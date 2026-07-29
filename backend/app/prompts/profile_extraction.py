@@ -19,7 +19,10 @@ def build_profile_extraction_prompt(cv_text: str) -> str:
             "5. Detect career or domain transitions automatically from chronological evidence. "
             "6. Never assume a candidate belongs to a domain based solely on a degree, title, or keyword without supporting evidence. "
             "7. If evidence is insufficient or conflicting, set confidence to 'UNCERTAIN' and explain in evidence_notes. "
-            "8. Calculate relevant_experience_years logically by examining the timeline and durations of roles."
+            "8. Calculate relevant_experience_years logically by examining the timeline and durations of roles. "
+            "9. Do not infer experience or skills not explicitly stated in the CV. "
+            "10. For every extracted field, there must be corresponding evidence in the CV. If no evidence exists, omit the field or set it to empty. "
+            "11. Never use generic terms like 'strong communication skills' unless the CV explicitly mentions them."
         ),
         "candidate_cv_markdown": cv_text,
     }

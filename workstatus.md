@@ -70,11 +70,23 @@
   - Updated status endpoint to return `match_analysis` directly from the basic result file (no need for separate `_enriched.json` step).
   - Increased frontend polling limits: `POLL_INTERVAL_MS` 2s→3s, `MAX_POLL_RETRIES` 60→250 (3s × 250 = 12.5 min total).
   - Improved timeout error message to suggest checking candidates list.
+- **Phase 15: Evidence-Based Reasoning for LLM Prompts**
+  - Injected 7 evidence-based reasoning rules into the primary `optimized_match.py` prompt:
+    - No assumptions without CV evidence
+    - Every conclusion must reference specific evidence
+    - "No evidence found" instead of guessing
+    - No generic phrases unless backed by specific CV content
+    - Compare item by item
+    - Explicitly report mismatches
+    - Never inflate score on assumptions
+  - Added 3 additional evidence rules to `profile_extraction.py` prompt.
 
 ## Files Changed
 - `app/services/document_parser.py`
 - `app/services/match_service.py`
 - `app/api/analysis.py`
+- `app/prompts/optimized_match.py`
+- `app/prompts/profile_extraction.py`
 - `frontend/src/constants/config.ts`
 - `frontend/src/hooks/useCvUpload.ts`
 - `app/repositories/job.py`

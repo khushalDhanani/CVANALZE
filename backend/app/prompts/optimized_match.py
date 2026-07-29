@@ -61,6 +61,15 @@ def build_optimized_match_prompt(
 
     prompt = f"""{input_json}
 
+EVIDENCE-BASED REASONING RULES:
+1. Do NOT make assumptions or infer experience not explicitly supported by the CV.
+2. EVERY conclusion in semantic_reason must reference specific evidence from the CV.
+3. If evidence is missing for a requirement, state "No evidence found" — do not guess.
+4. Do not use generic phrases like "strong experience" unless backed by specific skills, projects, or responsibilities cited from the CV.
+5. Compare the candidate against each vacancy requirement item by item.
+6. If there is a mismatch (department, domain, education, role, technology, skills), explicitly report it.
+7. Never increase semantic_fit_score based on assumptions — score only on verified evidence.
+
 INSTRUCTIONS:
 Return ONLY valid JSON matching the exact schema below without markdown wrapper, thinking tokens, or extra commentary.
 
@@ -78,7 +87,7 @@ Expected JSON Schema:
   "matched_vacancies": [
     {{
       "vacancy_id": 101,
-      "semantic_reason": "Clear explanation of semantic fit based on CV evidence",
+      "semantic_reason": "Clear explanation of semantic fit based on CV evidence, citing specific skills, projects, or roles. If no fit, state 'No evidence found for X requirement'.",
       "inferred_skills": ["Inferred skills relevant to this specific vacancy"],
       "matched_skills": ["Skills from required_skills present in CV"],
       "missing_critical": ["Critical requirements missing"],
