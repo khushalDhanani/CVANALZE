@@ -1,8 +1,6 @@
-import hashlib
 import re
 from typing import Any
 
-from app.core.cache import embedding_cache_manager
 from app.core.config import settings
 from app.core.logging import logger
 from app.services.embedding_service import EmbeddingService

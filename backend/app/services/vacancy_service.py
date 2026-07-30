@@ -35,7 +35,7 @@ class VacancyService:
         for vacancy in results:
             job_openings.append(self.map_to_job_requirement(vacancy))
             
-        unique_dept_ids = sorted(list({j.department_id for j in job_openings if j.department_id is not None}))
+        unique_dept_ids = sorted({j.department_id for j in job_openings if j.department_id is not None})
         logger.info(
             f"Active Vacancies: {len(job_openings)} | Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}"
         )
