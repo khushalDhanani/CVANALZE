@@ -675,7 +675,7 @@ doc_cache_manager = CacheManager(
 
 config_cache_manager = CacheManager(
     namespace="config",
-    providers=[_redis_cache],
+    providers=[_memory_cache, _redis_cache],
     default_ttl=3600,
 )
 

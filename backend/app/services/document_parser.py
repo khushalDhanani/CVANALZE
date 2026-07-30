@@ -131,17 +131,7 @@ class TextSanitizer:
             dedup_lines.append(line)
         text = "\n".join(dedup_lines)
 
-        # 4. Flatten Markdown Tables
-        def _flatten_table_line(l: str) -> str:
-            if re.match(r"^\|[-\s\|]+\|$", l.strip()):
-                return ""
-            if l.strip().startswith("|") and l.strip().endswith("|"):
-                parts = [p.strip() for p in l.split("|") if p.strip()]
-                return "  ".join(parts)
-            return l
-            
-        lines = [_flatten_table_line(l) for l in text.splitlines()]
-        text = "\n".join(l for l in lines if l.strip())
+        # 4. Preserve Markdown Tables (Removed flattening to support AI table extraction)
 
         # 5. Collapse consecutive empty lines
         text = re.sub(r"\n{3,}", "\n\n", text)
@@ -648,30 +638,74 @@ def _classify_pdf(content: bytes) -> tuple[str, str, int, bool]:
 
 def _extract_native_docx(content: bytes) -> str:
     """
-    Extract text from a DOCX file using python-docx (paragraphs + tables).
+    Extract text from a DOCX file using python-docx.
+    Iterates through document body to preserve exact element ordering.
     Used as a fallback if Docling conversion fails or returns sparse text.
     """
     try:
         import docx
+        from docx.oxml.text.paragraph import CT_P
+        from docx.oxml.table import CT_Tbl
+        from docx.text.paragraph import Paragraph
+        from docx.table import Table
+
         doc = docx.Document(BytesIO(content))
         lines = []
-        for p in doc.paragraphs:
-            text = p.text.strip()
-            if text:
-                if p.style and p.style.name and p.style.name.startswith("Heading"):
-                    lines.append(f"## {text}")
-                else:
-                    lines.append(text)
-
-        for table in doc.tables:
-            for row in table.rows:
-                row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                if row_cells:
-                    lines.append(" | ".join(row_cells))
+        for block in doc.element.body:
+            if isinstance(block, CT_P):
+                p = Paragraph(block, doc)
+                text = p.text.strip()
+                if text:
+                    if p.style and p.style.name and p.style.name.startswith("Heading"):
+                        lines.append(f"## {text}")
+                    else:
+                        lines.append(text)
+            elif isinstance(block, CT_Tbl):
+                table = Table(block, doc)
+                for i, row in enumerate(table.rows):
+                    row_cells = [cell.text.replace("\n", " ").strip() for cell in row.cells]
+                    if any(row_cells):
+                        lines.append("| " + " | ".join(row_cells) + " |")
+                        if i == 0:
+                            lines.append("|" + "|".join(["---"] * len(row_cells)) + "|")
 
         return "\n\n".join(lines).strip()
     except Exception as exc:
         logger.warning(f"python-docx native extraction failed: {exc}")
+        return ""
+
+
+def _extract_native_txt(content: bytes) -> str:
+    try:
+        return content.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return content.decode("latin-1", errors="replace").strip()
+
+
+def _extract_native_doc(content: bytes) -> str:
+    import subprocess
+    import tempfile
+    import os
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".doc", delete=False) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        try:
+            result = subprocess.run(["antiword", temp_file_path], capture_output=True, text=True, check=True)
+            return result.stdout.strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            try:
+                result = subprocess.run(["catdoc", temp_file_path], capture_output=True, text=True, check=True)
+                return result.stdout.strip()
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                logger.warning("Neither antiword nor catdoc is available for .doc extraction.")
+                return ""
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+    except Exception as exc:
+        logger.warning(f"Native .doc extraction failed: {exc}")
         return ""
 
 
@@ -705,6 +739,8 @@ class MarkdownGenerator:
                 raise ValueError("Invalid file signature. The file claims to be a PDF but the magic bytes mismatch.")
             elif extension == "docx" and kind.mime not in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/zip"]:
                 raise ValueError("Invalid file signature. The file claims to be a DOCX but the magic bytes mismatch.")
+            elif extension == "doc" and kind.mime != "application/msword":
+                logger.warning(f"Warning: .doc file has mime {kind.mime}")
         elif extension == "pdf":
             raise ValueError("Invalid file signature. Missing PDF magic bytes.")
 
@@ -712,46 +748,44 @@ class MarkdownGenerator:
             f"Starting MarkdownGenerator extraction pipeline for '{filename}' ({len(content)} bytes)..."
         )
 
-        # Stage 1: Detect PDF Type & Extract Native Selectable Text / DOCX Native Text
         pdf_type = "NON_PDF"
-        native_pdf_text = ""
-        native_docx_text = ""
+        native_text = ""
         native_char_count = 0
         has_images = False
-        if extension == "pdf":
-            pdf_type, native_pdf_text, native_char_count, has_images = _classify_pdf(content)
-            logger.info(
-                f"[STAGE 1: PDF TYPE] '{filename}': type={pdf_type}, native_chars={native_char_count}, has_images={has_images}"
-            )
-        elif extension == "docx":
-            native_docx_text = _extract_native_docx(content)
-            native_char_count = len(native_docx_text)
-            logger.info(
-                f"[STAGE 1: DOCX NATIVE] '{filename}': native_chars={native_char_count}"
-            )
 
-        # Stage 2: Primary Extractor (Docling Fast Converter - No OCR)
-        t_fast_start = time.perf_counter()
-        doc_stream = DocumentStream(name=filename, stream=BytesIO(content))
-        ocr_applied = False
-        docling_doc = None
+        if extension == "pdf":
+            pdf_type, native_text, native_char_count, has_images = _classify_pdf(content)
+        elif extension == "docx":
+            native_text = _extract_native_docx(content)
+            native_char_count = len(native_text)
+        elif extension == "txt":
+            native_text = _extract_native_txt(content)
+            native_char_count = len(native_text)
+        elif extension == "doc":
+            native_text = _extract_native_doc(content)
+            native_char_count = len(native_text)
+
+        logger.info(f"[STAGE 1: NATIVE EXTRACTION] '{filename}': type={pdf_type}, chars={native_char_count}, images={has_images}")
+
+        docling_supported = extension in ["pdf", "docx"]
         fast_markdown_text = ""
         fast_duration_ms = 0.0
+        docling_doc = None
+        ocr_applied = False
 
-        try:
-            conv_result = _fast_converter.convert(doc_stream)
-            docling_doc = conv_result.document
-            fast_markdown_text = docling_doc.export_to_markdown().strip() if docling_doc else ""
-            fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
-            logger.info(
-                f"[STAGE 2: DOCLING FAST] '{filename}': extracted_chars={len(fast_markdown_text)}, duration={fast_duration_ms}ms"
-            )
-        except Exception as exc:
-            fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
-            logger.warning(f"[STAGE 2: DOCLING FAST] Conversion error for '{filename}': {exc} ({fast_duration_ms}ms)")
-            fast_markdown_text = ""
+        if docling_supported:
+            t_fast_start = time.perf_counter()
+            try:
+                doc_stream = DocumentStream(name=filename, stream=BytesIO(content))
+                conv_result = _fast_converter.convert(doc_stream)
+                docling_doc = conv_result.document
+                fast_markdown_text = docling_doc.export_to_markdown().strip() if docling_doc else ""
+                fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
+                logger.info(f"[STAGE 2: DOCLING FAST] '{filename}': chars={len(fast_markdown_text)}, duration={fast_duration_ms}ms")
+            except Exception as exc:
+                fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
+                logger.warning(f"[STAGE 2: DOCLING FAST] Error for '{filename}': {exc} ({fast_duration_ms}ms)")
 
-        # Stage 3 & 4: Selective OCR Decision & Execution
         ocr_markdown_text = ""
         ocr_duration_ms = 0.0
         fast_len = len(fast_markdown_text)
@@ -766,10 +800,6 @@ class MarkdownGenerator:
             ocr_decision = "INVOKED_SPARSE_TEXT"
 
         if ocr_decision == "INVOKED_SPARSE_TEXT":
-            logger.info(
-                f"[STAGE 3: OCR DECISION] '{filename}': decision={ocr_decision}. "
-                f"Triggering RapidOCR (pdf_type={pdf_type}, fast_docling={fast_len} chars, native={native_char_count} chars)..."
-            )
             t_ocr_start = time.perf_counter()
             try:
                 doc_stream_ocr = DocumentStream(name=filename, stream=BytesIO(content))
@@ -778,49 +808,27 @@ class MarkdownGenerator:
                 if conv_result and conv_result.document:
                     ocr_docling_doc = conv_result.document
                     ocr_markdown_text = ocr_docling_doc.export_to_markdown().strip()
-                    if len(ocr_markdown_text) > len(fast_markdown_text):
+                    if len(ocr_markdown_text) > fast_len:
                         docling_doc = ocr_docling_doc
                     ocr_applied = True
-                    logger.info(
-                        f"[STAGE 4: OCR EXECUTION] '{filename}': ocr_chars={len(ocr_markdown_text)}, duration={ocr_duration_ms}ms"
-                    )
             except Exception as ocr_exc:
                 ocr_duration_ms = round((time.perf_counter() - t_ocr_start) * 1000.0, 2)
-                logger.warning(
-                    f"[STAGE 4: OCR EXECUTION] RapidOCR warning for '{filename}': {ocr_exc} ({ocr_duration_ms}ms). "
-                    f"Non-fatal fallback to native/fast text."
-                )
-        else:
-            logger.info(
-                f"[STAGE 3: OCR DECISION] '{filename}': decision={ocr_decision}. OCR skipped."
-            )
-
-        # Stage 5: Select Best Available Text & Validate Resume JSON
+                logger.warning(f"[STAGE 4: OCR EXECUTION] Warning for '{filename}': {ocr_exc}. Fallback to native.")
+        
         parser_used = "docling_fast"
         raw_final_text = fast_markdown_text
 
-        if ocr_applied and len(ocr_markdown_text) > len(raw_final_text):
+        if ocr_applied and len(ocr_markdown_text) > max(fast_len, native_char_count):
             raw_final_text = ocr_markdown_text
             parser_used = "docling_ocr"
-
-        if len(raw_final_text.strip()) < 20 and extension == "pdf" and len(native_pdf_text.strip()) >= 20:
-            logger.info(
-                f"Using native PDF text ({len(native_pdf_text)} chars) for '{filename}' "
-                f"as primary Docling output was empty or sparse."
-            )
-            raw_final_text = native_pdf_text
-            parser_used = "native_fitz"
-        elif len(raw_final_text.strip()) < 20 and extension == "docx" and len(native_docx_text.strip()) >= 20:
-            logger.info(
-                f"Using native DOCX text ({len(native_docx_text)} chars) for '{filename}' "
-                f"as primary Docling output was empty or sparse."
-            )
-            raw_final_text = native_docx_text
-            parser_used = "native_python_docx"
+        elif docling_supported and fast_len >= settings.AUTO_OCR_MIN_TEXT_CHARS:
+            raw_final_text = fast_markdown_text
+            parser_used = "docling_fast"
+        else:
+            raw_final_text = native_text
+            parser_used = f"native_{extension}"
 
         structured_dict = docling_doc.export_to_dict() if docling_doc and hasattr(docling_doc, "export_to_dict") else {}
-
-        # Recover missing text (headers hidden in pictures, and furniture elements)
         recovered_prepend = []
         if structured_dict and "texts" in structured_dict:
             texts_list = structured_dict["texts"]
@@ -830,11 +838,8 @@ class MarkdownGenerator:
                     continue
                 label = item.get("label", "")
                 content_layer = item.get("content_layer", "")
-                
-                # Recover titles/section headers not found in the raw markdown
                 if label in ("title", "section_header") and item_text not in raw_final_text:
                     recovered_prepend.append(item_text)
-                # Recover furniture (e.g. dates misclassified as headers/footers)
                 elif content_layer == "furniture" and item_text not in raw_final_text:
                     prev_text = ""
                     for j in range(i - 1, -1, -1):
@@ -843,7 +848,6 @@ class MarkdownGenerator:
                             prev_text = prev
                             break
                     if prev_text:
-                        # Replace the LAST occurrence of prev_text to inject in proper reading order
                         parts = raw_final_text.rsplit(prev_text, 1)
                         if len(parts) == 2:
                             raw_final_text = parts[0] + prev_text + "\n\n" + item_text + parts[1]
@@ -855,27 +859,16 @@ class MarkdownGenerator:
         if recovered_prepend:
             raw_final_text = "\n\n".join(recovered_prepend) + "\n\n" + raw_final_text
 
-        # Sanitize text
         final_text_clean = TextSanitizer.sanitize(raw_final_text)
 
         if not final_text_clean or (len(final_text_clean) < 20 and "<!-- image -->" in raw_final_text):
-            logger.error(
-                f"[STAGE 5: RESUME JSON] All extraction stages failed for '{filename}'. Total chars: {len(final_text_clean)}"
-            )
-            raise ValueError(
-                f"No readable text or content could be extracted from CV document '{filename}'. "
-                f"The document may be an unreadable low-quality scan or contain only non-text image elements."
-            )
+            logger.error(f"[STAGE 5: RESUME JSON] All extraction stages failed for '{filename}'.")
+            raise ValueError(f"No readable text or content could be extracted from CV document '{filename}'.")
 
-        pages_count = (
-            len(docling_doc.pages)
-            if docling_doc and hasattr(docling_doc, "pages") and docling_doc.pages
-            else 1
-        )
+        pages_count = len(docling_doc.pages) if docling_doc and hasattr(docling_doc, "pages") and docling_doc.pages else 1
 
         is_scanned = (pdf_type == "SCANNED_PDF") or (extension == "pdf" and (
-            "<!-- image -->" in raw_final_text
-            or (ocr_applied and native_char_count < 50)
+            "<!-- image -->" in raw_final_text or (ocr_applied and native_char_count < 50)
             or (docling_doc and hasattr(docling_doc, "pictures") and len(docling_doc.pictures) > 0)
         ))
 
@@ -892,11 +885,7 @@ class MarkdownGenerator:
             "parser_used": parser_used,
         }
 
-        logger.info(
-            f"[STAGE 5: FINAL TEXT] Successful markdown extraction for '{filename}': "
-            f"type={pdf_type}, parser={parser_used}, final_chars={len(final_text_clean)}, "
-            f"pages={pages_count}, scanned={is_scanned}, ocr={ocr_applied}."
-        )
+        logger.info(f"[STAGE 5: FINAL TEXT] '{filename}': type={pdf_type}, parser={parser_used}, chars={len(final_text_clean)}")
 
         return MarkdownResult(
             markdown=final_text_clean,

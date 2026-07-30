@@ -27,10 +27,15 @@
   - Removed "developer" and "engineer" from prefilter `stop_words`.
   - Added native `python-docx` fallback extractor to `app/services/document_parser.py`.
   - Updated granular interim progress emissions in `app/services/cv_service.py` (`validation`, `parsing`, `extraction`, `ai_analysis`, `matching`, `complete`).
-  - Fixed progress mapping in `src/hooks/useCvUpload.ts`.
+  - **Job Matching Bug Fix**:
+  - Fixed `UnboundLocalError: cannot access local variable 'ConfigRepository' where it is not associated with a value` in `app/services/scoring_engine.py` when `scoring_config` is passed in from `MatchService`.
+  - Moved `ConfigRepository` to module-level imports in `app/services/scoring_engine.py` and `app/services/match_service.py`.
+  - Pre-fetched `MATCH_COMPONENT_WEIGHTS` in `match_service.py` and added fallback in `scoring_engine.py`.
+  - Added unit test `test_evaluate_job_match_with_custom_scoring_config` in `tests/test_scoring_engine.py`.
 
 ## Test Results
 - `tests/test_audit_fixes.py`: **41 / 41 passed (100%)**
+- `tests/test_scoring_engine.py`: Passed
 
 ## Files Modified
 - `app/services/vacancy_service.py`

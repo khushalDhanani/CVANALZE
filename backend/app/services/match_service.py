@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
 from app.prompts.optimized_match import build_optimized_match_prompt
+from app.repositories.config import ConfigRepository
 from app.repositories.job import JobRepository
 from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
@@ -98,6 +99,17 @@ class MatchService:
             )
         profiler.metrics.vacancies_after_filtering = len(filtered_vacancies)
 
+        # Fetch configuration thresholds once for all jobs to avoid redundant lookups
+        scoring_config = {
+            "MANDATORY_FAILURE_PENALTY_PER_ITEM": float(ConfigRepository.get_setting("MANDATORY_FAILURE_PENALTY_PER_ITEM", settings.MANDATORY_FAILURE_PENALTY_PER_ITEM)),
+            "MAX_SCORE_ON_MANDATORY_FAILURE": float(ConfigRepository.get_setting("MAX_SCORE_ON_MANDATORY_FAILURE", settings.MAX_SCORE_ON_MANDATORY_FAILURE)),
+            "LLM_SEMANTIC_WEIGHT": float(ConfigRepository.get_setting("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT)),
+            "MAX_LLM_BOOST": float(ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST)),
+            "MATCH_HIGH_THRESHOLD": float(ConfigRepository.get_setting("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD)),
+            "MATCH_MEDIUM_THRESHOLD": float(ConfigRepository.get_setting("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD)),
+            "MATCH_COMPONENT_WEIGHTS": ConfigRepository.get_setting("MATCH_COMPONENT_WEIGHTS", None),
+        }
+
         # CONFIDENCE GATE CHECK (Phase 3)
         llm_skipped = False
         if filtered_vacancies:
@@ -110,6 +122,7 @@ class MatchService:
                     candidate_ctc=candidate_ctc,
                     optimized_profile=None,
                     llm_match=None,
+                    scoring_config=scoring_config,
                 )
                 pre_llm_matches.append(pre_llm_match)
                 
@@ -174,6 +187,7 @@ class MatchService:
                     candidate_ctc=candidate_ctc,
                     optimized_profile=optimized_profile,
                     llm_match=llm_match,
+                    scoring_config=scoring_config,
                 )
 
                 # Wrap into EnrichedJobMatchResult

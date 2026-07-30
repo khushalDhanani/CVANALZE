@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = ["*"]
     REDIS_URL: str | None = None
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
-    ALLOWED_EXTENSIONS: set[str] = {"pdf", "docx"}
+    ALLOWED_EXTENSIONS: set[str] = {"pdf", "docx", "doc", "txt"}
     UPLOADS_DIR: Path = Path("uploads")
     RESULTS_DIR: Path = Path("uploads/results")
 

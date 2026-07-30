@@ -63,3 +63,42 @@ def test_api_cv_match_endpoint(monkeypatch):
     assert "primary_department" in data
     assert data["best_match"]["classification"] in ["HIGH", "MEDIUM", "LOW"]
     assert "rejection_policy_note" in data
+
+
+def test_evaluate_job_match_with_custom_scoring_config():
+    job = {
+        "id": "1",
+        "title": "Software Engineer",
+        "department": "Engineering",
+        "skills": ["Python", "FastAPI"],
+        "technologies": ["Python", "Docker"],
+        "responsibilities": ["Develop APIs"],
+        "mandatory_requirements": [],
+    }
+    cv_text = "Senior Python Developer with FastAPI and Docker experience."
+    custom_config = {
+        "MANDATORY_FAILURE_PENALTY_PER_ITEM": 20.0,
+        "MAX_SCORE_ON_MANDATORY_FAILURE": 40.0,
+        "LLM_SEMANTIC_WEIGHT": 0.3,
+        "MAX_LLM_BOOST": 15.0,
+        "MATCH_HIGH_THRESHOLD": 80.0,
+        "MATCH_MEDIUM_THRESHOLD": 60.0,
+        "MATCH_COMPONENT_WEIGHTS": {
+            "role": 0.15,
+            "skills": 0.25,
+            "experience": 0.15,
+            "education": 0.10,
+            "domain": 0.15,
+            "technology": 0.10,
+            "certification": 0.05,
+            "responsibilities": 0.05,
+        },
+    }
+    # Must not raise UnboundLocalError: ConfigRepository
+    result = ScoringEngine.evaluate_job_match(
+        cv_text=cv_text,
+        job=job,
+        scoring_config=custom_config,
+    )
+    assert result.overall_score >= 0.0
+

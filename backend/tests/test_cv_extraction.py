@@ -145,7 +145,7 @@ def test_document_parser_rejects_empty_file():
 
 def test_document_parser_rejects_invalid_extension():
     with pytest.raises(ValueError, match="Unsupported file extension"):
-        MarkdownGenerator.generate("resume.txt", b"sample content")
+        MarkdownGenerator.generate("resume.exe", b"sample content")
 
 
 def test_api_upload_cv_endpoint(sample_docx_bytes: bytes):
@@ -175,7 +175,7 @@ def test_api_upload_rejects_invalid_file_extension():
     client = TestClient(app)
     response = client.post(
         "/api/cv/upload",
-        files={"file": ("invalid.txt", b"hello world", "text/plain")},
+        files={"file": ("invalid.exe", b"hello world", "application/octet-stream")},
     )
 
     assert response.status_code == 400

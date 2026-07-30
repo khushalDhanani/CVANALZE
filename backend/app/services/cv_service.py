@@ -68,7 +68,7 @@ async def process_cv_file(
     async with lock:
         current_stage = "initialization"
         try:
-            existing_data = ResultRepository.read_result_by_filename(result_filename)
+            existing_data = await asyncio.to_thread(ResultRepository.read_result_by_filename, result_filename)
 
             if existing_data and not force_reprocess and existing_data.get("status") != "FAILED":
                 existing_hash = existing_data.get("cv_hash")
@@ -109,7 +109,7 @@ async def process_cv_file(
             current_stage = "parsing"
             
             # Helper to save interim status
-            def _save_interim_status(progress: int, stage: str):
+            async def _save_interim_status(progress: int, stage: str):
                 interim_data = {
                     "id": cv_key,
                     "scan_id": cv_key,
@@ -119,15 +119,15 @@ async def process_cv_file(
                     "filename": filename,
                 }
                 try:
-                    ResultRepository.atomic_save_result(result_filename, interim_data)
+                    await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, interim_data)
                 except Exception as e:
                     logger.warning(f"Failed to save interim status for '{cv_key}': {e}")
 
             current_stage = "validation"
-            _save_interim_status(15, current_stage)
+            await _save_interim_status(15, current_stage)
 
             current_stage = "parsing"
-            _save_interim_status(25, current_stage)
+            await _save_interim_status(25, current_stage)
 
             # Markdown Generation & Persistence stage
             t_doc_start = asyncio.get_event_loop().time()
@@ -136,7 +136,7 @@ async def process_cv_file(
             
             if md_path.exists() and not force_reprocess:
                 logger.info(f"[MD_CACHE_HIT] Reading existing markdown from '{md_filename}'.")
-                markdown_text = md_path.read_text(encoding="utf-8")
+                markdown_text = await asyncio.to_thread(md_path.read_text, encoding="utf-8")
                 
                 # Reconstruct basic MarkdownResult from existing result data
                 stage_metrics = existing_data.get("stage_metrics", {}) if existing_data else {}
@@ -166,13 +166,13 @@ async def process_cv_file(
                 )
                 markdown_text = extraction.markdown
                 settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-                md_path.write_text(markdown_text, encoding="utf-8")
+                await asyncio.to_thread(md_path.write_text, markdown_text, encoding="utf-8")
                 logger.info(f"[MD_SAVED] Saved generated markdown to '{md_filename}'.")
                 
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
             
             current_stage = "extraction"
-            _save_interim_status(35, current_stage)
+            await _save_interim_status(35, current_stage)
 
             # Compute Quality Metrics & Extract JSON
             quality_metrics = QualityMetricsCalculator.compute(
@@ -201,12 +201,12 @@ async def process_cv_file(
                 return emb
 
             current_stage = "ai_analysis"
-            _save_interim_status(50, current_stage)
+            await _save_interim_status(50, current_stage)
 
             cv_embedding = await asyncio.to_thread(_generate_and_store_embedding)
 
             current_stage = "matching"
-            _save_interim_status(75, current_stage)
+            await _save_interim_status(75, current_stage)
 
             match_analysis = await MatchService.analyze_single_cv(
                 extraction.markdown,
@@ -227,7 +227,7 @@ async def process_cv_file(
             match_analysis.candidate_name = extracted_name
 
             current_stage = "complete"
-            _save_interim_status(100, current_stage)
+            await _save_interim_status(100, current_stage)
 
 
             now_iso = datetime.now(UTC).isoformat()
@@ -293,7 +293,7 @@ async def process_cv_file(
                 "match_analysis": match_analysis.model_dump(),
             }
 
-            saved_path = ResultRepository.atomic_save_result(result_filename, result_data)
+            saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, result_data)
             result_data["result_file_path"] = str(saved_path)
             return result_data
 
@@ -342,7 +342,7 @@ async def process_cv_file(
                 "match_analysis": None,
             }
             try:
-                ResultRepository.atomic_save_result(result_filename, failure_data)
+                await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, failure_data)
             except Exception as save_exc:
                 logger.error(f"Failed to persist failure status result for '{cv_key}': {save_exc}")
             raise

@@ -2,6 +2,7 @@ import re
 from typing import Any
 
 from app.core.config import settings
+from app.repositories.config import ConfigRepository
 from app.repositories.job import JobRepository
 from app.schemas.analysis import OptimizedCandidateProfile, OptimizedVacancyMatch
 from app.schemas.match import (
@@ -424,14 +425,22 @@ class ScoringEngine:
         dynamic_profile: DynamicCandidateProfile | None = None,
         optimized_profile: OptimizedCandidateProfile | None = None,
         llm_match: OptimizedVacancyMatch | None = None,
+        scoring_config: dict[str, float] | None = None,
     ) -> JobMatchResult:
-        from app.repositories.config import ConfigRepository
-        PENALTY_PER_ITEM = float(ConfigRepository.get_setting("MANDATORY_FAILURE_PENALTY_PER_ITEM", settings.MANDATORY_FAILURE_PENALTY_PER_ITEM))
-        MAX_SCORE_ON_FAILURE = float(ConfigRepository.get_setting("MAX_SCORE_ON_MANDATORY_FAILURE", settings.MAX_SCORE_ON_MANDATORY_FAILURE))
-        LLM_SEMANTIC_WEIGHT = float(ConfigRepository.get_setting("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT))
-        MAX_LLM_BOOST = float(ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST))
-        MATCH_HIGH_THRESHOLD = float(ConfigRepository.get_setting("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD))
-        MATCH_MEDIUM_THRESHOLD = float(ConfigRepository.get_setting("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD))
+        if scoring_config is None:
+            PENALTY_PER_ITEM = float(ConfigRepository.get_setting("MANDATORY_FAILURE_PENALTY_PER_ITEM", settings.MANDATORY_FAILURE_PENALTY_PER_ITEM))
+            MAX_SCORE_ON_FAILURE = float(ConfigRepository.get_setting("MAX_SCORE_ON_MANDATORY_FAILURE", settings.MAX_SCORE_ON_MANDATORY_FAILURE))
+            LLM_SEMANTIC_WEIGHT = float(ConfigRepository.get_setting("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT))
+            MAX_LLM_BOOST = float(ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST))
+            MATCH_HIGH_THRESHOLD = float(ConfigRepository.get_setting("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD))
+            MATCH_MEDIUM_THRESHOLD = float(ConfigRepository.get_setting("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD))
+        else:
+            PENALTY_PER_ITEM = scoring_config["MANDATORY_FAILURE_PENALTY_PER_ITEM"]
+            MAX_SCORE_ON_FAILURE = scoring_config["MAX_SCORE_ON_MANDATORY_FAILURE"]
+            LLM_SEMANTIC_WEIGHT = scoring_config["LLM_SEMANTIC_WEIGHT"]
+            MAX_LLM_BOOST = scoring_config["MAX_LLM_BOOST"]
+            MATCH_HIGH_THRESHOLD = scoring_config["MATCH_HIGH_THRESHOLD"]
+            MATCH_MEDIUM_THRESHOLD = scoring_config["MATCH_MEDIUM_THRESHOLD"]
         
         # 1. Normalize CV & Profile Text
         profile_parts = [cv_text]
@@ -852,7 +861,7 @@ class ScoringEngine:
 
 
         # Calculate Overall Raw Score (Weighted)
-        weights = ConfigRepository.get_setting("MATCH_COMPONENT_WEIGHTS", {
+        weights = (scoring_config.get("MATCH_COMPONENT_WEIGHTS") if scoring_config else None) or ConfigRepository.get_setting("MATCH_COMPONENT_WEIGHTS", {
             "role": 0.15,
             "skills": 0.25,
             "experience": 0.15,

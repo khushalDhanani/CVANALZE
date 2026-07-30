@@ -28,6 +28,8 @@ class JobRepository:
 
     _VACANCY_CACHE_KEY = VACANCY_CACHE_KEY
     _VERSION_CACHE_KEY = "all_jobs_version"
+    _STALENESS_CACHE: dict[str, tuple[float, bool]] = {}
+    _STALENESS_TTL = 10.0
 
     @classmethod
     def invalidate_cache(cls) -> None:
@@ -168,6 +170,13 @@ class JobRepository:
         and compares against cached count. Falls back to not-stale if DB
         is unavailable.
         """
+        import time
+        now = time.monotonic()
+        if stored_version in cls._STALENESS_CACHE:
+            cached_time, cached_result = cls._STALENESS_CACHE[stored_version]
+            if now - cached_time < cls._STALENESS_TTL:
+                return cached_result
+
         close_session = False
         if db is None and SessionLocal is not None:
             try:
@@ -189,9 +198,13 @@ class JobRepository:
                 or_(RecruitVacancyRequest.VacancyRequestClose == False,
                     RecruitVacancyRequest.VacancyRequestClose.is_(None)),
             ).scalar() or 0
-            return count != len(stored_jobs)
+            
+            is_stale_result = count != len(stored_jobs)
+            cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
+            return is_stale_result
         except Exception as exc:
             logger.warning(f"Staleness check failed: {exc}")
+            cls._STALENESS_CACHE[stored_version] = (now, False)
             return False
         finally:
             if close_session:
