@@ -87,8 +87,13 @@ class ResultRepository:
         results: list[str | Path] = []
         if _REDIS_CLIENT:
             try:
-                keys = _REDIS_CLIENT.keys(f"cv_result:*{scan_id}*.json")
-                results.extend([f"redis://{k}" for k in keys])
+                cursor = 0
+                pattern = f"cv_result:*{scan_id}*.json"
+                while True:
+                    cursor, keys = _REDIS_CLIENT.scan(cursor=cursor, match=pattern, count=100)
+                    results.extend([f"redis://{k}" for k in keys])
+                    if cursor == 0:
+                        break
             except Exception as exc:
                 logger.warning(f"Redis scan failed for scan_id {scan_id}: {exc}")
 

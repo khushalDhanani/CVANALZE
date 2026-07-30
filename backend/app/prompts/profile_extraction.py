@@ -24,7 +24,7 @@ def build_profile_extraction_prompt(cv_text: str) -> str:
             "10. For every extracted field, there must be corresponding evidence in the CV. If no evidence exists, omit the field or set it to empty. "
             "11. Never use generic terms like 'strong communication skills' unless the CV explicitly mentions them."
         ),
-        "candidate_cv_markdown": cv_text,
+        "candidate_cv_markdown": cv_text[:7500],
     }
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)

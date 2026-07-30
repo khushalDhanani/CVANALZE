@@ -160,10 +160,12 @@ export function useCvUpload() {
               setStatusMessage(msg);
 
               const stageMap: Record<string, number> = {
+                 'validation': 1,
                  'parsing': 2,
                  'extraction': 3,
                  'ai_analysis': 4,
                  'matching': 5,
+                 'ranking': 6,
                  'complete': 7
               };
               let nextStep = currentStepIndexRef.current;
@@ -176,6 +178,7 @@ export function useCvUpload() {
                   else if (prog >= 50) nextStep = 4;
                   else if (prog >= 35) nextStep = 3;
                   else if (prog >= 20) nextStep = 2;
+                  else if (prog >= 10) nextStep = 1;
               }
 
               if (nextStep === 4 && !isEnriched) {
@@ -198,10 +201,12 @@ export function useCvUpload() {
               setFailedStepName(failedRes.failed_step || null);
               
               const stageMap: Record<string, number> = {
+                 'validation': 1,
                  'parsing': 2,
                  'extraction': 3,
                  'ai_analysis': 4,
                  'matching': 5,
+                 'ranking': 6,
                  'complete': 7
               };
               let fIndex = currentStepIndexRef.current;
@@ -240,10 +245,12 @@ export function useCvUpload() {
               setStatusMessage(msg);
 
               const stageMap: Record<string, number> = {
+                 'validation': 1,
                  'parsing': 2,
                  'extraction': 3,
                  'ai_analysis': 4,
                  'matching': 5,
+                 'ranking': 6,
                  'complete': 7
               };
               let nextStep = currentStepIndexRef.current;
@@ -256,6 +263,7 @@ export function useCvUpload() {
                   else if (prog >= 50) nextStep = 5; // AI Analysis skipped
                   else if (prog >= 35) nextStep = 3;
                   else if (prog >= 20) nextStep = 2;
+                  else if (prog >= 10) nextStep = 1;
               }
 
               setCurrentStepIndex(nextStep);

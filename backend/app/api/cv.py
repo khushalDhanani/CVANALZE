@@ -83,9 +83,10 @@ async def upload_cv(
         ) from exc
 
     except Exception as exc:
+        logger.exception(f"Failed to process CV: {exc}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process CV: {exc}",
+            detail="An internal error occurred while processing the CV.",
         ) from exc
 
 
@@ -100,9 +101,10 @@ async def match_cv_text(payload: CVMatchRequest):
     try:
         return ScoringEngine.analyze_cv(payload.cv_text)
     except Exception as exc:
+        logger.exception(f"Failed to analyze CV text: {exc}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to analyze CV text: {exc}",
+            detail="An internal error occurred during CV analysis.",
         ) from exc
 
 

@@ -112,7 +112,7 @@ class VacancyPreFilter:
 
         # STAGE 2: Deterministic VacancyPreFilter (lexical + RRF fusion on Stage 1 candidates)
         cv_lower = cv_text.lower()
-        stop_words = {"and", "team", "for", "the", "with", "senior", "junior", "lead", "manager", "developer", "engineer", "specialist"}
+        stop_words = {"and", "team", "for", "the", "with", "senior", "junior", "lead", "manager", "specialist"}
 
         # 1. Fetch Vector Ranks (pgvector)
         vec_ranks = {}

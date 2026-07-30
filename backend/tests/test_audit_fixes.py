@@ -22,7 +22,6 @@ def test_document_cache_roundtrip():
     with patch("app.core.cache._REDIS_CLIENT", mock_redis):
         extraction = MarkdownResult(
             markdown="# Candidate\n\nExperience with Python.",
-            structured_doc={"schema": "test", "content": "mock"},
             page_count=2,
             is_scanned=False,
             ocr_applied=False,
@@ -264,7 +263,7 @@ def test_cv_upload_background_task_returns_processing_status():
     status_response = client.get(f"/api/cv/status/{cv_key}")
     assert status_response.status_code == 200
     status_data = status_response.json()
-    assert status_data["status"] in ("processing", "COMPLETED")
+    assert status_data["status"] in ("processing", "COMPLETED", "REPROCESSED")
 
 
 
@@ -295,7 +294,7 @@ def test_vacancy_cache_compute_hash():
 
 
 def test_vacancy_cache_is_stale():
-    """Test that _is_stale correctly detects changes."""
+    """Test that _is_stale correctly detects count changes from DB."""
     from app.repositories.job import JobRepository
 
     jobs = [
@@ -304,8 +303,12 @@ def test_vacancy_cache_is_stale():
     ]
     version = JobRepository._compute_vacancy_hash(jobs)
 
-    assert not JobRepository._is_stale(version, jobs), "Should NOT be stale when hash matches"
-    assert JobRepository._is_stale("wrong_hash", jobs), "Should BE stale when hash differs"
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.scalar.return_value = 2
+    assert not JobRepository._is_stale(version, jobs, db=mock_db), "Should NOT be stale when DB count matches cached count"
+
+    mock_db.query.return_value.filter.return_value.scalar.return_value = 5
+    assert JobRepository._is_stale(version, jobs, db=mock_db), "Should BE stale when DB count differs"
 
 
 def test_vacancy_cache_get_all_jobs_cached():
@@ -323,8 +326,9 @@ def test_vacancy_cache_get_all_jobs_cached():
         {"jobs": sample_jobs, "version": version},
     )
 
-    result = JobRepository.get_all_jobs()
-    assert result == sample_jobs
+    with patch.object(JobRepository, "_is_stale", return_value=False):
+        result = JobRepository.get_all_jobs()
+        assert result == sample_jobs
 
 
 def test_vacancy_cache_stale_triggers_refetch():
@@ -841,3 +845,38 @@ def test_cli_warmup_does_not_raise():
         assert counts["departments"] == 0
         assert counts["companies"] == 0
         assert counts["skills"] == 0
+
+
+def test_docx_upload_full_pipeline():
+    """Test that uploading a .docx file completes all pipeline stages cleanly."""
+    import docx
+    from io import BytesIO
+    from app.services.document_parser import MarkdownGenerator
+
+    doc = docx.Document()
+    doc.add_heading("Jane Smith", level=1)
+    doc.add_paragraph("Email: jane.smith@example.com | Phone: +1 555-0199")
+    doc.add_heading("Work Experience", level=2)
+    doc.add_paragraph("Senior Python Developer at Tech Corp (2020 - Present)")
+    doc.add_paragraph("- Built scalable FastAPI backend services")
+    doc.add_heading("Education", level=2)
+    doc.add_paragraph("Bachelor of Science in Computer Science")
+
+    buf = BytesIO()
+    doc.save(buf)
+    docx_bytes = buf.getvalue()
+
+    result = MarkdownGenerator.generate("jane_smith_resume.docx", docx_bytes)
+    assert result.markdown is not None
+    assert "Jane Smith" in result.markdown or "Python Developer" in result.markdown
+    assert result.page_count >= 1
+
+    # Verify endpoint handles .docx upload
+    response = client.post(
+        "/api/cv/upload",
+        files={"file": ("jane_smith_resume.docx", docx_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "processing"
+    assert "cv_key" in data

@@ -48,7 +48,7 @@ class JobRepository:
         stop_words = {
             "and", "team", "for", "the", "with",
             "senior", "junior", "lead", "manager",
-            "developer", "engineer", "specialist",
+            "specialist",
         }
 
         dept_name = (job.get("department_name") or job.get("department") or "").lower()
@@ -164,13 +164,38 @@ class JobRepository:
         db: Session | None = None,
     ) -> bool:
         """
-        Lightweight staleness check: computes the hash of the currently cached
-        vacancy identities (ID + title) and compares it against the stored version.
-        This avoids a DB round-trip by re-hashing what we already have in memory.
-        If the hash matches, the data has not changed.
+        Lightweight staleness check: queries DB for active vacancy count
+        and compares against cached count. Falls back to not-stale if DB
+        is unavailable.
         """
-        current_hash = cls._compute_vacancy_hash(stored_jobs)
-        return current_hash != stored_version
+        close_session = False
+        if db is None and SessionLocal is not None:
+            try:
+                db = SessionLocal()
+                close_session = True
+            except Exception:
+                return False
+
+        if db is None:
+            return False
+
+        try:
+            from sqlalchemy import func, or_
+            from app.models.recruit import RecruitVacancyRequest
+            count = db.query(func.count(RecruitVacancyRequest.VacancyRequestID)).filter(
+                RecruitVacancyRequest.VacancyRequestIsActive == True,
+                or_(RecruitVacancyRequest.VacancyRequestIsDeleted == False,
+                    RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None)),
+                or_(RecruitVacancyRequest.VacancyRequestClose == False,
+                    RecruitVacancyRequest.VacancyRequestClose.is_(None)),
+            ).scalar() or 0
+            return count != len(stored_jobs)
+        except Exception as exc:
+            logger.warning(f"Staleness check failed: {exc}")
+            return False
+        finally:
+            if close_session:
+                db.close()
 
     @classmethod
     def _cache_vacancy_embeddings(cls, job_dicts: list[dict[str, Any]]) -> None:

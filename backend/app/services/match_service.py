@@ -18,65 +18,6 @@ from app.services.vacancy_prefilter import VacancyPreFilter
 
 
 class MatchService:
-    @classmethod
-    def _find_relevant_department_vacancies(cls, cv_text: str, openings: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str], list[int]]:
-        """
-        Dynamically narrows active vacancies to relevant department vacancies by matching
-        candidate CV against active department names and job titles.
-        """
-        cv_lower = cv_text.lower()
-        dept_map = {}
-
-        for job in openings:
-            dept_id = job.get("department_id")
-            dept_name = job.get("department_name") or job.get("department") or "Unknown Department"
-            if dept_id is None:
-                continue
-
-            if dept_id not in dept_map:
-                dept_map[dept_id] = {
-                    "dept_id": dept_id,
-                    "dept_name": dept_name,
-                    "vacancies": [],
-                    "score": 0.0
-                }
-            dept_map[dept_id]["vacancies"].append(job)
-
-            title = job.get("title", "").lower()
-            title_terms = [t for t in re.split(r"[\s/&()\-,]+", title) if len(t) > 2 and t not in {"and", "team", "for", "the", "with"}]
-            matched_terms = [t for t in title_terms if t in cv_lower]
-
-            score = len(matched_terms) * 10.0
-            if dept_name.lower() in cv_lower:
-                score += 30.0
-
-            dept_map[dept_id]["score"] += score
-
-        relevant_depts = [d for d in dept_map.values() if d["score"] > 0]
-        relevant_depts.sort(key=lambda d: d["score"], reverse=True)
-        relevant_depts = relevant_depts[:3]
-
-        if not relevant_depts:
-            dept_names = list({d["dept_name"] for d in dept_map.values()})
-            dept_ids = sorted(dept_map.keys())
-            return openings, dept_names, dept_ids
-
-        narrowed_vacancies = []
-        for d in relevant_depts:
-            narrowed_vacancies.extend(d["vacancies"])
-
-        for job in narrowed_vacancies:
-            title = job.get("title", "").lower()
-            title_terms = [t for t in re.split(r"[\s/&()\-,]+", title) if len(t) > 2 and t not in {"and", "team", "for", "the", "with"}]
-            matched_terms = [t for t in title_terms if t in cv_lower]
-            job["_temp_rel"] = len(matched_terms)
-
-        narrowed_vacancies.sort(key=lambda j: j.get("_temp_rel", 0), reverse=True)
-        narrowed_vacancies = narrowed_vacancies[:10]
-
-        dept_names = [d["dept_name"] for d in relevant_depts]
-        dept_ids = [d["dept_id"] for d in relevant_depts]
-        return narrowed_vacancies, dept_names, dept_ids
 
     @staticmethod
     async def analyze_single_cv(
@@ -288,9 +229,7 @@ class MatchService:
             evaluated_matches.sort(key=lambda m: m.score, reverse=True)
 
             if evaluated_matches:
-                print("\n" + "="*60)
-                print("🏆 MATCHING PIPELINE DEBUG OUTPUT")
-                print("="*60)
+                logger.debug("MATCHING PIPELINE DEBUG OUTPUT")
                 for i, m in enumerate(evaluated_matches):
                     if i == 0:
                         m.ranking_reason = f"Ranked #1 with highest verified score of {m.score}%."
@@ -305,14 +244,12 @@ class MatchService:
                     
                     fails_snippet = "; ".join(f"{f.description}" for f in m.mandatory_failures) if m.mandatory_failures else "None"
                     
-                    print(f"[VACANCY] ID: {m.vacancy_id} | Title: {m.job_title}")
-                    print(f" -> Overall Score: {m.score}% (Coverage: {int(m.coverage * 100)}%)")
-                    print(f" -> SubScores: Role={m.role_score}, Skills={m.skills_score}, Exp={m.experience_score}, Edu={m.education_score}, Domain={m.domain_score}, Tech={m.technology_score}")
-                    print(f" -> Mandatory Fails: {fails_snippet}")
-                    print(f" -> Evidence: {evidence_snippet}")
-                    print(f" -> Ranking Reason: {m.ranking_reason}")
-                    print("-" * 60)
-                print()
+                    logger.debug(
+                        f"[VACANCY] ID: {m.vacancy_id} | Title: {m.job_title} | "
+                        f"Overall Score: {m.score}% (Coverage: {int(m.coverage * 100)}%) | "
+                        f"SubScores: Role={m.role_score}, Skills={m.skills_score}, Exp={m.experience_score}, Edu={m.education_score}, Domain={m.domain_score}, Tech={m.technology_score} | "
+                        f"Mandatory Fails: {fails_snippet} | Evidence: {evidence_snippet} | Ranking Reason: {m.ranking_reason}"
+                    )
 
         profiler.finish()
         profiler.log_summary()

@@ -1,290 +1,56 @@
-# CV Analyzer - Work Status
+# Work Status
 
-## Work Completed
-- **Phase 1: Vacancy Caching**
-  - Added in-memory caching to `JobRepository.get_all_jobs()` to eliminate repetitive DB queries per CV.
-  - Decreased vacancy retrieval latency from ~1776ms to ~0.5ms.
-- **Phase 2: Task Queue Architecture**
-  - Installed `rq` and configured Redis as a message broker for distributed processing.
-  - Replaced the synchronous loop in `main.py` with `scan_uploads_directory` enqueuing background tasks.
-  - Implemented `start_worker.py` to spawn independent concurrent workers (fixed macOS fork safety issues).
-  - Validated linear scaling of performance across 3 concurrent workers.
-- **Phase 3: LLM Bypass (Confidence Gating)**
-  - Implemented a configurable fast-track check using `ScoringEngine.evaluate_job_match()` prior to LLM processing.
-  - Added `LLM_SKIP_MARGIN_THRESHOLD` (15.0) and `LLM_SKIP_COVERAGE_THRESHOLD` (0.50) to configurations.
-  - Successfully bypassed 100% of LLM calls on standard unambiguous matches, cutting LLM latency (80s+) to 0ms.
-- **Phase 4: Optimization Analysis**
-  - Analyzed the Python regex pre-filter time complexity (strictly `O(V)`).
-  - Determined that an embedding-based ANN filter (FAISS/pgvector) is unnecessary until vacancy counts hit roughly 3,000–5,000.
-- **Phase 5: Frontend Tailwind CSS Setup (React Native / NativeWind v4)**
-  - Installed `nativewind` and `tailwindcss` in `frontend`.
-  - Configured `tailwind.config.js`, `metro.config.js` (`withNativeWind`), and `babel.config.js` (`jsxImportSource: 'nativewind'`).
-  - Added `@tailwind base;`, `@tailwind components;`, `@tailwind utilities;` to `frontend/src/global.css`.
-  - Imported `global.css` in `frontend/src/app/_layout.tsx`.
-  - Added `nativewind-env.d.ts` and updated `tsconfig.json` for TypeScript type support.
-- **Phase 6: Frontend API Integration Layer**
-  - Configured platform-aware HTTP base client in `frontend/src/constants/config.ts` & `frontend/src/services/apiClient.ts`.
-  - Created complete TypeScript contracts matching all backend Pydantic models in `frontend/src/types/api.ts`.
-  - Implemented modular API services: `cvService`, `matchService`, `jobsService`, `batchService` (with WebSocket streaming), and `configService`.
-  - Developed custom React hooks: `useJobs`, `useCvUpload`, `useMatchConfig`, and `useBatchProgress`.
-- **Phase 7: Full Production UI & Vector Icons Migration**
-  - Installed `@expo/vector-icons`.
-  - Replaced all emoji characters across all screens (`index.tsx`, `cv-match.tsx`, `vacancies.tsx`, `batch.tsx`, `config.tsx`, `HrReviewModal.tsx`, `app-tabs.web.tsx`) with professional `Feather` vector icons.
-- **Phase 8: Web Upload, Deprecation Warnings, Formatting & Icon Fixes**
-  - Fixed Web browser `FormData` file upload handling in `apiClient.ts` to send valid `File`/`Blob` objects instead of stringified objects.
-  - Added native browser file picker dialog in `cv-match.tsx`.
-  - Replaced deprecated `shadow*` props in `app-tabs.web.tsx` with standard `boxShadow`.
-  - Cleared invalid `Ionicons` name warnings.
-  - Fixed `Cannot read properties of undefined (reading 'toLowerCase')` in `vacancies.tsx` using null-safe string fallbacks.
-  - Fixed duplicate key warning in `vacancies.tsx` and `batch.tsx` `keyExtractor` with index fallbacks.
-  - Implemented Indian Rupees (`₹`) formatting in `en-IN` locale and LPA handling in `vacancies.tsx`.
-  - Replaced `dollar-sign` vector icon in `vacancies.tsx` with `FontAwesome5` `rupee-sign` icon.
-  - Verified 0 TypeScript errors via `npx tsc --noEmit`.
-- **Phase 9: Sidebar Navigation Refactoring**
-  - Scaffolded a responsive `SidebarLayout` component complying with the `UI.md` compact design system.
-  - Implemented automatic drawer management for phone-sized screens, alongside static sidebar behavior for larger screens.
-  - Wired active route state directly to Expo Router's `usePathname()`.
-  - Configured navigation actions to use `router.push()` from Expo Router.
-  - Integrated `SidebarLayout` into the main application shell (`app/_layout.tsx`), replacing `AppTabs`.
-- **Phase 10: Typography & Custom Fonts Loading**
-  - Installed `@expo-google-fonts/inter` to support the custom fonts defined in `tailwind.config.js`.
-  - Integrated `useFonts` within `app/_layout.tsx` to properly load `Inter_400Regular`, `Inter_500Medium`, `Inter_600SemiBold`, and `Inter_700Bold`.
-  - Added robust font loading logic hooked with `expo-splash-screen` to prevent layout shift and missing font crashes on native builds.
-- **Phase 11: Fleshing out the Config Screen (LLM Bypass Settings)**
-  - Modified the backend `MatchEngineConfigUpdate` and `MatchEngineConfigResponse` schemas in `schemas/config.py` to expose `LLM_SKIP_MARGIN_THRESHOLD` and `LLM_SKIP_COVERAGE_THRESHOLD`.
-  - Updated `backend/app/api/config.py` to correctly map these new settings from the `ConfigRepository`.
-  - Updated frontend `types/api.ts` to match the newly exposed properties.
-  - Revamped `frontend/src/app/config.tsx` by adding a dedicated UI section ("LLM Bypass (Fast-Track) Settings") allowing users to modify the margin and coverage thresholds dynamically.
-- **Phase 12: UI.md Compliance & Vector Icons Migration**
-  - Replaced `@expo/vector-icons` with `lucide-react-native` across all screens and components.
-  - Migrated all icon usages to their `lucide-react-native` equivalents (Feather → lucide-react-native icons).
-  - Replaced dollar-sign icon with `FontAwesome5` rupee-sign, then transitioned to `lucide-react-native` IndianRupee icon to maintain Indian Rupee branding.
+## Last Updated
+2026-07-30T10:44:00Z
 
-- **Phase 13: Scanned PDF OCR Failure Guard**
-  - Fixed "No candidate CV text provided" LLM error caused by scanned PDFs where OCR fails to extract text.
-  - Added post-OCR text quality check in `DocumentParser.parse()` to raise `ValueError` when extracted text is just `<!-- image -->` or below a minimum threshold after OCR.
-  - Added early validation in `MatchService.analyze_single_cv()` to reject image-only CV text before reaching the LLM, covering reanalysis paths.
-- **Phase 14: Processing Timeout Fix**
-  - Fixed "Processing timed out" frontend error caused by polling timeout (2 min) shorter than backend processing time (up to 10 min).
-  - Removed duplicate LLM call in `background_upload_and_analyze` — `process_cv_file` already does full LLM analysis, so `analyze_from_result_file` was redundant.
-  - Updated status endpoint to return `match_analysis` directly from the basic result file (no need for separate `_enriched.json` step).
-  - Increased frontend polling limits: `POLL_INTERVAL_MS` 2s→3s, `MAX_POLL_RETRIES` 60→250 (3s × 250 = 12.5 min total).
-  - Improved timeout error message to suggest checking candidates list.
-- **Phase 16: Pipeline Optimization & LLM Reasoning Reliability**
-  - **Eliminated Ollama GPU VRAM Model-Swapping Thrashing**: Removed unused synchronous `EmbeddingService.generate_embedding` call in `process_cv_file` that forced Ollama to constantly unload and re-load GPU model weights (`nomic-embed-text` vs `qwen`).
-  - **CV Context Truncation Fix**: Expanded `cleaned_cv` character limit from 3,500 to 7,500 characters in `optimized_match.py`, eliminating context truncation on multi-page resumes that previously caused false "No evidence found" warnings.
-  - **Strict Pydantic JSON Schema for Ollama Grammar Enforcement**: Added concrete `ClassifiedRequirementItem` and `RequirementEvidence` sub-models in `analysis.py`, eliminating unconstrained `dict[str, Any]` grammars in Ollama and preventing JSON parsing/validation failures.
-  - **Module-Level Thread Pool Reuse**: Replaced thread pool context manager instantiation per document parse with a persistent module-level `ThreadPoolExecutor(max_workers=4)` in `document_parser.py`.
-  - **Persistent HTTP Client Sessions**: Added persistent `_get_httpx_client()` session pool in `llm_service.py` to reuse TCP connections across Ollama LLM requests.
-  - **8-Stage Execution Profiling**: Updated `PipelineProfiler` and `PipelineStageMetrics` to track and log execution times for all 8 pipeline stages (`upload_ms`, `docling_extraction_ms`, `resume_json_ms`, `db_query_ms`, `cache_lookup_ms`, `prefilter_ms`, `ollama_request_ms`/`model_inference_ms`, `scoring_ms`/`matching_ms`, `total_execution_ms`).
+## Completed
+- **Full Backend Diagnostic Audit**: Completed (66 files audited, 14 findings identified).
+- **Implementation Plan**: Approved and executed across 6 phases.
+- **Phase 1 (HIGH Fixes)**:
+  - `app/services/vacancy_service.py`: Fixed skill double-counting by setting `preferred_keywords=[]`.
+  - `app/services/scoring_engine.py`: Fixed education and certification domain matching logic.
+  - `app/repositories/job.py`: Fixed `_is_stale()` no-op by introducing active vacancy DB count check.
+- **Phase 2 (MEDIUM Data Integrity)**:
+  - `app/repositories/config.py`: Moved cache update inside try block after DB commit.
+  - `app/api/analysis.py`: Added Pydantic schema validation to `/match/status/{cv_key}` response.
+- **Phase 3 (MEDIUM API Hardening)**:
+  - `app/api/cv.py`, `app/api/analysis.py`, `app/api/candidates.py`, `app/api/config.py`, `app/api/jobs.py`: Sanitized all 500 error responses and added try-except handlers.
+- **Phase 4 (MEDIUM LLM Structured Output)**:
+  - `app/services/llm_service.py`: Enforced JSON schema format parameter across all Ollama generate API calls.
+- **Phase 5 (LOW Cleanup)**:
+  - Deleted dead file `app/services/match_engine.py`.
+  - Removed dead method `_find_relevant_department_vacancies` from `app/services/match_service.py`.
+  - Replaced debug `print()` statements with `logger.debug()`.
+  - Replaced Redis `KEYS` with `SCAN` in `app/repositories/result.py`.
+- **Phase 6 (LOW Tuning & DOCX Support)**:
+  - Truncated `cv_text` in `app/prompts/profile_extraction.py` to 7500 chars.
+  - Removed "developer" and "engineer" from prefilter `stop_words`.
+  - Added native `python-docx` fallback extractor to `app/services/document_parser.py`.
+  - Updated granular interim progress emissions in `app/services/cv_service.py` (`validation`, `parsing`, `extraction`, `ai_analysis`, `matching`, `complete`).
+  - Fixed progress mapping in `src/hooks/useCvUpload.ts`.
 
-- **Phase 18: Upload Pipeline CACHE MISS & Terminal Status Persistence**
-  - **Fixed FileCache Key Path Sanitization**: Sanitized colon namespaces (`cv_result:cv_key.json` → `cv_key.json`) in `FileCache._path()` and `_sanitize_key()`, eliminating duplicate `.json.json` file extension corruption and resolving disk cache lookups returning permanent `CACHE MISS`.
-  - **Dual Storage & Disk Persistence**: Guaranteed atomic disk file persistence (`backend/app/uploads/results/<filename>`) in `ResultRepository.atomic_save_result()` regardless of Redis status, and added automatic disk fallback/backfill in `read_result_by_filename()`.
-  - **Terminal Failure Persistence**: Wrapped processing in `process_cv_file()` with exception handling that writes a `status: "FAILED"` result JSON containing the specific failure error message on any Docling, OCR, text validation, or LLM error.
-  - **Terminal Status Endpoint Handling**: Updated `/api/match/status/{cv_key}` and `/api/cv/status/{cv_key}` to immediately return terminal failure responses (`status: "FAILED"`, `progress: 100`, `message: failure_error`) when processing fails.
-- **Phase 20: CV Extraction Redesign & PDF Classification Architecture**
-  - **PDF Type Classifier**: Added PyMuPDF (`fitz`) document inspection in `_classify_pdf()` to classify documents into `TEXT_PDF`, `HYBRID_PDF`, or `SCANNED_PDF`.
-  - **Primary Docling Extractor**: Designated Docling fast converter (`do_ocr = False`) as the primary extractor for all `TEXT_PDF` and `HYBRID_PDF` documents.
-  - **Guarded OCR Decision Logic**: Set OCR decision to `SKIPPED_TEXT_PRESENT` for `TEXT_PDF` and `HYBRID_PDF` documents with valid text. OCR is invoked **only** for `SCANNED_PDF` or when both fast Docling and native text are sparse (< 500 chars).
-  - **Non-Fatal OCR Fallback**: Prevented OCR failures or poor outputs from aborting jobs when valid text is extracted by fast Docling or native PyMuPDF.
-  - **Stage-Level Execution Tracking**: Added metadata (`pdf_type`, `parser_used`, `ocr_decision`, `stage_metrics`) to `ExtractionResult` and persisted result JSONs.
-- **Phase 21: Pipeline Audit & Exception Call Stack Verification**
-  - **Code Audit & Search Verification**: Located all occurrences of `raise ValueError`, `RapidOCR`, `_get_ocr_converter`, and document parsing entry points across the codebase.
-  - **Execution Path Traceability**: Confirmed complete trace for Upload → Queue → Worker → DocumentParser → Resume Extraction → Matching. Verified single unified pipeline path.
-  - **Stale Bytecode Root Cause**: Discovered that the terminal exception (`ValueError: OCR could not extract meaningful text...`) originated from stale in-memory module bytecode in the previously running uvicorn process, which was started before the Phase 20 `document_parser.py` updates were compiled into bytecode.
-  - **Architecture Integrity**: Confirmed 0 duplicate `DocumentParser` classes, 0 legacy OCR pipelines, and 1 unified extraction pipeline (`backend/app/services/document_parser.py`).
-- **Phase 22: Frontend UI & Candidate Profile Enhancements**
-  - **Button Component Upgrade**: Updated `Button.tsx` to support optional vector icon props (`icon?: React.ReactNode`) and clean icon-only button layouts.
-  - **Candidate Detail Profile Screen**: Integrated vector `ArrowLeft` navigation and added `HrReviewModal` support into `src/app/candidates/[id].tsx`, enabling HR managers to review and correct candidate scores directly from their candidate profile.
-  - **Dashboard Quick Workflows**: Added `Candidate Directory` shortcut row to `src/app/index.tsx` for fast navigation to candidate profiles.
-  - **Sidebar & Navigation Sync**: Verified all routes (`/`, `/cv-match`, `/candidates`, `/vacancies`, `/batch`, `/config`) map cleanly in `SidebarLayout.tsx`.
-- **Phase 23: Complete API Integration Coverage**
-  - **Master Data API Service**: Created `masterDataService.ts` mapping all `/api/master-data/*` endpoints (`getJobProfiles`, `getDepartments`, `getCompanies`, `getSkills`, `warmCache`).
-  - **Analytics API Service**: Created `analyticsService.ts` mapping `/api/analytics/cache` and defined `CacheAnalyticsResponse` in `types/api.ts`.
-- **Phase 25: Frontend pgvector Integration Implementation**
-  - **Types Update**: Extended `JobMatchScore` and `EnrichedJobEvaluation` in `types/api.ts` with `retrieval_source` (`"keyword" | "vector" | "both"`) and optional `vector_score`.
-  - **Match Analysis UI**: Added visual badges (`Hybrid (Keyword + Vector)`, `pgvector Match`, `Keyword Match`) in `MatchAnalysisCard.tsx` header.
-  - **CV Match Screen**: Added `retrieval_source` badges to candidate match list items in `cv-match.tsx`.
-  - **Batch Screen**: Added `retrieval_source` badges to candidate results in `batch.tsx`.
-  - **Candidate Detail Profile**: Added `retrieval_source` badges to candidate detail profile match card in `candidates/[id].tsx`.
-  - **Home Screen System Health**: Separated top `StatCard` grid into distinct cards for **MSSQL Primary DB** and **pgvector DB**, and added explicit MSSQL Primary DB row alongside PostgreSQL (Vector DB) in `index.tsx`.
-  - **Phase 26: /cv-match UI & 8-Step CV Processing Redesign**
-  - **Upload CV Default Tab**: Set `activeTab` initial state to `'file'` and updated `SegmentedControl` so "Upload CV File" is the first, primary option.
-  - **Modern 8-Step Processing UI**: Built `StepProgressCard` visualizing all 8 pipeline stages (Upload → Validation → Parsing → Resume Extraction → AI Analysis → Matching → Ranking → Complete) with step icons, live ticking timer, progress bar, active pulse indicators, skipped badges, and failure alerts.
-  - **Hook Enhancements**: Enhanced `useCvUpload.ts` with `elapsedSeconds` ticker, `currentStepIndex`, `stepStates` tracking, and automatic handling for LLM-disabled fast-track modes.
-  - **Visual Feedback & Error Resilience**: Replaced blank waiting states with active step feedback, live backend status messages, and inline retry buttons.
-  - **Phase 27: Dynamic Scoring Engine & Alias Enhancement**
-  - **Flexible Term Matching**: Enhanced `ScoringEngine._extract_term_matches` with sub-token extraction, stop-word filtering, and alias resolution (`navigation` $\rightarrow$ route/maps/places/directions/eta, `widgets` $\rightarrow$ UI/widgets, `apis` $\rightarrow$ RESTful/HTTP APIs, `version control` $\rightarrow$ Git/GitHub).
-  - **Cross-Domain Divergence Guard**: Implemented domain mismatch penalty preventing IT/Software candidates (e.g. Flutter Developers) from falsely scoring HIGH on unrelated non-IT operational roles (e.g. Plant Assistant / Maintenance) simply due to general engineering degrees.
-  - **Phase 28: Candidate Details Re-run Analysis Upgrade**
-  - **Re-run Analysis Action**: Added a **"Re-run Analysis"** action button to `/candidates/{cv_id}` with a modal confirmation dialog warning that all cached data will be invalidated and reprocessed from scratch.
-  - **Backend Cache Purge & Reprocessing**: Created `POST /api/v1/candidates/{candidate_id}/reprocess` invalidating `cv_result_cache_manager`, `doc_cache_manager`, `llm_cache_manager`, `embedding_cache_manager`, and `match_result_cache_manager`.
-  - **Raw File Preservation**: Updated upload endpoints to save raw uploaded files to `settings.UPLOADS_DIR`. Synthesizes valid PDF bytes if original upload was absent.
-  - **Live Step Progress UI & Timestamp**: Embedded `StepProgressCard` displaying 8-stage progress, live elapsed ticker (`00:04s`), formatted `Last Analyzed: Jul 29, 2026, 5:02 PM` timestamp, and auto-refresh upon completion.
-  - **Phase 29: CV Text Extraction Pipeline Audit & Optimization**
-  - **PyMuPDF Layout-Aware Classification**: Enhanced `_classify_pdf` with `page.get_text("text", sort=True)` to preserve multi-column reading order and prevent interleaved layout text.
-  - **TextSanitizer**: Built `TextSanitizer` to automatically collapse spaced headings (e.g. `E D U C A T I O N` $\rightarrow$ `EDUCATION`, `S K I L L S` $\rightarrow$ `SKILLS`), strip `<!-- image -->` clutter comments, and normalize line breaks.
-  - **Extraction Quality Metrics**: Created `QualityMetricsCalculator` to calculate `pages`, `characters`, `words`, `sections_detected`, `has_email`, `has_phone`, and a quantitative `completeness_score` (0.0 to 1.0).
-  - **Normalized Resume JSON Extractor**: Built `ResumeJsonExtractor` parsing cleaned text into structured `resume_json` (`contact_info`, `summary`, `work_experience`, `education`, `skills`, `projects`, `certifications`, `quality_metrics`).
-  - **API & Schema Enrichment**: Updated `ExtractionResult`, `CVUploadResponse` schema, and `cv_service.py` to persist `quality_metrics` and `resume_json`.
-  - **Fixed HTTP 500 Error on Upload**: Fixed `NameError: name 'logger' is not defined` in `app/api/analysis.py` and `app/api/cv.py` by adding top-level `logger` imports, resolving the HTTP 500 error on `/api/match/upload`.
-  - **Verification**: Verified full test suite (`38 passed in 19.92s`) with 100% test success.
+## Test Results
+- `tests/test_audit_fixes.py`: **41 / 41 passed (100%)**
 
-- **Phase 30: Step 5 Processing Failed Fix**
-  - **Backend Stability**: Fixed a latent `UnboundLocalError` in `cv_service.py` and ensured `"stage": current_stage` is persisted in `failure_data` to allow frontend fallback mapping.
-  - **Frontend UI State Fixes**: Solved a stale closure bug in `useCvUpload.ts`'s `setInterval` by implementing `currentStepIndexRef` via `useRef`, preventing the UI from incorrectly falling back to "Step 1" upon failure.
-  - **Robust Network Error Catching**: Ensured the `catch` block correctly applies a `'failed'` state to `stepStates`, meaning if an OOM causes a connection drop at Step 5, the UI correctly halts and displays the error rather than freezing indefinitely.
+## Files Modified
+- `app/services/vacancy_service.py`
+- `app/services/scoring_engine.py`
+- `app/repositories/job.py`
+- `app/repositories/config.py`
+- `app/api/analysis.py`
+- `app/api/cv.py`
+- `app/api/candidates.py`
+- `app/api/config.py`
+- `app/api/jobs.py`
+- `app/services/llm_service.py`
+- `app/services/match_service.py`
+- `app/repositories/result.py`
+- `app/prompts/profile_extraction.py`
+- `app/services/vacancy_prefilter.py`
+- `app/services/document_parser.py`
+- `app/services/cv_service.py`
+- `src/hooks/useCvUpload.ts`
+- `tests/test_audit_fixes.py`
 
-## Files Changed
-- `backend/app/services/document_parser.py`
-- `backend/app/services/cv_service.py`
-- `backend/app/schemas/cv.py`
-- `backend/app/api/analysis.py`
-- `backend/app/api/cv.py`
-- `backend/app/api/candidates.py`
-- `backend/tests/test_cv_extraction.py`
-- `frontend/src/hooks/useCvUpload.ts`
-- `workstatus.md`
-
-
-
-## Pending Work
-- **pgvector Sidecar Retrieval Pipeline**
-  - [x] Phase 0 — Decision Lock
-  - [x] Phase 1 — Infrastructure (pgvector container & DB pool)
-  - [x] Phase 2 — Schema & migration
-  - [x] Phase 3 — Ingestion script & initial population
-  - [x] Phase 4 — Candidate-side embedding
-  - [x] Phase 5 — Retrieval integration
-  - [x] Phase 6 — Verification & parity test
-  - [x] Phase 7 — Frontend Audit & Diagnostic Table
-  - [x] Phase 8 — Frontend Integration Implementation
-- **CV Analysis Experience**
-  - [x] Phase 26 — Step-by-Step Progress & Upload UI Redesign
-
-## Important Decisions
-- Preserved ScoringEngine, domain word boundary bug fix, and UI styling as untouched isolated items.
-- Configured dedicated `pg_engine` and `pg_SessionLocal` in `app/core/database.py` strictly isolated from MSSQL `engine`.
-- Configured 8 distinct pipeline progress states in `StepProgressCard.tsx` while gracefully handling LLM bypass/disabled modes (`skipped` state).
-
-- **Phase 31: CV Status Endpoint 500 Error Fix**
-  - **Issue Identification**: Identified that `GET /api/cv/status/{cv_key}` crashed with a `500 Internal Server Error` (Pydantic `ValidationError`) when polling the endpoint while the background task was running. The background task persists intermediate state (`{"status": "processing"}`) into the JSON result file, which the API mistakenly attempted to parse directly into a final `CVUploadResponse`.
-  - **Resolution**: Updated `app/api/cv.py` to correctly check for `result.get("status") == "processing"` and properly serialize it as a `CVProcessingResponse`, preventing Pydantic validation failures during the intermediate polling phases.
-
-- **Phase 32: EmbeddingService Audit & Pipeline Standardization**
-  - **Thread-Safe Metrics & Observability**: Added thread-safe runtime metrics tracking (`total_requests`, `cache_hits`, `cache_misses`, `cache_hit_rate_pct`, `last_processing_time_ms`, `total_processing_time_ms`, `embedding_model`) exposed via `EmbeddingService.get_metrics()` and `reset_metrics()`.
-  - **Detailed Execution Profiling & Logging**: Added high-precision timing instrumentation (`time.perf_counter()`) and structured `[EMBEDDING]` logging detailing model version, text hash, processing duration, and cache HIT/MISS status.
-  - **Hash-Aware Dual Caching**: Standardized cache keys on SHA-256 content hashes (`f"{model_version}:{content_hash}"`) while supporting key aliasing for identifiers (`cv_key` / `doc_hash`), guaranteeing cache hits across both lookup formats.
-  - **Single Embedding Generation per CV**: Updated `cv_service.py` to generate and persist candidate embeddings once, passing `cv_embedding` into `MatchService.analyze_single_cv` and `VacancyPreFilter`. Eliminated duplicate generation calls between prefiltering and persistence.
-  - **Non-Blocking Fault Resilience**: Wrapped Ollama embedding calls in graceful exception handling, ensuring failed embedding generation logs warnings without throwing exceptions or blocking CV extraction/matching.
-  - **Backward Compatibility**: Preserved all existing module and class method signatures (`get_embedding`, `EmbeddingService.generate_embedding`, `generate_batch_embeddings`, `cosine_similarity`, `save_candidate_embedding`, `get_candidate_embedding`).
-  - **Unit Test Suite**: Added `backend/tests/test_embedding_service.py` verifying metrics, caching, version tracking, single pipeline execution, and non-blocking failure modes (`5 passed in 2.60s`).
-
-- **Phase 33: Active Vacancies Semantic Embeddings**
-  - **Rich Canonical Text Generation**: Built `build_vacancy_canonical_text(job)` synthesizing structured text from all 8 vacancy fields (Vacancy Title, Job Description, Required Skills, Experience Range, Education, Certifications, Department, and Responsibilities).
-  - **Incremental Update Detection**: Implemented SHA-256 content hashing (`content_hash`) per vacancy. Vacancies whose content has not changed automatically skip Ollama embed calls on sync.
-  - **PostgreSQL & Multi-Tier Cache Persistence**: Implemented `save_vacancy_embedding` and `get_vacancy_embedding` persisting versioned vacancy vectors in PostgreSQL `vacancy_embeddings` table (`VacancyEmbedding` model with HNSW vector index) and Redis L2 / File L3 cache manager.
-  - **Schema & API Preservation**: Preserved existing `JobOpening` Pydantic model response contracts and database schema.
-  - **Unit Test Verification**: Added `backend/tests/test_vacancy_embeddings.py` covering canonical text construction, incremental update skipping, content change re-embedding, and database/cache fallbacks (`4 passed in 1.13s`).
-
-- **Phase 34: Semantic Vector Retrieval First-Stage Selection**
-  - **Stage 1 (Semantic Retrieval)**: Implemented `semantic_vector_search()` in `VacancyPreFilter`. Generates/uses `cv_embedding` to perform vector similarity search against active vacancy embeddings, narrowing down active vacancies from $V$ total openings to the Top-N candidate vacancies (`SEMANTIC_RETRIEVAL_TOP_N: int = 50`).
-  - **Stage 2 (Deterministic VacancyPreFilter)**: Feeds Stage 1 semantic candidate vacancies into deterministic `VacancyPreFilter` logic (lexical scoring, title term matching, department matching, experience range suitability, RRF fusion).
-  - **Ranking Authority**: Preserved `ScoringEngine` (`ScoringEngine.evaluate_job_match`) as the final authority for match scoring and candidate ranking.
-  - **Fault Resilience**: Added graceful fallback to full vacancy list if embeddings are disabled or vector search returns no results.
-  - **Unit Test Suite**: Added `backend/tests/test_semantic_vacancy_retrieval.py` verifying Stage 1 vector candidate selection, fallback behavior, and ScoringEngine ranking authority (`3 passed in 0.79s`). Verified all 12 embedding and retrieval tests (`12 passed in 1.52s`).
-
-- **Phase 35: Hybrid Matching Architecture Refactoring**
-  - **Strict Candidate Retrieval Role**: Verified and enforced that vector embeddings and similarity scores act strictly as Stage 1 candidate retrieval mechanisms and never alter or dictate final candidate match scores.
-  - **8-Stage Hybrid Sequence**: Formalized complete execution sequence: `Resume → Embedding → Vector Search → Deterministic VacancyPreFilter → Confidence Gate → LLM (Conditional) → Deterministic Scoring Engine → Final Ranking`.
-  - **Explainability & Mandatory Validation Preservation**: Preserved detailed evidence extraction, matched/missing skill breakdowns, mandatory failure penalties, domain divergence penalties, and ranking reasons on `EnrichedJobMatchResult`.
-  - **Unit Test Verification**: Added `backend/tests/test_hybrid_matching_pipeline.py` verifying the full 8-stage sequence, strict score isolation from raw vectors, explainability metrics, and Confidence Gate LLM bypass (`4 passed in 2.48s`). Verified all 16 pipeline unit tests (`16 passed in 2.94s`).
-
-- **Phase 36: Enterprise Semantic Candidate Search**
-  - **Natural Language Vector Query Embedding**: Implemented `CandidateSearchService.search_candidates` converting recruiters' free-form natural language queries into embeddings via `EmbeddingService`.
-  - **Vector Similarity Candidate Retrieval**: Queries PostgreSQL `candidate_embeddings` (HNSW index) with fallback to candidate cache manager / dynamic candidate embedding synthesis to compute `similarity_score` (cosine similarity).
-  - **Structured Deterministic Filtering**: Applies structured filters (`department`, `min_experience`, `max_experience`, `location`, `skills`, `education`, `status`, `min_similarity`) on top of vector similarity candidate results.
-  - **Pydantic Schemas & API Endpoints**: Created `CandidateSearchRequest`, `CandidateSearchResultItem`, and `CandidateSearchResponse` in `app/schemas/candidate_search.py`. Exposed `POST /api/candidates/search` and updated `GET /api/candidates` with optional natural language `query` support.
-  - **Unit Test Suite**: Added `backend/tests/test_candidate_semantic_search.py` verifying vector similarity candidate ranking, structured deterministic filtering, and API endpoints (`4 passed in 6.35s`). Verified full suite across 20 test cases (`20 passed in 8.24s`).
-
-- **Phase 37: Automatic Similar Candidate Detection**
-  - **Automatic Post-Upload Detection**: Integrated `SimilarCandidateService.detect_similar_candidates` into `cv_service.py` to compare new CV embeddings against all existing candidate embeddings automatically after every successful CV processing.
-  - **Configurable Similarity Thresholds**: Added `SIMILAR_CANDIDATE_THRESHOLD: float = 0.85` and `SIMILAR_CANDIDATE_MAX_MATCHES: int = 5` in `config.py`.
-  - **Zero-Loss Data Integrity**: Kept original candidate records 100% separate and unmerged. Duplicate profile identification (`similarity_score >= 0.95`) flags `is_duplicate_flag = True` without deleting or modifying candidate records.
-  - **Candidate 360 Integration**: Saved `similar_candidates` metadata array inside candidate results and exposed payload via `GET /api/candidates/{candidate_id}`.
-  - **Unit Test Suite**: Added `backend/tests/test_similar_candidate_detection.py` verifying vector similarity candidate thresholding, duplicate flag setting, data preservation, and Candidate 360 API responses (`4 passed in 5.86s`). Verified full suite across 24 test cases (`24 passed in 7.71s`).
-
-- **Phase 38: Production-Ready Vector Database Integration**
-  - **PostgreSQL pgvector Database & HNSW Indexes**: Added HNSW vector indexes (`Vector(768)`, `vector_cosine_ops`, `m=16`, `ef_construction=64`) to `CandidateEmbedding` and `VacancyEmbedding` models in `app/models/pg.py`. Updated `init_db()` in `app/core/database.py` to enable `vector` extension and auto-create HNSW vector indexes.
-  - **Background Migration & Incremental Synchronization**: Implemented `VectorDatabaseMigrationService` handling content-hash incremental checks, model version tracking (`settings.EMBEDDING_MODEL`), and background migration of candidate and vacancy embeddings.
-  - **Vector DB Management Endpoints**: Created `app/api/vector_db.py` exposing `POST /api/vector-db/sync` and `GET /api/vector-db/status`. Mounted `vector_db_router` under `/api` in `app/main.py`.
-  - **Multi-Tier Graceful Fallback**: Ensured all vector searches fall back seamlessly to Redis L2 / File L3 cache manager and in-memory cosine similarity if PostgreSQL is disconnected or unavailable.
-  - **Unit Test Suite**: Added `backend/tests/test_vector_db_integration.py` verifying status monitoring, background sync, content-hash incremental skipping, and fallback handling (`4 passed in 6.24s`). Verified complete test suite across 28 test cases (`28 passed in 7.96s`).
-
-- **Phase 39: Domain Knowledge Embeddings**
-  - **8 Enterprise Domain Categories**: Implemented `DomainEmbeddingService` generating and caching vector embeddings across 8 domain categories: `skills`, `job_titles`, `departments`, `technologies`, `certifications`, `education_domains`, `industries`, `functional_areas`.
-  - **PostgreSQL pgvector HNSW Model**: Added `DomainEmbedding` model in `app/models/pg.py` with HNSW cosine distance vector index (`ix_domain_embeddings_embedding`).
-  - **Semantic Equivalent Resolution**: Resolved equivalent skills (e.g. "Postgres" $\approx$ "PostgreSQL", "K8s" $\approx$ "Kubernetes", "React.js" $\approx$ "React") and equivalent job roles via `find_semantic_equivalents()` and `expand_skills_with_semantic_equivalents()`.
-  - **Deterministic Authority Preserved**: Ensured semantic domain embeddings provide term expansion and role similarity boosts without overriding mandatory requirement validation rules in `ScoringEngine`.
-  - **API Endpoints**: Created `app/api/domain_knowledge.py` exposing `POST /api/domain-knowledge/equivalents` and `GET /api/domain-knowledge/categories`. Mounted router under `/api` in `app/main.py`.
-  - **Unit Test Suite**: Added `backend/tests/test_domain_knowledge_embeddings.py` covering all 8 domain categories, term equivalence, mandatory requirement authority preservation, and API endpoints (`6 passed in 6.99s`). Verified complete suite across 34 test cases (`34 passed in 8.21s`).
-
-- **Phase 40: Enterprise Talent Knowledge Graph**
-  - **9 Entity Node Types & Relationships**: Implemented `TalentKnowledgeGraphService` linking Candidates, Skills, Projects, Companies, Vacancies, Certifications, Departments, Technologies, and Industries across relationships (`HAS_SKILL`, `WORKED_AT`, `WORKED_ON`, `HOLD_CERTIFICATION`, `MATCHES`, `REQUIRES_SKILL`, `BELONGS_TO`, `BELONGS_TO_CATEGORY`, `SEMANTICALLY_SIMILAR`).
-  - **Relationship Discovery via Vector Embeddings**: Used vector embeddings strictly for discovering implicit relationship edges (`SEMANTICALLY_SIMILAR` skills, candidates, and vacancies) while preserving `ScoringEngine` deterministic validation as the final source of truth for `MATCHES` scores.
-  - **Graph REST APIs**: Created `app/api/talent_graph.py` exposing:
-    - `GET /api/talent-graph/candidate/{candidate_id}`: Candidate 360 subgraph & skill network.
-    - `GET /api/talent-graph/vacancy/{vacancy_id}`: Vacancy 360 subgraph & applicant matches.
-    - `GET /api/talent-graph/skill/{skill_name}`: Skill intelligence subgraph & market demand.
-    - `GET /api/talent-graph/analytics`: Global talent graph metrics & node/edge statistics.
-  - **Unit Test Suite**: Added `backend/tests/test_talent_knowledge_graph.py` verifying Candidate 360, Vacancy 360, Skill Intelligence, and Recruitment Analytics (`5 passed in 14.14s`). Verified complete backend test suite across all 39 test cases (`39 passed in 17.42s`).
-
-- **Phase 41: AI Recommendations**
-  - **7 Intelligence Domains**: Implemented `RecommendationService` delivering recruiter recommendations across 7 domains: Best Vacancies for Candidates, Similar Candidates for Vacancies, Related Skills, Missing Qualifications & Skill Gaps, Recommended Certifications, Career Transition Opportunities, and Internal Talent Pools.
-  - **Embeddings for Retrieval Only**: Vector embeddings perform candidate retrieval and skill expansion; deterministic validation and `ScoringEngine` rules remain 100% authoritative for scores.
-  - **Recommendation REST APIs**: Created `app/api/recommendations.py` exposing:
-    - `GET /api/recommendations/candidate/{candidate_id}`: Candidate 360 recommendations payload.
-    - `GET /api/recommendations/vacancy/{vacancy_id}`: Vacancy 360 recommendations payload.
-    - `GET /api/recommendations/talent-pools`: Aggregated internal talent pools summary.
-  - **Unit Test Suite**: Added `backend/tests/test_ai_recommendations.py` verifying candidate recs, vacancy recs, internal talent pools, and API endpoints (`4 passed in 6.54s`). Verified complete backend test suite across all 43 test cases (`43 passed in 17.14s`).
-
-- **Phase 42: Enterprise Performance Optimization**
-  - **Multi-Level Tiered Caching (L1 → L2 → L3)**: Implemented `EnterprisePerformanceService` with sub-millisecond `LRUMemoryCache` (L1 Memory), shared Redis cache (L2), and persistent PostgreSQL pgvector DB (L3).
-  - **Asynchronous Batch Embedding Pipeline**: Created `generate_embeddings_batch_async` using non-blocking worker threads with exponential backoff retries.
-  - **Intelligent Cache Invalidation**: Added `invalidate_cache_by_pattern` clearing multi-level LRU memory and shared cache entries by tag or pattern.
-  - **Observability & Performance REST APIs**: Created `app/api/performance.py` exposing:
-    - `GET /api/performance/metrics`: Real-time telemetry dashboard (L1/L2 hit ratios, batch throughput, retry attempt counts, 8-stage pipeline latencies).
-    - `POST /api/performance/cache/invalidate`: Targeted pattern-based cache clearing.
-  - **Unit Test Suite**: Added `backend/tests/test_enterprise_performance.py` covering async batch embeddings, multi-level caching, cache invalidation, and metrics telemetry (`5 passed in 6.75s`). Verified complete backend test suite across all 48 test cases (`48 passed in 14.81s`).
-
-- **Phase 43: Final Architecture Audit & Compliance Verification**
-  - **12-Stage Pipeline Sequence Audit**: Verified complete execution sequence: `CV Upload → Resume Extraction → Resume Extraction MD → Resume JSON → Resume Embedding → Vacancy Embedding Search → Deterministic Vacancy PreFilter → Confidence Gate → Optional LLM → Deterministic Scoring Engine → Final Ranking → Result Storage`.
-  - **Single Generation & Zero Duplicate Pathways**: Verified 1 candidate embedding per CV, zero duplicate pathways, zero redundant vector searches, and 0ms LLM latency on unambiguous matches via Confidence Gate.
-  - **Role Separation**: Confirmed vector embeddings perform retrieval & semantic expansion only; `ScoringEngine` maintains 100% authority for match scores and mandatory pass/fail rules.
-  - **Compliance Report Artifact**: Generated [final_architecture_compliance_report.md](file:///Users/khushaldhanani/.gemini/antigravity-ide/brain/0f864f1b-9366-43c7-8845-72666e8823f5/final_architecture_compliance_report.md) with 100% feature compliance matrix.
-  - **Full Suite Test Execution**: Ran all 48 backend test cases across 10 test suites (`48 passed in 16.11s`).
-
-- **Phase 44: Domain Alignment Engine & Summary Dualization**
-  - **Candidate Domain Profiler**: Implemented `ScoringEngine.extract_candidate_domain_profile` evaluating skills, experience, education, and projects to derive `recommended_department`, `professional_domain`, `strengths`, and suitable market `suitable_job_roles`.
-  - **Strict Domain Mismatch Penalty**: Enforced dynamic category cross-checking in `ScoringEngine.evaluate_job_match`. Conflicting domains (e.g. Flutter Dev vs Plant Assistant / Chemist / HR / Finance) automatically receive a score penalty (< 25%), domain score 0%, and mandatory failure details flagging domain divergence.
-  - **Active Vacancy Summary Gating**: Enforced `has_genuine_match` validation. If no active vacancy genuinely matches candidate's domain (score >= 50% without domain mismatch), `active_vacancy_summary` explicitly returns `"No suitable active vacancy found."` without forcing fit on unrelated openings.
-  - **Independent AI Career Summary**: Formatted standalone candidate profile analysis detailing candidate strengths, target department, specialized domain, and suitable job roles independently of vacancy availability.
-  - **Frontend UI & Pydantic Contracts**: Updated `analysis.py`, `cv.py`, `optimized_match.py`, and `frontend/src/types/api.ts`. Rendered dedicated **AI Career Summary** and **Active Vacancy Summary** cards in `candidates/[id].tsx`.
-  - **Unit Test Verification**: Added `backend/tests/test_domain_matching.py` covering domain profiling, domain mismatch penalties, genuine match validation, and dual summary generation (`5 passed in 32.25s`).
-
-- **Phase 45: CVUploadResponse Schema Nullable structured_doc Fix**
-  - **Issue Root Cause**: Identified that `GET /api/cv/status/{cv_key}` returned a `500 Internal Server Error` due to a Pydantic `ValidationError`. The JSON cache results store `"structured_doc": None` when docling doc model is absent, but `CVUploadResponse` required a non-null `dict[str, Any]`.
-  - **Fix Implementation**: Updated `CVUploadResponse` in [backend/app/schemas/cv.py](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/app/schemas/cv.py) to set `structured_doc: dict[str, Any] | None = Field(default=None, description="...")`.
-
-- **Phase 46: Deterministic Candidate Name Extraction Pipeline**
-  - **Job Title & Keyword Exclusion Blacklists**: Built comprehensive `JOB_TITLE_KEYWORDS` (e.g., `IT`, `EXECUTIVE`, `DEVELOPER`, `ENGINEER`, `MANAGER`, `ANALYST`, `ADMINISTRATOR`, etc.) and `RESUME_HEADER_KEYWORDS` in `ResumeJsonExtractor.extract_candidate_name()`, preventing job titles and profile headlines from being misextracted as candidate names.
-  - **Email Username Token Cross-Validation**: Cross-referenced candidate name candidates against email username tokens. If header line matches email username tokens (e.g. `tarun.gupta@example.com` matching `"Tarun Gupta"`), confidence is scored as `0.95` (`HIGH`).
-  - **Deterministic Multi-Tier Fallback Rules**: Implemented multi-tier fallback logic: `header_email_validated` (0.95) $\rightarrow$ `header_contact_section` (0.85) $\rightarrow$ `email_username_fallback` (0.60, e.g. `mitesh.darji95@gmail.com` $\rightarrow$ `"Mitesh Darji"`) $\rightarrow$ `filename_fallback` (0.30, e.g. `Jane_Smith_Resume.pdf` $\rightarrow$ `"Jane Smith"`) $\rightarrow$ `"Unknown Candidate"` (0.0).
-  - **Schema & Observability Telemetry**: Exposed top-level `full_name`, `candidate_name`, `email`, `phone`, `name_confidence`, and `name_extraction_source` across Pydantic schemas (`CVUploadResponse`, `CandidateMatchAnalysis`, `EnrichedCandidateAnalysis`) and logged telemetry (`logger.info`).
-  - **Frontend UI & Card Disambiguation**: Updated `MatchAnalysisCard.tsx`, `cv-match.tsx`, `candidates/[id].tsx`, `candidates/index.tsx`, and `types/api.ts` to display candidate names in a dedicated candidate banner above job match titles, eliminating confusion between Candidate Name and Best Matched Job Title.
-  - **Mitesh Darji Specific Fix & Result Backfill**: Re-extracted Mitesh Darji's CV (`cv_MITESH_DARJI_NEW_CV__1___1_`) to correctly set candidate name to `"Mitesh Darji"` (instead of `"IT EXECUTIVE"`), and ran a backfill script across all stored result JSON files.
-  - **Unit Test Suite**: Added test cases in `backend/tests/test_cv_extraction.py` verifying job title rejection, email validation, email fallback, and filename fallback (`11 passed in 6.46s`).
-
-
-
+## Files Deleted
+- `app/services/match_engine.py`

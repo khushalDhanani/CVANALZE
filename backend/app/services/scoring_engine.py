@@ -579,7 +579,14 @@ class ScoringEngine:
             req_id = "req_education"
             vac_ev = f"Mandatory Education Requirement: {education_req}"
             edu_matched, _ = cls._extract_term_matches(norm_text, [str(education_req)])
-            if edu_matched or (optimized_profile and optimized_profile.education_domains):
+            edu_profile_match = False
+            if not edu_matched and optimized_profile and optimized_profile.education_domains:
+                edu_req_lower = str(education_req).lower()
+                edu_profile_match = any(
+                    edu_req_lower in domain.lower() or domain.lower() in edu_req_lower
+                    for domain in optimized_profile.education_domains
+                )
+            if edu_matched or edu_profile_match:
                 cv_ev = f"CV contains education matching '{education_req}'"
                 ev = DualEvidence(cv_evidence=cv_ev, vacancy_evidence=vac_ev)
                 mandatory_reqs.append(RequirementEvaluation(
@@ -617,7 +624,14 @@ class ScoringEngine:
             req_id = "req_certification"
             vac_ev = f"Mandatory Certification Requirement: {certification_req}"
             cert_matched, _ = cls._extract_term_matches(norm_text, [str(certification_req)])
-            if cert_matched or (optimized_profile and optimized_profile.certifications):
+            cert_profile_match = False
+            if not cert_matched and optimized_profile and optimized_profile.certifications:
+                cert_req_lower = str(certification_req).lower()
+                cert_profile_match = any(
+                    cert_req_lower in cert.lower() or cert.lower() in cert_req_lower
+                    for cert in optimized_profile.certifications
+                )
+            if cert_matched or cert_profile_match:
                 cv_ev = f"CV contains certification matching '{certification_req}'"
                 ev = DualEvidence(cv_evidence=cv_ev, vacancy_evidence=vac_ev)
                 mandatory_reqs.append(RequirementEvaluation(

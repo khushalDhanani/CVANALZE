@@ -122,7 +122,11 @@ async def process_cv_file(
                     ResultRepository.atomic_save_result(result_filename, interim_data)
                 except Exception as e:
                     logger.warning(f"Failed to save interim status for '{cv_key}': {e}")
-            
+
+            current_stage = "validation"
+            _save_interim_status(15, current_stage)
+
+            current_stage = "parsing"
             _save_interim_status(25, current_stage)
 
             # Markdown Generation & Persistence stage
@@ -167,6 +171,9 @@ async def process_cv_file(
                 
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
             
+            current_stage = "extraction"
+            _save_interim_status(35, current_stage)
+
             # Compute Quality Metrics & Extract JSON
             quality_metrics = QualityMetricsCalculator.compute(
                 text=markdown_text,
@@ -197,6 +204,9 @@ async def process_cv_file(
             _save_interim_status(50, current_stage)
 
             cv_embedding = await asyncio.to_thread(_generate_and_store_embedding)
+
+            current_stage = "matching"
+            _save_interim_status(75, current_stage)
 
             match_analysis = await MatchService.analyze_single_cv(
                 extraction.markdown,

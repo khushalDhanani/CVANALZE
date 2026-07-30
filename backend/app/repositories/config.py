@@ -77,11 +77,12 @@ class ConfigRepository:
                     new_record = SystemConfig(setting_key=key, setting_value=val_str)
                     db.add(new_record)
                 db.commit()
+                config_cache_manager.set(key, value, ttl=cls.CACHE_TTL)
             except Exception as exc:
                 logger.error(f"Failed to save config {key} to DB: {exc}")
                 db.rollback()
             finally:
                 if close_session:
                     db.close()
-
-        config_cache_manager.set(key, value, ttl=cls.CACHE_TTL)
+        else:
+            config_cache_manager.set(key, value, ttl=cls.CACHE_TTL)

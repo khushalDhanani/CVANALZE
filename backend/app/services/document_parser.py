@@ -646,6 +646,35 @@ def _classify_pdf(content: bytes) -> tuple[str, str, int, bool]:
         return "UNKNOWN_PDF", "", 0, False
 
 
+def _extract_native_docx(content: bytes) -> str:
+    """
+    Extract text from a DOCX file using python-docx (paragraphs + tables).
+    Used as a fallback if Docling conversion fails or returns sparse text.
+    """
+    try:
+        import docx
+        doc = docx.Document(BytesIO(content))
+        lines = []
+        for p in doc.paragraphs:
+            text = p.text.strip()
+            if text:
+                if p.style and p.style.name and p.style.name.startswith("Heading"):
+                    lines.append(f"## {text}")
+                else:
+                    lines.append(text)
+
+        for table in doc.tables:
+            for row in table.rows:
+                row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if row_cells:
+                    lines.append(" | ".join(row_cells))
+
+        return "\n\n".join(lines).strip()
+    except Exception as exc:
+        logger.warning(f"python-docx native extraction failed: {exc}")
+        return ""
+
+
 _parser_thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="docling_parser")
 
 
@@ -683,15 +712,22 @@ class MarkdownGenerator:
             f"Starting MarkdownGenerator extraction pipeline for '{filename}' ({len(content)} bytes)..."
         )
 
-        # Stage 1: Detect PDF Type & Extract Native Selectable Text (layout sorted)
+        # Stage 1: Detect PDF Type & Extract Native Selectable Text / DOCX Native Text
         pdf_type = "NON_PDF"
         native_pdf_text = ""
+        native_docx_text = ""
         native_char_count = 0
         has_images = False
         if extension == "pdf":
             pdf_type, native_pdf_text, native_char_count, has_images = _classify_pdf(content)
             logger.info(
                 f"[STAGE 1: PDF TYPE] '{filename}': type={pdf_type}, native_chars={native_char_count}, has_images={has_images}"
+            )
+        elif extension == "docx":
+            native_docx_text = _extract_native_docx(content)
+            native_char_count = len(native_docx_text)
+            logger.info(
+                f"[STAGE 1: DOCX NATIVE] '{filename}': native_chars={native_char_count}"
             )
 
         # Stage 2: Primary Extractor (Docling Fast Converter - No OCR)
@@ -767,13 +803,20 @@ class MarkdownGenerator:
             raw_final_text = ocr_markdown_text
             parser_used = "docling_ocr"
 
-        if len(raw_final_text.strip()) < 20 and len(native_pdf_text.strip()) >= 20:
+        if len(raw_final_text.strip()) < 20 and extension == "pdf" and len(native_pdf_text.strip()) >= 20:
             logger.info(
                 f"Using native PDF text ({len(native_pdf_text)} chars) for '{filename}' "
                 f"as primary Docling output was empty or sparse."
             )
             raw_final_text = native_pdf_text
             parser_used = "native_fitz"
+        elif len(raw_final_text.strip()) < 20 and extension == "docx" and len(native_docx_text.strip()) >= 20:
+            logger.info(
+                f"Using native DOCX text ({len(native_docx_text)} chars) for '{filename}' "
+                f"as primary Docling output was empty or sparse."
+            )
+            raw_final_text = native_docx_text
+            parser_used = "native_python_docx"
 
         structured_dict = docling_doc.export_to_dict() if docling_doc and hasattr(docling_doc, "export_to_dict") else {}
 

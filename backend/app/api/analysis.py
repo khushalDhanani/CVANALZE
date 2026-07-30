@@ -55,8 +55,9 @@ async def analyze_cv_text(payload: CVMatchRequest):
     try:
         return await MatchService.analyze_single_cv(payload.cv_text)
     except Exception as exc:
+        logger.exception(f"Failed to analyze CV text: {exc}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to analyze CV text: {exc}"
+            status_code=500, detail="An internal error occurred during CV analysis."
         ) from exc
 
 
@@ -68,7 +69,6 @@ async def background_upload_and_analyze(filename: str, content: bytes, content_t
             content_type=content_type,
         )
     except Exception as exc:
-        from app.core.logging import logger
         logger.exception(f"Background match processing failed: {exc}")
 
 
@@ -114,8 +114,9 @@ async def upload_and_analyze(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception(f"Failed to process CV upload: {exc}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to process CV: {exc}"
+            status_code=500, detail="An internal error occurred while processing the CV."
         ) from exc
 
 
@@ -138,7 +139,10 @@ async def get_match_status(cv_key: str):
         if match_analysis:
             match_analysis["scan_id"] = result.get("scan_id", result.get("id"))
             match_analysis["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
-            return match_analysis
+            try:
+                return EnrichedCandidateAnalysis.model_validate(match_analysis)
+            except Exception:
+                return match_analysis
         
         return CVProcessingResponse(
             message=result.get("message") or f"{result.get('progress', 50)}% - Processing in progress...",
@@ -177,8 +181,9 @@ async def reanalyze_scan(scan_id: str):
     try:
         return await MatchService.analyze_from_result_file(file_path)
     except Exception as exc:
+        logger.exception(f"Failed to reanalyze CV: {exc}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to reanalyze CV: {exc}"
+            status_code=500, detail="An internal error occurred during reanalysis."
         ) from exc
 
 
@@ -248,9 +253,12 @@ async def submit_hr_review(payload: HRReviewRequest):
         TrainingRepository.append_training_example(example)
         return {"status": "success", "message": "Training example saved."}
 
+    except HTTPException:
+        raise
     except Exception as exc:
+        logger.exception(f"Failed to save HR review: {exc}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to save HR review: {exc}"
+            status_code=500, detail="An internal error occurred while saving the HR review."
         ) from exc
 
 

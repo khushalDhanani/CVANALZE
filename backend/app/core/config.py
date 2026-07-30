@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen3:4b"  # or qwen2.5:3b etc based on what's available
-    OLLAMA_REQUEST_TIMEOUT: float = 600.0
-    OLLAMA_MAX_RETRIES: int = 3
+    OLLAMA_REQUEST_TIMEOUT: float = 90.0
+    OLLAMA_MAX_RETRIES: int = 1
     LLM_BOOST_WEIGHT: float = 0.10
     MAX_LLM_BOOST: float = 10.0
     PREFILTER_TOP_K: int = 5

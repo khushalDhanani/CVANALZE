@@ -91,7 +91,7 @@ class VacancyService:
             job_description=job_desc,
             responsibilities=job_desc,
             required_skills=skills,
-            preferred_keywords=skills, # Just mapping same for now
+            preferred_keywords=[],
             min_experience_years=min_exp,
             max_experience_years=max_exp,
             min_ctc=min_ctc,

@@ -19,7 +19,12 @@ def search_candidates_post(request: CandidateSearchRequest) -> CandidateSearchRe
     Converts natural language search query into embeddings, computes vector similarity,
     and applies structured deterministic filters (department, experience, location, skills, education, status).
     """
-    return CandidateSearchService.search_candidates(request)
+    try:
+        return CandidateSearchService.search_candidates(request)
+    except Exception as exc:
+        from app.core.logging import logger
+        logger.exception(f"Candidate search failed: {exc}")
+        raise HTTPException(status_code=500, detail="An internal error occurred during candidate search.") from exc
 
 
 @router.get("", response_model=list[dict[str, Any]])
@@ -35,16 +40,21 @@ def list_candidates(
     List all processed candidate results with summary match scores, vector similarity scores, and metadata.
     Supports natural language semantic search via query parameter.
     """
-    search_query = query if query is not None else search
-    req = CandidateSearchRequest(
-        query=search_query,
-        department=department,
-        min_experience=min_experience,
-        max_experience=max_experience,
-        limit=limit,
-    )
-    res = CandidateSearchService.search_candidates(req)
-    return [item.model_dump() for item in res.candidates]
+    try:
+        search_query = query if query is not None else search
+        req = CandidateSearchRequest(
+            query=search_query,
+            department=department,
+            min_experience=min_experience,
+            max_experience=max_experience,
+            limit=limit,
+        )
+        res = CandidateSearchService.search_candidates(req)
+        return [item.model_dump() for item in res.candidates]
+    except Exception as exc:
+        from app.core.logging import logger
+        logger.exception(f"Candidate listing failed: {exc}")
+        raise HTTPException(status_code=500, detail="An internal error occurred while listing candidates.") from exc
 
 
 @router.get("/{candidate_id}", response_model=dict[str, Any])

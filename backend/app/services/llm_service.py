@@ -54,7 +54,19 @@ class OllamaLLMService:
             return DynamicCandidateProfile(**cached_entry.structured_data)
 
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {"model": model_name, "prompt": prompt, "stream": False}
+        payload = {
+            "model": model_name,
+            "prompt": prompt,
+            "format": DynamicCandidateProfile.model_json_schema(),
+            "stream": False,
+            "think": False,
+            "keep_alive": "30m",
+            "options": {
+                "num_predict": 2048,
+                "num_ctx": 4096,
+                "temperature": 0.1,
+            },
+        }
 
         timeout_cfg = httpx.Timeout(timeout=settings.OLLAMA_REQUEST_TIMEOUT, connect=2.0)
 
@@ -155,7 +167,19 @@ class OllamaLLMService:
             return QwenCVAnalysis(**cached_entry.structured_data)
 
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {"model": model_name, "prompt": prompt, "stream": False}
+        payload = {
+            "model": model_name,
+            "prompt": prompt,
+            "format": QwenCVAnalysis.model_json_schema(),
+            "stream": False,
+            "think": False,
+            "keep_alive": "30m",
+            "options": {
+                "num_predict": 2048,
+                "num_ctx": 4096,
+                "temperature": 0.1,
+            },
+        }
 
         for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
             start_time = time.time()
@@ -255,7 +279,19 @@ class OllamaLLMService:
             return DynamicMappingResponse(**cached_entry.structured_data)
 
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {"model": model_name, "prompt": prompt, "stream": False}
+        payload = {
+            "model": model_name,
+            "prompt": prompt,
+            "format": DynamicMappingResponse.model_json_schema(),
+            "stream": False,
+            "think": False,
+            "keep_alive": "30m",
+            "options": {
+                "num_predict": 2048,
+                "num_ctx": 4096,
+                "temperature": 0.1,
+            },
+        }
 
         for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
             start_time = time.time()
