@@ -1,6 +1,7 @@
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, BackgroundTasks
 
 from app.core.config import settings
+from app.core.logging import logger
 from app.schemas.cv import CVMatchRequest, CVUploadResponse, CVProcessingResponse
 from app.schemas.match import CandidateMatchAnalysis
 from app.services.cv_service import process_cv_file, get_stable_cv_key
@@ -44,7 +45,16 @@ async def upload_cv(
     try:
         content = await file.read()
         cv_key = get_stable_cv_key(file.filename, candidate_id, cv_id)
-        
+
+        # Preserve raw upload file for re-run analysis
+        try:
+            settings.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+            raw_path = settings.UPLOADS_DIR / file.filename
+            raw_path.write_bytes(content)
+            logger.info(f"Saved raw upload file to '{raw_path}'.")
+        except Exception as write_err:
+            logger.warning(f"Failed writing upload file to UPLOADS_DIR: {write_err}")
+
         background_tasks.add_task(
             background_process_cv,
             filename=file.filename,
@@ -53,6 +63,7 @@ async def upload_cv(
             candidate_id=candidate_id,
             cv_id=cv_id,
         )
+
 
         return CVProcessingResponse(
             message="10% - CV processing started in the background...",

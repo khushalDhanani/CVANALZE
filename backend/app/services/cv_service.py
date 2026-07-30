@@ -37,6 +37,8 @@ def get_stable_cv_key(
 ) -> str:
     raw_stem = Path(filename).stem
     safe_stem = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_stem)
+    if safe_stem.startswith("cv_"):
+        safe_stem = safe_stem[3:]
     if candidate_id is not None and cv_id is not None:
         return f"cand_{candidate_id}_cv_{cv_id}"
     if candidate_id is not None:
@@ -44,6 +46,7 @@ def get_stable_cv_key(
     if cv_id is not None:
         return f"cv_{cv_id}_{safe_stem}"
     return f"cv_{safe_stem}"
+
 
 
 async def process_cv_file(
@@ -63,6 +66,7 @@ async def process_cv_file(
     lock = _get_cv_lock(cv_key)
 
     async with lock:
+        current_stage = "initialization"
         try:
             existing_data = ResultRepository.read_result_by_filename(result_filename)
 
@@ -102,6 +106,25 @@ async def process_cv_file(
             else:
                 logger.info(f"[NEW_CV] Initial processing for '{cv_key}'.")
 
+            current_stage = "parsing"
+            
+            # Helper to save interim status
+            def _save_interim_status(progress: int, stage: str):
+                interim_data = {
+                    "id": cv_key,
+                    "scan_id": cv_key,
+                    "status": "processing",
+                    "progress": progress,
+                    "stage": stage,
+                    "filename": filename,
+                }
+                try:
+                    ResultRepository.atomic_save_result(result_filename, interim_data)
+                except Exception as e:
+                    logger.warning(f"Failed to save interim status for '{cv_key}': {e}")
+            
+            _save_interim_status(25, current_stage)
+
             # Docling extraction stage (with timing)
             t_doc_start = asyncio.get_event_loop().time()
             cached_doc = doc_cache_manager.get(cv_hash)
@@ -133,6 +156,9 @@ async def process_cv_file(
                     save_candidate_embedding(cv_key, emb, cv_hash)
                 return emb
 
+            current_stage = "ai_analysis"
+            _save_interim_status(50, current_stage)
+
             embedding_task = asyncio.to_thread(_generate_and_store_embedding)
 
             match_analysis, _ = await asyncio.gather(
@@ -144,6 +170,9 @@ async def process_cv_file(
                 ),
                 embedding_task,
             )
+
+            current_stage = "complete"
+            _save_interim_status(100, current_stage)
 
 
             now_iso = datetime.now(UTC).isoformat()
@@ -176,6 +205,8 @@ async def process_cv_file(
                 "parser_used": getattr(extraction, "parser_used", "docling_fast"),
                 "ocr_decision": getattr(extraction, "ocr_decision", "SKIPPED_TEXT_PRESENT"),
                 "stage_metrics": getattr(extraction, "stage_metrics", {}),
+                "quality_metrics": getattr(extraction, "quality_metrics", {}),
+                "resume_json": getattr(extraction, "resume_json", {}),
                 "characters": len(extraction.markdown),
                 "page_count": extraction.page_count,
                 "is_scanned": extraction.is_scanned,
@@ -192,9 +223,22 @@ async def process_cv_file(
             return result_data
 
         except Exception as exc:
-            logger.exception(f"CV processing failed for '{cv_key}': {exc}")
+            import traceback
+            error_details = traceback.format_exc()
+            logger.exception(f"CV processing failed for '{cv_key}' at stage '{current_stage}': {exc}")
             now_iso = datetime.now(UTC).isoformat()
             err_msg = str(exc)
+            
+            # Map stage to failed_step name for UI
+            stage_to_step = {
+                "parsing": "Docling Parsing",
+                "extraction": "Resume Extraction",
+                "ai_analysis": "AI Analysis",
+                "matching": "Job Matching",
+                "complete": "Finalizing"
+            }
+            failed_step = stage_to_step.get(current_stage, current_stage)
+
             failure_data = {
                 "id": cv_key,
                 "scan_id": cv_key,
@@ -208,7 +252,10 @@ async def process_cv_file(
                 "scanned_at": now_iso,
                 "status": "FAILED",
                 "error": err_msg,
-                "message": f"CV processing failed: {err_msg}",
+                "message": f"CV processing failed at {failed_step}: {err_msg}",
+                "stage": current_stage,
+                "failed_step": failed_step,
+                "error_details": error_details,
                 "characters": 0,
                 "page_count": 0,
                 "is_scanned": False,

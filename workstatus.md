@@ -109,16 +109,45 @@
   - **Batch Screen**: Added `retrieval_source` badges to candidate results in `batch.tsx`.
   - **Candidate Detail Profile**: Added `retrieval_source` badges to candidate detail profile match card in `candidates/[id].tsx`.
   - **Home Screen System Health**: Separated top `StatCard` grid into distinct cards for **MSSQL Primary DB** and **pgvector DB**, and added explicit MSSQL Primary DB row alongside PostgreSQL (Vector DB) in `index.tsx`.
-  - **Verification**: Verified zero TypeScript errors across the frontend codebase via `npx tsc --noEmit`.
+  - **Phase 26: /cv-match UI & 8-Step CV Processing Redesign**
+  - **Upload CV Default Tab**: Set `activeTab` initial state to `'file'` and updated `SegmentedControl` so "Upload CV File" is the first, primary option.
+  - **Modern 8-Step Processing UI**: Built `StepProgressCard` visualizing all 8 pipeline stages (Upload → Validation → Parsing → Resume Extraction → AI Analysis → Matching → Ranking → Complete) with step icons, live ticking timer, progress bar, active pulse indicators, skipped badges, and failure alerts.
+  - **Hook Enhancements**: Enhanced `useCvUpload.ts` with `elapsedSeconds` ticker, `currentStepIndex`, `stepStates` tracking, and automatic handling for LLM-disabled fast-track modes.
+  - **Visual Feedback & Error Resilience**: Replaced blank waiting states with active step feedback, live backend status messages, and inline retry buttons.
+  - **Phase 27: Dynamic Scoring Engine & Alias Enhancement**
+  - **Flexible Term Matching**: Enhanced `ScoringEngine._extract_term_matches` with sub-token extraction, stop-word filtering, and alias resolution (`navigation` $\rightarrow$ route/maps/places/directions/eta, `widgets` $\rightarrow$ UI/widgets, `apis` $\rightarrow$ RESTful/HTTP APIs, `version control` $\rightarrow$ Git/GitHub).
+  - **Cross-Domain Divergence Guard**: Implemented domain mismatch penalty preventing IT/Software candidates (e.g. Flutter Developers) from falsely scoring HIGH on unrelated non-IT operational roles (e.g. Plant Assistant / Maintenance) simply due to general engineering degrees.
+  - **Phase 28: Candidate Details Re-run Analysis Upgrade**
+  - **Re-run Analysis Action**: Added a **"Re-run Analysis"** action button to `/candidates/{cv_id}` with a modal confirmation dialog warning that all cached data will be invalidated and reprocessed from scratch.
+  - **Backend Cache Purge & Reprocessing**: Created `POST /api/v1/candidates/{candidate_id}/reprocess` invalidating `cv_result_cache_manager`, `doc_cache_manager`, `llm_cache_manager`, `embedding_cache_manager`, and `match_result_cache_manager`.
+  - **Raw File Preservation**: Updated upload endpoints to save raw uploaded files to `settings.UPLOADS_DIR`. Synthesizes valid PDF bytes if original upload was absent.
+  - **Live Step Progress UI & Timestamp**: Embedded `StepProgressCard` displaying 8-stage progress, live elapsed ticker (`00:04s`), formatted `Last Analyzed: Jul 29, 2026, 5:02 PM` timestamp, and auto-refresh upon completion.
+  - **Phase 29: CV Text Extraction Pipeline Audit & Optimization**
+  - **PyMuPDF Layout-Aware Classification**: Enhanced `_classify_pdf` with `page.get_text("text", sort=True)` to preserve multi-column reading order and prevent interleaved layout text.
+  - **TextSanitizer**: Built `TextSanitizer` to automatically collapse spaced headings (e.g. `E D U C A T I O N` $\rightarrow$ `EDUCATION`, `S K I L L S` $\rightarrow$ `SKILLS`), strip `<!-- image -->` clutter comments, and normalize line breaks.
+  - **Extraction Quality Metrics**: Created `QualityMetricsCalculator` to calculate `pages`, `characters`, `words`, `sections_detected`, `has_email`, `has_phone`, and a quantitative `completeness_score` (0.0 to 1.0).
+  - **Normalized Resume JSON Extractor**: Built `ResumeJsonExtractor` parsing cleaned text into structured `resume_json` (`contact_info`, `summary`, `work_experience`, `education`, `skills`, `projects`, `certifications`, `quality_metrics`).
+  - **API & Schema Enrichment**: Updated `ExtractionResult`, `CVUploadResponse` schema, and `cv_service.py` to persist `quality_metrics` and `resume_json`.
+  - **Fixed HTTP 500 Error on Upload**: Fixed `NameError: name 'logger' is not defined` in `app/api/analysis.py` and `app/api/cv.py` by adding top-level `logger` imports, resolving the HTTP 500 error on `/api/match/upload`.
+  - **Verification**: Verified full test suite (`38 passed in 19.92s`) with 100% test success.
+
+- **Phase 30: Step 5 Processing Failed Fix**
+  - **Backend Stability**: Fixed a latent `UnboundLocalError` in `cv_service.py` and ensured `"stage": current_stage` is persisted in `failure_data` to allow frontend fallback mapping.
+  - **Frontend UI State Fixes**: Solved a stale closure bug in `useCvUpload.ts`'s `setInterval` by implementing `currentStepIndexRef` via `useRef`, preventing the UI from incorrectly falling back to "Step 1" upon failure.
+  - **Robust Network Error Catching**: Ensured the `catch` block correctly applies a `'failed'` state to `stepStates`, meaning if an OOM causes a connection drop at Step 5, the UI correctly halts and displays the error rather than freezing indefinitely.
 
 ## Files Changed
-- `frontend/src/types/api.ts`
-- `frontend/src/components/ui/MatchAnalysisCard.tsx`
-- `frontend/src/app/cv-match.tsx`
-- `frontend/src/app/batch.tsx`
-- `frontend/src/app/candidates/[id].tsx`
-- `frontend/src/app/index.tsx`
+- `backend/app/services/document_parser.py`
+- `backend/app/services/cv_service.py`
+- `backend/app/schemas/cv.py`
+- `backend/app/api/analysis.py`
+- `backend/app/api/cv.py`
+- `backend/app/api/candidates.py`
+- `backend/tests/test_cv_extraction.py`
+- `frontend/src/hooks/useCvUpload.ts`
 - `workstatus.md`
+
+
 
 ## Pending Work
 - **pgvector Sidecar Retrieval Pipeline**
@@ -131,8 +160,11 @@
   - [x] Phase 6 — Verification & parity test
   - [x] Phase 7 — Frontend Audit & Diagnostic Table
   - [x] Phase 8 — Frontend Integration Implementation
-
+- **CV Analysis Experience**
+  - [x] Phase 26 — Step-by-Step Progress & Upload UI Redesign
 
 ## Important Decisions
 - Preserved ScoringEngine, domain word boundary bug fix, and UI styling as untouched isolated items.
 - Configured dedicated `pg_engine` and `pg_SessionLocal` in `app/core/database.py` strictly isolated from MSSQL `engine`.
+- Configured 8 distinct pipeline progress states in `StepProgressCard.tsx` while gracefully handling LLM bypass/disabled modes (`skipped` state).
+

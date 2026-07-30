@@ -1,44 +1,54 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from 'react-native';
-import { Edit3, Folder, FileText, Award, AlertTriangle, CpuIcon, FolderIcon } from 'lucide-react-native';
+import { Edit3, FileText, FolderIcon } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useCvUpload } from '@/hooks/useCvUpload';
 import { matchService } from '@/services/matchService';
-import { CandidateMatchAnalysis, JobMatchScore, MandatoryFailure } from '@/types/api';
-import { Card, Button, TextField, Badge, DenseRow, SegmentedControl, MatchAnalysisCard } from '@/components/ui';
+import { CandidateMatchAnalysis, JobMatchScore } from '@/types/api';
+import {
+  Card,
+  Button,
+  TextField,
+  Badge,
+  DenseRow,
+  SegmentedControl,
+  MatchAnalysisCard,
+  StepProgressCard,
+  StepState,
+} from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 export default function CvMatchScreen() {
-  const [activeTab, setActiveTab] = useState<'text' | 'file'>('text');
+  // Make 'file' the first and default active tab as requested
+  const [activeTab, setActiveTab] = useState<'file' | 'text'>('file');
   const [cvText, setCvText] = useState<string>('');
   const [useLlmEnrichment, setUseLlmEnrichment] = useState<boolean>(true);
   const [analyzingText, setAnalyzingText] = useState<boolean>(false);
   const [textError, setTextError] = useState<string | null>(null);
-  const [textAnalysis, setTextAnalysis] =
-    useState<CandidateMatchAnalysis | null>(null);
+  const [textAnalysis, setTextAnalysis] = useState<CandidateMatchAnalysis | null>(null);
 
   const {
     uploading,
+    isComplete,
     statusMessage,
     error: uploadError,
     basicResult,
     enrichedResult,
+    elapsedSeconds,
+    currentStepIndex,
+    stepStates,
     uploadAndProcess,
   } = useCvUpload();
 
-  const [selectedJobForReview, setSelectedJobForReview] =
-    useState<JobMatchScore | null>(null);
+  const [selectedJobForReview, setSelectedJobForReview] = useState<JobMatchScore | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
 
   const handleAnalyzeText = async () => {
@@ -92,12 +102,14 @@ export default function CvMatchScreen() {
   };
 
   const currentAnalysis =
-    activeTab === 'text'
-      ? textAnalysis
-      : enrichedResult || (basicResult?.match_analysis as any);
+    activeTab === 'file'
+      ? enrichedResult || (basicResult?.match_analysis as any)
+      : textAnalysis;
 
   const scanId =
     currentAnalysis?.scan_id || basicResult?.scan_id || 'manual_text_scan';
+
+  const showProgressCard = activeTab === 'file' && (uploading || isComplete || !!uploadError || currentStepIndex > 0);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -109,18 +121,28 @@ export default function CvMatchScreen() {
               CV Parsing & Job Match Analysis
             </Text>
             <Text className="text-xs font-sans text-text-muted">
-              Analyze candidates against active job vacancies with rule-based scoring and LLM semantic enrichment.
+              Analyze candidate resumes against active job vacancies with Docling extraction, rule-based scoring, and LLM semantic enrichment.
             </Text>
           </View>
 
-          {/* Mode Selector Tabs */}
+          {/* Mode Selector Tabs - Upload CV File as First & Default active tab */}
           <SegmentedControl
             options={[
-              { value: 'text', label: 'Paste Raw CV Text', icon: (props) => <Edit3 {...props} />, accessibilityLabel: 'Paste Raw CV Text' },
-              { value: 'file', label: 'Upload CV File', icon: (props) => <FolderIcon {...props} />, accessibilityLabel: 'Upload Resume File' }
+              {
+                value: 'file',
+                label: 'Upload CV File',
+                icon: (props) => <FolderIcon {...props} />,
+                accessibilityLabel: 'Upload Resume File',
+              },
+              {
+                value: 'text',
+                label: 'Paste Raw CV Text',
+                icon: (props) => <Edit3 {...props} />,
+                accessibilityLabel: 'Paste Raw CV Text',
+              },
             ]}
             value={activeTab}
-            onChange={(val) => setActiveTab(val as 'text' | 'file')}
+            onChange={(val) => setActiveTab(val as 'file' | 'text')}
           />
 
           {/* LLM Enrichment Switch */}
@@ -141,7 +163,48 @@ export default function CvMatchScreen() {
             />
           </Card>
 
-          {/* TAB 1: Paste Text */}
+          {/* TAB 1: Upload File (Default & Primary Tab) */}
+          {activeTab === 'file' && (
+            <View className="gap-3">
+              {/* File Upload Drop Area */}
+              <View className="bg-surface border-2 border-dashed border-border rounded-md p-6 items-center justify-center">
+                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-2">
+                  <FileText size={24} color={COLORS.primary} />
+                </View>
+                <Text className="text-sm font-sans-bold text-text-primary mb-1">
+                  Upload Resume File
+                </Text>
+                <Text className="text-xs font-sans text-text-muted text-center mb-4">
+                  Docling will extract text from PDF, DOCX, or Image resumes automatically.
+                </Text>
+
+                <Button
+                  label={uploading ? 'Processing Resume...' : 'Select File & Match'}
+                  onPress={handlePickAndUploadFile}
+                  loading={uploading}
+                  disabled={uploading}
+                  size="md"
+                />
+              </View>
+
+              {/* Step-by-Step Modern Progress UI */}
+              {showProgressCard && (
+                <StepProgressCard
+                  currentStepIndex={currentStepIndex}
+                  stepStates={stepStates}
+                  elapsedSeconds={elapsedSeconds}
+                  statusMessage={statusMessage}
+                  error={uploadError}
+                  useLlmEnrichment={useLlmEnrichment}
+                  onRetry={handlePickAndUploadFile}
+                  isProcessing={uploading}
+                  isComplete={isComplete}
+                />
+              )}
+            </View>
+          )}
+
+          {/* TAB 2: Paste Raw CV Text */}
           {activeTab === 'text' && (
             <View className="gap-3">
               <TextField
@@ -162,48 +225,6 @@ export default function CvMatchScreen() {
                 disabled={analyzingText}
                 size="md"
               />
-            </View>
-          )}
-
-          {/* TAB 2: Upload File */}
-          {activeTab === 'file' && (
-            <View className="gap-3">
-              <View className="bg-surface border-2 border-dashed border-border rounded-md p-6 items-center justify-center">
-                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-2">
-                  <FileText size={24} color={COLORS.primary} />
-                </View>
-                <Text className="text-sm font-sans-bold text-text-primary mb-1">
-                  Upload Resume File
-                </Text>
-                <Text className="text-xs font-sans text-text-muted text-center mb-4">
-                  Docling will extract text from PDF, DOCX, or Image resumes automatically.
-                </Text>
-
-                <Button
-                  label={uploading ? 'Processing File...' : 'Select File & Match'}
-                  onPress={handlePickAndUploadFile}
-                  loading={uploading}
-                  disabled={uploading}
-                  size="md"
-                />
-              </View>
-
-              {!!statusMessage && (
-                <Card className="bg-info/10 border-info/30 flex-row items-center gap-2">
-                  {uploading && <ActivityIndicator size="small" color={COLORS.info} />}
-                  <Text className="text-xs text-info font-sans-medium">
-                    {statusMessage}
-                  </Text>
-                </Card>
-              )}
-
-              {!!uploadError && (
-                <Card className="bg-danger/10 border-danger/30">
-                  <Text className="text-xs text-danger font-sans-medium">
-                    {uploadError}
-                  </Text>
-                </Card>
-              )}
             </View>
           )}
 

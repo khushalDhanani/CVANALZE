@@ -5,7 +5,12 @@ from docx import Document
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.document_parser import DocumentParser
+from app.services.document_parser import (
+    DocumentParser,
+    QualityMetricsCalculator,
+    ResumeJsonExtractor,
+    TextSanitizer,
+)
 
 
 @pytest.fixture
@@ -31,10 +36,109 @@ def test_document_parser_extracts_docx(sample_docx_bytes: bytes):
 
     assert len(extraction.markdown) > 0
     assert "Alex Johnson" in extraction.markdown
-    assert "Skills" in extraction.markdown
+    assert "skills" in extraction.markdown.lower()
     assert "Python" in extraction.markdown
     assert extraction.page_count >= 1
     assert isinstance(extraction.structured_doc, dict)
+    assert extraction.quality_metrics["completeness_score"] > 0.5
+    assert extraction.resume_json["contact_info"]["email"] == "alex.johnson@example.com"
+
+
+def test_text_sanitizer_collapses_spaced_headings_and_cleans_images():
+    raw = """
+## CONTACT
+
+<!-- image -->
+
+9998209988
+
+## E D U C A T I O N
+
+- BTech Mechanical
+
+## S K I L L S
+
+- Languages: Dart, Python
+    """
+    clean = TextSanitizer.sanitize(raw)
+
+    assert "<!-- image -->" not in clean
+    assert "## EDUCATION" in clean
+    assert "## SKILLS" in clean
+    assert "BTech Mechanical" in clean
+
+
+def test_quality_metrics_calculator():
+    sample_text = """
+## Tarun Gupta
+Email: tarun.gupta@example.com
+Phone: +91-9998209988
+Location: Surat, Gujarat
+
+## PROFILE SUMMARY
+Experienced Flutter Developer with 3+ years experience.
+
+## WORK EXPERIENCE
+Sr Developer at TechCorp (2022 - Present)
+- Developed mobile applications.
+
+## EDUCATION
+BTech Computer Science (2018 - 2022)
+
+## SKILLS
+Languages: Dart, Python, JavaScript
+    """
+    metrics = QualityMetricsCalculator.compute(
+        text=sample_text,
+        page_count=2,
+        pdf_type="TEXT_PDF",
+        parser_used="docling_fast",
+        ocr_applied=False,
+    )
+
+    assert metrics["pages"] == 2
+    assert metrics["words"] > 20
+    assert "contact" in metrics["sections_detected"]
+    assert "experience" in metrics["sections_detected"]
+    assert "education" in metrics["sections_detected"]
+    assert "skills" in metrics["sections_detected"]
+    assert metrics["has_email"] is True
+    assert metrics["has_phone"] is True
+    assert metrics["completeness_score"] >= 0.70
+
+
+def test_resume_json_extractor():
+    sample_text = """
+## Tarun Gupta
+Email: gtworks05@gmail.com
+Phone: 9998209988
+Location: Surat, Gujarat
+
+## PROFILE SUMMARY
+Results-driven Flutter Developer with 3+ years of experience.
+
+## WORK EXPERIENCE
+## Equal SoftTech
+Sr Developer (2022 - Present)
+- Developed cross-platform apps using Flutter.
+- Integrated Firebase and state management.
+
+## EDUCATION
+## PANDIT DEENDAYAL ENERGY UNIVERSITY
+BTech Mechanical (2018 - 2022)
+
+## SKILLS
+Languages: Dart, HTML, CSS, JavaScript, PHP
+Frameworks: Flutter, Provider, BLoC
+    """
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+
+    assert resume_json["contact_info"]["email"] == "gtworks05@gmail.com"
+    assert resume_json["contact_info"]["phone"] == "9998209988"
+    assert resume_json["summary"].startswith("Results-driven")
+    assert len(resume_json["work_experience"]) > 0
+    assert len(resume_json["education"]) > 0
+    assert "Dart" in resume_json["skills"]["all_skills"]
 
 
 def test_document_parser_rejects_empty_file():
@@ -49,6 +153,7 @@ def test_document_parser_rejects_invalid_extension():
 
 def test_api_upload_cv_endpoint(sample_docx_bytes: bytes):
     from unittest.mock import patch
+
     client = TestClient(app)
     with patch("app.api.cv.background_process_cv"):
         response = client.post(
@@ -67,8 +172,6 @@ def test_api_upload_cv_endpoint(sample_docx_bytes: bytes):
         assert "cv_key" in data
         assert data["status"] == "processing"
         assert "message" in data
-
-
 
 
 def test_api_upload_rejects_invalid_file_extension():

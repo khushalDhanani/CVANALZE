@@ -21,4 +21,15 @@ export const candidateService = {
   getCandidateById: (candidateId: string): Promise<CVUploadResponse> => {
     return apiClient.get<CVUploadResponse>(`/api/v1/candidates/${encodeURIComponent(candidateId)}`);
   },
+
+  /**
+   * Trigger cache invalidation and reprocess CV from scratch.
+   */
+  reprocessCandidate: (candidateId: string): Promise<{ cv_key: string; status: string; message: string; progress: number }> => {
+    return apiClient.post<{ cv_key: string; status: string; message: string; progress: number }>(
+      `/api/v1/candidates/${encodeURIComponent(candidateId)}/reprocess`,
+      {}
+    );
+  },
 };
+

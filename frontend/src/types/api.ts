@@ -27,6 +27,9 @@ export interface CVProcessingResponse {
   cv_key: string;
   status: 'processing' | 'completed' | 'failed' | 'FAILED' | string;
   progress?: number;
+  stage?: string | null;
+  failed_step?: string | null;
+  error_details?: string | null;
 }
 
 export interface MandatoryFailure {

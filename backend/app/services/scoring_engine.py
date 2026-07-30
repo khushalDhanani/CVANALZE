@@ -196,11 +196,44 @@ class ScoringEngine:
         matched = []
         missing = []
 
+        stop_phrases = {"e.g", "eg", "e.g.", "etc", "etc.", "i.e", "i.e."}
+        noise_words = {
+            "programming",
+            "language",
+            "framework",
+            "the",
+            "systems",
+            "principles",
+            "write",
+            "integrating",
+            "with",
+            "services",
+            "backend",
+            "of",
+        }
+
+        aliases: dict[str, list[str]] = {
+            "widgets": ["widget", "widgets", "ui"],
+            "navigation": ["navigation", "route", "routing", "maps", "gps", "eta", "directions", "places"],
+            "restful apis": ["api", "apis", "rest", "restful", "http"],
+            "json": ["json", "api", "apis", "data", "payload"],
+            "integrating with backend services": ["backend", "api", "apis", "cloud functions", "firebase", "http"],
+            "version control systems": ["git", "github", "versioning", "vcs"],
+            "problem-solving": ["problem", "solving", "architecture", "logic", "clean code"],
+        }
+
+
         for term in terms:
             term_clean = term.strip()
             if not term_clean:
                 continue
-            escaped = re.escape(term_clean.lower())
+
+            term_lower = term_clean.lower()
+            if term_lower in stop_phrases:
+                matched.append(term)
+                continue
+
+            escaped = re.escape(term_lower)
             # For special skill tokens containing symbols (+, #, .), use whitespace/delimiter boundaries
             if re.search(r"[\+\#\.]", term_clean):
                 pattern = r"(?:^|[\s,;/()\-_\"\'])" + escaped + r"(?:$|[\s,;/()\-_\"\'])"
@@ -209,10 +242,41 @@ class ScoringEngine:
 
             if re.search(pattern, normalized_text, re.IGNORECASE):
                 matched.append(term)
-            else:
-                missing.append(term)
+                continue
+
+            # Check Aliases
+            if term_lower in aliases:
+                alt_matched = False
+                for alt in aliases[term_lower]:
+                    alt_escaped = re.escape(alt)
+                    if re.search(r"(?:\b|_)" + alt_escaped + r"(?:\b|_)", normalized_text, re.IGNORECASE):
+                        matched.append(term)
+                        alt_matched = True
+                        break
+                if alt_matched:
+                    continue
+
+            # Key Sub-token matching (stripping noise/filler words)
+            sub_tokens = [w for w in re.split(r"[\s,;/()\-_]+", term_lower) if w and w not in noise_words and len(w) > 1]
+            token_found = False
+            if sub_tokens:
+                for tok in sub_tokens:
+                    tok_escaped = re.escape(tok)
+                    if re.search(r"[\+\#\.]", tok):
+                        tok_pattern = r"(?:^|[\s,;/()\-_\"\'])" + tok_escaped + r"(?:$|[\s,;/()\-_\"\'])"
+                    else:
+                        tok_pattern = r"(?:\b|_)" + tok_escaped + r"(?:\b|_)"
+                    if re.search(tok_pattern, normalized_text, re.IGNORECASE):
+                        matched.append(term)
+                        token_found = True
+                        break
+            if token_found:
+                continue
+
+            missing.append(term)
 
         return matched, missing
+
 
     @classmethod
     def evaluate_job_match(
@@ -686,14 +750,24 @@ class ScoringEngine:
             final_score = round(min(100.0, max(0.0, raw_score)), 1)
             # STRICT FALSE 100% GUARD
             if final_score >= 100.0:
-                if skills_score < 100.0 or len(missing_criteria) > 0 or domain_score < 100.0:
+                if (skills_score is not None and skills_score < 100.0) or len(missing_criteria) > 0 or (domain_score is not None and domain_score < 100.0):
                     final_score = 99.0
             hr_review_required = (final_score < MATCH_HIGH_THRESHOLD)
             reason_str = f"All mandatory requirements satisfied. Overall match score is {final_score}%."
 
+        # Cross-Domain Divergence Guard:
+        # Prevent software candidates from scoring high on unrelated non-IT operational vacancies (e.g. Plant Assistant, Chemist)
+        is_software_candidate = any(k in norm_text for k in ["flutter developer", "sr developer", "full stack developer", "software developer", "software engineer", "mobile developer", "dart", "react native"])
+        is_non_it_job = any(k in job_title.lower() or k in job_department.lower() for k in ["plant", "chemist", "cafe", "fire", "store", "safety", "maintenance", "utility", "ehs", "production"])
+        has_software_req = any("software" in str(s).lower() or "developer" in str(s).lower() or "code" in str(s).lower() or "dotnet" in str(s).lower() or "flutter" in str(s).lower() for s in req_skills)
+
+        if is_software_candidate and is_non_it_job and not has_software_req:
+            final_score = round(max(0.0, final_score * 0.25), 1)
+
         if coverage < 0.5:
             classification = "LOW"
             recommendation = "Low Confidence Match — Requires HR verification (Vacancy is underspecified)."
+
         elif final_score >= MATCH_HIGH_THRESHOLD:
             classification = "HIGH"
             recommendation = "Strong candidate — proceed to interview."

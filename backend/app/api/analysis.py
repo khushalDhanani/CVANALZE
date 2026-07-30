@@ -4,6 +4,7 @@ import httpx
 from fastapi import APIRouter, File, HTTPException, UploadFile, BackgroundTasks
 
 from app.core.config import settings
+from app.core.logging import logger
 from app.repositories.job import JobRepository
 from app.repositories.result import ResultRepository
 from app.repositories.training import TrainingRepository
@@ -83,13 +84,23 @@ async def upload_and_analyze(
     try:
         content = await file.read()
         cv_key = get_stable_cv_key(file.filename)
-        
+
+        # Preserve raw upload file for re-run analysis
+        try:
+            settings.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+            raw_path = settings.UPLOADS_DIR / file.filename
+            raw_path.write_bytes(content)
+            logger.info(f"Saved raw upload file to '{raw_path}'.")
+        except Exception as write_err:
+            logger.warning(f"Failed writing upload file to UPLOADS_DIR: {write_err}")
+
         background_tasks.add_task(
             background_upload_and_analyze,
             filename=file.filename,
             content=content,
             content_type=file.content_type,
         )
+
 
         return CVProcessingResponse(
             message="10% - Upload and match processing started in the background...",
@@ -119,6 +130,9 @@ async def get_match_status(cv_key: str):
                 cv_key=cv_key,
                 status="FAILED",
                 progress=100,
+                stage=result.get("stage"),
+                failed_step=result.get("failed_step"),
+                error_details=result.get("error_details"),
             )
         match_analysis = result.get("match_analysis")
         if match_analysis:
@@ -127,17 +141,19 @@ async def get_match_status(cv_key: str):
             return match_analysis
         
         return CVProcessingResponse(
-            message="50% - Parsing complete, matching in progress...",
+            message=result.get("message") or f"{result.get('progress', 50)}% - Processing in progress...",
             cv_key=cv_key,
-            status="processing",
-            progress=50
+            status=result.get("status", "processing"),
+            progress=result.get("progress", 50),
+            stage=result.get("stage")
         )
         
     return CVProcessingResponse(
         message="Uploading and parsing CV...",
         cv_key=cv_key,
         status="processing",
-        progress=25
+        progress=25,
+        stage="parsing"
     )
 
 

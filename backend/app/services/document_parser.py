@@ -1,3 +1,4 @@
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -24,6 +25,8 @@ class ExtractionResult:
         parser_used: str = "docling_fast",
         ocr_decision: str = "SKIPPED_TEXT_PRESENT",
         stage_metrics: dict[str, Any] | None = None,
+        quality_metrics: dict[str, Any] | None = None,
+        resume_json: dict[str, Any] | None = None,
     ):
         self.markdown = markdown
         self.structured_doc = structured_doc
@@ -34,6 +37,8 @@ class ExtractionResult:
         self.parser_used = parser_used
         self.ocr_decision = ocr_decision
         self.stage_metrics = stage_metrics or {}
+        self.quality_metrics = quality_metrics or {}
+        self.resume_json = resume_json or {}
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -46,6 +51,8 @@ class ExtractionResult:
             "parser_used": self.parser_used,
             "ocr_decision": self.ocr_decision,
             "stage_metrics": self.stage_metrics,
+            "quality_metrics": self.quality_metrics,
+            "resume_json": self.resume_json,
         }
 
     @classmethod
@@ -60,7 +67,347 @@ class ExtractionResult:
             parser_used=data.get("parser_used", "docling_fast"),
             ocr_decision=data.get("ocr_decision", "SKIPPED_TEXT_PRESENT"),
             stage_metrics=data.get("stage_metrics", {}),
+            quality_metrics=data.get("quality_metrics", {}),
+            resume_json=data.get("resume_json", {}),
         )
+
+
+class TextSanitizer:
+    @classmethod
+    def sanitize(cls, raw_text: str) -> str:
+        if not raw_text:
+            return ""
+
+        # 1. Remove HTML image placeholders and markdown comment artifacts
+        text = re.sub(r"<!--\s*image\s*-->", "", raw_text)
+        text = re.sub(r"<!--\s*.*?\s*-->", "", text, flags=re.DOTALL)
+
+        # 2. Fix spaced-letter words and headings (e.g. "E D U C A T I O N", "W O R K   E X P E R I E N C E")
+        def _fix_spaced_line(line: str) -> str:
+            if not line.strip():
+                return ""
+
+            header_prefix = ""
+            match_header = re.match(r"^(\s*#+\s*)(.*)$", line)
+            if match_header:
+                header_prefix = match_header.group(1)
+                content = match_header.group(2)
+            else:
+                content = line
+
+            parts = re.split(r"\s{2,}", content.strip())
+            fixed_parts = []
+            for part in parts:
+                tokens = part.split()
+                if len(tokens) >= 3 and all(len(t) == 1 for t in tokens):
+                    fixed_parts.append("".join(tokens))
+                elif len(tokens) >= 2 and all(len(t) == 1 for t in tokens) and len(part.replace(" ", "")) >= 3:
+                    fixed_parts.append("".join(tokens))
+                else:
+                    fixed_parts.append(part)
+
+            rejoined = " ".join(fixed_parts)
+            return f"{header_prefix}{rejoined}" if header_prefix else rejoined
+
+        lines = text.splitlines()
+        cleaned_lines = []
+        for line in lines:
+            cleaned_line = _fix_spaced_line(line).rstrip()
+            cleaned_lines.append(cleaned_line)
+
+        text = "\n".join(cleaned_lines)
+
+        # 3. Normalize common heading variations
+        text = re.sub(r"##\s*WORK\s+EXPERIENCE", "## WORK EXPERIENCE", text, flags=re.IGNORECASE)
+        text = re.sub(r"##\s*EDUCATION", "## EDUCATION", text, flags=re.IGNORECASE)
+        text = re.sub(r"##\s*SKILLS", "## SKILLS", text, flags=re.IGNORECASE)
+        text = re.sub(r"##\s*PROJECTS", "## PROJECTS", text, flags=re.IGNORECASE)
+        text = re.sub(r"##\s*CONTACT", "## CONTACT", text, flags=re.IGNORECASE)
+
+        # 4. Collapse consecutive empty lines
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+
+class QualityMetricsCalculator:
+    @classmethod
+    def compute(
+        cls,
+        text: str,
+        page_count: int,
+        pdf_type: str,
+        parser_used: str,
+        ocr_applied: bool,
+    ) -> dict[str, Any]:
+        clean_text = text.strip()
+        char_count = len(clean_text)
+        words = re.findall(r"\b[a-zA-Z0-9_+-]+\b", clean_text)
+        word_count = len(words)
+
+        section_patterns = {
+            "contact": r"\b(contact|email|phone|address|linkedin|github|location)\b",
+            "summary": r"\b(summary|profile|about|objective|overview)\b",
+            "experience": r"\b(experience|employment|work history|career|work experience)\b",
+            "education": r"\b(education|academic|qualification|university|degree|college)\b",
+            "skills": r"\b(skills|technical skills|technologies|expertise|competencies)\b",
+            "certifications": r"\b(certifications|certificates|licenses|courses)\b",
+            "projects": r"\b(projects|key projects|personal projects)\b",
+        }
+
+        text_lower = clean_text.lower()
+        sections_detected = []
+        for sec_name, pattern in section_patterns.items():
+            if re.search(pattern, text_lower):
+                sections_detected.append(sec_name)
+
+        core_sections = {"contact", "summary", "experience", "education", "skills"}
+        detected_core = [s for s in sections_detected if s in core_sections]
+        section_score = len(detected_core) * 0.10
+
+        has_email = bool(re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", clean_text))
+        has_phone = bool(re.search(r"(\+?\d{1,4}[\s.-]?)?\(?\d{3,5}\)?[\s.-]?\d{3,5}[\s.-]?\d{3,5}", clean_text))
+        has_location = bool(re.search(r"\b[A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+\b", clean_text))
+        contact_score = (0.10 if has_email else 0) + (0.10 if has_phone else 0) + (0.05 if has_location else 0)
+
+        words_per_page = word_count / max(page_count, 1)
+        if words_per_page >= 150:
+            density_score = 0.25
+        elif words_per_page >= 80:
+            density_score = 0.20
+        elif words_per_page >= 30:
+            density_score = 0.10
+        else:
+            density_score = 0.05
+
+        completeness_score = round(min(1.0, section_score + contact_score + density_score), 2)
+
+        return {
+            "pages": page_count,
+            "characters": char_count,
+            "words": word_count,
+            "sections_detected": sections_detected,
+            "sections_count": len(sections_detected),
+            "completeness_score": completeness_score,
+            "has_email": has_email,
+            "has_phone": has_phone,
+            "pdf_type": pdf_type,
+            "parser_used": parser_used,
+            "ocr_applied": ocr_applied,
+        }
+
+
+class ResumeJsonExtractor:
+    @classmethod
+    def extract(cls, text: str, metrics: dict[str, Any] | None = None) -> dict[str, Any]:
+        if not text:
+            return {}
+
+        text_lines = text.splitlines()
+
+        email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text)
+        email = email_match.group(0) if email_match else None
+
+        phone_match = re.search(r"(\+?\d{1,4}[\s.-]?)?\(?\d{3,5}\)?[\s.-]?\d{3,5}[\s.-]?\d{3,5}", text)
+        phone = phone_match.group(0).strip() if phone_match else None
+
+        linkedin_match = re.search(r"(linkedin\.com/in/[\w-]+)", text, re.IGNORECASE)
+        linkedin = linkedin_match.group(0) if linkedin_match else None
+
+        github_match = re.search(r"(github\.com/[\w-]+)", text, re.IGNORECASE)
+        github = github_match.group(0) if github_match else None
+
+        candidate_name = ""
+        for line in text_lines[:10]:
+            clean_l = line.strip()
+            if not clean_l or clean_l.startswith("#") or "CONTACT" in clean_l.upper() or "@" in clean_l:
+                continue
+            cleaned_title = re.sub(
+                r"\b(FULL STACK|DEVELOPER|ENGINEER|SR|SENIOR|MOBILE)\b.*$",
+                "",
+                clean_l,
+                flags=re.IGNORECASE,
+            ).strip()
+            if len(cleaned_title) > 2 and len(cleaned_title) < 40:
+                candidate_name = cleaned_title
+                break
+        if not candidate_name and text_lines:
+            candidate_name = text_lines[0].replace("#", "").strip()
+
+        location = None
+        loc_match = re.search(r"\b([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)\b", text)
+        if loc_match:
+            location = loc_match.group(1).strip()
+
+        contact_info = {
+            "name": candidate_name,
+            "email": email,
+            "phone": phone,
+            "location": location,
+            "linkedin": linkedin,
+            "github": github,
+        }
+
+        sections: dict[str, list[str]] = {}
+        current_section = "general"
+        sections[current_section] = []
+
+        section_heading_re = re.compile(
+            r"^(?:#+|\*\*)\s*(SUMMARY|PROFILE SUMMARY|PROFILE|WORK EXPERIENCE|EXPERIENCE|EMPLOYMENT|EDUCATION|SKILLS|TECHNICAL SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|HOBBIES|CONTACT)\b",
+            re.IGNORECASE,
+        )
+
+        for line in text_lines:
+            m = section_heading_re.match(line.strip())
+            if m:
+                heading = m.group(1).upper()
+                if "EXPERIENCE" in heading or "EMPLOYMENT" in heading:
+                    current_section = "experience"
+                elif "EDUCATION" in heading:
+                    current_section = "education"
+                elif "SKILL" in heading:
+                    current_section = "skills"
+                elif "PROJECT" in heading:
+                    current_section = "projects"
+                elif "SUMMARY" in heading or "PROFILE" in heading:
+                    current_section = "summary"
+                elif "CERTIFICATION" in heading:
+                    current_section = "certifications"
+                else:
+                    current_section = heading.lower()
+
+                if current_section not in sections:
+                    sections[current_section] = []
+            else:
+                sections[current_section].append(line)
+
+        summary_text = "\n".join(sections.get("summary", [])).strip()
+
+        work_experience = []
+        exp_lines = sections.get("experience", [])
+        current_job: dict[str, Any] = {}
+        for line in exp_lines:
+            clean_l = line.strip()
+            if not clean_l:
+                continue
+            if clean_l.startswith("##") or clean_l.startswith("###") or re.search(r"\b(20\d{2}|19\d{2})\b", clean_l):
+                if current_job.get("company") or current_job.get("job_title"):
+                    work_experience.append(current_job)
+                    current_job = {}
+                if clean_l.startswith("#"):
+                    current_job["company"] = clean_l.replace("#", "").strip()
+                elif re.search(r"\b(20\d{2}|Present)\b", clean_l, re.IGNORECASE):
+                    current_job["dates"] = clean_l
+                else:
+                    current_job["job_title"] = clean_l
+            elif clean_l.startswith("-") or clean_l.startswith("•"):
+                if "responsibilities" not in current_job:
+                    current_job["responsibilities"] = []
+                current_job["responsibilities"].append(clean_l.lstrip("-• ").strip())
+            else:
+                if "description" not in current_job:
+                    current_job["description"] = clean_l
+                else:
+                    current_job["description"] += " " + clean_l
+        if current_job.get("company") or current_job.get("job_title") or current_job.get("responsibilities"):
+            work_experience.append(current_job)
+
+        education = []
+        edu_lines = sections.get("education", [])
+        current_edu: dict[str, Any] = {}
+        for line in edu_lines:
+            clean_l = line.strip()
+            if not clean_l:
+                continue
+            if clean_l.startswith("#"):
+                if current_edu.get("institution") or current_edu.get("degree"):
+                    education.append(current_edu)
+                    current_edu = {}
+                current_edu["institution"] = clean_l.replace("#", "").strip()
+            elif "CPI" in clean_l or "GPA" in clean_l or "Grade" in clean_l:
+                current_edu["grade"] = clean_l.lstrip("-• ").strip()
+            elif re.search(r"\b(20\d{2}|19\d{2})\b", clean_l):
+                current_edu["dates"] = clean_l
+            elif "BTech" in clean_l or "Degree" in clean_l or "Bachelor" in clean_l or "Master" in clean_l or "Ph" in clean_l:
+                current_edu["degree"] = clean_l.lstrip("-• ").strip()
+            elif clean_l.startswith("-") or clean_l.startswith("•"):
+                if "details" not in current_edu:
+                    current_edu["details"] = []
+                current_edu["details"].append(clean_l.lstrip("-• ").strip())
+
+        if current_edu.get("institution") or current_edu.get("degree"):
+            education.append(current_edu)
+
+        skills_lines = sections.get("skills", [])
+        categorized_skills: dict[str, list[str]] = {}
+        all_skills: list[str] = []
+
+        for line in skills_lines:
+            clean_l = line.lstrip("-• ").strip()
+            if not clean_l:
+                continue
+            if ":" in clean_l:
+                category, items_str = clean_l.split(":", 1)
+                cat_name = category.strip()
+                items = [it.strip() for it in re.split(r"[,;&|]+", items_str) if it.strip()]
+                categorized_skills[cat_name] = items
+                all_skills.extend(items)
+            else:
+                items = [it.strip() for it in re.split(r"[,;&|]+", clean_l) if it.strip()]
+                all_skills.extend(items)
+
+        seen = set()
+        dedup_skills = []
+        for s in all_skills:
+            if s.lower() not in seen:
+                seen.add(s.lower())
+                dedup_skills.append(s)
+
+        projects = []
+        proj_lines = sections.get("projects", [])
+        current_proj: dict[str, Any] = {}
+
+        for line in proj_lines:
+            clean_l = line.strip()
+            if not clean_l:
+                continue
+            if clean_l.startswith("##") or clean_l.startswith("###"):
+                if current_proj.get("name"):
+                    projects.append(current_proj)
+                    current_proj = {}
+                current_proj["name"] = clean_l.replace("#", "").strip()
+            elif "|" in clean_l and not clean_l.startswith("-"):
+                techs = [t.strip() for t in clean_l.split("|") if t.strip()]
+                current_proj["technologies"] = techs
+            elif clean_l.startswith("-") or clean_l.startswith("•"):
+                if "bullet_points" not in current_proj:
+                    current_proj["bullet_points"] = []
+                current_proj["bullet_points"].append(clean_l.lstrip("-• ").strip())
+            else:
+                if "description" not in current_proj:
+                    current_proj["description"] = clean_l
+                else:
+                    current_proj["description"] += " " + clean_l
+
+        if current_proj.get("name"):
+            projects.append(current_proj)
+
+        certifications = [
+            l.lstrip("-• ").strip() for l in sections.get("certifications", []) if l.strip()
+        ]
+
+        return {
+            "contact_info": contact_info,
+            "summary": summary_text,
+            "work_experience": work_experience,
+            "education": education,
+            "skills": {
+                "categorized": categorized_skills,
+                "all_skills": dedup_skills,
+            },
+            "projects": projects,
+            "certifications": certifications,
+            "quality_metrics": metrics or {},
+        }
 
 
 def _init_fast_converter() -> DocumentConverter:
@@ -93,14 +440,14 @@ def _get_ocr_converter() -> DocumentConverter:
 
 def _classify_pdf(content: bytes) -> tuple[str, str, int, bool]:
     """
-    Inspect PDF using PyMuPDF (fitz) to detect native text and images,
-    and classify document as TEXT_PDF, HYBRID_PDF, or SCANNED_PDF.
+    Inspect PDF using PyMuPDF (fitz) with layout sorting to detect native text,
+    reading order, images, and classify document as TEXT_PDF, HYBRID_PDF, or SCANNED_PDF.
     Returns tuple: (pdf_type, native_text, native_char_count, has_images)
     """
     try:
         import fitz  # PyMuPDF
         doc = fitz.open(stream=content, filetype="pdf")
-        page_texts = [page.get_text() for page in doc]
+        page_texts = [page.get_text("text", sort=True) for page in doc]
         native_text = "\n".join(page_texts).strip()
         native_char_count = len(native_text)
         has_images = any(len(page.get_images()) > 0 for page in doc)
@@ -155,7 +502,7 @@ class DocumentParser:
             f"Starting DocumentParser extraction pipeline for '{filename}' ({len(content)} bytes)..."
         )
 
-        # Stage 1: Detect PDF Type & Extract Native Selectable Text
+        # Stage 1: Detect PDF Type & Extract Native Selectable Text (layout sorted)
         pdf_type = "NON_PDF"
         native_pdf_text = ""
         native_char_count = 0
@@ -233,23 +580,24 @@ class DocumentParser:
 
         # Stage 5: Select Best Available Text & Validate Resume JSON
         parser_used = "docling_fast"
-        final_text = fast_markdown_text
+        raw_final_text = fast_markdown_text
 
-        if ocr_applied and len(ocr_markdown_text) > len(final_text):
-            final_text = ocr_markdown_text
+        if ocr_applied and len(ocr_markdown_text) > len(raw_final_text):
+            raw_final_text = ocr_markdown_text
             parser_used = "docling_ocr"
 
-        if len(final_text.strip()) < 20 and len(native_pdf_text.strip()) >= 20:
+        if len(raw_final_text.strip()) < 20 and len(native_pdf_text.strip()) >= 20:
             logger.info(
                 f"Using native PDF text ({len(native_pdf_text)} chars) for '{filename}' "
                 f"as primary Docling output was empty or sparse."
             )
-            final_text = native_pdf_text
+            raw_final_text = native_pdf_text
             parser_used = "native_fitz"
 
-        final_text_clean = final_text.strip()
+        # Sanitize text
+        final_text_clean = TextSanitizer.sanitize(raw_final_text)
 
-        if not final_text_clean or (len(final_text_clean) < 20 and "<!-- image -->" in final_text_clean):
+        if not final_text_clean or (len(final_text_clean) < 20 and "<!-- image -->" in raw_final_text):
             logger.error(
                 f"[STAGE 5: RESUME JSON] All extraction stages failed for '{filename}'. Total chars: {len(final_text_clean)}"
             )
@@ -266,10 +614,22 @@ class DocumentParser:
         )
 
         is_scanned = (pdf_type == "SCANNED_PDF") or (extension == "pdf" and (
-            "<!-- image -->" in final_text_clean
+            "<!-- image -->" in raw_final_text
             or (ocr_applied and native_char_count < 50)
             or (docling_doc and hasattr(docling_doc, "pictures") and len(docling_doc.pictures) > 0)
         ))
+
+        # Compute Extraction Quality Metrics
+        quality_metrics = QualityMetricsCalculator.compute(
+            text=final_text_clean,
+            page_count=pages_count,
+            pdf_type=pdf_type,
+            parser_used=parser_used,
+            ocr_applied=ocr_applied,
+        )
+
+        # Extract Structured Resume JSON
+        resume_json = ResumeJsonExtractor.extract(final_text_clean, quality_metrics)
 
         stage_metrics = {
             "pdf_type": pdf_type,
@@ -282,11 +642,13 @@ class DocumentParser:
             "ocr_ms": ocr_duration_ms,
             "final_char_count": len(final_text_clean),
             "parser_used": parser_used,
+            "quality_metrics": quality_metrics,
         }
 
         logger.info(
             f"[STAGE 5: RESUME JSON] Successful extraction for '{filename}': "
             f"type={pdf_type}, parser={parser_used}, final_chars={len(final_text_clean)}, "
+            f"words={quality_metrics['words']}, score={quality_metrics['completeness_score']}, "
             f"pages={pages_count}, scanned={is_scanned}, ocr={ocr_applied}."
         )
 
@@ -300,6 +662,8 @@ class DocumentParser:
             parser_used=parser_used,
             ocr_decision=ocr_decision,
             stage_metrics=stage_metrics,
+            quality_metrics=quality_metrics,
+            resume_json=resume_json,
         )
 
     @classmethod

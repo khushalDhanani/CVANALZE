@@ -11,6 +11,9 @@ class CVProcessingResponse(BaseModel):
     cv_key: str = Field(..., description="Unique CV execution ID")
     status: str = Field(default="processing", description="Current status")
     progress: int | None = Field(default=None, description="Progress percentage (0-100)")
+    stage: str | None = Field(default=None, description="Current processing stage")
+    failed_step: str | None = Field(default=None, description="Step where the pipeline failed")
+    error_details: str | None = Field(default=None, description="Detailed stack trace or technical error info")
 
 
 class CVUploadResponse(BaseModel):
@@ -54,6 +57,12 @@ class CVUploadResponse(BaseModel):
     )
     dynamic_profile: DynamicCandidateProfile | None = Field(
         None, description="Dynamically extracted candidate profile from LLM analysis."
+    )
+    quality_metrics: dict[str, Any] | None = Field(
+        None, description="Extraction quality metrics (pages, words, completeness score, sections detected)"
+    )
+    resume_json: dict[str, Any] | None = Field(
+        None, description="Normalized structured Resume JSON parsed from extracted text"
     )
 
 

@@ -12,3 +12,5 @@ export * from "./SegmentedControl";
 export * from "./MatchAnalysisCard";
 export * from "./WeightControlRow";
 export * from "./StatCard";
+export * from "./StepProgressCard";
+

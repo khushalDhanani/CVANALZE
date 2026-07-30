@@ -1,7 +1,8 @@
 from typing import Any
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from app.repositories.result import ResultRepository
+
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
@@ -20,18 +21,23 @@ def list_candidates(
         s_lower = search.lower()
         filtered = []
         for r in results:
-            fname = r.get("filename", "").lower()
-            cv_id = r.get("id", "").lower()
-            text = r.get("markdown", "")[:500].lower()
+            if not r or not isinstance(r, dict):
+                continue
+            fname = str(r.get("filename") or "").lower()
+            cv_id = str(r.get("id") or "").lower()
+            text = str(r.get("markdown") or "")[:500].lower()
             if s_lower in fname or s_lower in cv_id or s_lower in text:
                 filtered.append(r)
         results = filtered
 
     summaries = []
     for r in results[:limit]:
-        match_analysis = r.get("match_analysis", {})
-        best_match = match_analysis.get("best_match", {})
-        
+        if not r or not isinstance(r, dict):
+            continue
+        raw_match = r.get("match_analysis")
+        match_analysis = raw_match if isinstance(raw_match, dict) else {}
+        best_match = match_analysis.get("best_match") or {}
+
         summaries.append({
             "id": r.get("id"),
             "filename": r.get("filename"),
@@ -57,17 +63,153 @@ def get_candidate_detail(candidate_id: str):
     """
     Retrieve complete parsed candidate result and full match analysis by candidate ID / scan key.
     """
-    filename = f"{candidate_id}.json" if not candidate_id.endswith(".json") else candidate_id
+    cid = candidate_id.strip()
+    filename = f"{cid}.json" if not cid.endswith(".json") else cid
     result = ResultRepository.read_result_by_filename(filename)
     
     if not result:
-        # Fallback search by scan_id
-        matches = ResultRepository.find_results_by_scan_id(candidate_id)
+        # Fallback search by scan_id / stem
+        stem = cid[:-5] if cid.endswith(".json") else cid
+        matches = ResultRepository.find_results_by_scan_id(stem)
         if matches:
             first_match = matches[0]
             result = ResultRepository.read_result(first_match)
 
     if not result:
-        raise HTTPException(status_code=404, detail=f"Candidate record '{candidate_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
 
     return result
+
+
+@router.post("/{candidate_id}/reprocess", response_model=dict[str, Any])
+async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTasks):
+    """
+    Invalidate and delete all existing cache entries related to candidate CV,
+    preserve original CV file, and reprocess CV from scratch using latest pipeline.
+    """
+    from app.core.config import settings
+    from app.core.cache import (
+        cv_result_cache_manager,
+        doc_cache_manager,
+        llm_cache_manager,
+        embedding_cache_manager,
+        match_result_cache_manager,
+    )
+    from app.core.logging import logger
+    from app.services.cv_service import process_cv_file
+
+    cid = candidate_id.strip()
+    result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
+    cv_key = result_filename[:-5] if result_filename.endswith(".json") else result_filename
+    
+    existing_result = ResultRepository.read_result_by_filename(result_filename)
+    if not existing_result:
+        matches = ResultRepository.find_results_by_scan_id(cv_key)
+        if matches:
+            existing_result = ResultRepository.read_result(matches[0])
+
+    if not existing_result:
+        raise HTTPException(status_code=404, detail=f"Candidate record '{cv_key}' not found.")
+
+
+    # Prevent duplicate concurrent reprocessing jobs
+    if existing_result.get("status") == "processing":
+        return {
+            "message": existing_result.get("message") or "Analysis is already in progress for this candidate.",
+            "cv_key": cv_key,
+            "status": "processing",
+            "progress": existing_result.get("progress", 20),
+        }
+
+    filename = existing_result.get("filename") or f"{cv_key}.pdf"
+    content_type = existing_result.get("content_type")
+    cv_hash = existing_result.get("cv_hash")
+
+    # Invalidate and delete all cache entries for this CV
+    cv_result_cache_manager.delete(result_filename)
+    cv_result_cache_manager.delete_by_pattern(f"*{cv_key}*")
+    if cv_hash:
+        doc_cache_manager.delete(cv_hash)
+        doc_cache_manager.delete_by_pattern(f"*{cv_hash}*")
+        llm_cache_manager.delete_by_pattern(f"*{cv_hash}*")
+        embedding_cache_manager.delete_by_pattern(f"*{cv_hash}*")
+        match_result_cache_manager.delete_by_pattern(f"*{cv_hash}*")
+
+    # Unlink old result file on disk to ensure fresh reprocessing
+    disk_path = settings.RESULTS_DIR / result_filename
+    if disk_path.exists():
+        try:
+            disk_path.unlink()
+        except Exception as e:
+            logger.warning(f"Could not remove old result file '{disk_path}': {e}")
+
+    # Locate raw file content from UPLOADS_DIR or fallback to extracted text
+    raw_bytes = None
+    raw_file_candidates = [
+        settings.UPLOADS_DIR / filename,
+        settings.UPLOADS_DIR / f"{cv_key}.pdf",
+        settings.UPLOADS_DIR / f"{cv_key}.docx",
+    ]
+    for path in raw_file_candidates:
+        if path.exists() and path.is_file():
+            try:
+                raw_bytes = path.read_bytes()
+                logger.info(f"[REPROCESS] Found preserved raw file at '{path}'.")
+                break
+            except Exception as e:
+                logger.warning(f"Failed reading raw upload file '{path}': {e}")
+
+    if not raw_bytes:
+        fallback_text = existing_result.get("markdown") or existing_result.get("text") or ""
+        if fallback_text:
+            try:
+                import fitz
+                doc = fitz.open()
+                page = doc.new_page()
+                page.insert_text((50, 50), fallback_text[:3000])
+                raw_bytes = doc.tobytes()
+                doc.close()
+                filename = f"{cv_key}.pdf"
+                content_type = "application/pdf"
+                logger.info(f"[REPROCESS] Created synthetic PDF from extracted text for candidate '{cv_key}'.")
+            except Exception as pdf_err:
+                logger.warning(f"Failed generating synthetic PDF from text: {pdf_err}")
+                raw_bytes = fallback_text.encode("utf-8")
+                filename = f"{cv_key}.pdf"
+                content_type = "application/pdf"
+
+
+
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Original CV content is missing and cannot be reprocessed.")
+
+    # Save active processing marker
+    processing_marker = {
+        "id": cv_key,
+        "scan_id": cv_key,
+        "filename": filename,
+        "status": "processing",
+        "message": "10% - Caches purged. Reprocessing CV from scratch...",
+        "progress": 10,
+        "created_at": existing_result.get("created_at"),
+        "parsed_at": existing_result.get("parsed_at"),
+    }
+    ResultRepository.save_result(result_filename, processing_marker)
+
+    background_tasks.add_task(
+        process_cv_file,
+        filename=filename,
+        content=raw_bytes,
+        content_type=content_type,
+        force_reprocess=True,
+        candidate_id=existing_result.get("candidate_id"),
+        cv_id=existing_result.get("cv_id"),
+    )
+
+    return {
+        "message": "10% - Caches purged. Reprocessing CV from scratch...",
+        "cv_key": cv_key,
+        "status": "processing",
+        "progress": 10,
+    }
+

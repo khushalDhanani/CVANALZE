@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3 } from 'lucide-react-native';
+import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3, RefreshCw, X, Clock } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
+import { cvService } from '@/services/cvService';
 import { CVUploadResponse, JobMatchScore } from '@/types/api';
 import { Card, Button, Badge, DenseRow } from '@/components/ui';
 import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
+import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
 import { COLORS } from '@/constants/colors';
 
 export default function CandidateDetailScreen() {
@@ -19,6 +21,27 @@ export default function CandidateDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showFullText, setShowFullText] = useState<boolean>(false);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
+
+  // Reprocessing state
+  const [reprocessModalVisible, setReprocessModalVisible] = useState<boolean>(false);
+  const [isReprocessing, setIsReprocessing] = useState<boolean>(false);
+  const [reprocessError, setReprocessError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
+  const [reprocessStatusMsg, setReprocessStatusMsg] = useState<string>('Initializing re-analysis...');
+  const [stepStates, setStepStates] = useState<StepState[]>([
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+  ]);
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchDetail = () => {
     if (!id) return;
@@ -33,11 +56,118 @@ export default function CandidateDetailScreen() {
 
   useEffect(() => {
     fetchDetail();
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
   }, [id]);
+
+  const stopTimers = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  };
+
+  const handleConfirmReprocess = async () => {
+    if (!id) return;
+    setReprocessModalVisible(false);
+    setIsReprocessing(true);
+    setReprocessError(null);
+    setElapsedSeconds(0);
+    setCurrentStepIndex(1);
+    setReprocessStatusMsg('Caches purged. Re-running CV analysis pipeline...');
+    setStepStates(['completed', 'active', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
+    try {
+      await candidateService.reprocessCandidate(id);
+      
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      pollTimerRef.current = setInterval(async () => {
+        try {
+          const statusRes: any = await cvService.getCvStatus(id);
+          const statusStr = statusRes.status;
+          const msg = statusRes.message || statusRes.error || '';
+          const pct = statusRes.progress || 0;
+
+          if (msg) setReprocessStatusMsg(msg);
+
+          if (statusStr === 'FAILED') {
+            stopTimers();
+            setIsReprocessing(false);
+            setReprocessError(msg || 'Reprocessing failed.');
+            return;
+          }
+
+          // Compute step states
+          let nextIdx = 1;
+          if (pct >= 85 || statusRes.match_analysis) {
+            nextIdx = 6;
+          } else if (pct >= 65) {
+            nextIdx = 5;
+          } else if (pct >= 45) {
+            nextIdx = 4;
+          } else if (pct >= 25) {
+            nextIdx = 3;
+          } else if (pct >= 15) {
+            nextIdx = 2;
+          }
+
+          setCurrentStepIndex(nextIdx);
+          setStepStates((prev) => {
+            const updated = [...prev];
+            for (let i = 0; i < nextIdx; i++) {
+              if (updated[i] !== 'skipped') updated[i] = 'completed';
+            }
+            updated[nextIdx] = 'active';
+            return updated;
+          });
+
+          // Completion check: when job is finished and result contains parsed data
+          if (statusStr !== 'processing' && (statusRes.match_analysis || statusRes.text || statusRes.markdown)) {
+            stopTimers();
+            setCurrentStepIndex(7);
+            setStepStates(['completed', 'completed', 'completed', 'completed', 'completed', 'completed', 'completed', 'completed']);
+            setIsReprocessing(false);
+            fetchDetail();
+          }
+        } catch (err: any) {
+          // Keep polling unless explicit 404
+        }
+      }, 1500);
+
+    } catch (err: any) {
+      stopTimers();
+      setIsReprocessing(false);
+      setReprocessError(err.message || 'Failed to trigger re-analysis.');
+    }
+  };
 
   const analysis = data?.enriched_match_analysis || data?.match_analysis;
   const bestMatch = analysis?.best_match;
   const scanId = data?.scan_id || data?.id || id || '';
+
+  const rawTimestamp = data?.parsed_at || data?.scanned_at || data?.created_at;
+  const formattedParsedAt = rawTimestamp
+    ? new Date(rawTimestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : 'N/A';
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -54,11 +184,53 @@ export default function CandidateDetailScreen() {
             Candidate Profile
           </Text>
         </View>
-        <Badge label={data?.is_scanned ? 'OCR Scanned' : 'Native PDF'} tone="info" />
+        <View className="flex-row items-center gap-2">
+          <Button
+            label="Re-run Analysis"
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw size={14} color={COLORS.primary} />}
+            onPress={() => setReprocessModalVisible(true)}
+            disabled={isReprocessing}
+          />
+          <Badge label={data?.is_scanned ? 'OCR Scanned' : 'Native PDF'} tone="info" />
+        </View>
       </View>
 
       <ScrollView className="flex-1 px-3 py-4">
-        {loading ? (
+        {/* Active Processing Step Card */}
+        {isReprocessing && (
+          <View className="mb-4">
+            <StepProgressCard
+              currentStepIndex={currentStepIndex}
+              stepStates={stepStates}
+              statusMessage={reprocessStatusMsg}
+              elapsedSeconds={elapsedSeconds}
+              isComplete={false}
+              useLlmEnrichment={true}
+            />
+          </View>
+        )}
+
+
+        {reprocessError && (
+          <Card className="bg-danger/10 border-danger/30 mb-4 flex-row items-center justify-between">
+            <View className="flex-row items-center gap-2 flex-1 pr-2">
+              <AlertCircle size={16} color={COLORS.danger} />
+              <Text className="text-xs font-sans-medium text-danger flex-1">
+                {reprocessError}
+              </Text>
+            </View>
+            <Button
+              label="Retry"
+              variant="secondary"
+              size="sm"
+              onPress={() => setReprocessModalVisible(true)}
+            />
+          </Card>
+        )}
+
+        {loading && !isReprocessing ? (
           <View className="flex-1 justify-center items-center py-16">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">Loading candidate profile...</Text>
@@ -84,16 +256,26 @@ export default function CandidateDetailScreen() {
                   <Text className="text-base font-sans-bold text-text-primary">
                     {data.filename || data.id}
                   </Text>
-                  <Text className="text-xs font-sans text-text-muted">
-                    ID: {data.id} • Parsed: {data.parsed_at ? new Date(data.parsed_at).toLocaleDateString() : 'N/A'}
-                  </Text>
+                  <View className="flex-row items-center gap-1.5 mt-0.5 flex-wrap">
+                    <Text className="text-xs font-sans text-text-muted">
+                      ID: {data.id}
+                    </Text>
+                    <Text className="text-xs text-text-muted">•</Text>
+                    <View className="flex-row items-center gap-1">
+                      <Clock size={12} color={COLORS.textMuted} />
+                      <Text className="text-xs font-sans-medium text-text-muted">
+                        Last Analyzed: {formattedParsedAt}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
 
-              <View className="flex-row gap-2 mt-1">
+              <View className="flex-row gap-2 mt-1 flex-wrap">
                 <Badge label={`${data.page_count || 1} Page(s)`} tone="neutral" />
                 <Badge label={`${data.characters || 0} Chars`} tone="neutral" />
                 {data.ocr_applied && <Badge label="RapidOCR Applied" tone="warning" />}
+                {data.status === 'REPROCESSED' && <Badge label="Fresh Analysis" tone="success" />}
               </View>
             </Card>
 
@@ -209,7 +391,59 @@ export default function CandidateDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Reprocess Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={reprocessModalVisible}
+        onRequestClose={() => setReprocessModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/60 px-4">
+          <Card className="w-full max-w-md bg-surface p-4 border-border gap-3">
+            <View className="flex-row items-center justify-between border-b border-border pb-2">
+              <View className="flex-row items-center gap-2">
+                <RefreshCw size={18} color={COLORS.primary} />
+                <Text className="text-base font-sans-bold text-text-primary">
+                  Re-run CV Analysis
+                </Text>
+              </View>
+              <Pressable onPress={() => setReprocessModalVisible(false)}>
+                <X size={18} color={COLORS.textMuted} />
+              </Pressable>
+            </View>
+
+            <Text className="text-xs font-sans text-text-primary leading-5">
+              Are you sure you want to re-run analysis for{' '}
+              <Text className="font-sans-bold">{data?.filename || scanId}</Text>?
+            </Text>
+
+            <View className="bg-warning/10 p-2.5 rounded-md border border-warning/30">
+              <Text className="text-xs font-sans text-warning">
+                ⚠️ This will purge all cached results (Resume JSON, LLM reasoning, embeddings, match rankings) and reprocess the resume from scratch using the latest pipeline.
+              </Text>
+            </View>
+
+            <View className="flex-row justify-end gap-2 mt-2">
+              <Button
+                label="Cancel"
+                variant="ghost"
+                size="sm"
+                onPress={() => setReprocessModalVisible(false)}
+              />
+              <Button
+                label="Confirm & Reprocess"
+                variant="primary"
+                size="sm"
+                icon={<RefreshCw size={14} color="#FFF" />}
+                onPress={handleConfirmReprocess}
+              />
+            </View>
+          </Card>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
 
