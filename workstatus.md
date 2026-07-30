@@ -168,3 +168,123 @@
 - Configured dedicated `pg_engine` and `pg_SessionLocal` in `app/core/database.py` strictly isolated from MSSQL `engine`.
 - Configured 8 distinct pipeline progress states in `StepProgressCard.tsx` while gracefully handling LLM bypass/disabled modes (`skipped` state).
 
+- **Phase 31: CV Status Endpoint 500 Error Fix**
+  - **Issue Identification**: Identified that `GET /api/cv/status/{cv_key}` crashed with a `500 Internal Server Error` (Pydantic `ValidationError`) when polling the endpoint while the background task was running. The background task persists intermediate state (`{"status": "processing"}`) into the JSON result file, which the API mistakenly attempted to parse directly into a final `CVUploadResponse`.
+  - **Resolution**: Updated `app/api/cv.py` to correctly check for `result.get("status") == "processing"` and properly serialize it as a `CVProcessingResponse`, preventing Pydantic validation failures during the intermediate polling phases.
+
+- **Phase 32: EmbeddingService Audit & Pipeline Standardization**
+  - **Thread-Safe Metrics & Observability**: Added thread-safe runtime metrics tracking (`total_requests`, `cache_hits`, `cache_misses`, `cache_hit_rate_pct`, `last_processing_time_ms`, `total_processing_time_ms`, `embedding_model`) exposed via `EmbeddingService.get_metrics()` and `reset_metrics()`.
+  - **Detailed Execution Profiling & Logging**: Added high-precision timing instrumentation (`time.perf_counter()`) and structured `[EMBEDDING]` logging detailing model version, text hash, processing duration, and cache HIT/MISS status.
+  - **Hash-Aware Dual Caching**: Standardized cache keys on SHA-256 content hashes (`f"{model_version}:{content_hash}"`) while supporting key aliasing for identifiers (`cv_key` / `doc_hash`), guaranteeing cache hits across both lookup formats.
+  - **Single Embedding Generation per CV**: Updated `cv_service.py` to generate and persist candidate embeddings once, passing `cv_embedding` into `MatchService.analyze_single_cv` and `VacancyPreFilter`. Eliminated duplicate generation calls between prefiltering and persistence.
+  - **Non-Blocking Fault Resilience**: Wrapped Ollama embedding calls in graceful exception handling, ensuring failed embedding generation logs warnings without throwing exceptions or blocking CV extraction/matching.
+  - **Backward Compatibility**: Preserved all existing module and class method signatures (`get_embedding`, `EmbeddingService.generate_embedding`, `generate_batch_embeddings`, `cosine_similarity`, `save_candidate_embedding`, `get_candidate_embedding`).
+  - **Unit Test Suite**: Added `backend/tests/test_embedding_service.py` verifying metrics, caching, version tracking, single pipeline execution, and non-blocking failure modes (`5 passed in 2.60s`).
+
+- **Phase 33: Active Vacancies Semantic Embeddings**
+  - **Rich Canonical Text Generation**: Built `build_vacancy_canonical_text(job)` synthesizing structured text from all 8 vacancy fields (Vacancy Title, Job Description, Required Skills, Experience Range, Education, Certifications, Department, and Responsibilities).
+  - **Incremental Update Detection**: Implemented SHA-256 content hashing (`content_hash`) per vacancy. Vacancies whose content has not changed automatically skip Ollama embed calls on sync.
+  - **PostgreSQL & Multi-Tier Cache Persistence**: Implemented `save_vacancy_embedding` and `get_vacancy_embedding` persisting versioned vacancy vectors in PostgreSQL `vacancy_embeddings` table (`VacancyEmbedding` model with HNSW vector index) and Redis L2 / File L3 cache manager.
+  - **Schema & API Preservation**: Preserved existing `JobOpening` Pydantic model response contracts and database schema.
+  - **Unit Test Verification**: Added `backend/tests/test_vacancy_embeddings.py` covering canonical text construction, incremental update skipping, content change re-embedding, and database/cache fallbacks (`4 passed in 1.13s`).
+
+- **Phase 34: Semantic Vector Retrieval First-Stage Selection**
+  - **Stage 1 (Semantic Retrieval)**: Implemented `semantic_vector_search()` in `VacancyPreFilter`. Generates/uses `cv_embedding` to perform vector similarity search against active vacancy embeddings, narrowing down active vacancies from $V$ total openings to the Top-N candidate vacancies (`SEMANTIC_RETRIEVAL_TOP_N: int = 50`).
+  - **Stage 2 (Deterministic VacancyPreFilter)**: Feeds Stage 1 semantic candidate vacancies into deterministic `VacancyPreFilter` logic (lexical scoring, title term matching, department matching, experience range suitability, RRF fusion).
+  - **Ranking Authority**: Preserved `ScoringEngine` (`ScoringEngine.evaluate_job_match`) as the final authority for match scoring and candidate ranking.
+  - **Fault Resilience**: Added graceful fallback to full vacancy list if embeddings are disabled or vector search returns no results.
+  - **Unit Test Suite**: Added `backend/tests/test_semantic_vacancy_retrieval.py` verifying Stage 1 vector candidate selection, fallback behavior, and ScoringEngine ranking authority (`3 passed in 0.79s`). Verified all 12 embedding and retrieval tests (`12 passed in 1.52s`).
+
+- **Phase 35: Hybrid Matching Architecture Refactoring**
+  - **Strict Candidate Retrieval Role**: Verified and enforced that vector embeddings and similarity scores act strictly as Stage 1 candidate retrieval mechanisms and never alter or dictate final candidate match scores.
+  - **8-Stage Hybrid Sequence**: Formalized complete execution sequence: `Resume → Embedding → Vector Search → Deterministic VacancyPreFilter → Confidence Gate → LLM (Conditional) → Deterministic Scoring Engine → Final Ranking`.
+  - **Explainability & Mandatory Validation Preservation**: Preserved detailed evidence extraction, matched/missing skill breakdowns, mandatory failure penalties, domain divergence penalties, and ranking reasons on `EnrichedJobMatchResult`.
+  - **Unit Test Verification**: Added `backend/tests/test_hybrid_matching_pipeline.py` verifying the full 8-stage sequence, strict score isolation from raw vectors, explainability metrics, and Confidence Gate LLM bypass (`4 passed in 2.48s`). Verified all 16 pipeline unit tests (`16 passed in 2.94s`).
+
+- **Phase 36: Enterprise Semantic Candidate Search**
+  - **Natural Language Vector Query Embedding**: Implemented `CandidateSearchService.search_candidates` converting recruiters' free-form natural language queries into embeddings via `EmbeddingService`.
+  - **Vector Similarity Candidate Retrieval**: Queries PostgreSQL `candidate_embeddings` (HNSW index) with fallback to candidate cache manager / dynamic candidate embedding synthesis to compute `similarity_score` (cosine similarity).
+  - **Structured Deterministic Filtering**: Applies structured filters (`department`, `min_experience`, `max_experience`, `location`, `skills`, `education`, `status`, `min_similarity`) on top of vector similarity candidate results.
+  - **Pydantic Schemas & API Endpoints**: Created `CandidateSearchRequest`, `CandidateSearchResultItem`, and `CandidateSearchResponse` in `app/schemas/candidate_search.py`. Exposed `POST /api/candidates/search` and updated `GET /api/candidates` with optional natural language `query` support.
+  - **Unit Test Suite**: Added `backend/tests/test_candidate_semantic_search.py` verifying vector similarity candidate ranking, structured deterministic filtering, and API endpoints (`4 passed in 6.35s`). Verified full suite across 20 test cases (`20 passed in 8.24s`).
+
+- **Phase 37: Automatic Similar Candidate Detection**
+  - **Automatic Post-Upload Detection**: Integrated `SimilarCandidateService.detect_similar_candidates` into `cv_service.py` to compare new CV embeddings against all existing candidate embeddings automatically after every successful CV processing.
+  - **Configurable Similarity Thresholds**: Added `SIMILAR_CANDIDATE_THRESHOLD: float = 0.85` and `SIMILAR_CANDIDATE_MAX_MATCHES: int = 5` in `config.py`.
+  - **Zero-Loss Data Integrity**: Kept original candidate records 100% separate and unmerged. Duplicate profile identification (`similarity_score >= 0.95`) flags `is_duplicate_flag = True` without deleting or modifying candidate records.
+  - **Candidate 360 Integration**: Saved `similar_candidates` metadata array inside candidate results and exposed payload via `GET /api/candidates/{candidate_id}`.
+  - **Unit Test Suite**: Added `backend/tests/test_similar_candidate_detection.py` verifying vector similarity candidate thresholding, duplicate flag setting, data preservation, and Candidate 360 API responses (`4 passed in 5.86s`). Verified full suite across 24 test cases (`24 passed in 7.71s`).
+
+- **Phase 38: Production-Ready Vector Database Integration**
+  - **PostgreSQL pgvector Database & HNSW Indexes**: Added HNSW vector indexes (`Vector(768)`, `vector_cosine_ops`, `m=16`, `ef_construction=64`) to `CandidateEmbedding` and `VacancyEmbedding` models in `app/models/pg.py`. Updated `init_db()` in `app/core/database.py` to enable `vector` extension and auto-create HNSW vector indexes.
+  - **Background Migration & Incremental Synchronization**: Implemented `VectorDatabaseMigrationService` handling content-hash incremental checks, model version tracking (`settings.EMBEDDING_MODEL`), and background migration of candidate and vacancy embeddings.
+  - **Vector DB Management Endpoints**: Created `app/api/vector_db.py` exposing `POST /api/vector-db/sync` and `GET /api/vector-db/status`. Mounted `vector_db_router` under `/api` in `app/main.py`.
+  - **Multi-Tier Graceful Fallback**: Ensured all vector searches fall back seamlessly to Redis L2 / File L3 cache manager and in-memory cosine similarity if PostgreSQL is disconnected or unavailable.
+  - **Unit Test Suite**: Added `backend/tests/test_vector_db_integration.py` verifying status monitoring, background sync, content-hash incremental skipping, and fallback handling (`4 passed in 6.24s`). Verified complete test suite across 28 test cases (`28 passed in 7.96s`).
+
+- **Phase 39: Domain Knowledge Embeddings**
+  - **8 Enterprise Domain Categories**: Implemented `DomainEmbeddingService` generating and caching vector embeddings across 8 domain categories: `skills`, `job_titles`, `departments`, `technologies`, `certifications`, `education_domains`, `industries`, `functional_areas`.
+  - **PostgreSQL pgvector HNSW Model**: Added `DomainEmbedding` model in `app/models/pg.py` with HNSW cosine distance vector index (`ix_domain_embeddings_embedding`).
+  - **Semantic Equivalent Resolution**: Resolved equivalent skills (e.g. "Postgres" $\approx$ "PostgreSQL", "K8s" $\approx$ "Kubernetes", "React.js" $\approx$ "React") and equivalent job roles via `find_semantic_equivalents()` and `expand_skills_with_semantic_equivalents()`.
+  - **Deterministic Authority Preserved**: Ensured semantic domain embeddings provide term expansion and role similarity boosts without overriding mandatory requirement validation rules in `ScoringEngine`.
+  - **API Endpoints**: Created `app/api/domain_knowledge.py` exposing `POST /api/domain-knowledge/equivalents` and `GET /api/domain-knowledge/categories`. Mounted router under `/api` in `app/main.py`.
+  - **Unit Test Suite**: Added `backend/tests/test_domain_knowledge_embeddings.py` covering all 8 domain categories, term equivalence, mandatory requirement authority preservation, and API endpoints (`6 passed in 6.99s`). Verified complete suite across 34 test cases (`34 passed in 8.21s`).
+
+- **Phase 40: Enterprise Talent Knowledge Graph**
+  - **9 Entity Node Types & Relationships**: Implemented `TalentKnowledgeGraphService` linking Candidates, Skills, Projects, Companies, Vacancies, Certifications, Departments, Technologies, and Industries across relationships (`HAS_SKILL`, `WORKED_AT`, `WORKED_ON`, `HOLD_CERTIFICATION`, `MATCHES`, `REQUIRES_SKILL`, `BELONGS_TO`, `BELONGS_TO_CATEGORY`, `SEMANTICALLY_SIMILAR`).
+  - **Relationship Discovery via Vector Embeddings**: Used vector embeddings strictly for discovering implicit relationship edges (`SEMANTICALLY_SIMILAR` skills, candidates, and vacancies) while preserving `ScoringEngine` deterministic validation as the final source of truth for `MATCHES` scores.
+  - **Graph REST APIs**: Created `app/api/talent_graph.py` exposing:
+    - `GET /api/talent-graph/candidate/{candidate_id}`: Candidate 360 subgraph & skill network.
+    - `GET /api/talent-graph/vacancy/{vacancy_id}`: Vacancy 360 subgraph & applicant matches.
+    - `GET /api/talent-graph/skill/{skill_name}`: Skill intelligence subgraph & market demand.
+    - `GET /api/talent-graph/analytics`: Global talent graph metrics & node/edge statistics.
+  - **Unit Test Suite**: Added `backend/tests/test_talent_knowledge_graph.py` verifying Candidate 360, Vacancy 360, Skill Intelligence, and Recruitment Analytics (`5 passed in 14.14s`). Verified complete backend test suite across all 39 test cases (`39 passed in 17.42s`).
+
+- **Phase 41: AI Recommendations**
+  - **7 Intelligence Domains**: Implemented `RecommendationService` delivering recruiter recommendations across 7 domains: Best Vacancies for Candidates, Similar Candidates for Vacancies, Related Skills, Missing Qualifications & Skill Gaps, Recommended Certifications, Career Transition Opportunities, and Internal Talent Pools.
+  - **Embeddings for Retrieval Only**: Vector embeddings perform candidate retrieval and skill expansion; deterministic validation and `ScoringEngine` rules remain 100% authoritative for scores.
+  - **Recommendation REST APIs**: Created `app/api/recommendations.py` exposing:
+    - `GET /api/recommendations/candidate/{candidate_id}`: Candidate 360 recommendations payload.
+    - `GET /api/recommendations/vacancy/{vacancy_id}`: Vacancy 360 recommendations payload.
+    - `GET /api/recommendations/talent-pools`: Aggregated internal talent pools summary.
+  - **Unit Test Suite**: Added `backend/tests/test_ai_recommendations.py` verifying candidate recs, vacancy recs, internal talent pools, and API endpoints (`4 passed in 6.54s`). Verified complete backend test suite across all 43 test cases (`43 passed in 17.14s`).
+
+- **Phase 42: Enterprise Performance Optimization**
+  - **Multi-Level Tiered Caching (L1 → L2 → L3)**: Implemented `EnterprisePerformanceService` with sub-millisecond `LRUMemoryCache` (L1 Memory), shared Redis cache (L2), and persistent PostgreSQL pgvector DB (L3).
+  - **Asynchronous Batch Embedding Pipeline**: Created `generate_embeddings_batch_async` using non-blocking worker threads with exponential backoff retries.
+  - **Intelligent Cache Invalidation**: Added `invalidate_cache_by_pattern` clearing multi-level LRU memory and shared cache entries by tag or pattern.
+  - **Observability & Performance REST APIs**: Created `app/api/performance.py` exposing:
+    - `GET /api/performance/metrics`: Real-time telemetry dashboard (L1/L2 hit ratios, batch throughput, retry attempt counts, 8-stage pipeline latencies).
+    - `POST /api/performance/cache/invalidate`: Targeted pattern-based cache clearing.
+  - **Unit Test Suite**: Added `backend/tests/test_enterprise_performance.py` covering async batch embeddings, multi-level caching, cache invalidation, and metrics telemetry (`5 passed in 6.75s`). Verified complete backend test suite across all 48 test cases (`48 passed in 14.81s`).
+
+- **Phase 43: Final Architecture Audit & Compliance Verification**
+  - **12-Stage Pipeline Sequence Audit**: Verified complete execution sequence: `CV Upload → Resume Extraction → Resume Extraction MD → Resume JSON → Resume Embedding → Vacancy Embedding Search → Deterministic Vacancy PreFilter → Confidence Gate → Optional LLM → Deterministic Scoring Engine → Final Ranking → Result Storage`.
+  - **Single Generation & Zero Duplicate Pathways**: Verified 1 candidate embedding per CV, zero duplicate pathways, zero redundant vector searches, and 0ms LLM latency on unambiguous matches via Confidence Gate.
+  - **Role Separation**: Confirmed vector embeddings perform retrieval & semantic expansion only; `ScoringEngine` maintains 100% authority for match scores and mandatory pass/fail rules.
+  - **Compliance Report Artifact**: Generated [final_architecture_compliance_report.md](file:///Users/khushaldhanani/.gemini/antigravity-ide/brain/0f864f1b-9366-43c7-8845-72666e8823f5/final_architecture_compliance_report.md) with 100% feature compliance matrix.
+  - **Full Suite Test Execution**: Ran all 48 backend test cases across 10 test suites (`48 passed in 16.11s`).
+
+- **Phase 44: Domain Alignment Engine & Summary Dualization**
+  - **Candidate Domain Profiler**: Implemented `ScoringEngine.extract_candidate_domain_profile` evaluating skills, experience, education, and projects to derive `recommended_department`, `professional_domain`, `strengths`, and suitable market `suitable_job_roles`.
+  - **Strict Domain Mismatch Penalty**: Enforced dynamic category cross-checking in `ScoringEngine.evaluate_job_match`. Conflicting domains (e.g. Flutter Dev vs Plant Assistant / Chemist / HR / Finance) automatically receive a score penalty (< 25%), domain score 0%, and mandatory failure details flagging domain divergence.
+  - **Active Vacancy Summary Gating**: Enforced `has_genuine_match` validation. If no active vacancy genuinely matches candidate's domain (score >= 50% without domain mismatch), `active_vacancy_summary` explicitly returns `"No suitable active vacancy found."` without forcing fit on unrelated openings.
+  - **Independent AI Career Summary**: Formatted standalone candidate profile analysis detailing candidate strengths, target department, specialized domain, and suitable job roles independently of vacancy availability.
+  - **Frontend UI & Pydantic Contracts**: Updated `analysis.py`, `cv.py`, `optimized_match.py`, and `frontend/src/types/api.ts`. Rendered dedicated **AI Career Summary** and **Active Vacancy Summary** cards in `candidates/[id].tsx`.
+  - **Unit Test Verification**: Added `backend/tests/test_domain_matching.py` covering domain profiling, domain mismatch penalties, genuine match validation, and dual summary generation (`5 passed in 32.25s`).
+
+- **Phase 45: CVUploadResponse Schema Nullable structured_doc Fix**
+  - **Issue Root Cause**: Identified that `GET /api/cv/status/{cv_key}` returned a `500 Internal Server Error` due to a Pydantic `ValidationError`. The JSON cache results store `"structured_doc": None` when docling doc model is absent, but `CVUploadResponse` required a non-null `dict[str, Any]`.
+  - **Fix Implementation**: Updated `CVUploadResponse` in [backend/app/schemas/cv.py](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/app/schemas/cv.py) to set `structured_doc: dict[str, Any] | None = Field(default=None, description="...")`.
+
+- **Phase 46: Deterministic Candidate Name Extraction Pipeline**
+  - **Job Title & Keyword Exclusion Blacklists**: Built comprehensive `JOB_TITLE_KEYWORDS` (e.g., `IT`, `EXECUTIVE`, `DEVELOPER`, `ENGINEER`, `MANAGER`, `ANALYST`, `ADMINISTRATOR`, etc.) and `RESUME_HEADER_KEYWORDS` in `ResumeJsonExtractor.extract_candidate_name()`, preventing job titles and profile headlines from being misextracted as candidate names.
+  - **Email Username Token Cross-Validation**: Cross-referenced candidate name candidates against email username tokens. If header line matches email username tokens (e.g. `tarun.gupta@example.com` matching `"Tarun Gupta"`), confidence is scored as `0.95` (`HIGH`).
+  - **Deterministic Multi-Tier Fallback Rules**: Implemented multi-tier fallback logic: `header_email_validated` (0.95) $\rightarrow$ `header_contact_section` (0.85) $\rightarrow$ `email_username_fallback` (0.60, e.g. `mitesh.darji95@gmail.com` $\rightarrow$ `"Mitesh Darji"`) $\rightarrow$ `filename_fallback` (0.30, e.g. `Jane_Smith_Resume.pdf` $\rightarrow$ `"Jane Smith"`) $\rightarrow$ `"Unknown Candidate"` (0.0).
+  - **Schema & Observability Telemetry**: Exposed top-level `full_name`, `candidate_name`, `email`, `phone`, `name_confidence`, and `name_extraction_source` across Pydantic schemas (`CVUploadResponse`, `CandidateMatchAnalysis`, `EnrichedCandidateAnalysis`) and logged telemetry (`logger.info`).
+  - **Frontend UI & Card Disambiguation**: Updated `MatchAnalysisCard.tsx`, `cv-match.tsx`, `candidates/[id].tsx`, `candidates/index.tsx`, and `types/api.ts` to display candidate names in a dedicated candidate banner above job match titles, eliminating confusion between Candidate Name and Best Matched Job Title.
+  - **Mitesh Darji Specific Fix & Result Backfill**: Re-extracted Mitesh Darji's CV (`cv_MITESH_DARJI_NEW_CV__1___1_`) to correctly set candidate name to `"Mitesh Darji"` (instead of `"IT EXECUTIVE"`), and ran a backfill script across all stored result JSON files.
+  - **Unit Test Suite**: Added test cases in `backend/tests/test_cv_extraction.py` verifying job title rejection, email validation, email fallback, and filename fallback (`11 passed in 6.46s`).
+
+
+
