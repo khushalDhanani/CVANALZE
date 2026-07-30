@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { Award, AlertTriangle, CpuIcon } from 'lucide-react-native';
+import { Award, AlertTriangle, CpuIcon, User } from 'lucide-react-native';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Badge } from './Badge';
@@ -11,6 +11,7 @@ import { JobMatchScore, MandatoryFailure } from '@/types/api';
 
 interface MatchAnalysisCardProps {
   bestMatch: JobMatchScore | any;
+  candidateName?: string | null;
   onReviewPress?: () => void;
 }
 
@@ -23,12 +24,24 @@ const getRetrievalBadge = (source?: string) => {
   return { label: source, tone: 'neutral' as const };
 };
 
-export function MatchAnalysisCard({ bestMatch, onReviewPress }: MatchAnalysisCardProps) {
+export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: MatchAnalysisCardProps) {
   if (!bestMatch) return null;
   const retrievalBadge = getRetrievalBadge(bestMatch.retrieval_source);
+  const resolvedName = candidateName || bestMatch.full_name || bestMatch.candidate_name;
 
   return (
     <Card className="border-primary/40 shadow-sm gap-3">
+      {!!resolvedName && (
+        <View className="flex-row items-center gap-2 pb-2 border-b border-border/50">
+          <View className="w-6 h-6 rounded-full bg-primary/10 items-center justify-center">
+            <User size={14} color={COLORS.primary} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-sans-medium text-text-muted uppercase tracking-wider">Candidate</Text>
+            <Text className="text-sm font-sans-bold text-text-primary">{resolvedName}</Text>
+          </View>
+        </View>
+      )}
       <View className="flex-row justify-between items-start">
         <View className="flex-1 pr-2">
           <View className="flex-row items-center gap-2 mb-1 flex-wrap">

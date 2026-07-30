@@ -69,6 +69,7 @@ EVIDENCE-BASED REASONING RULES:
 5. Compare the candidate against each vacancy requirement item by item.
 6. If there is a mismatch (department, domain, education, role, technology, skills), explicitly report it.
 7. Never increase semantic_fit_score based on assumptions — score only on verified evidence.
+8. If there is no genuine match with any active vacancy, set active_vacancy_summary to "No suitable active vacancy found.".
 
 INSTRUCTIONS:
 Return ONLY valid JSON matching the exact schema below without markdown wrapper, thinking tokens, or extra commentary.
@@ -82,8 +83,14 @@ Expected JSON Schema:
     "education_domains": ["Extracted education domains/degrees"],
     "certifications": ["Extracted certifications"],
     "current_role": "Current or most recent job title",
-    "professional_domains": ["Extracted professional domain areas"]
+    "professional_domains": ["Extracted professional domain areas"],
+    "recommended_department": "Most suitable department for candidate",
+    "professional_domain": "Candidate's specialized professional domain",
+    "strengths": ["Key candidate strengths from skills, experience, projects"],
+    "suitable_job_roles": ["List of suitable market job roles"]
   }},
+  "active_vacancy_summary": "Summary of genuine active vacancy match if genuine match exists; otherwise 'No suitable active vacancy found.'",
+  "ai_career_summary": "Independent AI analysis of candidate's profile, strengths, recommended department, and suitable job roles.",
   "matched_vacancies": [
     {{
       "vacancy_id": 101,

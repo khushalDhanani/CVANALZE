@@ -19,6 +19,12 @@ class JobOpening(BaseModel):
     company_name: str | None = Field(None, description="Company name")
     location_name: str | None = Field(None, description="Location name")
     
+    # Detailed Semantic Requirement Fields
+    job_description: str | None = Field(None, description="Detailed job description")
+    responsibilities: str | None = Field(None, description="Key responsibilities and duties")
+    education: str | None = Field(None, description="Required education background")
+    certifications: str | None = Field(None, description="Required or preferred certifications")
+
     # Live DB IDs
     vacancy_id: int | None = Field(None, description="Live MSSQL VacancyRequestID")
     job_profile_id: int | None = Field(None, description="Live MSSQL JobProfileID")

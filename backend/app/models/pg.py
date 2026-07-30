@@ -34,4 +34,36 @@ class CandidateEmbedding(pg_Base):
     content_hash = Column(String, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    __table_args__ = (
+        Index(
+            "ix_candidate_embeddings_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
+
+class DomainEmbedding(pg_Base):
+    __tablename__ = "domain_embeddings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String, nullable=False, index=True)
+    term = Column(String, nullable=False, index=True)
+    embedding = Column(Vector(768), nullable=True)
+    embedding_model_version = Column(String, nullable=True)
+    content_hash = Column(String, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index(
+            "ix_domain_embeddings_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
 

@@ -238,6 +238,7 @@ export default function CvMatchScreen() {
               {/* Best Match Card */}
               <MatchAnalysisCard
                 bestMatch={currentAnalysis.best_match}
+                candidateName={currentAnalysis.full_name || currentAnalysis.candidate_name}
                 onReviewPress={() => {
                   setSelectedJobForReview(currentAnalysis.best_match!);
                   setReviewModalVisible(true);

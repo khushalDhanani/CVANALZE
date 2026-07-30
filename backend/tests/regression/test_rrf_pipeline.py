@@ -9,7 +9,7 @@ backend_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(backend_dir))
 
 from app.services.cv_service import process_cv_file
-from app.services.document_parser import ExtractionResult
+from app.services.document_parser import MarkdownResult
 from app.repositories.job import JobRepository
 
 FIXTURES_DIR = backend_dir / "tests" / "fixtures"
@@ -23,7 +23,7 @@ async def test_candidate(name: str, fixture_file: str, cv_id: str):
     with open(fixture_path, "r", encoding="utf-8") as f:
         cv_text = f.read()
 
-    mock_extraction = ExtractionResult(
+    mock_extraction = MarkdownResult(
         markdown=cv_text,
         structured_doc={},
         page_count=1,
@@ -31,7 +31,7 @@ async def test_candidate(name: str, fixture_file: str, cv_id: str):
         ocr_applied=False
     )
     
-    with patch("app.services.document_parser.DocumentParser.parse", return_value=mock_extraction):
+    with patch("app.services.document_parser.MarkdownGenerator.parse", return_value=mock_extraction):
         # We pass the fixture text natively
         result = await process_cv_file(
             filename=f"{cv_id}_mock.md",

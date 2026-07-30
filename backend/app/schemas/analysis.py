@@ -49,6 +49,10 @@ class OptimizedCandidateProfile(BaseModel):
     certifications: list[str] = Field(default_factory=list)
     current_role: str | None = None
     professional_domains: list[str] = Field(default_factory=list)
+    recommended_department: str | None = None
+    professional_domain: str | None = None
+    strengths: list[str] = Field(default_factory=list)
+    suitable_job_roles: list[str] = Field(default_factory=list)
 
 
 class OptimizedVacancyMatch(BaseModel):
@@ -67,6 +71,8 @@ class OptimizedVacancyMatch(BaseModel):
 class OptimizedLLMMatchResponse(BaseModel):
     candidate_profile: OptimizedCandidateProfile = Field(default_factory=OptimizedCandidateProfile)
     matched_vacancies: list[OptimizedVacancyMatch] = Field(default_factory=list)
+    active_vacancy_summary: str = Field(default="No suitable active vacancy found.")
+    ai_career_summary: str = Field(default="")
 
 
 class PipelineStageMetrics(BaseModel):
@@ -105,8 +111,33 @@ class EnrichedJobMatchResult(JobMatchResult):
 
 
 class EnrichedCandidateAnalysis(BaseModel):
+    full_name: str | None = Field(default=None, description="Extracted candidate full name")
+    candidate_name: str | None = Field(default=None, description="Extracted candidate name")
     primary_department: str = Field(
         ..., description="Top recommended department for candidate"
+    )
+    recommended_department: str = Field(
+        default="", description="Recommended department derived from candidate profile"
+    )
+    professional_domain: str = Field(
+        default="", description="Candidate's specialized professional domain"
+    )
+    strengths: list[str] = Field(
+        default_factory=list, description="Key strengths identified from CV"
+    )
+    suitable_job_roles: list[str] = Field(
+        default_factory=list, description="Suitable job roles for candidate"
+    )
+    has_genuine_match: bool = Field(
+        default=False, description="True if a genuine match with an active vacancy exists"
+    )
+    active_vacancy_summary: str = Field(
+        default="No suitable active vacancy found.",
+        description="Summary of active vacancy match or fallback message",
+    )
+    ai_career_summary: str = Field(
+        default="",
+        description="Independent AI analysis of candidate profile, strengths, department, and suitable roles",
     )
     best_match: EnrichedJobMatchResult = Field(
         ..., description="Top matching job opening"

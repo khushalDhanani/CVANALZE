@@ -118,6 +118,14 @@ async def get_cv_status(cv_key: str):
                 status="FAILED",
                 progress=100,
             )
+        if result.get("status") == "processing":
+            return CVProcessingResponse(
+                message=f"{result.get('progress', 25)}% - {result.get('stage', 'Processing')}...",
+                cv_key=result.get("id") or cv_key,
+                status="processing",
+                progress=result.get("progress"),
+                stage=result.get("stage")
+            )
         if "scan_id" not in result and "id" in result:
             result["scan_id"] = result["id"]
         if "parsed_at" not in result and "scanned_at" in result:

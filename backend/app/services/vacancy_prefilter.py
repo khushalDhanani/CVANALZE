@@ -10,10 +10,37 @@ from app.services.embedding_service import EmbeddingService
 
 class VacancyPreFilter:
     """
-    Lightweight deterministic Python pre-filter to narrow down active database vacancies
-    to the top relevant candidates before passing them to the LLM.
-    Uses Reciprocal Rank Fusion (RRF) to merge lexical and pgvector semantic ranks.
+    Two-stage Vacancy Pre-Filter:
+    - Stage 1 (Semantic Retrieval): First-stage vector search narrows down active vacancies to Top-N semantic candidates.
+    - Stage 2 (Deterministic Pre-filtering): Evaluates lexical scoring, title matching, required skills, and RRF fusion on Stage 1 candidates.
+    The Deterministic Scoring Engine remains the final authority for ranking.
     """
+
+    @classmethod
+    def semantic_vector_search(cls, candidate_embedding: list[float], top_n: int = 50) -> list[str]:
+        """
+        Performs vector similarity search against active vacancy embeddings.
+        Returns a list of vacancy_id strings ordered by proximity.
+        """
+        try:
+            from app.core.database import pg_SessionLocal
+            from app.models.pg import VacancyEmbedding
+            from sqlalchemy import select
+
+            if pg_SessionLocal is not None:
+                with pg_SessionLocal() as session:
+                    stmt = (
+                        select(VacancyEmbedding.vacancy_id)
+                        .order_by(VacancyEmbedding.embedding.cosine_distance(candidate_embedding))
+                        .limit(top_n)
+                    )
+                    results = session.execute(stmt).scalars().all()
+                    if results:
+                        return [str(vid) for vid in results]
+        except Exception as e:
+            logger.warning(f"[SEMANTIC_RETRIEVAL] pgvector query failed: {e}")
+
+        return []
 
     @classmethod
     def vector_prefilter(cls, candidate_embedding: list[float], top_k: int = 200) -> dict[str, int]:
@@ -55,9 +82,6 @@ class VacancyPreFilter:
         if len(openings) <= limit:
             return openings
 
-        cv_lower = cv_text.lower()
-        stop_words = {"and", "team", "for", "the", "with", "senior", "junior", "lead", "manager", "developer", "engineer", "specialist"}
-
         # Generate cv_embedding if missing
         if cv_embedding is None and settings.EMBEDDING_ENABLED:
             try:
@@ -68,15 +92,36 @@ class VacancyPreFilter:
                 logger.warning(f"CV embedding generation failed in prefilter: {e}")
                 cv_embedding = None
 
+        # STAGE 1: Semantic Vector Retrieval (first-stage vacancy selection)
+        stage1_openings = openings
+        if cv_embedding and settings.EMBEDDING_ENABLED and len(openings) > limit:
+            top_n = getattr(settings, "SEMANTIC_RETRIEVAL_TOP_N", 50)
+            top_n_ids = cls.semantic_vector_search(cv_embedding, top_n=top_n)
+            if top_n_ids:
+                top_n_set = set(top_n_ids)
+                semantic_candidates = [
+                    job for job in openings
+                    if str(job.get("vacancy_id") or job.get("id")) in top_n_set
+                ]
+                if semantic_candidates:
+                    stage1_openings = semantic_candidates
+                    logger.info(
+                        f"[SEMANTIC_RETRIEVAL] Stage 1 vector search selected {len(stage1_openings)} candidate vacancies "
+                        f"out of {len(openings)} total openings (Top-N={top_n})."
+                    )
+
+        # STAGE 2: Deterministic VacancyPreFilter (lexical + RRF fusion on Stage 1 candidates)
+        cv_lower = cv_text.lower()
+        stop_words = {"and", "team", "for", "the", "with", "senior", "junior", "lead", "manager", "developer", "engineer", "specialist"}
+
         # 1. Fetch Vector Ranks (pgvector)
         vec_ranks = {}
         if cv_embedding:
-            # fetch up to len(openings) so we rank as many as possible
-            vec_ranks = cls.vector_prefilter(cv_embedding, top_k=max(200, len(openings)))
+            vec_ranks = cls.vector_prefilter(cv_embedding, top_k=max(200, len(stage1_openings)))
 
         # 2. Compute Lexical Scores & Ranks
         lexical_scored = []
-        for job in openings:
+        for job in stage1_openings:
             score = 0.0
 
             # Department match
@@ -132,7 +177,7 @@ class VacancyPreFilter:
         # 3. Reciprocal Rank Fusion (RRF)
         rrf_scored = []
         k_constant = 60.0
-        for job in openings:
+        for job in stage1_openings:
             vid = str(job.get("vacancy_id") or job.get("id"))
             
             l_rank = lex_ranks.get(vid)
@@ -169,7 +214,7 @@ class VacancyPreFilter:
                 vector_only += 1
 
         logger.info(
-            f"Vacancy Pre-filter (RRF): {len(openings)} total vacancies reduced to {len(selected)} candidates (Top K={limit}). "
+            f"Vacancy Pre-filter (RRF): {len(stage1_openings)} Stage-1 candidates reduced to {len(selected)} final vacancies (Top K={limit}). "
             f"Composition: Both={both}, Keyword-Only={keyword_only}, Vector-Only={vector_only}"
         )
         return selected

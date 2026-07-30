@@ -1,61 +1,50 @@
 from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
+from app.schemas.candidate_search import (
+    CandidateSearchRequest,
+    CandidateSearchResponse,
+)
+from app.services.candidate_search_service import CandidateSearchService
 from app.repositories.result import ResultRepository
 
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
 
+@router.post("/search", response_model=CandidateSearchResponse)
+def search_candidates_post(request: CandidateSearchRequest) -> CandidateSearchResponse:
+    """
+    Enterprise Semantic Candidate Search endpoint.
+    Converts natural language search query into embeddings, computes vector similarity,
+    and applies structured deterministic filters (department, experience, location, skills, education, status).
+    """
+    return CandidateSearchService.search_candidates(request)
+
+
 @router.get("", response_model=list[dict[str, Any]])
 def list_candidates(
     search: str | None = Query(None, description="Filter candidates by filename or keyword"),
+    query: str | None = Query(None, description="Natural language semantic search query"),
+    department: str | None = Query(None, description="Filter by department name"),
+    min_experience: float | None = Query(None, description="Minimum total experience years"),
+    max_experience: float | None = Query(None, description="Maximum total experience years"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """
-    List all processed candidate results with summary match scores and metadata.
+    List all processed candidate results with summary match scores, vector similarity scores, and metadata.
+    Supports natural language semantic search via query parameter.
     """
-    results = ResultRepository.list_all_results()
-    
-    if search:
-        s_lower = search.lower()
-        filtered = []
-        for r in results:
-            if not r or not isinstance(r, dict):
-                continue
-            fname = str(r.get("filename") or "").lower()
-            cv_id = str(r.get("id") or "").lower()
-            text = str(r.get("markdown") or "")[:500].lower()
-            if s_lower in fname or s_lower in cv_id or s_lower in text:
-                filtered.append(r)
-        results = filtered
-
-    summaries = []
-    for r in results[:limit]:
-        if not r or not isinstance(r, dict):
-            continue
-        raw_match = r.get("match_analysis")
-        match_analysis = raw_match if isinstance(raw_match, dict) else {}
-        best_match = match_analysis.get("best_match") or {}
-
-        summaries.append({
-            "id": r.get("id"),
-            "filename": r.get("filename"),
-            "parsed_at": r.get("parsed_at") or r.get("created_at"),
-            "page_count": r.get("page_count", 1),
-            "is_scanned": r.get("is_scanned", False),
-            "ocr_applied": r.get("ocr_applied", False),
-            "primary_department": match_analysis.get("primary_department"),
-            "best_match": {
-                "job_title": best_match.get("job_title"),
-                "department": best_match.get("department") or best_match.get("department_name"),
-                "score": best_match.get("score") or best_match.get("overall_score"),
-                "classification": best_match.get("classification"),
-                "recommendation": best_match.get("recommendation"),
-            },
-        })
-
-    return summaries
+    search_query = query if query is not None else search
+    req = CandidateSearchRequest(
+        query=search_query,
+        department=department,
+        min_experience=min_experience,
+        max_experience=max_experience,
+        limit=limit,
+    )
+    res = CandidateSearchService.search_candidates(req)
+    return [item.model_dump() for item in res.candidates]
 
 
 @router.get("/{candidate_id}", response_model=dict[str, Any])
@@ -77,6 +66,16 @@ def get_candidate_detail(candidate_id: str):
 
     if not result:
         raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
+
+    if "similar_candidates" not in result or result.get("similar_candidates") is None:
+        from app.services.similar_candidate_service import SimilarCandidateService
+        from app.services.embedding_service import get_candidate_embedding
+        stem = cid[:-5] if cid.endswith(".json") else cid
+        cand_emb = get_candidate_embedding(stem)
+        if cand_emb:
+            result["similar_candidates"] = SimilarCandidateService.detect_similar_candidates(stem, cand_emb)
+        else:
+            result["similar_candidates"] = []
 
     return result
 

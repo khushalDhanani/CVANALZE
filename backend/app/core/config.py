@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     # Embedding Configuration
     EMBEDDING_ENABLED: bool = True
     EMBEDDING_MODEL: str = "nomic-embed-text"
+    SEMANTIC_RETRIEVAL_TOP_N: int = 50
+    SIMILAR_CANDIDATE_THRESHOLD: float = 0.85
+    SIMILAR_CANDIDATE_MAX_MATCHES: int = 5
 
     # Matching Logic Version (bump when scoring/ranking logic changes)
     MATCHING_VERSION: str = "1.0.0"

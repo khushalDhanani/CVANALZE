@@ -13,11 +13,10 @@ from app.core.config import settings
 from app.core.logging import logger
 
 
-class ExtractionResult:
+class MarkdownResult:
     def __init__(
         self,
         markdown: str,
-        structured_doc: dict[str, Any],
         page_count: int,
         is_scanned: bool,
         ocr_applied: bool,
@@ -25,11 +24,8 @@ class ExtractionResult:
         parser_used: str = "docling_fast",
         ocr_decision: str = "SKIPPED_TEXT_PRESENT",
         stage_metrics: dict[str, Any] | None = None,
-        quality_metrics: dict[str, Any] | None = None,
-        resume_json: dict[str, Any] | None = None,
     ):
         self.markdown = markdown
-        self.structured_doc = structured_doc
         self.page_count = page_count
         self.is_scanned = is_scanned
         self.ocr_applied = ocr_applied
@@ -37,13 +33,10 @@ class ExtractionResult:
         self.parser_used = parser_used
         self.ocr_decision = ocr_decision
         self.stage_metrics = stage_metrics or {}
-        self.quality_metrics = quality_metrics or {}
-        self.resume_json = resume_json or {}
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "markdown": self.markdown,
-            "structured_doc": self.structured_doc,
             "page_count": self.page_count,
             "is_scanned": self.is_scanned,
             "ocr_applied": self.ocr_applied,
@@ -51,15 +44,12 @@ class ExtractionResult:
             "parser_used": self.parser_used,
             "ocr_decision": self.ocr_decision,
             "stage_metrics": self.stage_metrics,
-            "quality_metrics": self.quality_metrics,
-            "resume_json": self.resume_json,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ExtractionResult":
+    def from_dict(cls, data: dict[str, Any]) -> "MarkdownResult":
         return cls(
             markdown=data["markdown"],
-            structured_doc=data.get("structured_doc", {}),
             page_count=data.get("page_count", 1),
             is_scanned=data.get("is_scanned", False),
             ocr_applied=data.get("ocr_applied", False),
@@ -67,8 +57,6 @@ class ExtractionResult:
             parser_used=data.get("parser_used", "docling_fast"),
             ocr_decision=data.get("ocr_decision", "SKIPPED_TEXT_PRESENT"),
             stage_metrics=data.get("stage_metrics", {}),
-            quality_metrics=data.get("quality_metrics", {}),
-            resume_json=data.get("resume_json", {}),
         )
 
 
@@ -81,6 +69,9 @@ class TextSanitizer:
         # 1. Remove HTML image placeholders and markdown comment artifacts
         text = re.sub(r"<!--\s*image\s*-->", "", raw_text)
         text = re.sub(r"<!--\s*.*?\s*-->", "", text, flags=re.DOTALL)
+
+        # 1.5 Remove markdown checkboxes hallucinated by Docling
+        text = re.sub(r"-\s*\[[x\s]\]\s*", "", text, flags=re.IGNORECASE)
 
         # 2. Fix spaced-letter words and headings (e.g. "E D U C A T I O N", "W O R K   E X P E R I E N C E")
         def _fix_spaced_line(line: str) -> str:
@@ -124,7 +115,35 @@ class TextSanitizer:
         text = re.sub(r"##\s*PROJECTS", "## PROJECTS", text, flags=re.IGNORECASE)
         text = re.sub(r"##\s*CONTACT", "## CONTACT", text, flags=re.IGNORECASE)
 
-        # 4. Collapse consecutive empty lines
+        # 3.5 Remove consecutive duplicate headings
+        lines = text.splitlines()
+        dedup_lines = []
+        last_heading = None
+        for line in lines:
+            clean_l = line.strip()
+            if clean_l.startswith("## "):
+                heading_text = clean_l.lower()
+                if heading_text == last_heading:
+                    continue
+                last_heading = heading_text
+            elif clean_l:
+                last_heading = None
+            dedup_lines.append(line)
+        text = "\n".join(dedup_lines)
+
+        # 4. Flatten Markdown Tables
+        def _flatten_table_line(l: str) -> str:
+            if re.match(r"^\|[-\s\|]+\|$", l.strip()):
+                return ""
+            if l.strip().startswith("|") and l.strip().endswith("|"):
+                parts = [p.strip() for p in l.split("|") if p.strip()]
+                return "  ".join(parts)
+            return l
+            
+        lines = [_flatten_table_line(l) for l in text.splitlines()]
+        text = "\n".join(l for l in lines if l.strip())
+
+        # 5. Collapse consecutive empty lines
         text = re.sub(r"\n{3,}", "\n\n", text)
         return text.strip()
 
@@ -197,8 +216,149 @@ class QualityMetricsCalculator:
 
 
 class ResumeJsonExtractor:
+    JOB_TITLE_KEYWORDS: set[str] = {
+        "IT", "EXECUTIVE", "DEVELOPER", "ENGINEER", "MANAGER", "LEAD", "ANALYST", "SPECIALIST",
+        "CONSULTANT", "ARCHITECT", "OFFICER", "DIRECTOR", "ADMINISTRATOR", "COORDINATOR", "TECHNICIAN",
+        "ASSISTANT", "INTERN", "DESIGNER", "TESTER", "ACCOUNTANT", "SECRETARY", "REPRESENTATIVE",
+        "OPERATOR", "SUPERVISOR", "HEAD", "CHIEF", "SENIOR", "JUNIOR", "ASSOCIATE", "PRINCIPAL",
+        "STAFF", "FULL STACK", "FRONTEND", "BACKEND", "MOBILE", "DEVOPS", "CLOUD", "SOFTWARE",
+        "SYSTEM", "NETWORK", "PROJECT", "PRODUCT", "SALES", "MARKETING", "FINANCE", "HR",
+        "RECRUITER", "OPERATIONS", "GENERAL MANAGER", "CHEMIST", "PLANT", "SOLUTIONS", "DATA",
+        "SCIENTIST", "SCRUM", "MASTER", "VP", "VICE", "PRESIDENT", "CEO", "CTO", "CFO", "COO",
+        "FOUNDER", "CO-FOUNDER", "STUDENT", "FREELANCER", "TRAINEE", "RECEPTIONIST", "CLERK",
+        "ADVISOR", "AUDITOR", "STRATEGIST"
+    }
+
+    RESUME_HEADER_KEYWORDS: set[str] = {
+        "CURRICULUM", "VITAE", "RESUME", "CV", "BIODATA", "PROFILE", "SUMMARY", "CAREER",
+        "OBJECTIVE", "EXPERIENCE", "EDUCATION", "SKILLS", "PROJECTS", "CERTIFICATIONS",
+        "LANGUAGES", "REFERENCES", "DECLARATION", "PERSONAL", "DETAILS", "CONTACT",
+        "INFORMATION", "ADDRESS", "PHONE", "EMAIL", "PAGE", "PVT", "LTD", "LLC", "INC",
+        "INDUSTRIES", "COMPANY", "UNIVERSITY", "COLLEGE", "INSTITUTE", "SCHOOL", "BACHELOR",
+        "MASTER", "DIPLOMA", "DEGREE", "WORK", "EMPLOYMENT", "TECHNICAL", "HOBBIES", "ACHIEVEMENTS"
+    }
+
     @classmethod
-    def extract(cls, text: str, metrics: dict[str, Any] | None = None) -> dict[str, Any]:
+    def extract_candidate_name(
+        cls,
+        text_lines: list[str],
+        email: str | None,
+        phone: str | None,
+        location: str | None,
+        filename: str | None = None,
+    ) -> tuple[str, float, str, str]:
+        """
+        Deterministically extract and validate the candidate's real name.
+        Returns: (candidate_name, confidence_score, confidence_level, extraction_source)
+        """
+        email_tokens: list[str] = []
+        if email:
+            local_part = email.split("@")[0].lower()
+            clean_local = re.sub(r"\d+", "", local_part)
+            raw_tokens = re.split(r"[._\-\s]+", clean_local)
+            email_tokens = [t for t in raw_tokens if len(t) >= 2]
+
+        def clean_line_text(l: str) -> str:
+            clean = l.strip().lstrip("#*->•: ").rstrip(" *#:")
+            if re.match(r"^name\s*[:-]?\s*", clean, re.IGNORECASE):
+                clean = re.sub(r"^name\s*[:-]?\s*", "", clean, flags=re.IGNORECASE).strip()
+            return clean
+
+        def is_valid_name_candidate(candidate_str: str) -> bool:
+            if not candidate_str or len(candidate_str) < 2 or len(candidate_str) > 45:
+                return False
+            if re.search(r"\d", candidate_str):
+                return False
+            if any(sym in candidate_str for sym in ["@", "http", "www.", ".com", ".org", ".io", "github", "linkedin"]):
+                return False
+
+            tokens = [t for t in re.split(r"\s+", candidate_str) if t]
+            if not (1 <= len(tokens) <= 4):
+                return False
+
+            upper_tokens = [t.upper() for t in tokens]
+            
+            # Reject if ALL tokens or ANY 1-token line matches job titles or header keywords
+            if len(tokens) == 1 and (upper_tokens[0] in cls.JOB_TITLE_KEYWORDS or upper_tokens[0] in cls.RESUME_HEADER_KEYWORDS):
+                return False
+            
+            job_match_count = sum(1 for t in upper_tokens if t in cls.JOB_TITLE_KEYWORDS)
+            header_match_count = sum(1 for t in upper_tokens if t in cls.RESUME_HEADER_KEYWORDS)
+
+            if (job_match_count + header_match_count) >= len(tokens) * 0.5:
+                return False
+
+            if phone and (candidate_str in phone or phone in candidate_str):
+                return False
+            if email and (candidate_str in email or email in candidate_str):
+                return False
+            if location and (candidate_str in location or location in candidate_str):
+                return False
+
+            return True
+
+        contact_line_idx = -1
+        for i, line in enumerate(text_lines):
+            if (email and email in line) or (phone and phone in line):
+                contact_line_idx = i
+                break
+
+        search_indices: list[int] = []
+        if contact_line_idx != -1:
+            start_idx = max(0, contact_line_idx - 5)
+            end_idx = min(len(text_lines), contact_line_idx + 6)
+            search_indices.extend(list(range(start_idx, end_idx)))
+
+        for i in range(min(10, len(text_lines))):
+            if i not in search_indices:
+                search_indices.append(i)
+
+        header_candidates: list[tuple[str, bool]] = []
+        for idx in search_indices:
+            if idx >= len(text_lines):
+                continue
+            line = text_lines[idx]
+            clean_l = clean_line_text(line)
+            if not clean_l or "@" in clean_l or "CONTACT" in clean_l.upper():
+                continue
+
+            if is_valid_name_candidate(clean_l):
+                name_words = [w.lower() for w in clean_l.split()]
+                has_email_token_match = any(w in email_tokens for w in name_words) if email_tokens else False
+                header_candidates.append((clean_l, has_email_token_match))
+
+        for cand_name, has_email_match in header_candidates:
+            if has_email_match:
+                return (cand_name, 0.95, "HIGH", "header_email_validated")
+
+        if header_candidates:
+            cand_name, _ = header_candidates[0]
+            return (cand_name, 0.85, "HIGH", "header_contact_section")
+
+        if email_tokens:
+            formatted_tokens = [t.capitalize() for t in email_tokens]
+            email_derived_name = " ".join(formatted_tokens)
+            if is_valid_name_candidate(email_derived_name):
+                return (email_derived_name, 0.60, "MEDIUM", "email_username_fallback")
+
+        if filename:
+            clean_fn = re.sub(r"\.(pdf|docx|doc|txt)$", "", filename, flags=re.IGNORECASE)
+            clean_fn = re.sub(r"[-_](cv|resume|updated|\d+)", "", clean_fn, flags=re.IGNORECASE)
+            clean_fn = re.sub(r"[-_]+", " ", clean_fn).strip()
+            if clean_fn:
+                fn_derived_name = " ".join([w.capitalize() for w in clean_fn.split()])
+                if is_valid_name_candidate(fn_derived_name):
+                    return (fn_derived_name, 0.30, "LOW", "filename_fallback")
+
+        return ("Unknown Candidate", 0.0, "FALLBACK", "default")
+
+    @classmethod
+    def extract(
+        cls,
+        text: str,
+        metrics: dict[str, Any] | None = None,
+        filename: str | None = None,
+    ) -> dict[str, Any]:
         if not text:
             return {}
 
@@ -216,35 +376,44 @@ class ResumeJsonExtractor:
         github_match = re.search(r"(github\.com/[\w-]+)", text, re.IGNORECASE)
         github = github_match.group(0) if github_match else None
 
-        candidate_name = ""
-        for line in text_lines[:10]:
-            clean_l = line.strip()
-            if not clean_l or clean_l.startswith("#") or "CONTACT" in clean_l.upper() or "@" in clean_l:
-                continue
-            cleaned_title = re.sub(
-                r"\b(FULL STACK|DEVELOPER|ENGINEER|SR|SENIOR|MOBILE)\b.*$",
-                "",
-                clean_l,
-                flags=re.IGNORECASE,
-            ).strip()
-            if len(cleaned_title) > 2 and len(cleaned_title) < 40:
-                candidate_name = cleaned_title
-                break
-        if not candidate_name and text_lines:
-            candidate_name = text_lines[0].replace("#", "").strip()
-
         location = None
         loc_match = re.search(r"\b([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)\b", text)
         if loc_match:
             location = loc_match.group(1).strip()
 
+        candidate_name, name_conf, conf_level, name_source = cls.extract_candidate_name(
+            text_lines=text_lines,
+            email=email,
+            phone=phone,
+            location=location,
+            filename=filename,
+        )
+
+        logger.info(
+            f"[NAME_EXTRACTION] Extracted '{candidate_name}' "
+            f"(confidence={name_conf:.2f}, level='{conf_level}', source='{name_source}')"
+        )
+
+        field_confidence = {
+            "name": name_conf,
+            "email": 1.0 if email else 0.0,
+            "phone": 1.0 if phone else 0.0,
+            "location": 1.0 if location else 0.0,
+        }
+
         contact_info = {
             "name": candidate_name,
+            "full_name": candidate_name,
+            "candidate_name": candidate_name,
             "email": email,
             "phone": phone,
             "location": location,
             "linkedin": linkedin,
             "github": github,
+            "field_confidence": field_confidence,
+            "name_confidence": name_conf,
+            "name_confidence_level": conf_level,
+            "extraction_source": name_source,
         }
 
         sections: dict[str, list[str]] = {}
@@ -318,21 +487,33 @@ class ResumeJsonExtractor:
             clean_l = line.strip()
             if not clean_l:
                 continue
-            if clean_l.startswith("#"):
+                
+            is_date_match = re.search(r"\b(20\d{2}|19\d{2})\b", clean_l)
+            is_degree = any(d in clean_l for d in ["BTech", "Degree", "Bachelor", "Master", "Ph", "BE", "B.E.", "Diploma"])
+            
+            # If we see a new header or a new degree and we already have data, commit current_edu
+            if clean_l.startswith("#") or (is_degree and current_edu.get("degree")):
                 if current_edu.get("institution") or current_edu.get("degree"):
                     education.append(current_edu)
                     current_edu = {}
+                    
+            if clean_l.startswith("#"):
                 current_edu["institution"] = clean_l.replace("#", "").strip()
-            elif "CPI" in clean_l or "GPA" in clean_l or "Grade" in clean_l:
+            elif "CPI" in clean_l or "GPA" in clean_l or "Grade" in clean_l or "CPGA" in clean_l:
                 current_edu["grade"] = clean_l.lstrip("-• ").strip()
-            elif re.search(r"\b(20\d{2}|19\d{2})\b", clean_l):
-                current_edu["dates"] = clean_l
-            elif "BTech" in clean_l or "Degree" in clean_l or "Bachelor" in clean_l or "Master" in clean_l or "Ph" in clean_l:
+            elif is_degree:
                 current_edu["degree"] = clean_l.lstrip("-• ").strip()
+                if is_date_match:
+                    current_edu["dates"] = is_date_match.group(0)
+            elif is_date_match:
+                current_edu["dates"] = clean_l
             elif clean_l.startswith("-") or clean_l.startswith("•"):
                 if "details" not in current_edu:
                     current_edu["details"] = []
                 current_edu["details"].append(clean_l.lstrip("-• ").strip())
+            else:
+                if not current_edu.get("institution"):
+                    current_edu["institution"] = clean_l
 
         if current_edu.get("institution") or current_edu.get("degree"):
             education.append(current_edu)
@@ -468,9 +649,9 @@ def _classify_pdf(content: bytes) -> tuple[str, str, int, bool]:
 _parser_thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="docling_parser")
 
 
-class DocumentParser:
+class MarkdownGenerator:
     @classmethod
-    def parse(cls, filename: str, content: bytes) -> ExtractionResult:
+    def generate(cls, filename: str, content: bytes) -> MarkdownResult:
         if not content or len(content) == 0:
             raise ValueError("Uploaded file is empty (0 bytes).")
 
@@ -499,7 +680,7 @@ class DocumentParser:
             raise ValueError("Invalid file signature. Missing PDF magic bytes.")
 
         logger.info(
-            f"Starting DocumentParser extraction pipeline for '{filename}' ({len(content)} bytes)..."
+            f"Starting MarkdownGenerator extraction pipeline for '{filename}' ({len(content)} bytes)..."
         )
 
         # Stage 1: Detect PDF Type & Extract Native Selectable Text (layout sorted)
@@ -594,6 +775,43 @@ class DocumentParser:
             raw_final_text = native_pdf_text
             parser_used = "native_fitz"
 
+        structured_dict = docling_doc.export_to_dict() if docling_doc and hasattr(docling_doc, "export_to_dict") else {}
+
+        # Recover missing text (headers hidden in pictures, and furniture elements)
+        recovered_prepend = []
+        if structured_dict and "texts" in structured_dict:
+            texts_list = structured_dict["texts"]
+            for i, item in enumerate(texts_list):
+                item_text = item.get("text", "").strip()
+                if not item_text:
+                    continue
+                label = item.get("label", "")
+                content_layer = item.get("content_layer", "")
+                
+                # Recover titles/section headers not found in the raw markdown
+                if label in ("title", "section_header") and item_text not in raw_final_text:
+                    recovered_prepend.append(item_text)
+                # Recover furniture (e.g. dates misclassified as headers/footers)
+                elif content_layer == "furniture" and item_text not in raw_final_text:
+                    prev_text = ""
+                    for j in range(i - 1, -1, -1):
+                        prev = texts_list[j].get("text", "").strip()
+                        if prev and prev in raw_final_text:
+                            prev_text = prev
+                            break
+                    if prev_text:
+                        # Replace the LAST occurrence of prev_text to inject in proper reading order
+                        parts = raw_final_text.rsplit(prev_text, 1)
+                        if len(parts) == 2:
+                            raw_final_text = parts[0] + prev_text + "\n\n" + item_text + parts[1]
+                        else:
+                            recovered_prepend.append(item_text)
+                    else:
+                        recovered_prepend.append(item_text)
+
+        if recovered_prepend:
+            raw_final_text = "\n\n".join(recovered_prepend) + "\n\n" + raw_final_text
+
         # Sanitize text
         final_text_clean = TextSanitizer.sanitize(raw_final_text)
 
@@ -606,7 +824,6 @@ class DocumentParser:
                 f"The document may be an unreadable low-quality scan or contain only non-text image elements."
             )
 
-        structured_dict = docling_doc.export_to_dict() if docling_doc and hasattr(docling_doc, "export_to_dict") else {}
         pages_count = (
             len(docling_doc.pages)
             if docling_doc and hasattr(docling_doc, "pages") and docling_doc.pages
@@ -619,18 +836,6 @@ class DocumentParser:
             or (docling_doc and hasattr(docling_doc, "pictures") and len(docling_doc.pictures) > 0)
         ))
 
-        # Compute Extraction Quality Metrics
-        quality_metrics = QualityMetricsCalculator.compute(
-            text=final_text_clean,
-            page_count=pages_count,
-            pdf_type=pdf_type,
-            parser_used=parser_used,
-            ocr_applied=ocr_applied,
-        )
-
-        # Extract Structured Resume JSON
-        resume_json = ResumeJsonExtractor.extract(final_text_clean, quality_metrics)
-
         stage_metrics = {
             "pdf_type": pdf_type,
             "native_char_count": native_char_count,
@@ -642,19 +847,16 @@ class DocumentParser:
             "ocr_ms": ocr_duration_ms,
             "final_char_count": len(final_text_clean),
             "parser_used": parser_used,
-            "quality_metrics": quality_metrics,
         }
 
         logger.info(
-            f"[STAGE 5: RESUME JSON] Successful extraction for '{filename}': "
+            f"[STAGE 5: FINAL TEXT] Successful markdown extraction for '{filename}': "
             f"type={pdf_type}, parser={parser_used}, final_chars={len(final_text_clean)}, "
-            f"words={quality_metrics['words']}, score={quality_metrics['completeness_score']}, "
             f"pages={pages_count}, scanned={is_scanned}, ocr={ocr_applied}."
         )
 
-        return ExtractionResult(
+        return MarkdownResult(
             markdown=final_text_clean,
-            structured_doc=structured_dict,
             page_count=pages_count,
             is_scanned=is_scanned,
             ocr_applied=ocr_applied,
@@ -662,24 +864,22 @@ class DocumentParser:
             parser_used=parser_used,
             ocr_decision=ocr_decision,
             stage_metrics=stage_metrics,
-            quality_metrics=quality_metrics,
-            resume_json=resume_json,
         )
 
     @classmethod
-    def parse_with_timeout(
+    def generate_with_timeout(
         cls,
         filename: str,
         content: bytes,
         timeout_seconds: float | None = None,
-    ) -> ExtractionResult:
+    ) -> MarkdownResult:
         timeout = (
             timeout_seconds
             if timeout_seconds is not None
             else settings.EXTRACTION_TIMEOUT_SECONDS
         )
 
-        future = _parser_thread_pool.submit(cls.parse, filename, content)
+        future = _parser_thread_pool.submit(cls.generate, filename, content)
         try:
             return future.result(timeout=timeout)
         except FuturesTimeoutError as exc:

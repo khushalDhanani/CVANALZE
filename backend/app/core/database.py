@@ -76,7 +76,7 @@ def init_db():
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
                 conn.commit()
             
-            from app.models.pg import VacancyEmbedding
+            from app.models.pg import CandidateEmbedding, DomainEmbedding, VacancyEmbedding
             pg_Base.metadata.create_all(bind=pg_engine)
         except Exception as exc:
             import logging

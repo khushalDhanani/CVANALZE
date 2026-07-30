@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3, RefreshCw, X, Clock } from 'lucide-react-native';
+import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3, RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target, CheckCircle2 } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
 import { CVUploadResponse, JobMatchScore } from '@/types/api';
@@ -248,39 +248,153 @@ export default function CandidateDetailScreen() {
           <View className="gap-4 pb-8">
             {/* Candidate Metadata Banner */}
             <Card className="gap-2">
-              <View className="flex-row items-center gap-2">
+              <View className="flex-row items-center gap-3">
                 <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
-                  <FileText size={20} color={COLORS.primary} />
+                  <UserCheck size={20} color={COLORS.primary} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-base font-sans-bold text-text-primary">
-                    {data.filename || data.id}
-                  </Text>
-                  <View className="flex-row items-center gap-1.5 mt-0.5 flex-wrap">
-                    <Text className="text-xs font-sans text-text-muted">
-                      ID: {data.id}
+                  {(data.full_name || data.candidate_name) ? (
+                    <Text className="text-base font-sans-bold text-text-primary">
+                      {data.full_name || data.candidate_name}
                     </Text>
-                    <Text className="text-xs text-text-muted">•</Text>
+                  ) : (
+                    <Text className="text-base font-sans-bold text-text-faint">
+                      Name not detected
+                    </Text>
+                  )}
+                  
+                  <View className="flex-row items-center gap-3 mt-1">
                     <View className="flex-row items-center gap-1">
-                      <Clock size={12} color={COLORS.textMuted} />
-                      <Text className="text-xs font-sans-medium text-text-muted">
-                        Last Analyzed: {formattedParsedAt}
-                      </Text>
+                      <Mail size={12} color="#9CA3AF" />
+                      <Text className="text-xs font-sans text-text-muted">{data.email || "—"}</Text>
+                    </View>
+                    <View className="flex-row items-center gap-1">
+                      <Phone size={12} color="#9CA3AF" />
+                      <Text className="text-xs font-sans text-text-muted">{data.phone || "—"}</Text>
                     </View>
                   </View>
                 </View>
               </View>
 
+              <View className="flex-row items-center gap-1.5 mt-2 flex-wrap">
+                <FileText size={12} color={COLORS.textMuted} />
+                <Text className="text-[11px] font-sans text-text-muted">
+                  File: {data.filename || data.id}
+                </Text>
+                <Text className="text-[11px] text-text-muted">•</Text>
+                <Clock size={12} color={COLORS.textMuted} />
+                <Text className="text-[11px] font-sans text-text-muted">
+                  Analyzed: {formattedParsedAt}
+                </Text>
+              </View>
+
               <View className="flex-row gap-2 mt-1 flex-wrap">
                 <Badge label={`${data.page_count || 1} Page(s)`} tone="neutral" />
-                <Badge label={`${data.characters || 0} Chars`} tone="neutral" />
                 {data.ocr_applied && <Badge label="RapidOCR Applied" tone="warning" />}
                 {data.status === 'REPROCESSED' && <Badge label="Fresh Analysis" tone="success" />}
               </View>
             </Card>
 
-            {/* Best Job Match Card */}
-            {bestMatch ? (
+            {/* AI Career Summary Card */}
+            <Card className="border-primary/30 gap-3">
+              <View className="flex-row items-center gap-2 border-b border-border pb-2">
+                <Briefcase size={16} color={COLORS.primary} />
+                <Text className="text-sm font-sans-bold text-text-primary uppercase tracking-wider">
+                  AI Career Summary
+                </Text>
+              </View>
+
+              <View className="gap-2">
+                <View className="flex-row items-center justify-between flex-wrap gap-1">
+                  <Text className="text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
+                  <Badge
+                    label={analysis?.recommended_department || analysis?.primary_department || 'General'}
+                    tone="info"
+                  />
+                </View>
+
+                {!!analysis?.professional_domain && (
+                  <View className="flex-row items-center justify-between flex-wrap gap-1">
+                    <Text className="text-xs font-sans-medium text-text-muted">Professional Domain:</Text>
+                    <Text className="text-xs font-sans-bold text-text-primary">
+                      {analysis.professional_domain}
+                    </Text>
+                  </View>
+                )}
+
+                {!!analysis?.suitable_job_roles && analysis.suitable_job_roles.length > 0 && (
+                  <View className="gap-1 mt-1">
+                    <Text className="text-xs font-sans-medium text-text-muted">Suitable Job Roles:</Text>
+                    <View className="flex-row flex-wrap gap-1.5">
+                      {analysis.suitable_job_roles.map((role, idx) => (
+                        <Badge key={idx} label={role} tone="neutral" />
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {!!analysis?.strengths && analysis.strengths.length > 0 && (
+                  <View className="gap-1 mt-1">
+                    <Text className="text-xs font-sans-medium text-text-muted">Key Strengths:</Text>
+                    {analysis.strengths.map((str, idx) => (
+                      <View key={idx} className="flex-row items-center gap-1.5">
+                        <CheckCircle2 size={12} color={COLORS.success} />
+                        <Text className="text-xs font-sans text-text-primary flex-1">{str}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {!!analysis?.ai_career_summary && (
+                  <View className="bg-background p-3 rounded-md border border-border mt-1">
+                    <Text className="text-xs font-sans text-text-primary leading-5">
+                      {analysis.ai_career_summary}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Card>
+
+            {/* Active Vacancy Summary Card */}
+            <Card className="gap-3">
+              <View className="flex-row items-center justify-between border-b border-border pb-2">
+                <View className="flex-row items-center gap-2">
+                  <Target size={16} color={analysis?.has_genuine_match ? COLORS.success : COLORS.warning} />
+                  <Text className="text-sm font-sans-bold text-text-primary uppercase tracking-wider">
+                    Active Vacancy Summary
+                  </Text>
+                </View>
+                <Badge
+                  label={analysis?.has_genuine_match ? 'Genuine Match' : 'No Active Match'}
+                  tone={analysis?.has_genuine_match ? 'success' : 'warning'}
+                />
+              </View>
+
+              {!analysis?.has_genuine_match ? (
+                <View className="bg-warning/10 p-3 rounded-md border border-warning/30 gap-1.5">
+                  <View className="flex-row items-center gap-2">
+                    <AlertCircle size={16} color={COLORS.warning} />
+                    <Text className="text-xs font-sans-bold text-warning">
+                      {analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}
+                    </Text>
+                  </View>
+                  <Text className="text-xs font-sans text-text-muted leading-4">
+                    None of the active job openings match this candidate's specialized domain ({analysis?.professional_domain || analysis?.recommended_department || 'Current Domain'}). The CV has not been forced to match an unrelated job.
+                  </Text>
+                </View>
+              ) : (
+                <View className="gap-2">
+                  <View className="bg-success/10 p-3 rounded-md border border-success/30">
+                    <Text className="text-xs font-sans text-text-primary leading-5">
+                      {analysis?.active_vacancy_summary}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Card>
+
+            {/* Best Job Match Card (Shown if genuine match exists) */}
+            {bestMatch && analysis?.has_genuine_match ? (
               <Card className="border-primary/40 gap-3">
                 <View className="flex-row justify-between items-start">
                   <View className="flex-1 pr-2">

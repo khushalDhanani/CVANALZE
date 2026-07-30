@@ -39,40 +39,176 @@ class ScoringEngine:
         "skills",
         "work experience",
     }
-    DOMAIN_INFERENCE_KEYWORDS = {
-        "engineering": {
-            "api",
-            "backend",
-            "developer",
-            "development",
-            "django",
-            "engineer",
-            "fastapi",
-            "frontend",
-            "java",
-            "javascript",
-            "python",
-            "react",
-            "software",
-            "typescript",
+    DEPARTMENT_DOMAIN_MAP = {
+        "Information Technology & Software": {
+            "keywords": [
+                "developer", "engineer", "software", "flutter", "react", "frontend",
+                "backend", "full stack", "fullstack", "python", "java", "javascript",
+                "typescript", "dart", "c#", "dotnet", "sql", "api", "mobile", "ios",
+                "android", "devops", "cloud", "aws", "azure", "docker", "kubernetes",
+                "database", "ui/ux", "web", "coding", "code"
+            ],
+            "dept_name": "Information Technology",
+            "default_roles": ["Software Developer", "Full Stack Engineer", "Frontend/Mobile Engineer", "Backend Developer"]
         },
-        "finance": {
-            "analyst",
-            "excel",
-            "financial",
-            "forecasting",
-            "investment",
-            "modeling",
-            "valuation",
+        "Finance & Accounting": {
+            "keywords": [
+                "finance", "financial", "accounting", "accountant", "audit", "tax",
+                "ca", "cpa", "cfa", "tally", "ledger", "payroll", "budgeting",
+                "forecasting", "treasury", "billing", "valuation"
+            ],
+            "dept_name": "Finance & Accounting",
+            "default_roles": ["Financial Analyst", "Accountant", "Finance Manager", "Audit Specialist"]
         },
-        "healthcare": {
-            "clinical",
-            "hospital",
-            "icu",
-            "nurse",
-            "patient",
+        "Human Resources": {
+            "keywords": [
+                "hr", "human resources", "recruitment", "recruiter", "talent acquisition",
+                "onboarding", "employee relations", "performance management", "hrbp",
+                "payroll management", "people operations"
+            ],
+            "dept_name": "Human Resources",
+            "default_roles": ["HR Executive", "Talent Acquisition Specialist", "HR Generalist", "Recruiter"]
         },
+        "Plant & Maintenance Engineering": {
+            "keywords": [
+                "plant", "maintenance", "mechanical", "electrical", "utility",
+                "instrumentation", "boiler", "hvac", "plc", "scada", "equipment",
+                "preventive maintenance", "technician", "machinery", "fabrication"
+            ],
+            "dept_name": "Plant & Maintenance",
+            "default_roles": ["Plant Maintenance Engineer", "Maintenance Technician", "Mechanical Engineer", "Plant Assistant"]
+        },
+        "Sales & Marketing": {
+            "keywords": [
+                "sales", "marketing", "business development", "b2b", "b2c",
+                "digital marketing", "seo", "sem", "lead generation", "account management",
+                "branding", "campaigns", "client relationship"
+            ],
+            "dept_name": "Sales & Marketing",
+            "default_roles": ["Sales Executive", "Business Development Manager", "Digital Marketing Specialist", "Account Executive"]
+        },
+        "Quality & EHS": {
+            "keywords": [
+                "quality assurance", "qa", "qc", "ehs", "safety", "environmental",
+                "iso", "compliance", "inspection", "audit", "safety officer", "quality control"
+            ],
+            "dept_name": "Quality & Safety",
+            "default_roles": ["Quality Assurance Engineer", "EHS Specialist", "Quality Control Inspector"]
+        },
+        "Supply Chain & Operations": {
+            "keywords": [
+                "supply chain", "logistics", "procurement", "inventory", "warehouse",
+                "store keeper", "purchase", "vendor", "distribution", "operations manager"
+            ],
+            "dept_name": "Supply Chain & Operations",
+            "default_roles": ["Supply Chain Executive", "Logistics Coordinator", "Procurement Officer", "Operations Manager"]
+        },
+        "Healthcare & Clinical": {
+            "keywords": [
+                "clinical", "nurse", "nursing", "doctor", "physician", "patient",
+                "medical", "hospital", "pharma", "pharmacist", "laboratory"
+            ],
+            "dept_name": "Healthcare",
+            "default_roles": ["Staff Nurse", "Medical Officer", "Clinical Specialist", "Pharmacist"]
+        }
     }
+
+    @classmethod
+    def extract_candidate_domain_profile(
+        cls,
+        cv_text: str,
+        dynamic_profile: DynamicCandidateProfile | None = None,
+        optimized_profile: OptimizedCandidateProfile | None = None,
+        resume_json: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Identifies candidate's most suitable department and professional domain
+        from skills, experience, education, and projects.
+        """
+        combined_parts = [cv_text]
+        skills_set: set[str] = set()
+        education_list: list[str] = []
+        projects_list: list[str] = []
+        roles_list: list[str] = []
+
+        if optimized_profile:
+            skills_set.update(optimized_profile.core_skills)
+            skills_set.update(optimized_profile.inferred_skills)
+            education_list.extend(optimized_profile.education_domains)
+            if optimized_profile.current_role:
+                roles_list.append(optimized_profile.current_role)
+            combined_parts.extend(optimized_profile.professional_domains)
+
+        if dynamic_profile:
+            skills_set.update(dynamic_profile.core_skills)
+            education_list.extend(dynamic_profile.education_domains)
+            if dynamic_profile.current_role:
+                roles_list.append(dynamic_profile.current_role)
+            roles_list.extend(dynamic_profile.previous_roles)
+
+        if resume_json:
+            if isinstance(resume_json.get("skills"), list):
+                skills_set.update(resume_json["skills"])
+            if isinstance(resume_json.get("education"), list):
+                for edu in resume_json["education"]:
+                    if isinstance(edu, dict):
+                        education_list.append(f"{edu.get('degree', '')} {edu.get('field_of_study', '')}")
+                    else:
+                        education_list.append(str(edu))
+            if isinstance(resume_json.get("projects"), list):
+                for proj in resume_json["projects"]:
+                    if isinstance(proj, dict):
+                        projects_list.append(f"{proj.get('title', '')}: {proj.get('description', '')}")
+                    else:
+                        projects_list.append(str(proj))
+
+        combined_text = " ".join(
+            filter(None, combined_parts + list(skills_set) + education_list + projects_list + roles_list)
+        ).lower()
+
+        dept_scores: dict[str, float] = {}
+        for cat_name, cat_info in cls.DEPARTMENT_DOMAIN_MAP.items():
+            kw_matches = 0
+            for kw in cat_info["keywords"]:
+                if re.search(r"(?:\b|_)" + re.escape(kw) + r"(?:\b|_)", combined_text, re.IGNORECASE):
+                    kw_matches += 1
+            if kw_matches > 0:
+                dept_scores[cat_name] = float(kw_matches)
+
+        if dept_scores:
+            best_cat_name = max(dept_scores, key=dept_scores.get)
+            best_cat_info = cls.DEPARTMENT_DOMAIN_MAP[best_cat_name]
+            recommended_dept = best_cat_info["dept_name"]
+            prof_domain = best_cat_name
+            suitable_roles = best_cat_info["default_roles"]
+        else:
+            recommended_dept = "General Engineering & Operations"
+            prof_domain = "General Operations"
+            suitable_roles = ["Operations Associate", "General Specialist"]
+
+        custom_roles = []
+        if roles_list:
+            custom_roles.extend([r.title() for r in roles_list if len(r) > 2])
+        if not custom_roles:
+            custom_roles = suitable_roles
+
+        strengths: list[str] = []
+        if skills_set:
+            top_skills = sorted(list(skills_set))[:5]
+            strengths.append(f"Core Skills: {', '.join(top_skills)}")
+        if education_list:
+            strengths.append(f"Education: {', '.join(education_list[:2])}")
+        if projects_list:
+            strengths.append(f"Project Experience: {len(projects_list)} documented project(s)")
+        if not strengths:
+            strengths.append("Versatile background with adaptable technical & operational capabilities")
+
+        return {
+            "recommended_department": recommended_dept,
+            "professional_domain": prof_domain,
+            "strengths": strengths,
+            "suitable_job_roles": custom_roles[:4],
+        }
 
     @staticmethod
     def _normalize_text(text: str) -> str:
@@ -172,9 +308,9 @@ class ScoringEngine:
         domain_text = cls._normalize_text(" ".join(filter(None, domain_parts)))
         domain_words = set(re.findall(r"\w+", domain_text))
         inferred_domains = [
-            domain
-            for domain, keywords in cls.DOMAIN_INFERENCE_KEYWORDS.items()
-            if domain_words.intersection(keywords)
+            cat_info["dept_name"]
+            for domain, cat_info in cls.DEPARTMENT_DOMAIN_MAP.items()
+            if domain_words.intersection(set(cat_info["keywords"]))
         ]
         return " ".join([domain_text, *inferred_domains]).strip()
 
@@ -756,13 +892,94 @@ class ScoringEngine:
             reason_str = f"All mandatory requirements satisfied. Overall match score is {final_score}%."
 
         # Cross-Domain Divergence Guard:
-        # Prevent software candidates from scoring high on unrelated non-IT operational vacancies (e.g. Plant Assistant, Chemist)
-        is_software_candidate = any(k in norm_text for k in ["flutter developer", "sr developer", "full stack developer", "software developer", "software engineer", "mobile developer", "dart", "react native"])
-        is_non_it_job = any(k in job_title.lower() or k in job_department.lower() for k in ["plant", "chemist", "cafe", "fire", "store", "safety", "maintenance", "utility", "ehs", "production"])
-        has_software_req = any("software" in str(s).lower() or "developer" in str(s).lower() or "code" in str(s).lower() or "dotnet" in str(s).lower() or "flutter" in str(s).lower() for s in req_skills)
+        # Prevent candidate domain mismatches (e.g. software candidates scoring high on non-IT roles, or finance candidates scoring high on software roles)
+        cand_profile = cls.extract_candidate_domain_profile(
+            cv_text=cv_text,
+            dynamic_profile=dynamic_profile,
+            optimized_profile=optimized_profile,
+        )
+        cand_dept = cand_profile.get("recommended_department", "")
+        cand_domain = cand_profile.get("professional_domain", "")
 
-        if is_software_candidate and is_non_it_job and not has_software_req:
-            final_score = round(max(0.0, final_score * 0.25), 1)
+        is_software_cand = (
+            "Information Technology" in cand_dept
+            or "Software" in cand_domain
+            or any(
+                k in norm_text
+                for k in [
+                    "flutter developer",
+                    "sr developer",
+                    "full stack developer",
+                    "software developer",
+                    "software engineer",
+                    "mobile developer",
+                    "dart",
+                    "react native",
+                ]
+            )
+        )
+        is_non_it_job = any(
+            k in job_title.lower() or k in job_department.lower()
+            for k in [
+                "plant",
+                "chemist",
+                "cafe",
+                "fire",
+                "store",
+                "safety",
+                "maintenance",
+                "utility",
+                "ehs",
+                "production",
+                "hr",
+                "human resources",
+                "finance",
+                "accounting",
+            ]
+        )
+        has_software_req = any(
+            "software" in str(s).lower()
+            or "developer" in str(s).lower()
+            or "code" in str(s).lower()
+            or "dotnet" in str(s).lower()
+            or "flutter" in str(s).lower()
+            for s in req_skills
+        )
+
+        domain_mismatch = False
+        if is_software_cand and is_non_it_job and not has_software_req:
+            domain_mismatch = True
+        elif cand_dept and job_department:
+            job_dept_clean = job_department.lower()
+            if "information technology" in cand_dept.lower() and not any(
+                w in job_dept_clean or w in job_title.lower()
+                for w in ["software", "it", "tech", "developer", "data", "system", "code", "web"]
+            ):
+                domain_mismatch = True
+            elif "finance" in cand_dept.lower() and not any(
+                w in job_dept_clean or w in job_title.lower()
+                for w in ["finance", "account", "audit", "tax", "ledger"]
+            ):
+                domain_mismatch = True
+            elif "human resources" in cand_dept.lower() and not any(
+                w in job_dept_clean or w in job_title.lower()
+                for w in ["hr", "human", "recruit", "people", "talent"]
+            ):
+                domain_mismatch = True
+
+        if domain_mismatch:
+            domain_score = 0.0
+            final_score = round(max(0.0, min(final_score * 0.15, 20.0)), 1)
+            reason_str += f" | Strict Domain Mismatch Penalty: Candidate domain ({cand_dept}) conflicts with job department ({job_department})."
+            if not any(f.requirement_id == "req_domain_mismatch" for f in mandatory_failures):
+                mandatory_failures.append(
+                    MandatoryFailureDetails(
+                        requirement_id="req_domain_mismatch",
+                        description=f"Domain Mismatch: Candidate domain ({cand_dept}) conflicts with vacancy department ({job_department})",
+                        reason=f"Candidate background ({cand_domain}) does not match job opening domain ({job_department}).",
+                        score_impact=50.0,
+                    )
+                )
 
         if coverage < 0.5:
             classification = "LOW"

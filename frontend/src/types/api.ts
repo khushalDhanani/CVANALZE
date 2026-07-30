@@ -78,6 +78,8 @@ export interface JobMatchScore {
 export interface CandidateMatchAnalysis {
   scan_id: string;
   parsed_at: string;
+  full_name?: string | null;
+  candidate_name?: string | null;
   best_match?: JobMatchScore | null;
   suitable_openings: JobMatchScore[];
   unsuitable_openings?: JobMatchScore[];
@@ -93,12 +95,23 @@ export interface EnrichedJobEvaluation extends JobMatchScore {
 }
 
 export interface EnrichedCandidateAnalysis {
-  scan_id: string;
-  parsed_at: string;
+  scan_id?: string;
+  parsed_at?: string;
+  full_name?: string | null;
+  candidate_name?: string | null;
+  primary_department?: string;
+  recommended_department?: string;
+  professional_domain?: string;
+  strengths?: string[];
+  suitable_job_roles?: string[];
+  has_genuine_match?: boolean;
+  active_vacancy_summary?: string;
+  ai_career_summary?: string;
   best_match?: EnrichedJobEvaluation | null;
   suitable_openings: EnrichedJobEvaluation[];
-  unsuitable_openings: EnrichedJobEvaluation[];
-  llm_model_used: string;
+  unsuitable_openings?: EnrichedJobEvaluation[];
+  llm_model_used?: string;
+  llm_skipped?: boolean;
 }
 
 export interface CVUploadResponse {
@@ -106,6 +119,12 @@ export interface CVUploadResponse {
   filename: string;
   parsed_at: string;
   markdown: string;
+  full_name?: string | null;
+  candidate_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  name_confidence?: number | null;
+  name_extraction_source?: string | null;
   match_analysis?: CandidateMatchAnalysis | null;
   enriched_match_analysis?: EnrichedCandidateAnalysis | null;
   [key: string]: any;
@@ -210,6 +229,9 @@ export interface LlmHealthResponse {
 export interface CandidateSummary {
   id: string;
   filename: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
   parsed_at?: string;
   page_count?: number;
   is_scanned?: boolean;

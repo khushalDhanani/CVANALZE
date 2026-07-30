@@ -127,6 +127,8 @@ class JobMatchResult(BaseModel):
 
 
 class CandidateMatchAnalysis(BaseModel):
+    full_name: str | None = Field(default=None, description="Extracted candidate full name")
+    candidate_name: str | None = Field(default=None, description="Extracted candidate name")
     primary_department: str = Field(
         ..., description="Top recommended department for candidate"
     )

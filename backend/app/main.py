@@ -11,6 +11,7 @@ from app.api.cv import router as cv_router
 from app.api.jobs import router as jobs_router
 from app.api.master_data import router as master_data_router
 from app.api.analytics import router as analytics_router
+from app.api.vector_db import router as vector_db_router
 from app.core.config import settings
 from app.core.database import engine, init_db
 from app.core.logging import logger
@@ -57,10 +58,41 @@ app.include_router(
 )
 app.include_router(
     candidates_router,
-    prefix="/api/v1",
+    prefix="/api",
 )
 app.include_router(
+    candidates_router,
+    prefix="/api/v1",
+)
+from app.api.domain_knowledge import router as domain_knowledge_router
+from app.api.talent_graph import router as talent_graph_router
+
+from app.api.recommendations import router as recommendations_router
+
+from app.api.performance import router as performance_router
+
+app.include_router(
     analytics_router,
+    prefix="/api",
+)
+app.include_router(
+    vector_db_router,
+    prefix="/api",
+)
+app.include_router(
+    domain_knowledge_router,
+    prefix="/api",
+)
+app.include_router(
+    talent_graph_router,
+    prefix="/api",
+)
+app.include_router(
+    recommendations_router,
+    prefix="/api",
+)
+app.include_router(
+    performance_router,
     prefix="/api",
 )
 

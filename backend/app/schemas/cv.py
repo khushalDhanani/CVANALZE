@@ -35,14 +35,14 @@ class CVUploadResponse(BaseModel):
     )
     text: str = Field(..., description="Clean extracted Markdown text content")
     markdown: str = Field(..., description="Clean extracted Markdown text content")
-    structured_doc: dict[str, Any] = Field(
-        ..., description="Docling structured document JSON model"
+    structured_doc: dict[str, Any] | None = Field(
+        default=None, description="Docling structured document JSON model"
     )
     match_analysis: CandidateMatchAnalysis = Field(
         ..., description="Job matching analysis, scores, and candidate classifications"
     )
-    result_file_path: str = Field(
-        ..., description="Path to saved JSON extraction result file"
+    result_file_path: str | None = Field(
+        None, description="Path to saved JSON extraction result file"
     )
     candidate_id: str | None = Field(None, description="Candidate or User ID")
     cv_id: str | None = Field(None, description="Unique CV ID")
@@ -64,6 +64,12 @@ class CVUploadResponse(BaseModel):
     resume_json: dict[str, Any] | None = Field(
         None, description="Normalized structured Resume JSON parsed from extracted text"
     )
+    full_name: str | None = Field(None, description="Extracted candidate full name")
+    candidate_name: str | None = Field(None, description="Extracted candidate name")
+    email: str | None = Field(None, description="Extracted candidate email address")
+    phone: str | None = Field(None, description="Extracted candidate phone number")
+    name_confidence: float | None = Field(None, description="Name extraction confidence score (0.0 to 1.0)")
+    name_extraction_source: str | None = Field(None, description="Source of candidate name extraction")
 
 
 

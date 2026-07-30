@@ -174,41 +174,66 @@ class JobRepository:
 
     @classmethod
     def _cache_vacancy_embeddings(cls, job_dicts: list[dict[str, Any]]) -> None:
-        """Generate and cache embeddings for vacancies with ``vac:`` prefix for selective invalidation."""
+        """
+        Generate and cache semantic vector embeddings for all active vacancies.
+        Uses rich canonical text (Title, Description, Skills, Experience, Education, Certifications, Department, Responsibilities),
+        checks content hashes for incremental updates, and persists embeddings to PostgreSQL and cache manager.
+        """
         if not settings.EMBEDDING_ENABLED:
             return
 
         from app.core.cache import embedding_cache_manager as _ecm
-        from app.services.embedding_service import EmbeddingService as _es
-
-        texts: list[str] = []
-        for job in job_dicts:
-            title = job.get("title", "")
-            dept = job.get("department_name") or job.get("department") or ""
-            skills = " ".join(job.get("required_skills", []) or [])
-            text = f"{title} {dept} {skills}".strip()
-            if text:
-                texts.append(text)
-
-        if not texts:
-            return
+        from app.services.embedding_service import (
+            EmbeddingService as _es,
+            build_vacancy_canonical_text,
+            save_vacancy_embedding,
+            get_vacancy_embedding,
+        )
 
         model = settings.EMBEDDING_MODEL
-        text_hashes = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in texts]
-        uncached_indices = [
-            i for i, h in enumerate(text_hashes)
-            if _ecm.get(f"{model}:vac:{h}") is None
-        ]
+        uncached: list[tuple[int, dict[str, Any], str, str]] = []  # (vac_id, job, canonical_text, content_hash)
 
-        if uncached_indices:
-            uncached_texts = [texts[i] for i in uncached_indices]
+        for job in job_dicts:
+            vac_id = job.get("vacancy_id") or job.get("id")
+            try:
+                vac_id_int = int(vac_id) if vac_id is not None else 0
+            except (ValueError, TypeError):
+                vac_id_int = 0
+
+            canonical_text = build_vacancy_canonical_text(job)
+            if not canonical_text:
+                continue
+
+            content_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
+            job["_canonical_text"] = canonical_text
+            job["_content_hash"] = content_hash
+
+            # Check if embedding already exists in cache or DB for this model and content hash
+            cached_emb = _ecm.get(f"{model}:vac:{content_hash}")
+            if cached_emb is None and vac_id_int > 0:
+                pg_emb, stored_hash = get_vacancy_embedding(vac_id_int)
+                if pg_emb is not None and stored_hash == content_hash:
+                    cached_emb = pg_emb
+                    _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
+
+            if cached_emb is None:
+                uncached.append((vac_id_int, job, canonical_text, content_hash))
+
+        if uncached:
+            uncached_texts = [item[2] for item in uncached]
             embeddings = _es._call_ollama_batch_embed(model, uncached_texts)
-            if embeddings is not None and len(embeddings) == len(uncached_indices):
-                for i, idx in enumerate(uncached_indices):
-                    _ecm.set(f"{model}:vac:{text_hashes[idx]}", embeddings[i])
+            if embeddings is not None and len(embeddings) == len(uncached):
+                for (vac_id_int, job, _, content_hash), emb in zip(uncached, embeddings):
+                    if emb:
+                        _ecm.set(f"{model}:vac:{content_hash}", emb)
+                        if vac_id_int > 0:
+                            save_vacancy_embedding(vac_id_int, emb, content_hash)
 
         cls._VACANCY_EMBEDDINGS_CACHED = True
-        logger.info(f"[EMBED] Cached {len(texts)} vacancy embeddings.")
+        logger.info(
+            f"[VACANCY_EMBEDDINGS] Processed {len(job_dicts)} vacancies: "
+            f"{len(uncached)} newly embedded, {len(job_dicts) - len(uncached)} cached/unchanged."
+        )
 
     _VACANCY_EMBEDDINGS_CACHED = False
 

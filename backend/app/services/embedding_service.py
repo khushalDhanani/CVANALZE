@@ -1,6 +1,8 @@
 import hashlib
 import json
 import math
+import threading
+import time
 from typing import Any
 
 import httpx
@@ -13,7 +15,12 @@ from app.core.logging import logger
 def get_embedding(text: str, model_name: str | None = None) -> list[float]:
     """
     Generate vector embedding for given text using Ollama /api/embeddings endpoint with nomic-embed-text.
+    Check cache first via EmbeddingService.
     """
+    emb = EmbeddingService.generate_embedding(text, model_version=model_name)
+    if emb is not None:
+        return emb
+
     model = model_name or settings.EMBEDDING_MODEL
     url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embeddings"
     payload = {"model": model, "prompt": text}
@@ -43,9 +50,49 @@ class EmbeddingService:
     """
     Generates text embeddings via Ollama /api/embed or /api/embeddings with Redis L2 + File L3 caching.
     Cache key = ``embed:{model_version}:{sha256(text)}``.
+    Supports thread-safe metrics, timing instrumentation, and detailed logging.
     """
 
     _BATCH_SIZE = 10
+
+    _metrics_lock = threading.Lock()
+    _total_requests: int = 0
+    _cache_hits: int = 0
+    _cache_misses: int = 0
+    _last_processing_time_ms: float = 0.0
+    _total_processing_time_ms: float = 0.0
+
+    @classmethod
+    def get_metrics(cls) -> dict[str, Any]:
+        """
+        Return runtime metrics for embedding generation.
+        """
+        with cls._metrics_lock:
+            total = cls._total_requests
+            hits = cls._cache_hits
+            misses = cls._cache_misses
+            rate = round((hits / total) * 100.0, 2) if total > 0 else 0.0
+            return {
+                "total_requests": total,
+                "cache_hits": hits,
+                "cache_misses": misses,
+                "cache_hit_rate_pct": rate,
+                "last_processing_time_ms": round(cls._last_processing_time_ms, 2),
+                "total_processing_time_ms": round(cls._total_processing_time_ms, 2),
+                "embedding_model": settings.EMBEDDING_MODEL,
+            }
+
+    @classmethod
+    def reset_metrics(cls) -> None:
+        """
+        Reset runtime metrics.
+        """
+        with cls._metrics_lock:
+            cls._total_requests = 0
+            cls._cache_hits = 0
+            cls._cache_misses = 0
+            cls._last_processing_time_ms = 0.0
+            cls._total_processing_time_ms = 0.0
 
     @classmethod
     def get_embedding(cls, text: str, model_version: str | None = None) -> list[float]:
@@ -68,22 +115,59 @@ class EmbeddingService:
     ) -> list[float] | None:
         if not settings.EMBEDDING_ENABLED:
             return None
-        model = model_version or settings.EMBEDDING_MODEL
-        content_hash = identifier or cls._content_hash(text)
-        cache_key = cls._cache_key(content_hash, model)
 
-        cached = embedding_cache_manager.get(cache_key)
+        model = model_version or settings.EMBEDDING_MODEL
+        content_hash = cls._content_hash(text)
+        primary_cache_key = cls._cache_key(content_hash, model)
+        id_cache_key = cls._cache_key(identifier, model) if identifier else None
+
+        with cls._metrics_lock:
+            cls._total_requests += 1
+
+        # Check primary content-hash key first, then alias identifier key
+        cached = embedding_cache_manager.get(primary_cache_key)
+        if cached is None and id_cache_key:
+            cached = embedding_cache_manager.get(id_cache_key)
+
         if cached is not None:
+            with cls._metrics_lock:
+                cls._cache_hits += 1
+            logger.info(
+                f"[EMBEDDING] Cache HIT for model='{model}' hash='{content_hash[:12]}...' (0.0ms)"
+            )
             return cached
 
+        with cls._metrics_lock:
+            cls._cache_misses += 1
+
+        t0 = time.perf_counter()
         try:
             embedding = cls._call_ollama_embed(model, text)
-            if embedding is not None:
-                embedding_cache_manager.set(cache_key, embedding)
-            return embedding
-        except Exception:
-            return None
+            duration_ms = (time.perf_counter() - t0) * 1000.0
 
+            with cls._metrics_lock:
+                cls._last_processing_time_ms = duration_ms
+                cls._total_processing_time_ms += duration_ms
+
+            if embedding is not None:
+                embedding_cache_manager.set(primary_cache_key, embedding)
+                if id_cache_key and id_cache_key != primary_cache_key:
+                    embedding_cache_manager.set(id_cache_key, embedding)
+                logger.info(
+                    f"[EMBEDDING] Generated embedding via Ollama model='{model}' hash='{content_hash[:12]}...' in {duration_ms:.1f}ms (cache miss)"
+                )
+                return embedding
+            else:
+                logger.warning(
+                    f"[EMBEDDING] Ollama returned empty embedding for model='{model}' in {duration_ms:.1f}ms"
+                )
+                return None
+        except Exception as exc:
+            duration_ms = (time.perf_counter() - t0) * 1000.0
+            logger.warning(
+                f"[EMBEDDING] Non-fatal embedding generation failure for model='{model}': {exc} ({duration_ms:.1f}ms)"
+            )
+            return None
 
     @classmethod
     def generate_batch_embeddings(
@@ -119,10 +203,26 @@ class EmbeddingService:
 
     @classmethod
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embeddings"
+        payload = {"model": model, "prompt": text}
         try:
-            return get_embedding(text, model_name=model)
+            with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
+                resp = client.post(url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                embedding = data.get("embedding")
+                if embedding and isinstance(embedding, list):
+                    return embedding
+                embed_url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
+                resp2 = client.post(embed_url, json={"model": model, "input": text})
+                resp2.raise_for_status()
+                data2 = resp2.json()
+                embs = data2.get("embeddings")
+                if embs and len(embs) > 0:
+                    return embs[0]
+                return None
         except Exception as exc:
-            logger.warning(f"Embedding generation failed for model {model}: {exc}")
+            logger.warning(f"Ollama embed call failed for model {model}: {exc}")
             return None
 
     @classmethod
@@ -200,9 +300,12 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
         )
         pg_db.execute(stmt)
         pg_db.commit()
-        # Also cache in L2/L3 cache manager under cv_key
+        # Also cache in L2/L3 cache manager under cv_key and content_hash
         cache_key = f"{settings.EMBEDDING_MODEL}:{cv_key}"
         embedding_cache_manager.set(cache_key, embedding)
+        if content_hash and content_hash != cv_key:
+            hash_cache_key = f"{settings.EMBEDDING_MODEL}:{content_hash}"
+            embedding_cache_manager.set(hash_cache_key, embedding)
         return True
     except Exception as exc:
         pg_db.rollback()
@@ -236,5 +339,138 @@ def get_candidate_embedding(cv_key: str) -> list[float] | None:
     if cached is not None:
         return cached
     return None
+
+
+def build_vacancy_canonical_text(job: dict[str, Any]) -> str:
+    """
+    Construct semantic canonical embedding input from all active vacancy fields:
+    Vacancy Title, Job Description, Required Skills, Experience, Education,
+    Certifications, Department, and Responsibilities.
+    """
+    parts: list[str] = []
+
+    title = job.get("title") or ""
+    if title:
+        parts.append(f"Vacancy Title: {title}")
+
+    dept = job.get("department_name") or job.get("department") or ""
+    if dept:
+        parts.append(f"Department: {dept}")
+
+    comp = job.get("company_name") or ""
+    if comp:
+        parts.append(f"Company: {comp}")
+
+    desc = job.get("job_description") or job.get("description") or job.get("JobProfileDesc") or ""
+    if desc:
+        parts.append(f"Job Description: {desc}")
+
+    resp = job.get("responsibilities") or ""
+    if resp and resp != desc:
+        parts.append(f"Responsibilities: {resp}")
+
+    skills = job.get("required_skills") or []
+    if skills:
+        skills_str = ", ".join(skills) if isinstance(skills, list) else str(skills)
+        parts.append(f"Required Skills: {skills_str}")
+
+    pref = job.get("preferred_keywords") or []
+    if pref and pref != skills:
+        pref_str = ", ".join(pref) if isinstance(pref, list) else str(pref)
+        parts.append(f"Preferred Keywords: {pref_str}")
+
+    min_exp = job.get("min_experience_years")
+    max_exp = job.get("max_experience_years")
+    if min_exp is not None or max_exp is not None:
+        min_str = f"{min_exp}" if min_exp is not None else "0"
+        max_str = f"{max_exp}" if max_exp is not None else "N/A"
+        parts.append(f"Experience Required: {min_str} to {max_str} years")
+
+    edu = job.get("education") or job.get("education_requirements") or ""
+    if edu:
+        parts.append(f"Education Requirements: {edu}")
+
+    certs = job.get("certifications") or ""
+    if certs:
+        parts.append(f"Certifications: {certs}")
+
+    return "\n".join(parts).strip()
+
+
+def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash: str | None = None) -> bool:
+    """
+    Upsert vacancy embedding into PostgreSQL vacancy_embeddings table keyed by vacancy_id.
+    Also caches in embedding_cache_manager.
+    """
+    from app.core.database import pg_SessionLocal
+
+    cache_key_id = f"{settings.EMBEDDING_MODEL}:vac_id:{vacancy_id}"
+    embedding_cache_manager.set(cache_key_id, embedding)
+    if content_hash:
+        cache_key_hash = f"{settings.EMBEDDING_MODEL}:vac:{content_hash}"
+        embedding_cache_manager.set(cache_key_hash, embedding)
+
+    if pg_SessionLocal is None:
+        return False
+
+    pg_db = pg_SessionLocal()
+    try:
+        from sqlalchemy import func
+        from sqlalchemy.dialects.postgresql import insert
+        from app.models.pg import VacancyEmbedding
+
+        stmt = insert(VacancyEmbedding).values(
+            vacancy_id=vacancy_id,
+            embedding=embedding,
+            embedding_model_version=settings.EMBEDDING_MODEL,
+            content_hash=content_hash,
+            updated_at=func.now(),
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["vacancy_id"],
+            set_={
+                "embedding": stmt.excluded.embedding,
+                "embedding_model_version": stmt.excluded.embedding_model_version,
+                "content_hash": stmt.excluded.content_hash,
+                "updated_at": func.now(),
+            },
+        )
+        pg_db.execute(stmt)
+        pg_db.commit()
+        return True
+    except Exception as exc:
+        pg_db.rollback()
+        logger.error(f"save_vacancy_embedding failed for vacancy_id={vacancy_id}: {exc}")
+        return False
+    finally:
+        pg_db.close()
+
+
+def get_vacancy_embedding(vacancy_id: int) -> tuple[list[float] | None, str | None]:
+    """
+    Retrieve vacancy vector embedding and content hash by vacancy_id from PostgreSQL or cache.
+    """
+    from app.core.database import pg_SessionLocal
+
+    if pg_SessionLocal is not None:
+        pg_db = pg_SessionLocal()
+        try:
+            from app.models.pg import VacancyEmbedding
+
+            rec = pg_db.query(VacancyEmbedding).filter(VacancyEmbedding.vacancy_id == vacancy_id).first()
+            if rec and rec.embedding is not None:
+                vec = [float(x) for x in list(rec.embedding)]
+                return vec, rec.content_hash
+        except Exception as exc:
+            logger.warning(f"get_vacancy_embedding PG query error for vacancy_id={vacancy_id}: {exc}")
+        finally:
+            pg_db.close()
+
+    cache_key_id = f"{settings.EMBEDDING_MODEL}:vac_id:{vacancy_id}"
+    cached = embedding_cache_manager.get(cache_key_id)
+    if cached is not None:
+        return cached, None
+    return None, None
+
 
 

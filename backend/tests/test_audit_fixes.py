@@ -9,7 +9,7 @@ from app.main import app
 from app.repositories.result import ResultRepository
 from app.repositories.llm_cache import LLMCacheRepository
 from app.schemas.analysis import OptimizedCandidateProfile, OptimizedLLMMatchResponse, OptimizedVacancyMatch
-from app.services.document_parser import ExtractionResult
+from app.services.document_parser import MarkdownResult
 
 client = TestClient(app)
 
@@ -20,7 +20,7 @@ def test_document_cache_roundtrip():
 
     mock_redis = MagicMock()
     with patch("app.core.cache._REDIS_CLIENT", mock_redis):
-        extraction = ExtractionResult(
+        extraction = MarkdownResult(
             markdown="# Candidate\n\nExperience with Python.",
             structured_doc={"schema": "test", "content": "mock"},
             page_count=2,
@@ -34,9 +34,8 @@ def test_document_cache_roundtrip():
 
         cached = doc_cache_manager.get(doc_hash)
         assert cached is not None
-        restored = ExtractionResult.from_dict(cached)
+        restored = MarkdownResult.from_dict(cached)
         assert restored.markdown == extraction.markdown
-        assert restored.structured_doc == extraction.structured_doc
         assert restored.page_count == extraction.page_count
         assert restored.is_scanned == extraction.is_scanned
         assert restored.ocr_applied == extraction.ocr_applied

@@ -1,7 +1,7 @@
 import time
 import pytest
 from unittest.mock import MagicMock
-from app.services.document_parser import DocumentParser
+from app.services.document_parser import MarkdownGenerator
 
 
 def test_document_parser_timeout(monkeypatch):
@@ -9,10 +9,10 @@ def test_document_parser_timeout(monkeypatch):
         time.sleep(1.5)
         return "slow content"
 
-    monkeypatch.setattr(DocumentParser, "parse", slow_parse)
+    monkeypatch.setattr(MarkdownGenerator, "parse", slow_parse)
 
     with pytest.raises(TimeoutError, match="timed out"):
-        DocumentParser.parse_with_timeout("slow.pdf", b"content", timeout_seconds=0.2)
+        MarkdownGenerator.generate_with_timeout("slow.pdf", b"content", timeout_seconds=0.2)
 
 
 @pytest.mark.asyncio

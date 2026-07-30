@@ -5,7 +5,6 @@ import logging
 from datetime import datetime
 from sqlalchemy import text
 
-# Ensure backend path is in sys.path so we can import from app
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
@@ -31,9 +30,10 @@ def backfill():
 
     db = SessionLocal()
     try:
+        # cv_documents
         upsert_cv_sql = text("""
             MERGE INTO cvai.cv_documents AS target
-            USING (SELECT :id AS id, :cv_hash AS cv_hash, :filename AS filename, :content_type AS content_type,
+            USING (SELECT :id AS id, :tenant_id AS tenant_id, :cv_hash AS cv_hash, :filename AS filename, :content_type AS content_type,
                           :page_count AS page_count, :is_scanned AS is_scanned, :ocr_applied AS ocr_applied,
                           :parser_used AS parser_used, :parser_version AS parser_version, :schema_version AS schema_version,
                           :parsed_at AS parsed_at, :created_at AS created_at, :updated_at AS updated_at,
@@ -42,33 +42,55 @@ def backfill():
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
-                    cv_hash = source.cv_hash, filename = source.filename, content_type = source.content_type,
+                    tenant_id = source.tenant_id, cv_hash = source.cv_hash, filename = source.filename, content_type = source.content_type,
                     page_count = source.page_count, is_scanned = source.is_scanned, ocr_applied = source.ocr_applied,
                     parser_used = source.parser_used, parser_version = source.parser_version, schema_version = source.schema_version,
                     parsed_at = source.parsed_at, updated_at = source.updated_at, text = source.text,
                     markdown = source.markdown, structured_doc = source.structured_doc, quality_metrics = source.quality_metrics,
                     stage_metrics = source.stage_metrics
             WHEN NOT MATCHED THEN
-                INSERT (id, cv_hash, filename, content_type, page_count, is_scanned, ocr_applied, parser_used,
+                INSERT (id, tenant_id, cv_hash, filename, content_type, page_count, is_scanned, ocr_applied, parser_used,
                         parser_version, schema_version, parsed_at, created_at, updated_at, text, markdown,
                         structured_doc, quality_metrics, stage_metrics)
-                VALUES (source.id, source.cv_hash, source.filename, source.content_type, source.page_count, source.is_scanned, source.ocr_applied, source.parser_used,
+                VALUES (source.id, source.tenant_id, source.cv_hash, source.filename, source.content_type, source.page_count, source.is_scanned, source.ocr_applied, source.parser_used,
                         source.parser_version, source.schema_version, source.parsed_at, source.created_at, source.updated_at, source.text, source.markdown,
                         source.structured_doc, source.quality_metrics, source.stage_metrics);
         """)
 
+        # candidates
         upsert_candidate_sql = text("""
             MERGE INTO cvai.candidates AS target
-            USING (SELECT :id AS id, :cv_document_id AS cv_document_id, :dynamic_profile AS dynamic_profile,
-                          :resume_json AS resume_json, :match_analysis AS match_analysis, :created_at AS created_at) AS source
+            USING (SELECT :id AS id, :tenant_id AS tenant_id, :cv_document_id AS cv_document_id, :raw_skills_json AS raw_skills_json,
+                          :raw_education_json AS raw_education_json, :raw_experience_json AS raw_experience_json, :raw_profile_json AS raw_profile_json,
+                          :schema_version AS schema_version, :created_at AS created_at, :updated_at AS updated_at) AS source
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
-                    cv_document_id = source.cv_document_id, dynamic_profile = source.dynamic_profile,
-                    resume_json = source.resume_json, match_analysis = source.match_analysis
+                    tenant_id = source.tenant_id, cv_document_id = source.cv_document_id, raw_skills_json = source.raw_skills_json,
+                    raw_education_json = source.raw_education_json, raw_experience_json = source.raw_experience_json, raw_profile_json = source.raw_profile_json,
+                    schema_version = source.schema_version, updated_at = source.updated_at
             WHEN NOT MATCHED THEN
-                INSERT (id, cv_document_id, dynamic_profile, resume_json, match_analysis, created_at)
-                VALUES (source.id, source.cv_document_id, source.dynamic_profile, source.resume_json, source.match_analysis, source.created_at);
+                INSERT (id, tenant_id, cv_document_id, raw_skills_json, raw_education_json, raw_experience_json, raw_profile_json, schema_version, created_at, updated_at)
+                VALUES (source.id, source.tenant_id, source.cv_document_id, source.raw_skills_json, source.raw_education_json, source.raw_experience_json, source.raw_profile_json, source.schema_version, source.created_at, source.updated_at);
+        """)
+
+        # match_results
+        upsert_match_sql = text("""
+            MERGE INTO cvai.match_results AS target
+            USING (SELECT :id AS id, :tenant_id AS tenant_id, :candidate_id AS candidate_id, :vacancy_id AS vacancy_id,
+                          :vacancy_title AS vacancy_title, :department_name AS department_name, :scoring_engine_version AS scoring_engine_version,
+                          :rule_config_version AS rule_config_version, :overall_score AS overall_score, :component_scores_json AS component_scores_json,
+                          :created_at AS created_at, :updated_at AS updated_at) AS source
+            ON target.id = source.id
+            WHEN MATCHED THEN
+                UPDATE SET
+                    tenant_id = source.tenant_id, candidate_id = source.candidate_id, vacancy_id = source.vacancy_id,
+                    vacancy_title = source.vacancy_title, department_name = source.department_name, scoring_engine_version = source.scoring_engine_version,
+                    rule_config_version = source.rule_config_version, overall_score = source.overall_score, component_scores_json = source.component_scores_json,
+                    updated_at = source.updated_at
+            WHEN NOT MATCHED THEN
+                INSERT (id, tenant_id, candidate_id, vacancy_id, vacancy_title, department_name, scoring_engine_version, rule_config_version, overall_score, component_scores_json, created_at, updated_at)
+                VALUES (source.id, source.tenant_id, source.candidate_id, source.vacancy_id, source.vacancy_title, source.department_name, source.scoring_engine_version, source.rule_config_version, source.overall_score, source.component_scores_json, source.created_at, source.updated_at);
         """)
 
         processed_count = 0
@@ -78,7 +100,6 @@ def backfill():
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
-                # Parse dates (fallback to current time if missing/invalid)
                 def parse_date(date_str):
                     if not date_str:
                         return datetime.utcnow()
@@ -90,20 +111,17 @@ def backfill():
                 parsed_at = parse_date(data.get("parsed_at"))
                 created_at = parse_date(data.get("created_at"))
                 updated_at = parse_date(data.get("updated_at"))
-
-                # Ensure defaults for boolean/numeric
-                is_scanned = bool(data.get("is_scanned", False))
-                ocr_applied = bool(data.get("ocr_applied", False))
-                page_count = int(data.get("page_count") or 1)
+                tenant_id = data.get("tenant_id") # Nullable
 
                 cv_doc_params = {
                     "id": data.get("cv_id") or data.get("id") or filename.replace(".json", ""),
+                    "tenant_id": tenant_id,
                     "cv_hash": data.get("cv_hash") or filename.replace(".json", "").replace("cv_", ""),
                     "filename": data.get("filename"),
                     "content_type": data.get("content_type"),
-                    "page_count": page_count,
-                    "is_scanned": is_scanned,
-                    "ocr_applied": ocr_applied,
+                    "page_count": int(data.get("page_count") or 1),
+                    "is_scanned": bool(data.get("is_scanned", False)),
+                    "ocr_applied": bool(data.get("ocr_applied", False)),
                     "parser_used": data.get("parser_used") or data.get("parser_version"),
                     "parser_version": data.get("parser_version"),
                     "schema_version": data.get("schema_version"),
@@ -117,27 +135,53 @@ def backfill():
                     "stage_metrics": json.dumps(data.get("stage_metrics")) if data.get("stage_metrics") else None
                 }
 
-                # Candidates table backfill if dynamic_profile/resume_json present
+                # Extract profile data (which contains skills, experience, etc.)
+                dyn_profile = data.get("dynamic_profile") or data.get("resume_json") or {}
+                
                 candidate_id = data.get("candidate_id") or f"cand_{cv_doc_params['id']}"
                 candidate_params = {
                     "id": candidate_id,
+                    "tenant_id": tenant_id,
                     "cv_document_id": cv_doc_params["id"],
-                    "dynamic_profile": json.dumps(data.get("dynamic_profile")) if data.get("dynamic_profile") else None,
-                    "resume_json": json.dumps(data.get("resume_json")) if data.get("resume_json") else None,
-                    "match_analysis": json.dumps(data.get("match_analysis")) if data.get("match_analysis") else None,
-                    "created_at": created_at
+                    "raw_skills_json": json.dumps(dyn_profile.get("skills")) if dyn_profile.get("skills") else None,
+                    "raw_education_json": json.dumps(dyn_profile.get("education")) if dyn_profile.get("education") else None,
+                    "raw_experience_json": json.dumps(dyn_profile.get("experience")) if dyn_profile.get("experience") else None,
+                    "raw_profile_json": json.dumps(dyn_profile) if dyn_profile else None,
+                    "schema_version": cv_doc_params["schema_version"],
+                    "created_at": created_at,
+                    "updated_at": updated_at
                 }
 
                 db.execute(upsert_cv_sql, cv_doc_params)
-                if any([candidate_params["dynamic_profile"], candidate_params["resume_json"], candidate_params["match_analysis"]]):
-                    db.execute(upsert_candidate_sql, candidate_params)
+                db.execute(upsert_candidate_sql, candidate_params)
+
+                # Process match analysis if available
+                match_analysis = data.get("match_analysis")
+                if match_analysis:
+                    match_id = match_analysis.get("id") or f"match_{candidate_id}"
+                    
+                    match_params = {
+                        "id": match_id,
+                        "tenant_id": tenant_id,
+                        "candidate_id": candidate_id,
+                        "vacancy_id": str(match_analysis.get("vacancy_id", "")),
+                        "vacancy_title": match_analysis.get("vacancy_title"),
+                        "department_name": match_analysis.get("department_name"),
+                        "scoring_engine_version": match_analysis.get("scoring_engine_version"),
+                        "rule_config_version": match_analysis.get("rule_config_version"),
+                        "overall_score": float(match_analysis.get("overall_score", 0.0)),
+                        "component_scores_json": json.dumps(match_analysis.get("component_scores")) if match_analysis.get("component_scores") else None,
+                        "created_at": created_at,
+                        "updated_at": updated_at
+                    }
+                    db.execute(upsert_match_sql, match_params)
 
                 processed_count += 1
             
             except Exception as e:
                 logger.error(f"Error processing file {filename}: {e}", exc_info=True)
 
-        db.commit()
+        db.commit() 
         logger.info(f"Successfully backfilled {processed_count} files.")
     
     except Exception as e:

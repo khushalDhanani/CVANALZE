@@ -82,10 +82,14 @@ class VacancyService:
             )
         
         
+        job_desc = vacancy.job_profile.JobProfileDesc if vacancy.job_profile and vacancy.job_profile.JobProfileDesc else None
+
         return JobOpening(
             id=str(vacancy.VacancyRequestID),
             title=title,
             department=dept_name,
+            job_description=job_desc,
+            responsibilities=job_desc,
             required_skills=skills,
             preferred_keywords=skills, # Just mapping same for now
             min_experience_years=min_exp,

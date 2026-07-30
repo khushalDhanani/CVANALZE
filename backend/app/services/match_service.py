@@ -88,6 +88,7 @@ class MatchService:
         candidate_id: str = "",
         upload_ms: float = 0.0,
         docling_extraction_ms: float = 0.0,
+        cv_embedding: list[float] | None = None,
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
         profiler.metrics.upload_ms = upload_ms
@@ -152,6 +153,7 @@ class MatchService:
                 openings=openings,
                 candidate_experience=candidate_experience,
                 top_k=settings.PREFILTER_TOP_K,
+                cv_embedding=cv_embedding,
             )
         profiler.metrics.vacancies_after_filtering = len(filtered_vacancies)
 
@@ -315,17 +317,69 @@ class MatchService:
         profiler.finish()
         profiler.log_summary()
 
-        if evaluated_matches:
-            best_match = evaluated_matches[0]
-            logger.info(
-                f"Selected Best DB Record: vacancy_id={best_match.vacancy_id}, job_title='{best_match.job_title}', "
-                f"department_name='{best_match.department_name or best_match.department}', score={best_match.score}"
+        cand_profile = ScoringEngine.extract_candidate_domain_profile(
+            cv_text=cv_text,
+            optimized_profile=optimized_profile,
+        )
+        recommended_dept = cand_profile.get("recommended_department", "General")
+        professional_domain = cand_profile.get("professional_domain", "General Operations")
+        strengths = cand_profile.get("strengths", [])
+        suitable_roles = cand_profile.get("suitable_job_roles", [])
+
+        has_genuine_match = False
+        if evaluated_matches and evaluated_matches[0].score >= settings.MATCH_MEDIUM_THRESHOLD:
+            top_m = evaluated_matches[0]
+            has_domain_mismatch = any(
+                f.requirement_id == "req_domain_mismatch" for f in top_m.mandatory_failures
             )
+            if not has_domain_mismatch:
+                has_genuine_match = True
+
+        if has_genuine_match and evaluated_matches:
+            top_m = evaluated_matches[0]
+            skills_str = (
+                ", ".join(top_m.matched_skills[:4])
+                if top_m.matched_skills
+                else "core qualification requirements"
+            )
+            active_vacancy_summary = (
+                f"Genuine Match Found: Candidate is a strong match for '{top_m.job_title}' "
+                f"in the {top_m.department_name or top_m.department} department "
+                f"with an overall match score of {top_m.score}%. Key matching skills include {skills_str}."
+            )
+            best_match = top_m
         else:
-            best_match = MatchService._empty_job_match()
+            active_vacancy_summary = "No suitable active vacancy found."
+            best_match = evaluated_matches[0] if evaluated_matches else MatchService._empty_job_match()
+
+        roles_str = ", ".join(suitable_roles) if suitable_roles else "General Roles"
+        strengths_str = "; ".join(strengths) if strengths else "Solid technical and professional baseline."
+
+        if optimized_response and optimized_response.ai_career_summary:
+            ai_career_summary = optimized_response.ai_career_summary
+        else:
+            ai_career_summary = (
+                f"Candidate Profile Analysis:\n"
+                f"• Recommended Department: {recommended_dept}\n"
+                f"• Professional Domain: {professional_domain}\n"
+                f"• Key Strengths: {strengths_str}\n"
+                f"• Suitable Job Roles: {roles_str}"
+            )
+
+        logger.info(
+            f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}', "
+            f"has_genuine_match={has_genuine_match}"
+        )
 
         result = EnrichedCandidateAnalysis(
-            primary_department=best_match.department_name or best_match.department,
+            primary_department=recommended_dept,
+            recommended_department=recommended_dept,
+            professional_domain=professional_domain,
+            strengths=strengths,
+            suitable_job_roles=suitable_roles,
+            has_genuine_match=has_genuine_match,
+            active_vacancy_summary=active_vacancy_summary,
+            ai_career_summary=ai_career_summary,
             best_match=best_match,
             suitable_openings=evaluated_matches,
             llm_skipped=llm_skipped,
@@ -376,12 +430,33 @@ class MatchService:
         )
 
     @staticmethod
-    def _empty_analysis() -> EnrichedCandidateAnalysis:
+    def _empty_analysis(cv_text: str = "") -> EnrichedCandidateAnalysis:
+        cand_profile = (
+            ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
+        )
+        rec_dept = cand_profile.get("recommended_department", "General")
+        prof_domain = cand_profile.get("professional_domain", "General Operations")
+        strengths = cand_profile.get("strengths", ["General technical background"])
+        roles = cand_profile.get("suitable_job_roles", ["Operations Associate"])
         best_match = MatchService._empty_job_match()
+
         return EnrichedCandidateAnalysis(
-            primary_department="General",
+            primary_department=rec_dept,
+            recommended_department=rec_dept,
+            professional_domain=prof_domain,
+            strengths=strengths,
+            suitable_job_roles=roles,
+            has_genuine_match=False,
+            active_vacancy_summary="No suitable active vacancy found.",
+            ai_career_summary=(
+                f"Candidate Profile Analysis:\n"
+                f"• Recommended Department: {rec_dept}\n"
+                f"• Professional Domain: {prof_domain}\n"
+                f"• Key Strengths: {'; '.join(strengths)}\n"
+                f"• Suitable Job Roles: {', '.join(roles)}"
+            ),
             best_match=best_match,
-            suitable_openings=[]
+            suitable_openings=[],
         )
 
     @staticmethod

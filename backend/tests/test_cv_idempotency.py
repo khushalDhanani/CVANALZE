@@ -7,7 +7,7 @@ import pytest
 from app.core.config import settings
 from app.repositories.result import ResultRepository
 from app.services.cv_service import get_stable_cv_key, process_cv_file
-from app.services.document_parser import DocumentParser, ExtractionResult
+from app.services.document_parser import MarkdownGenerator, MarkdownResult
 from app.services.scoring_engine import ScoringEngine
 
 
@@ -22,7 +22,7 @@ def clear_caches():
 @pytest.fixture
 def mock_parser_and_engine(monkeypatch):
 
-    extraction_mock = ExtractionResult(
+    extraction_mock = MarkdownResult(
         markdown="# Jane Doe\nSoftware Engineer with Python skills.",
         structured_doc={"name": "Jane Doe"},
         page_count=1,
@@ -30,7 +30,7 @@ def mock_parser_and_engine(monkeypatch):
         ocr_applied=False,
     )
     monkeypatch.setattr(
-        DocumentParser, "parse_with_timeout", MagicMock(return_value=extraction_mock)
+        MarkdownGenerator, "parse_with_timeout", MagicMock(return_value=extraction_mock)
     )
 
     match_analysis_mock = MagicMock()
@@ -77,13 +77,13 @@ async def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mo
     assert res1["cv_hash"] is not None
     assert res1["created_at"] is not None
     assert res1["updated_at"] is not None
-    assert DocumentParser.parse_with_timeout.call_count == 1
+    assert MarkdownGenerator.parse_with_timeout.call_count == 1
 
     expected_json_path = tmp_path / "cand_user_123_cv_cv_456.json"
     assert expected_json_path.is_file()
 
     # Reset mock call count
-    DocumentParser.parse_with_timeout.reset_mock()
+    MarkdownGenerator.parse_with_timeout.reset_mock()
     ScoringEngine.analyze_cv.reset_mock()
 
     # Second run: identical file & config -> CACHE_HIT
@@ -98,7 +98,7 @@ async def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mo
     assert res2["created_at"] == res1["created_at"]
     assert res2["updated_at"] == res1["updated_at"]
     # Parser and AI scoring MUST NOT be called on CACHE_HIT
-    assert DocumentParser.parse_with_timeout.call_count == 0
+    assert MarkdownGenerator.parse_with_timeout.call_count == 0
     assert ScoringEngine.analyze_cv.call_count == 0
 
     # Ensure no duplicate JSON files were created

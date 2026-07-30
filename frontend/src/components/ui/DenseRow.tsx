@@ -9,8 +9,8 @@ export function DenseRow({
   onPress,
   className = "",
 }: {
-  title: string;
-  subtitle?: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
   trailing?: React.ReactNode;
   onPress?: () => void;
   className?: string;
@@ -22,13 +22,21 @@ export function DenseRow({
       className={`flex-row items-center justify-between px-3 py-2 bg-surface rounded-md border border-border active:bg-background ${className}`}
     >
       <View className="flex-1 gap-0.5 pr-2">
-        <Text numberOfLines={1} className="text-sm font-sans-medium text-text-primary">
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text numberOfLines={1} className="text-xs font-sans text-text-muted">
-            {subtitle}
+        {typeof title === 'string' ? (
+          <Text numberOfLines={1} className="text-sm font-sans-medium text-text-primary">
+            {title}
           </Text>
+        ) : (
+          title
+        )}
+        {subtitle ? (
+          typeof subtitle === 'string' ? (
+            <Text numberOfLines={1} className="text-xs font-sans text-text-muted">
+              {subtitle}
+            </Text>
+          ) : (
+            subtitle
+          )
         ) : null}
       </View>
       <View className="flex-row items-center gap-1.5">

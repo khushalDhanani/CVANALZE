@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { UserCheck, FileText, Search, RefreshCw } from 'lucide-react-native';
+import { UserCheck, FileText, Search, RefreshCw, Mail, Phone } from 'lucide-react-native';
 import { useCandidates } from '@/hooks/useCandidates';
 import { CandidateSummary } from '@/types/api';
 import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl } from '@/components/ui';
@@ -20,11 +20,14 @@ export default function CandidateListScreen() {
     if (!cand) return false;
     const q = searchQuery.toLowerCase();
     const fname = (cand.filename || '').toLowerCase();
+    const fullname = (cand.full_name || '').toLowerCase();
+    const email = (cand.email || '').toLowerCase();
+    const phone = (cand.phone || '').toLowerCase();
     const id = (cand.id || '').toLowerCase();
     const dept = (cand.primary_department || '').toLowerCase();
     const job = (cand.best_match?.job_title || '').toLowerCase();
     
-    const matchSearch = fname.includes(q) || id.includes(q) || dept.includes(q) || job.includes(q);
+    const matchSearch = fname.includes(q) || fullname.includes(q) || email.includes(q) || phone.includes(q) || id.includes(q) || dept.includes(q) || job.includes(q);
     
     const candClassification = cand.best_match?.classification;
     const matchClassification = 
@@ -38,16 +41,47 @@ export default function CandidateListScreen() {
   });
 
   const renderCandidateRow = ({ item }: { item: CandidateSummary }) => {
-    const title = item.filename || item.id;
-    const subtitle = item.best_match?.job_title
-      ? `Top Role: ${item.best_match.job_title}${item.primary_department ? ` (${item.primary_department})` : ''}`
-      : 'Parsed Candidate Record';
+    const titleNode = item.full_name ? (
+      <Text numberOfLines={1} className="text-sm font-sans-medium text-text-primary">
+        {item.full_name}
+      </Text>
+    ) : (
+      <Text numberOfLines={1} className="text-sm font-sans-medium text-text-faint">
+        Name not detected
+      </Text>
+    );
+    
+    const emailText = item.email || "—";
+    const phoneText = item.phone || "—";
+
+    const subtitleNode = (
+      <View className="gap-1 mt-0.5">
+        <View className="flex-row items-center gap-3">
+          <View className="flex-row items-center gap-1">
+            <Mail size={12} color="#9CA3AF" />
+            <Text numberOfLines={1} className="text-xs font-sans text-text-muted">{emailText}</Text>
+          </View>
+          <View className="flex-row items-center gap-1 flex-1">
+            <Phone size={12} color="#9CA3AF" />
+            <Text numberOfLines={1} className="text-xs font-sans text-text-muted">{phoneText}</Text>
+          </View>
+        </View>
+        {item.best_match?.job_title && (
+          <Text numberOfLines={1} className="text-xs font-sans text-text-muted">
+            Role: {item.best_match.job_title}{item.primary_department ? ` (${item.primary_department})` : ''}
+          </Text>
+        )}
+        <Text numberOfLines={1} className="text-[11px] font-sans text-text-faint">
+          File: {item.filename}
+        </Text>
+      </View>
+    );
 
     return (
       <View className="mb-2">
         <DenseRow
-          title={title}
-          subtitle={subtitle}
+          title={titleNode}
+          subtitle={subtitleNode}
           onPress={() => router.push(`/candidates/${encodeURIComponent(item.id)}` as any)}
           trailing={
 

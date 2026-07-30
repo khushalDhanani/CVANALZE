@@ -11,7 +11,7 @@ from app.core.cache import CacheInvalidator, doc_cache_manager
 from app.core.config import settings
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
-from app.services.document_parser import DocumentParser, ExtractionResult
+from app.services.document_parser import MarkdownGenerator, MarkdownResult, QualityMetricsCalculator, ResumeJsonExtractor
 from app.services.embedding_service import EmbeddingService
 
 import asyncio
@@ -125,32 +125,69 @@ async def process_cv_file(
             
             _save_interim_status(25, current_stage)
 
-            # Docling extraction stage (with timing)
+            # Markdown Generation & Persistence stage
             t_doc_start = asyncio.get_event_loop().time()
-            cached_doc = doc_cache_manager.get(cv_hash)
-            if cached_doc is not None:
-                extraction = ExtractionResult.from_dict(cached_doc)
-                logger.info(f"[DOC_CACHE_HIT] Reusing Docling output for hash '{cv_hash[:12]}...'.")
+            md_filename = f"{cv_key}.md"
+            md_path = settings.RESULTS_DIR / md_filename
+            
+            if md_path.exists() and not force_reprocess:
+                logger.info(f"[MD_CACHE_HIT] Reading existing markdown from '{md_filename}'.")
+                markdown_text = md_path.read_text(encoding="utf-8")
+                
+                # Reconstruct basic MarkdownResult from existing result data
+                stage_metrics = existing_data.get("stage_metrics", {}) if existing_data else {}
+                page_count = existing_data.get("page_count", 1) if existing_data else 1
+                is_scanned = existing_data.get("is_scanned", False) if existing_data else False
+                ocr_applied = existing_data.get("ocr_applied", False) if existing_data else False
+                pdf_type = existing_data.get("pdf_type", "NON_PDF") if existing_data else "NON_PDF"
+                parser_used = existing_data.get("parser_used", "cached") if existing_data else "cached"
+                ocr_decision = existing_data.get("ocr_decision", "cached") if existing_data else "cached"
+                
+                extraction = MarkdownResult(
+                    markdown=markdown_text,
+                    page_count=page_count,
+                    is_scanned=is_scanned,
+                    ocr_applied=ocr_applied,
+                    pdf_type=pdf_type,
+                    parser_used=parser_used,
+                    ocr_decision=ocr_decision,
+                    stage_metrics=stage_metrics,
+                )
             else:
                 extraction = await asyncio.to_thread(
-                    DocumentParser.parse_with_timeout,
+                    MarkdownGenerator.generate_with_timeout,
                     filename=filename,
                     content=content,
                     timeout_seconds=timeout_seconds,
                 )
-                doc_cache_manager.set(cv_hash, extraction.to_dict())
-                logger.info(f"[DOC_CACHE_SET] Cached Docling output for hash '{cv_hash[:12]}...'.")
+                markdown_text = extraction.markdown
+                settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+                md_path.write_text(markdown_text, encoding="utf-8")
+                logger.info(f"[MD_SAVED] Saved generated markdown to '{md_filename}'.")
+                
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
+            
+            # Compute Quality Metrics & Extract JSON
+            quality_metrics = QualityMetricsCalculator.compute(
+                text=markdown_text,
+                page_count=extraction.page_count,
+                pdf_type=extraction.pdf_type,
+                parser_used=extraction.parser_used,
+                ocr_applied=extraction.ocr_applied,
+            )
+            resume_json = ResumeJsonExtractor.extract(
+                markdown_text, quality_metrics, filename=filename
+            )
 
-            # Run optimized LLM pipeline & matching concurrently with embedding generation & persistence
+            # Run optimized LLM pipeline & matching with pre-generated & persisted embedding
             from app.services.match_service import MatchService
             from app.services.embedding_service import save_candidate_embedding
 
             def _generate_and_store_embedding():
                 emb = EmbeddingService.generate_embedding(
                     extraction.markdown,
-                    None,
-                    cv_key,
+                    model_version=None,
+                    identifier=cv_key,
                 )
                 if emb:
                     save_candidate_embedding(cv_key, emb, cv_hash)
@@ -159,17 +196,25 @@ async def process_cv_file(
             current_stage = "ai_analysis"
             _save_interim_status(50, current_stage)
 
-            embedding_task = asyncio.to_thread(_generate_and_store_embedding)
+            cv_embedding = await asyncio.to_thread(_generate_and_store_embedding)
 
-            match_analysis, _ = await asyncio.gather(
-                MatchService.analyze_single_cv(
-                    extraction.markdown,
-                    document_hash=cv_hash,
-                    candidate_id=str(candidate_id) if candidate_id is not None else "",
-                    docling_extraction_ms=docling_duration_ms,
-                ),
-                embedding_task,
+            match_analysis = await MatchService.analyze_single_cv(
+                extraction.markdown,
+                document_hash=cv_hash,
+                candidate_id=str(candidate_id) if candidate_id is not None else "",
+                docling_extraction_ms=docling_duration_ms,
+                cv_embedding=cv_embedding,
             )
+
+            contact_info = (resume_json or {}).get("contact_info") or {}
+            extracted_name = contact_info.get("name") or contact_info.get("full_name") or "Unknown Candidate"
+            email = contact_info.get("email")
+            phone = contact_info.get("phone")
+            name_confidence = contact_info.get("name_confidence")
+            name_extraction_source = contact_info.get("extraction_source")
+
+            match_analysis.full_name = extracted_name
+            match_analysis.candidate_name = extracted_name
 
             current_stage = "complete"
             _save_interim_status(100, current_stage)
@@ -184,7 +229,20 @@ async def process_cv_file(
             updated_at = now_iso
 
             status = "REPROCESSED" if existing_data else "NEW_CV"
-            logger.info(f"[{status}] Extraction complete for '{cv_key}'.")
+            logger.info(f"[{status}] Extraction complete for '{cv_key}'. Candidate: '{extracted_name}'")
+
+            from app.services.similar_candidate_service import SimilarCandidateService
+
+            similar_candidates = []
+            if cv_embedding:
+                try:
+                    similar_candidates = await asyncio.to_thread(
+                        SimilarCandidateService.detect_similar_candidates,
+                        cv_key=cv_key,
+                        cv_embedding=cv_embedding,
+                    )
+                except Exception as sim_exc:
+                    logger.warning(f"Similar candidate detection failed for '{cv_key}': {sim_exc}")
 
             result_data = {
                 "id": cv_key,
@@ -195,25 +253,32 @@ async def process_cv_file(
                 "filename": filename,
                 "content_type": content_type,
                 "cv_hash": cv_hash,
+                "full_name": extracted_name,
+                "candidate_name": extracted_name,
+                "email": email,
+                "phone": phone,
+                "name_confidence": name_confidence,
+                "name_extraction_source": name_extraction_source,
                 "parser_version": settings.EXTRACTION_PARSER_VERSION,
                 "schema_version": settings.EXTRACTION_SCHEMA_VERSION,
                 "created_at": created_at,
                 "updated_at": updated_at,
                 "scanned_at": now_iso,
                 "status": status,
+                "similar_candidates": similar_candidates,
                 "pdf_type": getattr(extraction, "pdf_type", "NON_PDF"),
                 "parser_used": getattr(extraction, "parser_used", "docling_fast"),
                 "ocr_decision": getattr(extraction, "ocr_decision", "SKIPPED_TEXT_PRESENT"),
                 "stage_metrics": getattr(extraction, "stage_metrics", {}),
-                "quality_metrics": getattr(extraction, "quality_metrics", {}),
-                "resume_json": getattr(extraction, "resume_json", {}),
+                "quality_metrics": quality_metrics,
+                "resume_json": resume_json,
                 "characters": len(extraction.markdown),
                 "page_count": extraction.page_count,
                 "is_scanned": extraction.is_scanned,
                 "ocr_applied": extraction.ocr_applied,
                 "text": extraction.markdown,
                 "markdown": extraction.markdown,
-                "structured_doc": extraction.structured_doc,
+                "structured_doc": None,
                 "dynamic_profile": None,
                 "match_analysis": match_analysis.model_dump(),
             }
