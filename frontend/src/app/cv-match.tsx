@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import React, { useState } from 'react';
 import {
   Platform,
@@ -69,7 +70,7 @@ export default function CvMatchScreen() {
     }
   };
 
-  const handlePickAndUploadFile = () => {
+  const handlePickAndUploadFile = async () => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -90,14 +91,32 @@ export default function CvMatchScreen() {
       };
       input.click();
     } else {
-      uploadAndProcess(
-        {
-          uri: 'file:///sample.pdf',
-          name: 'Sample_Candidate_CV.pdf',
-          type: 'application/pdf',
-        },
-        useLlmEnrichment
-      );
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+          ],
+          copyToCacheDirectory: true,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const picked = result.assets[0];
+          uploadAndProcess(
+            {
+              uri: picked.uri,
+              name: picked.name,
+              type: picked.mimeType || 'application/pdf',
+              rawFile: (picked as any).file,
+            },
+            useLlmEnrichment
+          );
+        }
+      } catch (err: any) {
+        console.warn('Native document picker failed:', err);
+      }
     }
   };
 

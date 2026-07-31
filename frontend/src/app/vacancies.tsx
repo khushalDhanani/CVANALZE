@@ -2,15 +2,19 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
   Text,
   View,
 } from 'react-native';
-import { Briefcase, Target, CheckCircle, IndianRupee } from 'lucide-react-native';
+import { Briefcase, Target, CheckCircle, IndianRupee, Sparkles, X, UserCheck, AlertTriangle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { jobsService } from '@/services/jobsService';
 import { useJobs } from '@/hooks/useJobs';
-import { JobOpening } from '@/types/api';
-import { TextField, Card, Button, Badge, EmptyState } from '@/components/ui';
+import { JobOpening, VacancyRecommendationsResponse } from '@/types/api';
+import { TextField, Card, Button, Badge, EmptyState, DenseRow } from '@/components/ui';
+import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { COLORS } from '@/constants/colors';
 
 export default function VacanciesScreen() {
@@ -18,6 +22,25 @@ export default function VacanciesScreen() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [clearingCache, setClearingCache] = useState<boolean>(false);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
+
+  // AI Recommendation modal state
+  const [recModalVisible, setRecModalVisible] = useState<boolean>(false);
+  const [loadingRec, setLoadingRec] = useState<boolean>(false);
+  const [recData, setRecData] = useState<VacancyRecommendationsResponse | null>(null);
+
+  const handleOpenRecommendations = async (vacancyId: number | string) => {
+    setRecModalVisible(true);
+    setLoadingRec(true);
+    setRecData(null);
+    try {
+      const res = await jobsService.getVacancyRecommendations(vacancyId);
+      setRecData(res);
+    } catch (err) {
+      console.warn('Failed to load vacancy recommendations:', err);
+    } finally {
+      setLoadingRec(false);
+    }
+  };
 
   const handleInvalidateCache = async () => {
     setClearingCache(true);
@@ -132,7 +155,7 @@ export default function VacanciesScreen() {
           </View>
         )}
 
-        {/* Salary & Domain */}
+        {/* Salary, Domain & AI Insights Trigger */}
         <View className="flex-row justify-between items-center pt-2 border-t border-border mt-1">
           <View className="flex-row items-center gap-1">
             <IndianRupee size={11} color={COLORS.textFaint} />
@@ -140,14 +163,14 @@ export default function VacanciesScreen() {
               Salary: {salaryText}
             </Text>
           </View>
-          {item.TargetDomainExperience && (
-            <View className="flex-row items-center gap-1 truncate max-w-[160px]">
-              <Target size={12} color={COLORS.textFaint} />
-              <Text className="text-[11px] font-sans-medium text-text-muted truncate">
-                {item.TargetDomainExperience}
-              </Text>
-            </View>
-          )}
+
+          <Button
+            label="AI Insights"
+            variant="ghost"
+            size="sm"
+            icon={<Sparkles size={12} color={COLORS.info} />}
+            onPress={() => handleOpenRecommendations(vacancyId)}
+          />
         </View>
       </Card>
     );
@@ -223,6 +246,125 @@ export default function VacanciesScreen() {
           />
         )}
       </View>
+
+      {/* AI Vacancy Recommendations Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={recModalVisible}
+        onRequestClose={() => setRecModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/60">
+          <View className="w-full bg-surface rounded-t-lg p-5 gap-4 max-h-[85%]">
+            <View className="flex-row justify-between items-center pb-3 border-b border-border">
+              <View className="flex-row items-center gap-2">
+                <Sparkles size={18} color={COLORS.info} />
+                <Text className="text-base font-sans-bold text-text-primary">
+                  AI Vacancy Intelligence
+                </Text>
+              </View>
+              <Pressable onPress={() => setRecModalVisible(false)} hitSlop={8}>
+                <X size={18} color={COLORS.textMuted} />
+              </Pressable>
+            </View>
+
+            {loadingRec ? (
+              <View className="py-12 items-center">
+                <ActivityIndicator size="large" color={COLORS.info} />
+                <Text className="text-xs font-sans text-text-muted mt-2">
+                  Analyzing candidate matches & market skill gaps...
+                </Text>
+              </View>
+            ) : recData ? (
+              <ScrollView className="gap-4">
+                <View className="mb-3">
+                  <Text className="text-lg font-sans-bold text-text-primary">
+                    {recData.job_title || `Vacancy #${recData.vacancy_id}`}
+                  </Text>
+                  {recData.department && (
+                    <Text className="text-xs font-sans-medium text-text-muted">
+                      Department: {recData.department}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Assigned Talent Pools */}
+                {recData.talent_pools && recData.talent_pools.length > 0 && (
+                  <Card className="gap-2 mb-3">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Assigned Talent Pools:
+                    </Text>
+                    <View className="flex-row flex-wrap gap-1.5">
+                      {recData.talent_pools.map((pool, idx) => (
+                        <Badge key={idx} label={pool} tone="success" />
+                      ))}
+                    </View>
+                  </Card>
+                )}
+
+                {/* Top Candidate Matches */}
+                <Card className="gap-2 mb-3">
+                  <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                    Top Matched Candidates ({recData.top_candidate_matches?.length || 0}):
+                  </Text>
+                  {(!recData.top_candidate_matches || recData.top_candidate_matches.length === 0) ? (
+                    <Text className="text-xs font-sans text-text-faint italic">
+                      No candidates matched yet for this vacancy.
+                    </Text>
+                  ) : (
+                    recData.top_candidate_matches.map((cand: any, idx: number) => (
+                      <DenseRow
+                        key={idx}
+                        title={cand.full_name || cand.candidate_id}
+                        subtitle={cand.recommendation}
+                        trailing={
+                          <ScoreBadge
+                            score={cand.match_score || 0}
+                            classification={cand.classification || 'LOW'}
+                          />
+                        }
+                      />
+                    ))
+                  )}
+                </Card>
+
+                {/* Skill Gap Insights */}
+                {recData.skill_gap_insights && recData.skill_gap_insights.length > 0 && (
+                  <Card className="gap-2 mb-4">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Market Skill Gap & Interview Insights:
+                    </Text>
+                    {recData.skill_gap_insights.map((sg, idx) => (
+                      <View key={idx} className="bg-background p-2.5 rounded-md border border-border gap-1">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-xs font-sans-bold text-info">
+                            {sg.skill}
+                          </Text>
+                          <Badge label={sg.market_rarity} tone="warning" />
+                        </View>
+                        <Text className="text-[11px] font-sans text-text-muted">
+                          💡 {sg.recommendation}
+                        </Text>
+                      </View>
+                    ))}
+                  </Card>
+                )}
+              </ScrollView>
+            ) : (
+              <Text className="text-xs font-sans text-text-muted text-center py-6">
+                No recommendations found for this vacancy.
+              </Text>
+            )}
+
+            <Button
+              label="Close Panel"
+              variant="secondary"
+              size="md"
+              onPress={() => setRecModalVisible(false)}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3, RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target, CheckCircle2 } from 'lucide-react-native';
+import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3, RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target, CheckCircle2, Sparkles, AlertTriangle, Users } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
-import { CVUploadResponse, JobMatchScore } from '@/types/api';
+import { CandidateRecommendationsResponse, CVUploadResponse, JobMatchScore } from '@/types/api';
 import { Card, Button, Badge, DenseRow } from '@/components/ui';
 import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
@@ -17,6 +17,9 @@ export default function CandidateDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [data, setData] = useState<CVUploadResponse | null>(null);
+  const [recommendations, setRecommendations] = useState<CandidateRecommendationsResponse | null>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState<boolean>(true);
+  const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showFullText, setShowFullText] = useState<boolean>(false);
@@ -52,6 +55,20 @@ export default function CandidateDetailScreen() {
       .then((res) => setData(res))
       .catch((err) => setError(err.message || 'Failed to load candidate details.'))
       .finally(() => setLoading(false));
+
+    setRecommendationsLoading(true);
+    setRecommendationsError(null);
+    candidateService
+      .getCandidateRecommendations(id)
+      .then((rec) => {
+        setRecommendations(rec);
+        setRecommendationsError(null);
+      })
+      .catch((err) => {
+        setRecommendationsError(err.message || 'Failed to load candidate recommendations.');
+        setRecommendations(null);
+      })
+      .finally(() => setRecommendationsLoading(false));
   };
 
   useEffect(() => {
@@ -79,6 +96,9 @@ export default function CandidateDetailScreen() {
     setReprocessModalVisible(false);
     setIsReprocessing(true);
     setReprocessError(null);
+    setRecommendations(null);
+    setRecommendationsLoading(true);
+    setRecommendationsError(null);
     setElapsedSeconds(0);
     setCurrentStepIndex(1);
     setReprocessStatusMsg('Caches purged. Re-running CV analysis pipeline...');
@@ -355,6 +375,193 @@ export default function CandidateDetailScreen() {
               </View>
             </Card>
 
+            {/* AI Recommendations Panel */}
+            {recommendationsLoading ? (
+              <Card className="border-info/30 gap-3">
+                <View className="flex-row items-center justify-between border-b border-border pb-2">
+                  <View className="flex-row items-center gap-2">
+                    <Sparkles size={16} color={COLORS.info} />
+                    <Text className="text-sm font-sans-bold text-text-primary uppercase tracking-wider">
+                      AI Recommendations & Talent Intelligence
+                    </Text>
+                  </View>
+                  <Badge label="Analyzing..." tone="info" />
+                </View>
+                <View className="py-6 items-center justify-center">
+                  <ActivityIndicator size="small" color={COLORS.info} />
+                  <Text className="text-xs font-sans text-text-muted mt-2">
+                    Generating dynamic evidence-based recommendations...
+                  </Text>
+                </View>
+              </Card>
+            ) : recommendationsError ? (
+              <Card className="border-warning/30 bg-warning/5 gap-2">
+                <View className="flex-row items-center gap-2">
+                  <AlertTriangle size={16} color={COLORS.warning} />
+                  <Text className="text-xs font-sans-medium text-warning flex-1">
+                    {recommendationsError}
+                  </Text>
+                </View>
+              </Card>
+            ) : !recommendations || (
+              (!recommendations.talent_pools || recommendations.talent_pools.length === 0) &&
+              (!recommendations.career_transitions || recommendations.career_transitions.length === 0) &&
+              (!recommendations.missing_qualifications || recommendations.missing_qualifications.length === 0) &&
+              (!recommendations.recommended_certifications || recommendations.recommended_certifications.length === 0) &&
+              (!recommendations.related_skills || recommendations.related_skills.length === 0) &&
+              (!recommendations.actionable_suggestions || recommendations.actionable_suggestions.length === 0) &&
+              (!recommendations.strengths || recommendations.strengths.length === 0)
+            ) ? (
+              <Card className="border-border bg-surface/50 gap-2">
+                <View className="flex-row items-center justify-between border-b border-border pb-2">
+                  <View className="flex-row items-center gap-2">
+                    <Sparkles size={16} color={COLORS.textMuted} />
+                    <Text className="text-sm font-sans-bold text-text-muted uppercase tracking-wider">
+                      AI Recommendations & Talent Intelligence
+                    </Text>
+                  </View>
+                  <Badge label="Career Insights" tone="neutral" />
+                </View>
+                <Text className="text-xs font-sans text-text-muted py-2 leading-5">
+                  No specific recommendations or skill gaps identified for this profile. The candidate's background fully matches evaluated requirements or has no unassigned target opportunities.
+                </Text>
+              </Card>
+            ) : (
+              <Card className="border-info/40 gap-3">
+                <View className="flex-row items-center justify-between border-b border-border pb-2">
+                  <View className="flex-row items-center gap-2">
+                    <Sparkles size={16} color={COLORS.info} />
+                    <Text className="text-sm font-sans-bold text-text-primary uppercase tracking-wider">
+                      AI Recommendations & Talent Intelligence
+                    </Text>
+                  </View>
+                  {recommendations.overall_match_confidence ? (
+                    <Badge label={`${Math.round(recommendations.overall_match_confidence)}% Confidence`} tone="info" />
+                  ) : (
+                    <Badge label="Career Insights" tone="info" />
+                  )}
+                </View>
+
+                {/* Candidate Strengths & Highlights */}
+                {recommendations.strengths && recommendations.strengths.length > 0 && (
+                  <View className="gap-1">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Key Strengths & Highlights:
+                    </Text>
+                    {recommendations.strengths.map((str, idx) => (
+                      <View key={idx} className="flex-row items-center gap-1.5">
+                        <CheckCircle2 size={12} color={COLORS.success} />
+                        <Text className="text-xs font-sans text-text-primary flex-1">{str}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Actionable Suggestions */}
+                {recommendations.actionable_suggestions && recommendations.actionable_suggestions.length > 0 && (
+                  <View className="gap-1 mt-1">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Actionable Insights & Guidance:
+                    </Text>
+                    {recommendations.actionable_suggestions.map((sug, idx) => (
+                      <View key={idx} className="bg-info/10 p-2 rounded-md border border-info/20 flex-row items-start gap-1.5">
+                        <Text className="text-xs">💡</Text>
+                        <Text className="text-xs font-sans text-text-primary flex-1 leading-4">{sug}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Assigned Talent Pools */}
+                {recommendations.talent_pools && recommendations.talent_pools.length > 0 && (
+                  <View className="gap-1 mt-1">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Assigned Talent Pools:
+                    </Text>
+                    <View className="flex-row flex-wrap gap-1.5">
+                      {recommendations.talent_pools.map((pool, idx) => (
+                        <Badge key={idx} label={pool} tone="success" />
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Career Transition Opportunities */}
+                {recommendations.career_transitions && recommendations.career_transitions.length > 0 && (
+                  <View className="gap-1.5 mt-1">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Career Transition Opportunities:
+                    </Text>
+                    {recommendations.career_transitions.map((trans, idx) => (
+                      <View key={idx} className="bg-background p-2.5 rounded-md border border-border gap-1">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-xs font-sans-bold text-primary">
+                            ➜ {trans.target_role}
+                          </Text>
+                          <Badge label={`${Math.round(trans.feasibility_score)}% Feasibility`} tone="info" />
+                        </View>
+                        <Text className="text-[11px] font-sans text-text-muted">
+                          {trans.growth_note}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Identified Skill Gaps */}
+                {recommendations.missing_qualifications && recommendations.missing_qualifications.length > 0 && (
+                  <View className="gap-1 mt-1">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Identified Skill Gaps:
+                    </Text>
+                    {recommendations.missing_qualifications.map((qual, idx) => (
+                      <View key={idx} className="bg-background p-2 rounded-md border border-border gap-1">
+                        <View className="flex-row items-center gap-1.5">
+                          <AlertTriangle size={12} color={COLORS.warning} />
+                          <Text className="text-xs font-sans-medium text-warning flex-1">
+                            {qual.requirement} — <Text className="font-sans text-text-muted">{qual.impact}</Text>
+                          </Text>
+                        </View>
+                        {qual.actionable_suggestion && (
+                          <Text className="text-[11px] font-sans text-text-muted pl-4">
+                            💡 {qual.actionable_suggestion}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Recommended Certifications */}
+                {recommendations.recommended_certifications && recommendations.recommended_certifications.length > 0 && (
+                  <View className="gap-1 mt-1">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Recommended Certifications:
+                    </Text>
+                    <View className="flex-row flex-wrap gap-1.5">
+                      {recommendations.recommended_certifications.map((cert, idx) => (
+                        <Badge key={idx} label={`📜 ${cert}`} tone="neutral" />
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Related Skills Expansion */}
+                {recommendations.related_skills && recommendations.related_skills.length > 0 && (
+                  <View className="gap-1 mt-1">
+                    <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                      Semantically Related Skills:
+                    </Text>
+                    <View className="flex-row flex-wrap gap-1.5">
+                      {recommendations.related_skills.map((skill, idx) => (
+                        <Badge key={idx} label={skill} tone="neutral" />
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Card>
+            )}
+
             {/* Active Vacancy Summary Card */}
             <Card className="gap-3">
               <View className="flex-row items-center justify-between border-b border-border pb-2">
@@ -469,6 +676,41 @@ export default function CandidateDetailScreen() {
                 </View>
               </Card>
             ) : null}
+
+            {/* Semantically Similar Candidates Card */}
+            {data?.similar_candidates && data.similar_candidates.length > 0 && (
+              <Card className="gap-3">
+                <View className="flex-row items-center justify-between border-b border-border pb-2">
+                  <View className="flex-row items-center gap-2">
+                    <Users size={16} color={COLORS.primary} />
+                    <Text className="text-sm font-sans-bold text-text-primary uppercase tracking-wider">
+                      Semantically Similar Candidates (pgvector)
+                    </Text>
+                  </View>
+                  <Badge label={`${data.similar_candidates.length} Profiles`} tone="info" />
+                </View>
+
+                <View className="gap-2">
+                  {data.similar_candidates.map((sim: any, idx: number) => {
+                    const simScore = Math.round((sim.similarity_score || sim.score || 0) * 100);
+                    return (
+                      <DenseRow
+                        key={idx}
+                        title={sim.full_name || sim.filename || sim.candidate_id || `Candidate ${idx + 1}`}
+                        subtitle={sim.primary_department ? `Dept: ${sim.primary_department}` : 'Vector Similarity Match'}
+                        onPress={() => router.push(`/candidates/${encodeURIComponent(sim.candidate_id || sim.id)}` as any)}
+                        trailing={
+                          <Badge
+                            label={`${simScore}% Vector Similarity`}
+                            tone={simScore >= 80 ? 'success' : simScore >= 60 ? 'info' : 'neutral'}
+                          />
+                        }
+                      />
+                    );
+                  })}
+                </View>
+              </Card>
+            )}
 
             {/* Extracted Raw Text / Markdown */}
             <Card>

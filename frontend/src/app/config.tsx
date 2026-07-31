@@ -59,8 +59,14 @@ export default function ConfigScreen() {
     setWeights((prev) => ({ ...prev, [key]: num }));
   };
 
+  const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+  const isWeightValid = Math.abs(totalWeight - 1.0) < 0.001;
+
   const handleSave = async () => {
     setSuccessMsg(null);
+    if (!isWeightValid) {
+      return;
+    }
     try {
       await updateConfig({
         MATCH_HIGH_THRESHOLD: parseFloat(highThreshold),
@@ -78,8 +84,6 @@ export default function ConfigScreen() {
       // Error handled in hook
     }
   };
-
-  const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -239,11 +243,19 @@ export default function ConfigScreen() {
             </Card>
 
             {/* SAVE BUTTON */}
+            {!isWeightValid && (
+              <Card className="bg-danger/10 border-danger/30 p-3">
+                <Text className="text-xs font-sans-medium text-danger">
+                  ⚠️ Component weights total must equal exactly 100% (1.00) before saving. Current total is {(totalWeight * 100).toFixed(0)}%.
+                </Text>
+              </Card>
+            )}
+
             <Button
               label={updating ? 'Saving Configuration...' : 'Save Configuration Changes'}
               onPress={handleSave}
               loading={updating}
-              disabled={updating}
+              disabled={updating || !isWeightValid}
               size="md"
             />
           </View>

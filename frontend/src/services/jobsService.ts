@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import { JobOpening } from '@/types/api';
+import { JobOpening, VacancyRecommendationsResponse } from '@/types/api';
 
 export const jobsService = {
   /**
@@ -17,9 +17,21 @@ export const jobsService = {
   },
 
   /**
+   * Fetch AI Recommendations (skill gap insights, candidate supply, talent pools) for vacancy.
+   */
+  getVacancyRecommendations: (
+    vacancyId: string | number
+  ): Promise<VacancyRecommendationsResponse> => {
+    return apiClient.get<VacancyRecommendationsResponse>(
+      `/api/recommendations/vacancy/${encodeURIComponent(String(vacancyId))}`
+    );
+  },
+
+  /**
    * Invalidate job cache on backend.
    */
   invalidateJobsCache: (): Promise<{ message: string }> => {
     return apiClient.post<{ message: string }>('/api/jobs/cache/invalidate');
   },
 };
+

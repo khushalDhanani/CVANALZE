@@ -103,11 +103,7 @@ export const apiClient = {
       if (file.rawFile instanceof File || file.rawFile instanceof Blob) {
         formData.append('file', file.rawFile, file.name);
       } else {
-        // Fallback for sample file selection on web: construct valid Blob
-        const dummyBlob = new Blob(['Candidate Resume Sample Text Content'], {
-          type: file.type || 'application/pdf',
-        });
-        formData.append('file', dummyBlob, file.name || 'resume.pdf');
+        throw new ApiError('No valid file object provided for upload. Please re-select the resume file.', 400);
       }
     } else {
       formData.append('file', {

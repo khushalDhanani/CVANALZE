@@ -276,4 +276,65 @@ export interface CacheAnalyticsResponse {
   };
 }
 
+export interface CandidateSearchOptions {
+  query?: string;
+  department?: string;
+  min_experience?: number;
+  max_experience?: number;
+  limit?: number;
+}
+
+export interface CandidateSearchResponse {
+  total_found: number;
+  search_mode: string;
+  query?: string;
+  candidates: CandidateSummary[];
+}
+
+export interface CareerTransition {
+  target_role: string;
+  transferable_skills: string[];
+  feasibility_score: number;
+  growth_note: string;
+}
+
+export interface MissingQualification {
+  requirement: string;
+  impact: string;
+  type: string;
+  actionable_suggestion?: string;
+}
+
+export interface CandidateRecommendationsResponse {
+  candidate_id: string;
+  full_name?: string;
+  primary_department?: string;
+  strengths?: string[];
+  overall_match_confidence?: number;
+  actionable_suggestions?: string[];
+  best_vacancies?: any[];
+  related_skills?: string[];
+  missing_qualifications?: MissingQualification[];
+  recommended_certifications?: string[];
+  career_transitions?: CareerTransition[];
+  talent_pools?: string[];
+}
+
+export interface SkillGapInsight {
+  skill: string;
+  market_rarity: string;
+  recommendation: string;
+}
+
+export interface VacancyRecommendationsResponse {
+  vacancy_id: string;
+  job_title?: string;
+  department?: string;
+  top_candidate_matches?: any[];
+  similar_candidates?: any[];
+  skill_gap_insights?: SkillGapInsight[];
+  talent_pools?: string[];
+}
+
+
 

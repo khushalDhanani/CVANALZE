@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserCheck, FileText, Search, RefreshCw, Mail, Phone } from 'lucide-react-native';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useDebounce } from '@/hooks/useDebounce';
 import { CandidateSummary } from '@/types/api';
 import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
@@ -11,33 +12,30 @@ import { COLORS } from '@/constants/colors';
 
 export default function CandidateListScreen() {
   const router = useRouter();
-  const { candidates, loading, error, refreshCandidates } = useCandidates();
+  const { candidates, loading, error, searchMode, refreshCandidates } = useCandidates();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterClassification, setFilterClassification] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED'>('ALL');
   const [filterDept, setFilterDept] = useState<string>('');
 
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  const debouncedDept = useDebounce(filterDept, 300);
+
+  useEffect(() => {
+    refreshCandidates({
+      query: debouncedSearch || undefined,
+      department: debouncedDept || undefined,
+    });
+  }, [debouncedSearch, debouncedDept, refreshCandidates]);
+
   const filteredCandidates = (candidates || []).filter((cand) => {
     if (!cand) return false;
-    const q = searchQuery.toLowerCase();
-    const fname = (cand.filename || '').toLowerCase();
-    const fullname = (cand.full_name || '').toLowerCase();
-    const email = (cand.email || '').toLowerCase();
-    const phone = (cand.phone || '').toLowerCase();
-    const id = (cand.id || '').toLowerCase();
-    const dept = (cand.primary_department || '').toLowerCase();
-    const job = (cand.best_match?.job_title || '').toLowerCase();
-    
-    const matchSearch = fname.includes(q) || fullname.includes(q) || email.includes(q) || phone.includes(q) || id.includes(q) || dept.includes(q) || job.includes(q);
-    
     const candClassification = cand.best_match?.classification;
-    const matchClassification = 
-      filterClassification === 'ALL' || 
+    const matchClassification =
+      filterClassification === 'ALL' ||
       (filterClassification === 'UNMATCHED' && !candClassification) ||
       candClassification === filterClassification;
-    
-    const matchDept = filterDept === '' || dept.includes(filterDept.toLowerCase());
 
-    return matchSearch && matchClassification && matchDept;
+    return matchClassification;
   });
 
   const renderCandidateRow = ({ item }: { item: CandidateSummary }) => {
@@ -50,7 +48,7 @@ export default function CandidateListScreen() {
         Name not detected
       </Text>
     );
-    
+
     const emailText = item.email || "—";
     const phoneText = item.phone || "—";
 
@@ -84,7 +82,6 @@ export default function CandidateListScreen() {
           subtitle={subtitleNode}
           onPress={() => router.push(`/candidates/${encodeURIComponent(item.id)}` as any)}
           trailing={
-
             item.best_match?.score != null ? (
               <ScoreBadge
                 score={item.best_match.score}
@@ -104,16 +101,24 @@ export default function CandidateListScreen() {
       {/* Sticky Header */}
       <View className="flex-row items-center justify-between px-3 py-2 bg-surface border-b border-border">
         <View>
-          <Text className="text-base font-sans-bold text-text-primary">Candidate Directory</Text>
+          <View className="flex-row items-center gap-2">
+            <Text className="text-base font-sans-bold text-text-primary">Candidate Directory</Text>
+            {searchQuery.trim() !== '' && (
+              <Badge
+                label={searchMode === 'semantic' ? 'Semantic Search' : 'Keyword Search'}
+                tone={searchMode === 'semantic' ? 'success' : 'neutral'}
+              />
+            )}
+          </View>
           <Text className="text-[11px] font-sans text-text-muted">
-            {filteredCandidates.length} of {candidates.length} candidate records parsed
+            {filteredCandidates.length} of {candidates.length} candidate records matching filters
           </Text>
         </View>
         <Button
           label="Refresh"
           variant="secondary"
           size="sm"
-          onPress={() => refreshCandidates(searchQuery)}
+          onPress={() => handleSearchTrigger(searchQuery, filterDept)}
         />
       </View>
 
@@ -125,9 +130,9 @@ export default function CandidateListScreen() {
             value={searchQuery}
             onChangeText={(text) => {
               setSearchQuery(text);
-              refreshCandidates(text);
+              handleSearchTrigger(text, filterDept);
             }}
-            placeholder="Search by candidate name, filename, department, or job title..."
+            placeholder="Search by candidate name, skill, title or natural language (e.g. Senior Python Developer)..."
           />
         </View>
 
@@ -147,8 +152,11 @@ export default function CandidateListScreen() {
           <TextField
             label=""
             value={filterDept}
-            onChangeText={setFilterDept}
-            placeholder="Filter by specific department..."
+            onChangeText={(dept) => {
+              setFilterDept(dept);
+              handleSearchTrigger(searchQuery, dept);
+            }}
+            placeholder="Filter by specific department (e.g. Engineering)..."
           />
         </View>
 
