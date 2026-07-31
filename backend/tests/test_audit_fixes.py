@@ -307,6 +307,7 @@ def test_vacancy_cache_is_stale():
     mock_db.query.return_value.filter.return_value.scalar.return_value = 2
     assert not JobRepository._is_stale(version, jobs, db=mock_db), "Should NOT be stale when DB count matches cached count"
 
+    JobRepository._STALENESS_CACHE.clear()
     mock_db.query.return_value.filter.return_value.scalar.return_value = 5
     assert JobRepository._is_stale(version, jobs, db=mock_db), "Should BE stale when DB count differs"
 
