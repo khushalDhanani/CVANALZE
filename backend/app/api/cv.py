@@ -111,7 +111,7 @@ async def match_cv_text(payload: CVMatchRequest):
 @router.get("/status/{cv_key}", response_model=CVUploadResponse | CVProcessingResponse)
 async def get_cv_status(cv_key: str):
     """Get the status or result of a background CV processing job."""
-    result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
+    result = ResultRepository.resolve_result(cv_key)
     if result:
         if result.get("status") == "FAILED":
             return CVProcessingResponse(
@@ -119,20 +119,27 @@ async def get_cv_status(cv_key: str):
                 cv_key=cv_key,
                 status="FAILED",
                 progress=100,
+                stage=result.get("stage"),
+                failed_step=result.get("failed_step"),
+                error_details=result.get("error_details"),
             )
-        if result.get("status") == "processing":
+        if result.get("status") == "processing" and not result.get("match_analysis"):
             return CVProcessingResponse(
                 message=f"{result.get('progress', 25)}% - {result.get('stage', 'Processing')}...",
                 cv_key=result.get("id") or cv_key,
                 status="processing",
-                progress=result.get("progress"),
+                progress=result.get("progress", 25),
                 stage=result.get("stage")
             )
         if "scan_id" not in result and "id" in result:
             result["scan_id"] = result["id"]
         if "parsed_at" not in result and "scanned_at" in result:
             result["parsed_at"] = result["scanned_at"]
+        result["status"] = "COMPLETED"
+        result["progress"] = 100
+        result["stage"] = "complete"
         return CVUploadResponse(**result)
+
     return CVProcessingResponse(
         message="25% - CV is still processing or does not exist...",
         cv_key=cv_key,

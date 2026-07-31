@@ -25,11 +25,13 @@ export interface CVMatchRequest {
 export interface CVProcessingResponse {
   message: string;
   cv_key: string;
-  status: 'processing' | 'completed' | 'failed' | 'FAILED' | string;
+  status: 'processing' | 'completed' | 'COMPLETED' | 'failed' | 'FAILED' | string;
   progress?: number;
   stage?: string | null;
+  is_complete?: boolean;
   failed_step?: string | null;
   error_details?: string | null;
+  stage_durations_ms?: Record<string, number>;
 }
 
 export interface MandatoryFailure {

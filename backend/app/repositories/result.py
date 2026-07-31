@@ -79,6 +79,46 @@ class ResultRepository:
         return None
 
     @classmethod
+    def resolve_result(cls, cv_key: str) -> dict[str, Any] | None:
+        """
+        Idempotently resolves result dictionary by cv_key, handling prefix variations (cv_ / CV_),
+        stem searching, and fallback disk lookups.
+        """
+        clean_key = cv_key.strip()
+        filename = f"{clean_key}.json" if not clean_key.endswith(".json") else clean_key
+        stem = filename[:-5] if filename.endswith(".json") else filename
+
+        # 1. Direct filename read
+        res = cls.read_result_by_filename(filename)
+        if res:
+            return res
+
+        # 2. Case variation & prefix normalization check
+        stems_to_try = [stem]
+        if stem.lower().startswith("cv_"):
+            stems_to_try.append(stem[3:])
+            stems_to_try.append(f"cv_{stem[3:]}")
+            stems_to_try.append(f"CV_{stem[3:]}")
+        else:
+            stems_to_try.append(f"cv_{stem}")
+
+        for s in stems_to_try:
+            fn = f"{s}.json"
+            res = cls.read_result_by_filename(fn)
+            if res:
+                return res
+
+        # 3. Fallback search by scan_id / glob
+        matches = cls.find_results_by_scan_id(stem)
+        if matches:
+            try:
+                return cls.read_result(matches[0])
+            except Exception as exc:
+                logger.warning(f"Failed loading matched result for stem {stem}: {exc}")
+
+        return None
+
+    @classmethod
     def exists(cls, filename: str) -> bool:
         return cv_result_cache_manager.exists(filename) or (settings.RESULTS_DIR / filename).is_file()
 

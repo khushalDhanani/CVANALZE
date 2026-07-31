@@ -123,7 +123,7 @@ async def upload_and_analyze(
 @router.get("/status/{cv_key}")
 async def get_match_status(cv_key: str):
     """Get the status or result of an enriched background match job."""
-    result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
+    result = ResultRepository.resolve_result(cv_key)
     if result:
         if result.get("status") == "FAILED":
             return CVProcessingResponse(

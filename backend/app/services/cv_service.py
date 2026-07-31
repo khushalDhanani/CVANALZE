@@ -37,7 +37,7 @@ def get_stable_cv_key(
 ) -> str:
     raw_stem = Path(filename).stem
     safe_stem = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_stem)
-    if safe_stem.startswith("cv_"):
+    if safe_stem.lower().startswith("cv_"):
         safe_stem = safe_stem[3:]
     if candidate_id is not None and cv_id is not None:
         return f"cand_{candidate_id}_cv_{cv_id}"
@@ -67,6 +67,9 @@ async def process_cv_file(
 
     async with lock:
         current_stage = "initialization"
+        t_pipeline_start = asyncio.get_event_loop().time()
+        stage_durations_ms: dict[str, float] = {}
+
         try:
             existing_data = await asyncio.to_thread(ResultRepository.read_result_by_filename, result_filename)
 
@@ -87,7 +90,11 @@ async def process_cv_file(
                     logger.info(
                         f"[CACHE_HIT] Reusing existing JSON for '{cv_key}' ({result_filename})."
                     )
-                    existing_data["status"] = "CACHE_HIT"
+                    existing_data["status"] = "COMPLETED"
+                    existing_data["original_status"] = "CACHE_HIT"
+                    existing_data["progress"] = 100
+                    existing_data["stage"] = "complete"
+                    existing_data["is_complete"] = True
                     existing_data["result_file_path"] = str(result_path)
                     return existing_data
 
@@ -106,7 +113,8 @@ async def process_cv_file(
             else:
                 logger.info(f"[NEW_CV] Initial processing for '{cv_key}'.")
 
-            current_stage = "parsing"
+            current_stage = "validation"
+            t_stage_start = asyncio.get_event_loop().time()
             
             # Helper to save interim status
             async def _save_interim_status(progress: int, stage: str):
@@ -123,11 +131,11 @@ async def process_cv_file(
                 except Exception as e:
                     logger.warning(f"Failed to save interim status for '{cv_key}': {e}")
 
-            current_stage = "validation"
             await _save_interim_status(15, current_stage)
+            stage_durations_ms["validation_ms"] = round((asyncio.get_event_loop().time() - t_stage_start) * 1000.0, 2)
 
             current_stage = "parsing"
-            await _save_interim_status(25, current_stage)
+            await _save_interim_status(30, current_stage)
 
             # Markdown Generation & Persistence stage
             t_doc_start = asyncio.get_event_loop().time()
@@ -138,7 +146,6 @@ async def process_cv_file(
                 logger.info(f"[MD_CACHE_HIT] Reading existing markdown from '{md_filename}'.")
                 markdown_text = await asyncio.to_thread(md_path.read_text, encoding="utf-8")
                 
-                # Reconstruct basic MarkdownResult from existing result data
                 stage_metrics = existing_data.get("stage_metrics", {}) if existing_data else {}
                 page_count = existing_data.get("page_count", 1) if existing_data else 1
                 is_scanned = existing_data.get("is_scanned", False) if existing_data else False
@@ -170,11 +177,12 @@ async def process_cv_file(
                 logger.info(f"[MD_SAVED] Saved generated markdown to '{md_filename}'.")
                 
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
+            stage_durations_ms["docling_parsing_ms"] = docling_duration_ms
             
             current_stage = "extraction"
-            await _save_interim_status(35, current_stage)
+            await _save_interim_status(45, current_stage)
 
-            # Compute Quality Metrics & Extract JSON
+            t_ext_start = asyncio.get_event_loop().time()
             quality_metrics = QualityMetricsCalculator.compute(
                 text=markdown_text,
                 page_count=extraction.page_count,
@@ -185,8 +193,8 @@ async def process_cv_file(
             resume_json = ResumeJsonExtractor.extract(
                 markdown_text, quality_metrics, filename=filename
             )
+            stage_durations_ms["resume_extraction_ms"] = round((asyncio.get_event_loop().time() - t_ext_start) * 1000.0, 2)
 
-            # Run optimized LLM pipeline & matching with pre-generated & persisted embedding
             from app.services.match_service import MatchService
             from app.services.embedding_service import save_candidate_embedding
 
@@ -201,13 +209,16 @@ async def process_cv_file(
                 return emb
 
             current_stage = "ai_analysis"
-            await _save_interim_status(50, current_stage)
+            await _save_interim_status(60, current_stage)
 
+            t_emb_start = asyncio.get_event_loop().time()
             cv_embedding = await asyncio.to_thread(_generate_and_store_embedding)
+            stage_durations_ms["embedding_ms"] = round((asyncio.get_event_loop().time() - t_emb_start) * 1000.0, 2)
 
             current_stage = "matching"
             await _save_interim_status(75, current_stage)
 
+            t_match_start = asyncio.get_event_loop().time()
             match_analysis = await MatchService.analyze_single_cv(
                 extraction.markdown,
                 document_hash=cv_hash,
@@ -215,6 +226,7 @@ async def process_cv_file(
                 docling_extraction_ms=docling_duration_ms,
                 cv_embedding=cv_embedding,
             )
+            stage_durations_ms["matching_ms"] = round((asyncio.get_event_loop().time() - t_match_start) * 1000.0, 2)
 
             contact_info = (resume_json or {}).get("contact_info") or {}
             extracted_name = contact_info.get("name") or contact_info.get("full_name") or "Unknown Candidate"
@@ -227,8 +239,7 @@ async def process_cv_file(
             match_analysis.candidate_name = extracted_name
 
             current_stage = "complete"
-            await _save_interim_status(100, current_stage)
-
+            await _save_interim_status(90, current_stage)
 
             now_iso = datetime.now(UTC).isoformat()
             created_at = (
@@ -239,7 +250,8 @@ async def process_cv_file(
             updated_at = now_iso
 
             status = "REPROCESSED" if existing_data else "NEW_CV"
-            logger.info(f"[{status}] Extraction complete for '{cv_key}'. Candidate: '{extracted_name}'")
+            stage_durations_ms["total_ms"] = round((asyncio.get_event_loop().time() - t_pipeline_start) * 1000.0, 2)
+            logger.info(f"[{status}] Extraction complete for '{cv_key}' in {stage_durations_ms['total_ms']}ms. Candidate: '{extracted_name}'")
 
             from app.services.similar_candidate_service import SimilarCandidateService
 
@@ -274,12 +286,19 @@ async def process_cv_file(
                 "created_at": created_at,
                 "updated_at": updated_at,
                 "scanned_at": now_iso,
-                "status": status,
+                "status": "COMPLETED",
+                "original_status": status,
+                "progress": 100,
+                "stage": "complete",
+                "is_complete": True,
+                "message": "100% - CV parsing & job matching complete!",
                 "similar_candidates": similar_candidates,
                 "pdf_type": getattr(extraction, "pdf_type", "NON_PDF"),
                 "parser_used": getattr(extraction, "parser_used", "docling_fast"),
                 "ocr_decision": getattr(extraction, "ocr_decision", "SKIPPED_TEXT_PRESENT"),
                 "stage_metrics": getattr(extraction, "stage_metrics", {}),
+                "docling_duration_ms": docling_duration_ms,
+                "stage_durations_ms": stage_durations_ms,
                 "quality_metrics": quality_metrics,
                 "resume_json": resume_json,
                 "characters": len(extraction.markdown),
@@ -293,6 +312,8 @@ async def process_cv_file(
                 "match_analysis": match_analysis.model_dump(),
             }
 
+            from app.core.cache import cv_result_cache_manager
+            cv_result_cache_manager.delete(result_filename)
             saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, result_data)
             result_data["result_file_path"] = str(saved_path)
             return result_data
@@ -304,7 +325,6 @@ async def process_cv_file(
             now_iso = datetime.now(UTC).isoformat()
             err_msg = str(exc)
             
-            # Map stage to failed_step name for UI
             stage_to_step = {
                 "parsing": "Docling Parsing",
                 "extraction": "Resume Extraction",
@@ -326,6 +346,8 @@ async def process_cv_file(
                 "updated_at": now_iso,
                 "scanned_at": now_iso,
                 "status": "FAILED",
+                "progress": 100,
+                "is_complete": False,
                 "error": err_msg,
                 "message": f"CV processing failed at {failed_step}: {err_msg}",
                 "stage": current_stage,
@@ -342,10 +364,16 @@ async def process_cv_file(
                 "match_analysis": None,
             }
             try:
+                from app.core.cache import cv_result_cache_manager
+                cv_result_cache_manager.delete(result_filename)
                 await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, failure_data)
             except Exception as save_exc:
                 logger.error(f"Failed to persist failure status result for '{cv_key}': {save_exc}")
             raise
+        finally:
+            from app.core.cache import cv_result_cache_manager
+            # Invalidate any transient interim status cache key
+            cv_result_cache_manager.delete(result_filename)
 
 
 def process_cv_task_sync(file_path: str) -> dict[str, Any]:

@@ -881,3 +881,33 @@ def test_docx_upload_full_pipeline():
     data = response.json()
     assert data["status"] == "processing"
     assert "cv_key" in data
+
+
+def test_get_stable_cv_key_case_normalization():
+    """Verify that get_stable_cv_key handles uppercase CV_ prefixes consistently."""
+    from app.services.cv_service import get_stable_cv_key
+
+    key_upper = get_stable_cv_key("CV_13347_Yagnik_Resume.pdf")
+    key_lower = get_stable_cv_key("cv_13347_Yagnik_Resume.pdf")
+    assert key_upper == "cv_13347_Yagnik_Resume"
+    assert key_lower == "cv_13347_Yagnik_Resume"
+    assert key_upper == key_lower
+
+
+def test_result_repository_resolve_result_with_prefix_variation(tmp_path, monkeypatch):
+    """Verify ResultRepository.resolve_result handles filename prefix variations."""
+    from app.repositories.result import ResultRepository
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
+    res_file = tmp_path / "cv_13347_Yagnik_Resume.json"
+    res_file.write_text('{"id": "cv_13347_Yagnik_Resume", "status": "COMPLETED", "progress": 100, "stage": "complete", "match_analysis": {}}', encoding="utf-8")
+
+    r1 = ResultRepository.resolve_result("cv_13347_Yagnik_Resume")
+    assert r1 is not None
+    assert r1["id"] == "cv_13347_Yagnik_Resume"
+
+    r2 = ResultRepository.resolve_result("CV_13347_Yagnik_Resume")
+    assert r2 is not None
+    assert r2["id"] == "cv_13347_Yagnik_Resume"
+

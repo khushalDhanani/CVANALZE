@@ -52,7 +52,13 @@ export default function CandidateDetailScreen() {
     setError(null);
     candidateService
       .getCandidateById(id)
-      .then((res) => setData(res))
+      .then((res) => {
+        setData(res);
+        if (res.status === 'COMPLETED' || res.is_complete || res.progress === 100 || res.match_analysis) {
+          setIsReprocessing(false);
+          stopTimers();
+        }
+      })
       .catch((err) => setError(err.message || 'Failed to load candidate details.'))
       .finally(() => setLoading(false));
 
@@ -113,7 +119,9 @@ export default function CandidateDetailScreen() {
       await candidateService.reprocessCandidate(id);
       
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      let pollCount = 0;
       pollTimerRef.current = setInterval(async () => {
+        pollCount++;
         try {
           const statusRes: any = await cvService.getCvStatus(id);
           const statusStr = statusRes.status;
@@ -126,6 +134,25 @@ export default function CandidateDetailScreen() {
             stopTimers();
             setIsReprocessing(false);
             setReprocessError(msg || 'Reprocessing failed.');
+            return;
+          }
+
+          // Completion check: when job is finished and result contains parsed data or COMPLETED status or max timeout reached (60s)
+          const isTerminated =
+            statusStr === 'COMPLETED' ||
+            statusStr === 'NEW_CV' ||
+            statusStr === 'REPROCESSED' ||
+            pct >= 100 ||
+            statusRes.is_complete ||
+            pollCount >= 40 ||
+            (statusStr !== 'processing' && (statusRes.match_analysis || statusRes.text || statusRes.markdown));
+
+          if (isTerminated) {
+            stopTimers();
+            setCurrentStepIndex(7);
+            setStepStates(['completed', 'completed', 'completed', 'completed', 'completed', 'completed', 'completed', 'completed']);
+            setIsReprocessing(false);
+            fetchDetail();
             return;
           }
 
@@ -152,15 +179,6 @@ export default function CandidateDetailScreen() {
             updated[nextIdx] = 'active';
             return updated;
           });
-
-          // Completion check: when job is finished and result contains parsed data
-          if (statusStr !== 'processing' && (statusRes.match_analysis || statusRes.text || statusRes.markdown)) {
-            stopTimers();
-            setCurrentStepIndex(7);
-            setStepStates(['completed', 'completed', 'completed', 'completed', 'completed', 'completed', 'completed', 'completed']);
-            setIsReprocessing(false);
-            fetchDetail();
-          }
         } catch (err: any) {
           // Keep polling unless explicit 404
         }

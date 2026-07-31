@@ -221,7 +221,14 @@ export function useCvUpload() {
                 next[fIndex] = 'failed';
                 return next;
               });
-            } else if ('scan_id' in res) {
+            } else if (
+              'scan_id' in res ||
+              'match_analysis' in res ||
+              (res as any).status === 'COMPLETED' ||
+              (res as any).status === 'NEW_CV' ||
+              (res as any).status === 'REPROCESSED' ||
+              (res as any).progress === 100
+            ) {
               clearInterval(interval);
               stopTimer();
               setBasicResult(res as CVUploadResponse);
