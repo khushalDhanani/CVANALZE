@@ -1,27 +1,32 @@
 # Work Status
 
 ## Last Updated
-2026-07-31T12:35:00Z
+2026-07-31T13:00:00Z
 
 ## Completed
 - **Full Backend Diagnostic Audit**: Completed (66 files audited, 14 findings identified).
 - **Full Frontend Diagnostic Audit & Gap Analysis**: Completed across 7 routes, 17 UI components, 6 hooks, and 10 API services.
-- **Candidate Recommendations Feature Audit & Overhaul**:
-  - `backend/app/services/recommendation_service.py`: Removed hardcoded static maps `DEPARTMENT_CERTIFICATION_MAP` and `CAREER_TRANSITION_MAP` and static fallback strings (`"AWS Certified..."`, `"DevOps Engineer"` at `80.0%`). Implemented dynamic evidence-based calculation of certifications, skill-overlap career transitions ($\ge 40.0\%$), aggregated skill gaps across domain vacancies, dynamic talent pool tags, and enriched response metadata (`strengths`, `overall_match_confidence`, `actionable_suggestions`).
-  - `frontend/src/types/api.ts`: Extended `CandidateRecommendationsResponse` and `MissingQualification` TypeScript interfaces.
-  - `frontend/src/app/candidates/[id].tsx`: Added `recommendationsLoading` and `recommendationsError` state tracking, clean Loading Card, Error Card, and dedicated Empty State Banner ("No specific recommendations or skill gaps identified for this profile"). Added key strengths, actionable suggestions, career transitions with feasibility badges, skill gaps with actionable learning notes, certifications, and talent pools. Reset recommendation state on re-run analysis.
-  - `backend/tests/test_ai_recommendations.py`: Updated and added test cases verifying dynamic evidence-based recommendations, dynamic skill-overlap feasibility calculations, enriched response fields, and clean empty state handling.
+- **Candidate Recommendations Feature Audit & Overhaul**: Completed.
+- **Pipeline 71% Hang & End-to-End Status Synchronization Fix**:
+  - `backend/app/services/cv_service.py`: Fixed case-sensitive key normalization in `get_stable_cv_key` (`safe_stem.lower().startswith("cv_")`), preventing duplicate key prefixing (`cv_CV_`). Added explicit terminal state identifiers (`"status": "COMPLETED"`, `"progress": 100`, `"stage": "complete"`, `"is_complete": True`) and stage timing metrics to saved result objects. Added cache invalidation prior to atomic result save.
+  - `backend/app/repositories/result.py`: Added `ResultRepository.resolve_result(cv_key)` for idempotent result lookup with prefix variation handling and scan ID fallback searching.
+  - `backend/app/api/cv.py` & `backend/app/api/analysis.py`: Updated `/api/cv/status/{cv_key}` and `/api/analysis/status/{cv_key}` to use `resolve_result(cv_key)` and ensure finished jobs return `status="COMPLETED"`, `progress=100`, `stage="complete"`.
+  - `frontend/src/app/candidates/[id].tsx` & `frontend/src/hooks/useCvUpload.ts`: Updated status polling loops to recognize `COMPLETED` status, 100% progress, or `is_complete` flags, setting `currentStepIndex(7)` and marking all step states as `completed`.
+  - `frontend/src/types/api.ts`: Updated `CVProcessingResponse` interface to include `is_complete` and `stage_durations_ms`.
 
 ## Test Results
 - `tests/test_ai_recommendations.py`: **5 / 5 passed (100%)**
-- `tests/test_audit_fixes.py`: **41 / 41 passed (100%)**
-- **Full Backend Test Suite (`.venv/bin/pytest`)**: **85 / 85 passed (100%)**
+- `tests/test_audit_fixes.py`: **43 / 43 passed (100%)**
 
 ## Files Modified
-- `backend/app/services/recommendation_service.py`
-- `backend/tests/test_ai_recommendations.py`
-- `frontend/src/types/api.ts`
+- `backend/app/services/cv_service.py`
+- `backend/app/repositories/result.py`
+- `backend/app/api/cv.py`
+- `backend/app/api/analysis.py`
+- `backend/tests/test_audit_fixes.py`
 - `frontend/src/app/candidates/[id].tsx`
+- `frontend/src/hooks/useCvUpload.ts`
+- `frontend/src/types/api.ts`
 - `workstatus.md`
 
 ## Files Deleted
