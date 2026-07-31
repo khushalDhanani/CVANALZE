@@ -111,6 +111,10 @@ class EnrichedJobMatchResult(JobMatchResult):
 
 
 class EnrichedCandidateAnalysis(BaseModel):
+    status: str | None = Field(default="COMPLETED", description="Status of processing job")
+    progress: int | None = Field(default=100, description="Progress percentage")
+    stage: str | None = Field(default="complete", description="Current stage")
+    is_complete: bool | None = Field(default=True, description="True if completed")
     full_name: str | None = Field(default=None, description="Extracted candidate full name")
     candidate_name: str | None = Field(default=None, description="Extracted candidate name")
     primary_department: str = Field(

@@ -68,8 +68,18 @@ class CVUploadResponse(BaseModel):
     candidate_name: str | None = Field(None, description="Extracted candidate name")
     email: str | None = Field(None, description="Extracted candidate email address")
     phone: str | None = Field(None, description="Extracted candidate phone number")
+    location: str | None = Field(None, description="Extracted candidate location")
+    job_title: str | None = Field(None, description="Extracted candidate job title")
+    company_name: str | None = Field(None, description="Extracted candidate company name")
     name_confidence: float | None = Field(None, description="Name extraction confidence score (0.0 to 1.0)")
+    name_confidence_tier: str | None = Field(None, description="Name confidence tier label (HIGH, MEDIUM, LOW)")
+    location_confidence_tier: str | None = Field(None, description="Location confidence tier label (HIGH, MEDIUM, LOW)")
+    job_title_confidence_tier: str | None = Field(None, description="Job title confidence tier label (HIGH, MEDIUM, LOW)")
+    company_name_confidence_tier: str | None = Field(None, description="Company name confidence tier label (HIGH, MEDIUM, LOW)")
+    field_confidence: dict[str, float | None] | None = Field(None, description="Per-field confidence raw scores")
+    field_confidence_tiers: dict[str, str | None] | None = Field(None, description="Per-field confidence tier labels (HIGH, MEDIUM, LOW)")
     name_extraction_source: str | None = Field(None, description="Source of candidate name extraction")
+
 
 
 

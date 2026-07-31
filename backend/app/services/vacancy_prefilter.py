@@ -4,13 +4,15 @@ from typing import Any
 from app.core.config import settings
 from app.core.logging import logger
 from app.services.embedding_service import EmbeddingService
+from app.services.job_taxonomy import TaxonomyClassifier, JobTaxonomy
 
 
 class VacancyPreFilter:
     """
-    Two-stage Vacancy Pre-Filter:
+    Three-stage Vacancy Pre-Filter:
+    - Stage 0 (Taxonomy Search Space Filtering): Classifies candidate CV into primary domain & job families and prunes cross-domain search space.
     - Stage 1 (Semantic Retrieval): First-stage vector search narrows down active vacancies to Top-N semantic candidates.
-    - Stage 2 (Deterministic Pre-filtering): Evaluates lexical scoring, title matching, required skills, and RRF fusion on Stage 1 candidates.
+    - Stage 2 (Deterministic Pre-filtering): Evaluates lexical scoring, title matching, required skills, and RRF fusion.
     The Deterministic Scoring Engine remains the final authority for ranking.
     """
 
@@ -72,6 +74,7 @@ class VacancyPreFilter:
         candidate_experience: float | None = None,
         top_k: int | None = None,
         cv_embedding: list[float] | None = None,
+        resume_json: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         if not openings:
             return []
@@ -79,6 +82,27 @@ class VacancyPreFilter:
         limit = top_k or settings.PREFILTER_TOP_K
         if len(openings) <= limit:
             return openings
+
+        # STAGE 0: Job Taxonomy Search Space Filtering
+        cand_domain, cand_families = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
+        stage0_openings = openings
+        if cand_families and cand_families != [JobTaxonomy.FAMILY_OTHER]:
+            compatible_jobs = []
+            for j in openings:
+                j_domain = j.get("_precomputed_domain") or j.get("domain")
+                j_family = j.get("_precomputed_job_family") or j.get("job_family")
+                if not j_family:
+                    j_domain, j_family = TaxonomyClassifier.classify_vacancy(j)
+
+                if TaxonomyClassifier.are_families_compatible(cand_families, j_family) or j_domain == cand_domain:
+                    compatible_jobs.append(j)
+
+            if compatible_jobs:
+                stage0_openings = compatible_jobs
+                logger.info(
+                    f"[TAXONOMY_PREFILTER] Candidate classified as Domain='{cand_domain}', Families={cand_families}. "
+                    f"Filtered {len(openings)} total openings down to {len(stage0_openings)} taxonomy-compatible vacancies."
+                )
 
         # Generate cv_embedding if missing
         if cv_embedding is None and settings.EMBEDDING_ENABLED:
@@ -90,25 +114,26 @@ class VacancyPreFilter:
                 logger.warning(f"CV embedding generation failed in prefilter: {e}")
                 cv_embedding = None
 
-        # STAGE 1: Semantic Vector Retrieval (first-stage vacancy selection)
-        stage1_openings = openings
-        if cv_embedding and settings.EMBEDDING_ENABLED and len(openings) > limit:
+        # STAGE 1: Semantic Vector Retrieval (first-stage vacancy selection on Stage 0 vacancies)
+        stage1_openings = stage0_openings
+        if cv_embedding and settings.EMBEDDING_ENABLED and len(stage0_openings) > limit:
             top_n = getattr(settings, "SEMANTIC_RETRIEVAL_TOP_N", 50)
             top_n_ids = cls.semantic_vector_search(cv_embedding, top_n=top_n)
             if top_n_ids:
                 top_n_set = set(top_n_ids)
                 semantic_candidates = [
-                    job for job in openings
+                    job for job in stage0_openings
                     if str(job.get("vacancy_id") or job.get("id")) in top_n_set
                 ]
                 if semantic_candidates:
                     stage1_openings = semantic_candidates
                     logger.info(
                         f"[SEMANTIC_RETRIEVAL] Stage 1 vector search selected {len(stage1_openings)} candidate vacancies "
-                        f"out of {len(openings)} total openings (Top-N={top_n})."
+                        f"out of {len(stage0_openings)} taxonomy openings (Top-N={top_n})."
                     )
 
         # STAGE 2: Deterministic VacancyPreFilter (lexical + RRF fusion on Stage 1 candidates)
+
         cv_lower = cv_text.lower()
         stop_words = {"and", "team", "for", "the", "with", "senior", "junior", "lead", "manager", "specialist"}
 

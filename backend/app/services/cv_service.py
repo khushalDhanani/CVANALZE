@@ -35,16 +35,15 @@ def get_stable_cv_key(
     candidate_id: str | int | None = None,
     cv_id: str | int | None = None,
 ) -> str:
+    """
+    Returns a single deterministic, canonical cv_key for a given CV filename.
+    Standardizes on cv_{safe_stem} across all upload routes (/cv/upload, /match/upload)
+    and processing lifecycle stages (interim status, final save, status polling).
+    """
     raw_stem = Path(filename).stem
     safe_stem = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_stem)
     if safe_stem.lower().startswith("cv_"):
         safe_stem = safe_stem[3:]
-    if candidate_id is not None and cv_id is not None:
-        return f"cand_{candidate_id}_cv_{cv_id}"
-    if candidate_id is not None:
-        return f"cand_{candidate_id}_{safe_stem}"
-    if cv_id is not None:
-        return f"cv_{cv_id}_{safe_stem}"
     return f"cv_{safe_stem}"
 
 
@@ -235,6 +234,28 @@ async def process_cv_file(
             name_confidence = contact_info.get("name_confidence")
             name_extraction_source = contact_info.get("extraction_source")
 
+            location_val = contact_info.get("location")
+            work_exp = (resume_json or {}).get("work_experience") or []
+            top_exp = work_exp[0] if work_exp else {}
+            job_title_val = contact_info.get("job_title") or top_exp.get("job_title")
+            company_val = contact_info.get("company_name") or contact_info.get("company") or top_exp.get("company")
+
+            raw_fc = contact_info.get("field_confidence") or {}
+            raw_fct = contact_info.get("field_confidence_tiers") or {}
+
+            from app.core.rule_config_manager import RuleConfigManager
+            name_tier = contact_info.get("name_confidence_level") or contact_info.get("name_confidence_tier") or raw_fct.get("name") or RuleConfigManager.get_confidence_tier("name", name_confidence)
+            loc_tier = contact_info.get("location_confidence_tier") or raw_fct.get("location") or RuleConfigManager.get_confidence_tier("location", raw_fc.get("location"))
+            title_tier = contact_info.get("job_title_confidence_tier") or raw_fct.get("job_title") or RuleConfigManager.get_confidence_tier("job_title", raw_fc.get("job_title"))
+            comp_tier = contact_info.get("company_name_confidence_tier") or raw_fct.get("company_name") or RuleConfigManager.get_confidence_tier("company_name", raw_fc.get("company_name"))
+
+            field_confidence_tiers = {
+                "name": name_tier if extracted_name and extracted_name.lower() != "unknown candidate" else "LOW",
+                "location": loc_tier if location_val else "LOW",
+                "job_title": title_tier if job_title_val else "LOW",
+                "company_name": comp_tier if company_val else "LOW",
+            }
+
             match_analysis.full_name = extracted_name
             match_analysis.candidate_name = extracted_name
 
@@ -275,11 +296,20 @@ async def process_cv_file(
                 "filename": filename,
                 "content_type": content_type,
                 "cv_hash": cv_hash,
-                "full_name": extracted_name,
-                "candidate_name": extracted_name,
+                "full_name": extracted_name if extracted_name != "Unknown Candidate" else None,
+                "candidate_name": extracted_name if extracted_name != "Unknown Candidate" else None,
                 "email": email,
                 "phone": phone,
+                "location": location_val,
+                "job_title": job_title_val,
+                "company_name": company_val,
                 "name_confidence": name_confidence,
+                "name_confidence_tier": field_confidence_tiers["name"],
+                "location_confidence_tier": field_confidence_tiers["location"],
+                "job_title_confidence_tier": field_confidence_tiers["job_title"],
+                "company_name_confidence_tier": field_confidence_tiers["company_name"],
+                "field_confidence": raw_fc,
+                "field_confidence_tiers": field_confidence_tiers,
                 "name_extraction_source": name_extraction_source,
                 "parser_version": settings.EXTRACTION_PARSER_VERSION,
                 "schema_version": settings.EXTRACTION_SCHEMA_VERSION,
@@ -312,8 +342,6 @@ async def process_cv_file(
                 "match_analysis": match_analysis.model_dump(),
             }
 
-            from app.core.cache import cv_result_cache_manager
-            cv_result_cache_manager.delete(result_filename)
             saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, result_data)
             result_data["result_file_path"] = str(saved_path)
             return result_data
@@ -364,16 +392,10 @@ async def process_cv_file(
                 "match_analysis": None,
             }
             try:
-                from app.core.cache import cv_result_cache_manager
-                cv_result_cache_manager.delete(result_filename)
                 await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, failure_data)
             except Exception as save_exc:
                 logger.error(f"Failed to persist failure status result for '{cv_key}': {save_exc}")
             raise
-        finally:
-            from app.core.cache import cv_result_cache_manager
-            # Invalidate any transient interim status cache key
-            cv_result_cache_manager.delete(result_filename)
 
 
 def process_cv_task_sync(file_path: str) -> dict[str, Any]:

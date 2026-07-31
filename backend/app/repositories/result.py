@@ -82,16 +82,16 @@ class ResultRepository:
     def resolve_result(cls, cv_key: str) -> dict[str, Any] | None:
         """
         Idempotently resolves result dictionary by cv_key, handling prefix variations (cv_ / CV_),
-        stem searching, and fallback disk lookups.
+        stem searching, and fallback disk lookups. Prefers completed results over interim processing markers.
         """
         clean_key = cv_key.strip()
         filename = f"{clean_key}.json" if not clean_key.endswith(".json") else clean_key
         stem = filename[:-5] if filename.endswith(".json") else filename
 
         # 1. Direct filename read
-        res = cls.read_result_by_filename(filename)
-        if res:
-            return res
+        direct_res = cls.read_result_by_filename(filename)
+        if direct_res and direct_res.get("status") not in ("processing", None):
+            return direct_res
 
         # 2. Case variation & prefix normalization check
         stems_to_try = [stem]
@@ -104,17 +104,24 @@ class ResultRepository:
 
         for s in stems_to_try:
             fn = f"{s}.json"
-            res = cls.read_result_by_filename(fn)
-            if res:
-                return res
+            alt_res = cls.read_result_by_filename(fn)
+            if alt_res and alt_res.get("status") not in ("processing", None):
+                return alt_res
 
         # 3. Fallback search by scan_id / glob
         matches = cls.find_results_by_scan_id(stem)
         if matches:
-            try:
-                return cls.read_result(matches[0])
-            except Exception as exc:
-                logger.warning(f"Failed loading matched result for stem {stem}: {exc}")
+            for match in matches:
+                try:
+                    alt_res = cls.read_result(match)
+                    if alt_res and alt_res.get("status") not in ("processing", None):
+                        return alt_res
+                except Exception as exc:
+                    logger.warning(f"Failed loading matched result for stem {stem}: {exc}")
+
+        # Return direct_res (even if processing) if no completed result was found anywhere
+        if direct_res:
+            return direct_res
 
         return None
 

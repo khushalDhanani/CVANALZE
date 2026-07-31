@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "Unified domain & parsing rule config combining keywords, confidence thresholds, and safety gates",
+  "last_updated": "2026-07-31T15:08:00Z",
+  "global_confidence_tiers": {
+    "HIGH": { "min_score": 0.80, "max_score": 1.00 },
+    "MEDIUM": { "min_score": 0.50, "max_score": 0.79 },
+    "LOW": { "min_score": 0.00, "max_score": 0.49 }
+  },
+  "fields": {
+    "name": {
+      "field_name": "name",
+      "description": "Rules and confidence thresholds for candidate name extraction",
+      "confidence_scoring": {
+        "header_email_validated": 0.95,
+        "header_contact_section": 0.85,
+        "email_username_fallback": 0.30,
+        "filename_fallback": 0.30,
+        "default_fallback": 0.00
+      },
+      "tier_thresholds": {
+        "high_min": 0.80,
+        "medium_min": 0.50,
+        "low_min": 0.20,
+        "override_reason": null
+      },
+      "downstream_gates": {
+        "min_acceptance_confidence": 0.50,
+        "reject_email_fallback_as_unverified": true
+      },
+      "keywords": {
+        "job_title_denylist": [
+          "IT", "EXECUTIVE", "DEVELOPER", "ENGINEER", "MANAGER", "LEAD", "ANALYST",
+          "SPECIALIST", "CONSULTANT", "ARCHITECT", "OFFICER", "DIRECTOR", "ADMINISTRATOR",
+          "COORDINATOR", "TECHNICIAN", "ASSISTANT", "INTERN", "DESIGNER", "TESTER",
+          "ACCOUNTANT", "SECRETARY", "REPRESENTATIVE", "OPERATOR", "SUPERVISOR", "HEAD",
+          "CHIEF", "SENIOR", "JUNIOR", "ASSOCIATE", "PRINCIPAL", "STAFF", "FULL STACK",
+          "FRONTEND", "BACKEND", "MOBILE", "DEVOPS", "CLOUD", "SOFTWARE", "SYSTEM",
+          "NETWORK", "PROJECT", "PRODUCT", "SALES", "MARKETING", "FINANCE", "HR",
+          "RECRUITER", "OPERATIONS", "GENERAL MANAGER", "CHEMIST", "PLANT", "SOLUTIONS",
+          "DATA", "SCIENTIST", "SCRUM", "MASTER", "VP", "VICE", "PRESIDENT", "CEO",
+          "CTO", "CFO", "COO", "FOUNDER", "CO-FOUNDER", "STUDENT", "FREELANCER",
+          "TRAINEE", "RECEPTIONIST", "CLERK", "ADVISOR", "AUDITOR", "STRATEGIST"
+        ],
+        "header_denylist": [
+          "CURRICULUM", "VITAE", "RESUME", "CV", "BIODATA", "PROFILE", "SUMMARY", "CAREER",
+          "OBJECTIVE", "EXPERIENCE", "EDUCATION", "SKILLS", "PROJECTS", "CERTIFICATIONS",
+          "LANGUAGES", "REFERENCES", "DECLARATION", "PERSONAL", "DETAILS", "CONTACT",
+          "INFORMATION", "ADDRESS", "PHONE", "EMAIL", "PAGE", "PVT", "LTD", "LLC", "INC",
+          "INDUSTRIES", "COMPANY", "UNIVERSITY", "COLLEGE", "INSTITUTE", "SCHOOL",
+          "BACHELOR", "MASTER", "DIPLOMA", "DEGREE", "WORK", "EMPLOYMENT", "TECHNICAL",
+          "HOBBIES", "ACHIEVEMENTS"
+        ]
+      }
+    },
+    "location": {
+      "field_name": "location",
+      "description": "Rules, gazetteers, and confidence thresholds for candidate location extraction",
+      "confidence_scoring": {
+        "gazetteer_match_score": 0.90,
+        "contact_block_generic_score": 0.50,
+        "blacklisted_score": 0.00,
+        "non_contact_region_score": 0.00
+      },
+      "tier_thresholds": {
+        "high_min": 0.80,
+        "medium_min": 0.50,
+        "low_min": 0.00,
+        "override_reason": null
+      },
+      "downstream_gates": {
+        "min_acceptance_confidence": 0.50,
+        "require_gazetteer_for_high": true
+      },
+      "keywords": {
+        "gazetteer": [
+          "new york", "ny", "london", "san francisco", "sf", "san jose", "seattle", "austin",
+          "chicago", "boston", "los angeles", "la", "toronto", "vancouver", "berlin", "munich",
+          "paris", "amsterdam", "singapore", "sydney", "melbourne", "tokyo", "dubai",
+          "bangalore", "bengaluru", "mumbai", "delhi", "new delhi", "hyderabad", "pune",
+          "chennai", "kolkata", "ahmedabad", "gurgaon", "noida", "california", "ca",
+          "texas", "tx", "washington", "wa", "ontario", "england", "uk", "germany",
+          "india", "usa", "canada", "australia", "united states", "united kingdom",
+          "surat", "vadodara", "baroda", "rajkot", "gujarat", "gandhinagar", "bhavnagar",
+          "jamnagar", "junagadh", "anand", "vapi", "ankleshwar", "navsari", "bharuch",
+          "mehsana", "morbi", "maharashtra", "karnataka", "tamil nadu", "telangana",
+          "haryana", "uttar pradesh", "kerala", "punjab", "rajasthan"
+        ],
+        "blacklist": [
+          "computer", "science", "software", "engineering", "developer", "manager",
+          "specialist", "executive", "director", "lead", "junior", "senior",
+          "experience", "employment", "status", "active", "dear", "hiring",
+          "university", "college", "school", "institute", "degree", "bachelor",
+          "master", "phd", "python", "java", "react", "fastapi", "postgresql",
+          "skills", "projects", "certifications", "contact", "summary", "profile"
+        ]
+      }
+    },
+    "job_title": {
+      "field_name": "job_title",
+      "description": "Rules, narrative sentence starters, and structural thresholds for job title validation",
+      "confidence_scoring": {
+        "title_keyword_match": 0.90,
+        "capitalized_phrase_match": 0.70,
+        "narrative_starter_penalty": 0.00,
+        "temporal_phrase_penalty": 0.00
+      },
+      "tier_thresholds": {
+        "high_min": 0.80,
+        "medium_min": 0.50,
+        "low_min": 0.00,
+        "override_reason": null
+      },
+      "downstream_gates": {
+        "min_acceptance_confidence": 0.50,
+        "max_word_count": 7,
+        "max_char_length": 60
+      },
+      "keywords": {
+        "narrative_starters": [
+          "graduated", "worked", "studied", "completed", "attended", "born",
+          "started", "joined", "finished", "served", "responsible", "managed",
+          "developed", "built", "helped", "achieved", "created", "designed",
+          "lead", "led", "supervised", "conducted", "handled", "oversaw"
+        ],
+        "narrative_phrases": [
+          "in 19", "in 20", "at 19", "at 20", "since 19", "since 20", "from 19", "from 20"
+        ]
+      }
+    },
+    "company_name": {
+      "field_name": "company_name",
+      "description": "Rules and section header denylists for company name extraction",
+      "confidence_scoring": {
+        "valid_company_score": 0.85,
+        "header_denylist_penalty": 0.00
+      },
+      "tier_thresholds": {
+        "high_min": 0.80,
+        "medium_min": 0.50,
+        "low_min": 0.00,
+        "override_reason": null
+      },
+      "downstream_gates": {
+        "min_acceptance_confidence": 0.50,
+        "max_char_length": 70
+      },
+      "keywords": {
+        "generic_section_headers": [
+          "experience", "work experience", "employment", "employment history",
+          "work history", "career history", "professional experience",
+          "professional background", "relevant experience", "technical experience",
+          "projects", "key projects", "academic projects", "personal projects",
+          "summary", "profile", "profile summary", "executive summary",
+          "overview", "education", "academic background", "qualifications",
+          "skills", "technical skills", "core competencies", "certifications",
+          "achievements", "contact", "contact information", "details", "general"
+        ]
+      }
+    }
+  }
+}

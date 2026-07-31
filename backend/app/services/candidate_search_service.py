@@ -11,6 +11,7 @@ from app.schemas.candidate_search import (
     CandidateSearchResponse,
     CandidateSearchResultItem,
 )
+from app.core.rule_config_manager import RuleConfigManager
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
 
 
@@ -205,13 +206,41 @@ class CandidateSearchService:
                 if request.status.strip().lower() != cand_status:
                     continue
 
+            location_val = r.get("location") or contact_info.get("location")
+            job_title_val = r.get("job_title") or contact_info.get("job_title") or best_match.get("job_title")
+            company_val = r.get("company_name") or r.get("company") or contact_info.get("company_name") or contact_info.get("company")
+
+            raw_fc = r.get("field_confidence") or contact_info.get("field_confidence") or {}
+            raw_fct = r.get("field_confidence_tiers") or contact_info.get("field_confidence_tiers") or {}
+
+            name_tier = r.get("name_confidence_tier") or raw_fct.get("name") or contact_info.get("name_confidence_level") or RuleConfigManager.get_confidence_tier("name", r.get("name_confidence") or raw_fc.get("name"))
+            loc_tier = r.get("location_confidence_tier") or raw_fct.get("location") or RuleConfigManager.get_confidence_tier("location", r.get("location_confidence") or raw_fc.get("location"))
+            title_tier = r.get("job_title_confidence_tier") or raw_fct.get("job_title") or RuleConfigManager.get_confidence_tier("job_title", r.get("job_title_confidence") or raw_fc.get("job_title"))
+            comp_tier = r.get("company_name_confidence_tier") or raw_fct.get("company_name") or RuleConfigManager.get_confidence_tier("company_name", r.get("company_name_confidence") or raw_fc.get("company_name"))
+
+            fct = {
+                "name": name_tier if extracted_name and extracted_name.lower() != "unknown candidate" else "LOW",
+                "location": loc_tier if location_val else "LOW",
+                "job_title": title_tier if job_title_val else "LOW",
+                "company_name": comp_tier if company_val else "LOW",
+            }
+
             items.append(
                 CandidateSearchResultItem(
                     id=r.get("id") or cv_key,
                     filename=r.get("filename") or f"{cv_key}.pdf",
-                    full_name=extracted_name if extracted_name else None,
+                    full_name=extracted_name if (extracted_name and extracted_name.lower() != "unknown candidate") else None,
                     email=email if email else None,
                     phone=phone if phone else None,
+                    location=location_val if location_val else None,
+                    job_title=job_title_val if job_title_val else None,
+                    company_name=company_val if company_val else None,
+                    name_confidence_tier=fct["name"],
+                    location_confidence_tier=fct["location"],
+                    job_title_confidence_tier=fct["job_title"],
+                    company_name_confidence_tier=fct["company_name"],
+                    field_confidence=raw_fc if raw_fc else None,
+                    field_confidence_tiers=fct,
                     parsed_at=r.get("parsed_at") or r.get("created_at"),
                     page_count=r.get("page_count", 1),
                     is_scanned=r.get("is_scanned", False),
@@ -225,6 +254,12 @@ class CandidateSearchService:
                         "score": best_match.get("score") or best_match.get("overall_score"),
                         "classification": best_match.get("classification"),
                         "recommendation": best_match.get("recommendation"),
+                        "domain_mismatch_capped": best_match.get("domain_mismatch_capped") or any(
+                            (f.get("requirement_id") == "req_domain_mismatch" if isinstance(f, dict) else False)
+                            for f in (best_match.get("mandatory_failures") or best_match.get("mandatory_fails") or [])
+                        ),
+                        "domain_mismatch_reason": best_match.get("domain_mismatch_reason"),
+                        "retrieval_source": best_match.get("retrieval_source"),
                     },
                 )
             )

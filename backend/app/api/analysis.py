@@ -135,15 +135,35 @@ async def get_match_status(cv_key: str):
                 failed_step=result.get("failed_step"),
                 error_details=result.get("error_details"),
             )
+
+        is_completed = (
+            result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED")
+            or result.get("progress") == 100
+            or result.get("is_complete") is True
+        )
+
         match_analysis = result.get("match_analysis")
         if match_analysis:
             match_analysis["scan_id"] = result.get("scan_id", result.get("id"))
             match_analysis["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
+            match_analysis["status"] = result.get("status", "COMPLETED")
+            match_analysis["progress"] = result.get("progress", 100)
+            match_analysis["stage"] = result.get("stage", "complete")
+            match_analysis["is_complete"] = result.get("is_complete", True)
             try:
                 return EnrichedCandidateAnalysis.model_validate(match_analysis)
             except Exception:
                 return match_analysis
-        
+
+        if is_completed:
+            return CVProcessingResponse(
+                message=result.get("message") or "100% - CV parsing & job matching complete!",
+                cv_key=result.get("scan_id") or result.get("id") or cv_key,
+                status="COMPLETED",
+                progress=100,
+                stage="complete",
+            )
+
         return CVProcessingResponse(
             message=result.get("message") or f"{result.get('progress', 50)}% - Processing in progress...",
             cv_key=cv_key,
@@ -151,7 +171,7 @@ async def get_match_status(cv_key: str):
             progress=result.get("progress", 50),
             stage=result.get("stage")
         )
-        
+
     return CVProcessingResponse(
         message="Uploading and parsing CV...",
         cv_key=cv_key,

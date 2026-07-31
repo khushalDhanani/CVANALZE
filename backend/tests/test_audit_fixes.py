@@ -297,6 +297,7 @@ def test_vacancy_cache_is_stale():
     """Test that _is_stale correctly detects count changes from DB."""
     from app.repositories.job import JobRepository
 
+    JobRepository._STALENESS_CACHE.clear()
     jobs = [
         {"vacancy_id": 1, "title": "Python Developer"},
         {"vacancy_id": 2, "title": "Java Engineer"},
@@ -304,6 +305,7 @@ def test_vacancy_cache_is_stale():
     version = JobRepository._compute_vacancy_hash(jobs)
 
     mock_db = MagicMock()
+    mock_db.execute.side_effect = Exception("Fallback to query count")
     mock_db.query.return_value.filter.return_value.scalar.return_value = 2
     assert not JobRepository._is_stale(version, jobs, db=mock_db), "Should NOT be stale when DB count matches cached count"
 
@@ -639,18 +641,69 @@ def test_match_result_cache_invalidated_by_version_change():
 
 
 def test_cache_invalidator_cv():
-    """Test that invalidate_cv removes doc_cache and match_result entries for that hash."""
-    from app.core.cache import CacheInvalidator, doc_cache_manager, match_result_cache_manager
+    """Test that invalidate_cv removes doc_cache and match_result entries for that hash without nuking unrelated entries."""
+    from app.core.cache import (
+        CacheIndex,
+        CacheInvalidator,
+        doc_cache_manager,
+        match_result_cache_manager,
+    )
 
-    doc_hash = "abc123"
-    doc_cache_manager.set(doc_hash, {"data": "test"})
-    match_result_cache_manager.set(f"match:{doc_hash}", {"score": 85})
+    CacheIndex.clear()
+    doc_hash_a = "abc123hash_a"
+    doc_hash_b = "xyz789hash_b"
 
-    assert doc_cache_manager.get(doc_hash) is not None
+    key_a = "match_key_a"
+    key_b = "match_key_b"
 
-    CacheInvalidator.invalidate_cv(doc_hash)
+    doc_cache_manager.set(doc_hash_a, {"data": "test_a"})
+    doc_cache_manager.set(doc_hash_b, {"data": "test_b"})
+    match_result_cache_manager.set(key_a, {"score": 85})
+    match_result_cache_manager.set(key_b, {"score": 92})
 
-    assert doc_cache_manager.get(doc_hash) is None, "doc_cache should be cleared"
+    CacheIndex.add("match_by_doc", doc_hash_a, key_a)
+    CacheIndex.add("match_by_doc", doc_hash_b, key_b)
+
+    assert doc_cache_manager.get(doc_hash_a) is not None
+    assert match_result_cache_manager.get(key_a) is not None
+    assert match_result_cache_manager.get(key_b) is not None
+
+    CacheInvalidator.invalidate_cv(doc_hash_a)
+
+    assert doc_cache_manager.get(doc_hash_a) is None, "Target doc_cache should be cleared"
+    assert doc_cache_manager.get(doc_hash_b) is not None, "Unrelated doc_cache should be preserved"
+    assert match_result_cache_manager.get(key_a) is None, "Target match result should be cleared"
+    assert match_result_cache_manager.get(key_b) is not None, "Unrelated match result should be preserved"
+
+
+def test_cache_invalidator_candidate():
+    """Test that invalidate_candidate selectively purges candidate entries."""
+    from app.core.cache import (
+        CacheIndex,
+        CacheInvalidator,
+        cv_result_cache_manager,
+        match_result_cache_manager,
+    )
+
+    CacheIndex.clear()
+    cand_1_match = "match_cand_1"
+    cand_2_match = "match_cand_2"
+
+    match_result_cache_manager.set(cand_1_match, {"score": 88})
+    match_result_cache_manager.set(cand_2_match, {"score": 95})
+
+    CacheIndex.add("match_by_cand", "cand_1", cand_1_match)
+    CacheIndex.add("match_by_cand", "cand_2", cand_2_match)
+
+    cv_result_cache_manager.set("cand_1_cv.json", {"status": "COMPLETED"})
+    cv_result_cache_manager.set("cand_2_cv.json", {"status": "COMPLETED"})
+
+    CacheInvalidator.invalidate_candidate("cand_1")
+
+    assert match_result_cache_manager.get(cand_1_match) is None, "Cand 1 match should be cleared"
+    assert match_result_cache_manager.get(cand_2_match) is not None, "Cand 2 match should be preserved"
+    assert cv_result_cache_manager.get("cand_1_cv.json") is None, "Cand 1 CV result should be cleared"
+    assert cv_result_cache_manager.get("cand_2_cv.json") is not None, "Cand 2 CV result should be preserved"
 
 
 def test_cache_invalidator_vacancies():
@@ -717,6 +770,72 @@ def test_cache_invalidator_embedding_model():
 
     assert embedding_cache_manager.get("model:v1:some_hash") is None
     assert embedding_cache_manager.get("model:v1:other_hash") is None
+
+
+def test_invalidate_cv_multi_tier():
+    """Test that invalidate_cv purges values across L1 memory, L2 redis, and L3 file cache tiers."""
+    from unittest.mock import MagicMock, patch
+    from app.core.cache import (
+        CacheInvalidator,
+        doc_cache_manager,
+        cv_result_cache_manager,
+        _memory_cache,
+        _cv_file_cache,
+    )
+
+    doc_hash = "multitier_hash_123"
+
+    # Populate L1 and L3
+    _memory_cache.set(f"doc_cache:{doc_hash}", {"parsed": "text"})
+    _cv_file_cache.set(f"{doc_hash}.json", {"status": "COMPLETED"})
+
+    mock_redis = MagicMock()
+    mock_redis.scan.return_value = (0, [])
+    with patch("app.core.cache._REDIS_CLIENT", mock_redis):
+        CacheInvalidator.invalidate_cv(doc_hash)
+
+        # Confirm L1 cleared
+        assert _memory_cache.get(f"doc_cache:{doc_hash}") is None
+        # Confirm L3 file cache cleared
+        assert _cv_file_cache.get(f"{doc_hash}.json") is None
+        # Confirm L2 Redis delete commands triggered
+        assert mock_redis.delete.called or mock_redis.scan.called
+
+
+def test_cache_manager_tier_simplification():
+    """Test that CacheManager.active_providers bypasses FileCache when Redis is active and retains it when Redis is down."""
+    from unittest.mock import MagicMock
+    from app.core.cache import CacheManager, MemoryCache, RedisCache, FileCache
+
+    mem = MemoryCache()
+    redis = RedisCache()
+    file_c = FileCache("/tmp/test_cache_dir")
+
+    cm = CacheManager("test_ns", [mem, redis, file_c])
+
+    # When Redis is available
+    mock_redis_client = MagicMock()
+    with patch("app.core.cache._REDIS_CLIENT", mock_redis_client):
+        active = cm.active_providers
+        assert mem in active
+        assert redis in active
+        assert file_c not in active, "FileCache should be bypassed when Redis is active"
+
+    # When Redis is unavailable
+    with patch("app.core.cache._REDIS_CLIENT", None):
+        active_fallback = cm.active_providers
+        assert mem in active_fallback
+        assert file_c in active_fallback, "FileCache should be retained as fallback when Redis is down"
+
+
+@pytest.mark.asyncio
+async def test_startup_warns_and_proceeds_when_redis_inactive():
+    """Verify that startup logs fallback warning and proceeds cleanly when Redis is inactive."""
+    from app.main import start_background_warmup
+
+    with patch("app.core.cache._REDIS_CLIENT", None):
+        # Should complete cleanly without raising RuntimeError
+        await start_background_warmup()
 
 
 def test_cache_delete_by_pattern():

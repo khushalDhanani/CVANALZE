@@ -14,8 +14,10 @@ from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
 from app.services.llm_service import OllamaLLMService
+from app.services.document_parser import ResumeJsonExtractor
 from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
+
 
 
 class MatchService:
@@ -70,8 +72,13 @@ class MatchService:
         profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
 
         # 3. JSON Loading stage timing (parsing CV text input)
+        resume_json = None
         with profiler.time_stage("resume_json"):
-            _ = cv_text.strip()
+            try:
+                resume_json = ResumeJsonExtractor.extract(cv_text)
+            except Exception as e:
+                logger.warning(f"ResumeJsonExtractor failed in match_service: {e}")
+                resume_json = None
 
         from fastapi.concurrency import run_in_threadpool
         # 2. Vacancy retrieval
@@ -88,7 +95,7 @@ class MatchService:
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
-        # 3. Python Pre-filter stage
+        # 3. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
         with profiler.time_stage("prefilter"):
             filtered_vacancies = VacancyPreFilter.filter_vacancies(
                 cv_text=cv_text,
@@ -96,8 +103,10 @@ class MatchService:
                 candidate_experience=candidate_experience,
                 top_k=settings.PREFILTER_TOP_K,
                 cv_embedding=cv_embedding,
+                resume_json=resume_json,
             )
         profiler.metrics.vacancies_after_filtering = len(filtered_vacancies)
+
 
         # Fetch configuration thresholds once for all jobs to avoid redundant lookups
         scoring_config = {
@@ -300,8 +309,9 @@ class MatchService:
             )
             best_match = top_m
         else:
-            active_vacancy_summary = "No suitable active vacancy found."
+            active_vacancy_summary = f"No suitable active vacancy found matching candidate domain/taxonomy profile (Primary Domain: {professional_domain}). Manual HR review recommended."
             best_match = evaluated_matches[0] if evaluated_matches else MatchService._empty_job_match()
+
 
         roles_str = ", ".join(suitable_roles) if suitable_roles else "General Roles"
         strengths_str = "; ".join(strengths) if strengths else "Solid technical and professional baseline."

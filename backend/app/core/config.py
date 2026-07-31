@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "CV Analyzer"
     VERSION: str = "0.1.0"
     ALLOWED_ORIGINS: list[str] = ["*"]
-    REDIS_URL: str | None = None
+    REDIS_URL: str | None = "redis://localhost:6379/0"
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
     ALLOWED_EXTENSIONS: set[str] = {"pdf", "docx", "doc", "txt"}
     UPLOADS_DIR: Path = Path("uploads")

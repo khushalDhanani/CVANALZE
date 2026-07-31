@@ -1,6 +1,8 @@
+import fnmatch
 import hashlib
 import json
 import os
+import re
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -188,13 +190,7 @@ class MemoryCache(CacheProvider):
     def _match_pattern(key: str, pattern: str) -> bool:
         if "*" not in pattern:
             return key == pattern
-        if pattern.startswith("*") and pattern.endswith("*"):
-            return pattern[1:-1] in key
-        if pattern.endswith("*"):
-            return key.startswith(pattern[:-1])
-        if pattern.startswith("*"):
-            return key.endswith(pattern[1:])
-        return key == pattern
+        return fnmatch.fnmatch(key, pattern)
 
     def exists(self, key: str) -> bool:
         raw = self._store.get(key)
@@ -384,12 +380,15 @@ class FileCache(CacheProvider):
 
     def delete_by_pattern(self, pattern: str) -> int:
         count = 0
-        clean_pat = pattern.split(":", 1)[1] if ":" in pattern else pattern
-        glob_pat = f"{self._key_prefix}{clean_pat}"
-        if not glob_pat.endswith(".json") and "*" not in glob_pat:
+        clean_pat = pattern
+        if ":" in clean_pat:
+            clean_pat = clean_pat.rsplit(":", 1)[-1]
+        clean_pat = re.sub(r"\*+", "*", clean_pat)
+        glob_pat = f"{self._key_prefix}*{clean_pat}" if not clean_pat.startswith("*") else f"{self._key_prefix}{clean_pat}"
+        if not glob_pat.endswith(".json") and not glob_pat.endswith("*"):
             glob_pat = f"{glob_pat}.json"
-        elif not glob_pat.endswith(".json") and not glob_pat.endswith("*"):
-            glob_pat = f"{glob_pat}.json"
+        elif not glob_pat.endswith(".json") and glob_pat.endswith("*"):
+            glob_pat = f"{glob_pat[:-1]}.json"
         for f in self._cache_dir.glob(glob_pat):
             try:
                 f.unlink()
@@ -441,10 +440,28 @@ class CacheManager:
     def _make_key(self, key: str) -> str:
         return f"{self._namespace}:{key}"
 
+    @property
+    def active_providers(self) -> list[CacheProvider]:
+        """
+        Dynamically yields active providers:
+        If RedisCache is present and available (_REDIS_CLIENT is not None), FileCache (L3)
+        is bypassed during reads/writes to eliminate FileLock disk I/O bottlenecks.
+        If RedisCache is down or unavailable, FileCache (L3) is retained as persistent fallback.
+        Deletion operations (delete, delete_by_pattern, clear) always execute against all providers
+        to ensure clean storage cleanup across all tiers.
+        """
+        has_active_redis = any(
+            isinstance(p, RedisCache) and p.available for p in self._providers
+        )
+        if has_active_redis:
+            return [p for p in self._providers if not isinstance(p, FileCache)]
+        return self._providers
+
     def get(self, key: str, default: Any = None) -> Any:
         cache_key = self._make_key(key)
         t0 = time.monotonic()
-        for i, provider in enumerate(self._providers):
+        providers = self.active_providers
+        for i, provider in enumerate(providers):
             val = provider.get(cache_key)
             if val is not None:
                 elapsed = (time.monotonic() - t0) * 1000
@@ -452,7 +469,7 @@ class CacheManager:
                 _metrics.record_lookup_time(self._namespace, elapsed)
                 for j in range(i):
                     try:
-                        self._providers[j].set(cache_key, val)
+                        providers[j].set(cache_key, val)
                     except Exception:
                         pass
                 logger.info(f"CACHE HIT [{self._namespace}] key={key} ({elapsed:.1f}ms)")
@@ -467,7 +484,7 @@ class CacheManager:
         cache_key = self._make_key(key)
         effective_ttl = self._default_ttl if ttl is None else ttl
         t0 = time.monotonic()
-        for provider in self._providers:
+        for provider in self.active_providers:
             try:
                 provider.set(cache_key, value, effective_ttl)
             except Exception as exc:
@@ -502,7 +519,7 @@ class CacheManager:
 
     def exists(self, key: str) -> bool:
         cache_key = self._make_key(key)
-        for provider in self._providers:
+        for provider in self.active_providers:
             try:
                 if provider.exists(cache_key):
                     return True
@@ -512,7 +529,7 @@ class CacheManager:
 
     def ttl(self, key: str) -> int | None:
         cache_key = self._make_key(key)
-        for provider in self._providers:
+        for provider in self.active_providers:
             try:
                 ttl_val = provider.ttl(cache_key)
                 if ttl_val is not None:
@@ -532,12 +549,13 @@ class CacheManager:
 
 class CacheIndex:
     """
-    Redis-backed secondary index for tracking which cache keys depend on
+    Redis and In-Memory secondary index for tracking which cache keys depend on
     which resource IDs, enabling selective invalidation without scanning.
     Index entries are SETs: ``cache_idx:{index_name}:{resource_id}`` containing cache keys.
     """
 
     _PREFIX = "cache_idx"
+    _in_memory_index: dict[str, set[str]] = {}
 
     @classmethod
     def _client(cls) -> Any:
@@ -545,40 +563,62 @@ class CacheIndex:
 
     @classmethod
     def add(cls, index_name: str, resource_id: str, cache_key: str) -> None:
+        if not index_name or not resource_id or not cache_key:
+            return
+        idx_key = f"{cls._PREFIX}:{index_name}:{resource_id}"
+        if idx_key not in cls._in_memory_index:
+            cls._in_memory_index[idx_key] = set()
+        cls._in_memory_index[idx_key].add(cache_key)
+
         client = cls._client()
         if client:
             try:
-                client.sadd(f"{cls._PREFIX}:{index_name}:{resource_id}", cache_key)
+                client.sadd(idx_key, cache_key)
             except Exception as exc:
                 logger.warning(f"CacheIndex.add({index_name}, {resource_id}) failed: {exc}")
 
     @classmethod
     def get_keys(cls, index_name: str, resource_id: str) -> set[str]:
+        idx_key = f"{cls._PREFIX}:{index_name}:{resource_id}"
+        keys = set(cls._in_memory_index.get(idx_key, set()))
         client = cls._client()
         if client:
             try:
-                return client.smembers(f"{cls._PREFIX}:{index_name}:{resource_id}")
+                redis_keys = client.smembers(idx_key)
+                if redis_keys:
+                    keys.update(redis_keys)
             except Exception as exc:
                 logger.warning(f"CacheIndex.get_keys({index_name}, {resource_id}) failed: {exc}")
-        return set()
+        return keys
 
     @classmethod
     def remove(cls, index_name: str, resource_id: str) -> None:
+        idx_key = f"{cls._PREFIX}:{index_name}:{resource_id}"
+        cls._in_memory_index.pop(idx_key, None)
         client = cls._client()
         if client:
             try:
-                client.delete(f"{cls._PREFIX}:{index_name}:{resource_id}")
+                client.delete(idx_key)
             except Exception as exc:
                 logger.warning(f"CacheIndex.remove({index_name}, {resource_id}) failed: {exc}")
 
     @classmethod
     def remove_key(cls, index_name: str, resource_id: str, cache_key: str) -> None:
+        idx_key = f"{cls._PREFIX}:{index_name}:{resource_id}"
+        if idx_key in cls._in_memory_index:
+            cls._in_memory_index[idx_key].discard(cache_key)
+            if not cls._in_memory_index[idx_key]:
+                del cls._in_memory_index[idx_key]
         client = cls._client()
         if client:
             try:
-                client.srem(f"{cls._PREFIX}:{index_name}:{resource_id}", cache_key)
+                client.srem(idx_key, cache_key)
             except Exception as exc:
                 logger.warning(f"CacheIndex.remove_key({index_name}, {resource_id}) failed: {exc}")
+
+    @classmethod
+    def clear(cls) -> None:
+        cls._in_memory_index.clear()
 
 
 class CacheInvalidator:
@@ -591,13 +631,21 @@ class CacheInvalidator:
     @classmethod
     def invalidate_cv(cls, doc_hash: str) -> None:
         doc_cache_manager.delete(doc_hash)
-        embedding_cache_manager.delete_by_pattern(f"*:{doc_hash}")
+        doc_cache_manager.delete_by_pattern(f"*{doc_hash}*")
+        cv_result_cache_manager.delete(doc_hash)
+        cv_result_cache_manager.delete_by_pattern(f"*{doc_hash}*")
+        embedding_cache_manager.delete_by_pattern(f"*:{doc_hash}*")
+        llm_cache_manager.delete_by_pattern(f"*{doc_hash}*")
         cls._invalidate_match_results_by_doc(doc_hash)
         logger.info(f"[INVALIDATE] CV cache invalidated for doc_hash={doc_hash[:12]}...")
 
     @classmethod
     def invalidate_candidate(cls, candidate_id: str) -> None:
+        cid = str(candidate_id).removeprefix("cand_")
         cls._invalidate_match_results_by_candidate(candidate_id)
+        cls._invalidate_match_results_by_candidate(cid)
+        cv_result_cache_manager.delete_by_pattern(f"*cand_{cid}*")
+        cv_result_cache_manager.delete_by_pattern(f"*{candidate_id}*")
         logger.info(f"[INVALIDATE] Candidate cache invalidated for candidate_id={candidate_id}")
 
     @classmethod
@@ -624,11 +672,13 @@ class CacheInvalidator:
     def invalidate_extraction(cls) -> None:
         doc_cache_manager.delete_by_pattern("*")
         llm_cache_manager.delete_by_pattern("*")
+        match_result_cache_manager.delete_by_pattern("*")
         logger.info("[INVALIDATE] Extraction cache invalidated.")
 
     @classmethod
     def invalidate_embedding_model(cls) -> None:
         embedding_cache_manager.delete_by_pattern("*")
+        match_result_cache_manager.delete_by_pattern("*")
         logger.info("[INVALIDATE] Embedding model cache invalidated.")
 
     @classmethod
@@ -637,7 +687,8 @@ class CacheInvalidator:
         for key in keys:
             match_result_cache_manager.delete(key)
         CacheIndex.remove("match_by_doc", doc_hash)
-        match_result_cache_manager.delete_by_pattern("*")
+        if not keys:
+            match_result_cache_manager.delete_by_pattern(f"*{doc_hash}*")
 
     @classmethod
     def _invalidate_match_results_by_candidate(cls, candidate_id: str) -> None:
@@ -645,6 +696,8 @@ class CacheInvalidator:
         for key in keys:
             match_result_cache_manager.delete(key)
         CacheIndex.remove("match_by_cand", candidate_id)
+        if not keys:
+            match_result_cache_manager.delete_by_pattern(f"*{candidate_id}*")
 
 
 _redis_cache = RedisCache(key_prefix="")
@@ -657,19 +710,19 @@ _embedding_file_cache = FileCache(settings.UPLOADS_DIR / ".embed_cache")
 
 llm_cache_manager = CacheManager(
     namespace="llm_cache",
-    providers=[_redis_cache, _llm_file_cache],
+    providers=[_memory_cache, _redis_cache, _llm_file_cache],
     default_ttl=2592000,
 )
 
 cv_result_cache_manager = CacheManager(
     namespace="cv_result",
-    providers=[_redis_cache, _cv_file_cache],
+    providers=[_memory_cache, _redis_cache, _cv_file_cache],
     default_ttl=604800,
 )
 
 doc_cache_manager = CacheManager(
     namespace="doc_cache",
-    providers=[_redis_cache, _doc_cache_file_cache],
+    providers=[_memory_cache, _redis_cache, _doc_cache_file_cache],
     default_ttl=2592000,
 )
 

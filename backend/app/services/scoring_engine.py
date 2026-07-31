@@ -15,6 +15,8 @@ from app.schemas.match import (
     RequirementTier,
 )
 from app.schemas.profile import DynamicCandidateProfile
+from app.services.job_taxonomy import TaxonomyClassifier
+
 
 
 class ScoringEngine:
@@ -969,8 +971,14 @@ class ScoringEngine:
             for s in req_skills
         )
 
+        cand_tax_domain, cand_families = TaxonomyClassifier.classify_candidate(cv_text)
+        vac_tax_domain, vac_family = TaxonomyClassifier.classify_vacancy(job)
+        is_tax_compat = TaxonomyClassifier.are_families_compatible(cand_families, vac_family)
+
         domain_mismatch = False
-        if is_software_cand and is_non_it_job and not has_software_req:
+        if not is_tax_compat and not has_software_req:
+            domain_mismatch = True
+        elif is_software_cand and is_non_it_job and not has_software_req:
             domain_mismatch = True
         elif cand_dept and job_department:
             job_dept_clean = job_department.lower()
@@ -993,13 +1001,13 @@ class ScoringEngine:
         if domain_mismatch:
             domain_score = 0.0
             final_score = round(max(0.0, min(final_score * 0.15, 20.0)), 1)
-            reason_str += f" | Strict Domain Mismatch Penalty: Candidate domain ({cand_dept}) conflicts with job department ({job_department})."
+            reason_str += f" | Strict Domain Mismatch Penalty: Candidate domain ({cand_tax_domain}) conflicts with vacancy domain ({vac_tax_domain})."
             if not any(f.requirement_id == "req_domain_mismatch" for f in mandatory_failures):
                 mandatory_failures.append(
                     MandatoryFailureDetails(
                         requirement_id="req_domain_mismatch",
-                        description=f"Domain Mismatch: Candidate domain ({cand_dept}) conflicts with vacancy department ({job_department})",
-                        reason=f"Candidate background ({cand_domain}) does not match job opening domain ({job_department}).",
+                        description=f"Domain Mismatch: Candidate family ({cand_families[0] if cand_families else 'Unknown'}) conflicts with vacancy family ({vac_family})",
+                        reason=f"Candidate job family ({cand_families[0] if cand_families else 'Unknown'}) is incompatible with target job family ({vac_family}).",
                         score_impact=50.0,
                     )
                 )
@@ -1029,10 +1037,34 @@ class ScoringEngine:
         def safe_round(val):
             return round(val, 1) if val is not None else 0.0
 
+        is_domain_capped = domain_mismatch or any(
+            f.requirement_id == "req_domain_mismatch" for f in mandatory_failures
+        )
+        domain_capped_reason = None
+        if is_domain_capped:
+            domain_capped_reason = (
+                f"Cross-domain match — score capped. Candidate family ({cand_families[0] if cand_families else 'Unknown'}) "
+                f"conflicts with target job family ({vac_family})."
+            )
+
+        retrieval_src = str(job.get("_retrieval_source") or "keyword")
+        rrf_details = job.get("_rrf_details", {})
+        if isinstance(rrf_details, dict):
+            has_lexical = rrf_details.get("lexical_rank") is not None
+            has_vector = rrf_details.get("vector_rank") is not None
+            if has_lexical and has_vector:
+                retrieval_src = "both"
+            elif has_vector:
+                retrieval_src = "vector"
+            elif has_lexical:
+                retrieval_src = "keyword"
+
+        cand_primary_family = cand_families[0] if cand_families else None
+
         return JobMatchResult(
-            job_id=str(job.get("id") or job.get("vacancy_id")),
-            job_title=job["title"],
-            department=job["department"],
+            job_id=str(job.get("id") or job.get("vacancy_id") or ""),
+            job_title=job_title,
+            department=str(job.get("department_name") or job.get("department") or ""),
             vacancy_id=job.get("vacancy_id"),
             job_profile_id=job.get("job_profile_id"),
             company_id=job.get("company_id"),
@@ -1041,6 +1073,8 @@ class ScoringEngine:
             location_id=job.get("location_id"),
             score=final_score,
             overall_score=final_score,
+            classification=classification,
+            recommendation=recommendation,
             role_score=safe_round(role_score),
             skills_score=safe_round(skills_score),
             experience_score=safe_round(experience_score),
@@ -1050,9 +1084,6 @@ class ScoringEngine:
             certification_score=safe_round(certification_score),
             responsibilities_score=safe_round(responsibilities_score),
             coverage=round(coverage, 2),
-            ranking_reason="",
-            classification=classification,
-            recommendation=recommendation,
             matched_skills=matched_skills,
             missing_skills=missing_skills,
             matched_keywords=matched_keywords,
@@ -1064,12 +1095,26 @@ class ScoringEngine:
             missing_criteria=missing_criteria,
             evidence=evidence_map,
             mandatory_failures=mandatory_failures,
+            mandatory_fails=[
+                {
+                    "requirement": f.description,
+                    "details": f.reason,
+                    "severity": "HIGH",
+                }
+                for f in mandatory_failures
+            ],
             confidence=confidence_val,
             hr_review_required=hr_review_required,
             reason=reason_str,
             career_transition_detected=career_transition_detected,
             career_transition_note=career_transition_note,
+            domain_mismatch_capped=is_domain_capped,
+            domain_mismatch_reason=domain_capped_reason,
+            retrieval_source=retrieval_src,
+            candidate_job_family=cand_primary_family,
+            vacancy_job_family=vac_family,
         )
+
 
 
     @classmethod

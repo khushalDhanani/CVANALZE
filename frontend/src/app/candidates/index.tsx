@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { UserCheck, FileText, Search, RefreshCw, Mail, Phone } from 'lucide-react-native';
+import { UserCheck, FileText, Search, RefreshCw, Mail, Phone, MapPin, Building, Briefcase } from 'lucide-react-native';
 import { useCandidates } from '@/hooks/useCandidates';
 import { useDebounce } from '@/hooks/useDebounce';
 import { CandidateSummary } from '@/types/api';
-import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl } from '@/components/ui';
+import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl, FieldConfidenceView } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { COLORS } from '@/constants/colors';
 
@@ -39,14 +39,20 @@ export default function CandidateListScreen() {
   });
 
   const renderCandidateRow = ({ item }: { item: CandidateSummary }) => {
-    const titleNode = item.full_name ? (
-      <Text numberOfLines={1} className="text-sm font-sans-medium text-text-primary">
-        {item.full_name}
-      </Text>
-    ) : (
-      <Text numberOfLines={1} className="text-sm font-sans-medium text-text-faint">
-        Name not detected
-      </Text>
+    const nameTier = item.name_confidence_tier || item.field_confidence_tiers?.name;
+    const locTier = item.location_confidence_tier || item.field_confidence_tiers?.location;
+    const jobTitleTier = item.job_title_confidence_tier || item.field_confidence_tiers?.job_title;
+    const compTier = item.company_name_confidence_tier || item.field_confidence_tiers?.company_name;
+
+    const jobTitleVal = item.job_title || item.best_match?.job_title;
+
+    const titleNode = (
+      <FieldConfidenceView
+        fieldName="name"
+        value={item.full_name}
+        tier={nameTier}
+        fallbackLabel="Name not detected"
+      />
     );
 
     const emailText = item.email || "—";
@@ -54,26 +60,54 @@ export default function CandidateListScreen() {
 
     const subtitleNode = (
       <View className="gap-1 mt-0.5">
-        <View className="flex-row items-center gap-3">
+        <View className="flex-row items-center gap-3 flex-wrap">
           <View className="flex-row items-center gap-1">
             <Mail size={12} color="#9CA3AF" />
             <Text numberOfLines={1} className="text-xs font-sans text-text-muted">{emailText}</Text>
           </View>
-          <View className="flex-row items-center gap-1 flex-1">
+          <View className="flex-row items-center gap-1">
             <Phone size={12} color="#9CA3AF" />
             <Text numberOfLines={1} className="text-xs font-sans text-text-muted">{phoneText}</Text>
           </View>
         </View>
-        {item.best_match?.job_title && (
-          <Text numberOfLines={1} className="text-xs font-sans text-text-muted">
-            Role: {item.best_match.job_title}{item.primary_department ? ` (${item.primary_department})` : ''}
-          </Text>
-        )}
-        <Text numberOfLines={1} className="text-[11px] font-sans text-text-faint">
+
+        {/* 4 Rule-Config Fields: Job Title, Company, Location */}
+        <View className="gap-1 mt-0.5">
+          <FieldConfidenceView
+            fieldName="job_title"
+            value={jobTitleVal}
+            tier={jobTitleTier}
+            icon={<Briefcase size={12} color="#9CA3AF" />}
+            fallbackLabel="Job title not detected"
+            textClassName="text-xs"
+          />
+          <View className="flex-row items-center gap-3 flex-wrap">
+            <FieldConfidenceView
+              fieldName="company_name"
+              value={item.company_name}
+              tier={compTier}
+              icon={<Building size={12} color="#9CA3AF" />}
+              fallbackLabel="Company not detected"
+              textClassName="text-xs"
+            />
+            <FieldConfidenceView
+              fieldName="location"
+              value={item.location}
+              tier={locTier}
+              icon={<MapPin size={12} color="#9CA3AF" />}
+              fallbackLabel="Location not detected"
+              textClassName="text-xs"
+            />
+          </View>
+        </View>
+
+        <Text numberOfLines={1} className="text-[11px] font-sans text-text-faint mt-0.5">
           File: {item.filename}
         </Text>
       </View>
     );
+
+    const isDomainCapped = Boolean(item.best_match?.domain_mismatch_capped);
 
     return (
       <View className="mb-2">
@@ -83,10 +117,15 @@ export default function CandidateListScreen() {
           onPress={() => router.push(`/candidates/${encodeURIComponent(item.id)}` as any)}
           trailing={
             item.best_match?.score != null ? (
-              <ScoreBadge
-                score={item.best_match.score}
-                classification={item.best_match.classification || 'LOW'}
-              />
+              <View className="items-end gap-1">
+                <ScoreBadge
+                  score={item.best_match.score}
+                  classification={item.best_match.classification || 'LOW'}
+                />
+                {isDomainCapped && (
+                  <Badge label="Cross-domain match — score capped" tone="warning" />
+                )}
+              </View>
             ) : (
               <Badge label={`${item.page_count || 1} pg`} tone="neutral" />
             )

@@ -2,11 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3, RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target, CheckCircle2, Sparkles, AlertTriangle, Users } from 'lucide-react-native';
+import { ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3, RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target, CheckCircle2, Sparkles, AlertTriangle, Users, MapPin, Building } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
 import { CandidateRecommendationsResponse, CVUploadResponse, JobMatchScore } from '@/types/api';
-import { Card, Button, Badge, DenseRow } from '@/components/ui';
+import { Card, Button, Badge, DenseRow, FieldConfidenceView } from '@/components/ui';
 import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
@@ -285,23 +285,21 @@ export default function CandidateDetailScreen() {
         ) : (
           <View className="gap-4 pb-8">
             {/* Candidate Metadata Banner */}
-            <Card className="gap-2">
+            <Card className="gap-3">
               <View className="flex-row items-center gap-3">
                 <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
                   <UserCheck size={20} color={COLORS.primary} />
                 </View>
                 <View className="flex-1">
-                  {(data.full_name || data.candidate_name) ? (
-                    <Text className="text-base font-sans-bold text-text-primary">
-                      {data.full_name || data.candidate_name}
-                    </Text>
-                  ) : (
-                    <Text className="text-base font-sans-bold text-text-faint">
-                      Name not detected
-                    </Text>
-                  )}
+                  <FieldConfidenceView
+                    fieldName="name"
+                    value={data.full_name || data.candidate_name || data.resume_json?.contact_info?.name}
+                    tier={data.name_confidence_tier || data.field_confidence_tiers?.name || data.resume_json?.contact_info?.field_confidence_tiers?.name}
+                    fallbackLabel="Name not detected"
+                    textClassName="text-base font-sans-bold"
+                  />
                   
-                  <View className="flex-row items-center gap-3 mt-1">
+                  <View className="flex-row items-center gap-3 mt-1 flex-wrap">
                     <View className="flex-row items-center gap-1">
                       <Mail size={12} color="#9CA3AF" />
                       <Text className="text-xs font-sans text-text-muted">{data.email || "—"}</Text>
@@ -314,7 +312,40 @@ export default function CandidateDetailScreen() {
                 </View>
               </View>
 
-              <View className="flex-row items-center gap-1.5 mt-2 flex-wrap">
+              {/* 4-Field Rule-Config Extraction Tiers */}
+              <View className="bg-background/60 p-2.5 rounded-md border border-border gap-2">
+                <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
+                  Rule-Config Extracted Profile Attributes:
+                </Text>
+                <View className="gap-1.5">
+                  <FieldConfidenceView
+                    fieldName="job_title"
+                    value={data.job_title || data.resume_json?.contact_info?.job_title || data.match_analysis?.best_match?.job_title}
+                    tier={data.job_title_confidence_tier || data.field_confidence_tiers?.job_title || data.resume_json?.contact_info?.field_confidence_tiers?.job_title}
+                    icon={<Briefcase size={13} color="#9CA3AF" />}
+                    fallbackLabel="Job title not detected"
+                    textClassName="text-xs"
+                  />
+                  <FieldConfidenceView
+                    fieldName="company_name"
+                    value={data.company_name || data.resume_json?.contact_info?.company_name}
+                    tier={data.company_name_confidence_tier || data.field_confidence_tiers?.company_name || data.resume_json?.contact_info?.field_confidence_tiers?.company_name}
+                    icon={<Building size={13} color="#9CA3AF" />}
+                    fallbackLabel="Company not detected"
+                    textClassName="text-xs"
+                  />
+                  <FieldConfidenceView
+                    fieldName="location"
+                    value={data.location || data.resume_json?.contact_info?.location}
+                    tier={data.location_confidence_tier || data.field_confidence_tiers?.location || data.resume_json?.contact_info?.field_confidence_tiers?.location}
+                    icon={<MapPin size={13} color="#9CA3AF" />}
+                    fallbackLabel="Location not detected"
+                    textClassName="text-xs"
+                  />
+                </View>
+              </View>
+
+              <View className="flex-row items-center gap-1.5 mt-1 flex-wrap">
                 <FileText size={12} color={COLORS.textMuted} />
                 <Text className="text-[11px] font-sans text-text-muted">
                   File: {data.filename || data.id}
@@ -526,11 +557,11 @@ export default function CandidateDetailScreen() {
                   </View>
                 )}
 
-                {/* Identified Skill Gaps */}
+                {/* Identified Mandatory Gaps & Missing Qualifications */}
                 {recommendations.missing_qualifications && recommendations.missing_qualifications.length > 0 && (
                   <View className="gap-1 mt-1">
                     <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">
-                      Identified Skill Gaps:
+                      Identified Mandatory Gaps & Missing Qualifications:
                     </Text>
                     {recommendations.missing_qualifications.map((qual, idx) => (
                       <View key={idx} className="bg-background p-2 rounded-md border border-border gap-1">
@@ -648,6 +679,9 @@ export default function CandidateDetailScreen() {
                           }
                         />
                       )}
+                      {(bestMatch.domain_mismatch_capped || (bestMatch.mandatory_failures || []).some((f: any) => f.requirement_id === 'req_domain_mismatch') || (bestMatch.mandatory_fails || []).some((f: any) => (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')) && (
+                        <Badge label="Cross-domain match — score capped" tone="warning" />
+                      )}
                     </View>
                     <Text className="text-lg font-sans-bold text-text-primary">
                       {bestMatch.job_title}
@@ -664,6 +698,21 @@ export default function CandidateDetailScreen() {
                   />
                 </View>
 
+                {/* Cross-Domain Guard Explainability Callout Banner */}
+                {(bestMatch.domain_mismatch_capped || (bestMatch.mandatory_failures || []).some((f: any) => f.requirement_id === 'req_domain_mismatch') || (bestMatch.mandatory_fails || []).some((f: any) => (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')) && (
+                  <View className="bg-warning/10 border border-warning/30 p-3 rounded-md gap-1">
+                    <View className="flex-row items-center gap-1.5">
+                      <AlertTriangle size={14} color={COLORS.warning} />
+                      <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
+                        Cross-domain match — score capped
+                      </Text>
+                    </View>
+                    <Text className="text-xs font-sans text-warning/90 leading-4">
+                      {bestMatch.domain_mismatch_reason || "The candidate's primary background conflicts with the target vacancy department. Suitability score has been automatically capped to prevent false-positive matches across unrelated domains."}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Sub-Score Breakdown */}
                 {!!bestMatch.component_scores && (
                   <View>
@@ -673,6 +722,55 @@ export default function CandidateDetailScreen() {
                     <ComponentScoreBar scores={bestMatch.component_scores} />
                   </View>
                 )}
+
+                {/* Mandatory Requirement Failures & Missing Criteria */}
+                {(() => {
+                  const rawFails: any[] = bestMatch.mandatory_fails || bestMatch.mandatory_failures || [];
+                  const failedReqs: any[] = (bestMatch.mandatory_requirements || []).filter((r: any) => r.status === 'FAILED');
+                  const missingCrit: string[] = bestMatch.missing_criteria || [];
+
+                  const failureList: Array<{ title: string; details: string }> = [];
+
+                  if (rawFails.length > 0) {
+                    rawFails.forEach((f: any) => {
+                      const title = typeof f === 'string' ? f : (f.requirement || f.description || f.requirement_id || 'Mandatory Requirement');
+                      const details = typeof f === 'string' ? '' : (f.details || f.reason || f.failure_reason || '');
+                      failureList.push({ title, details });
+                    });
+                  } else if (failedReqs.length > 0) {
+                    failedReqs.forEach((r: any) => {
+                      failureList.push({
+                        title: r.description || r.requirement_id || 'Mandatory Requirement',
+                        details: r.failure_reason || r.reason || '',
+                      });
+                    });
+                  } else if (missingCrit.length > 0) {
+                    missingCrit.forEach((mc: string) => {
+                      failureList.push({ title: 'Missing Criterion', details: mc });
+                    });
+                  }
+
+                  if (failureList.length === 0) return null;
+
+                  return (
+                    <Card className="bg-danger/10 border-danger/30 p-3 gap-1.5">
+                      <View className="flex-row items-center gap-1.5 mb-1">
+                        <CpuIcon size={14} color={COLORS.danger} />
+                        <Text className="text-xs font-sans-bold text-danger">
+                          Mandatory Requirement Failures & Missing Criteria:
+                        </Text>
+                      </View>
+                      {failureList.map((fail, idx) => (
+                        <View key={idx} className="flex-row items-start gap-1">
+                          <Text className="text-xs font-sans-bold text-danger">•</Text>
+                          <Text className="text-xs font-sans-medium text-danger flex-1">
+                            {fail.title}{fail.details ? `: ${fail.details}` : ''}
+                          </Text>
+                        </View>
+                      ))}
+                    </Card>
+                  );
+                })()}
 
                 {/* Recommendation */}
                 {!!bestMatch.recommendation && (

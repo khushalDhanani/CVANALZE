@@ -109,6 +109,9 @@ class JobMatchResult(BaseModel):
     mandatory_failures: list[MandatoryFailureDetails] = Field(
         default_factory=list, description="Explicit mandatory requirements that failed or partially failed"
     )
+    mandatory_fails: list[dict[str, Any]] = Field(
+        default_factory=list, description="Explicit mandatory requirement failure summary list"
+    )
     confidence: float = Field(
         default=1.0, ge=0.0, le=1.0, description="Overall confidence level in extraction and evidence completeness"
     )
@@ -124,6 +127,22 @@ class JobMatchResult(BaseModel):
     career_transition_note: str | None = Field(
         default=None, description="Notes on detected career transition"
     )
+    domain_mismatch_capped: bool = Field(
+        default=False, description="Flag indicating cross-domain guard fired and capped the suitability match score"
+    )
+    domain_mismatch_reason: str | None = Field(
+        default=None, description="Explicit explainability reason explaining why cross-domain guard capped the match score"
+    )
+    retrieval_source: str | None = Field(
+        default="keyword", description="Retrieval path that selected this vacancy: 'both', 'vector', or 'keyword'"
+    )
+    candidate_job_family: str | None = Field(
+        default=None, description="Classified job family of the candidate"
+    )
+    vacancy_job_family: str | None = Field(
+        default=None, description="Classified job family of the target vacancy"
+    )
+
 
 
 class CandidateMatchAnalysis(BaseModel):

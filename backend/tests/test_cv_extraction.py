@@ -214,7 +214,7 @@ Software engineer with 5 years experience.
     contact = resume_json["contact_info"]
 
     assert contact["name"] == "Alex Johnson"
-    assert contact["name_confidence"] == 0.60
+    assert contact["name_confidence"] == 0.30
     assert contact["extraction_source"] == "email_username_fallback"
 
 

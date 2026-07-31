@@ -34,17 +34,34 @@ export interface CVProcessingResponse {
   stage_durations_ms?: Record<string, number>;
 }
 
+export interface DualEvidence {
+  cv_evidence: string;
+  vacancy_evidence: string;
+}
+
 export interface MandatoryFailure {
   requirement: string;
   details: string;
   severity: 'HIGH' | 'CRITICAL' | string;
 }
 
+export interface MandatoryFailureDetails {
+  requirement_id: string;
+  description: string;
+  reason: string;
+  score_impact: number;
+}
+
 export interface RequirementEvaluation {
-  requirement: string;
-  score: number;
-  matched: boolean;
-  evidence: string;
+  requirement_id?: string;
+  description?: string;
+  requirement?: string;
+  score?: number;
+  tier?: 'MANDATORY' | 'PREFERRED' | 'OPTIONAL' | string;
+  status?: 'SATISFIED' | 'PARTIALLY_SATISFIED' | 'FAILED' | string;
+  matched?: boolean;
+  evidence?: DualEvidence | string;
+  failure_reason?: string | null;
 }
 
 export interface ComponentBreakdown {
@@ -61,19 +78,52 @@ export interface ComponentBreakdown {
 export interface JobMatchScore {
   job_id: number | string;
   job_title: string;
+  department?: string | null;
+  vacancy_id?: number | string | null;
+  job_profile_id?: number | null;
+  company_id?: number | null;
+  department_id?: number | null;
   department_name?: string | null;
+  location_id?: number | null;
   overall_score: number;
   score?: number;
+  role_score: number;
+  skills_score: number;
+  experience_score: number;
+  education_score: number;
+  domain_score: number;
+  technology_score: number;
+  certification_score: number;
+  responsibilities_score: number;
+  coverage: number;
   recommendation?: string | null;
   component_scores: ComponentBreakdown;
   mandatory_fails: MandatoryFailure[];
+  mandatory_failures: MandatoryFailureDetails[];
   requirement_evaluations: RequirementEvaluation[];
+  mandatory_requirements: RequirementEvaluation[];
+  preferred_requirements: RequirementEvaluation[];
+  optional_requirements: RequirementEvaluation[];
+  matched_skills: string[];
+  missing_skills: string[];
+  matched_keywords: string[];
+  missing_keywords: string[];
+  matched_criteria: string[];
+  missing_criteria: string[];
+  evidence: Record<string, DualEvidence>;
+  confidence: number;
+  hr_review_required: boolean;
+  reason: string;
   ranking_reason: string;
   llm_reason?: string | null;
   inferred_skills?: string[];
   classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   retrieval_source?: 'keyword' | 'vector' | 'both' | string;
   vector_score?: number | null;
+  career_transition_detected: boolean;
+  career_transition_note?: string | null;
+  domain_mismatch_capped: boolean;
+  domain_mismatch_reason?: string | null;
 }
 
 
@@ -97,6 +147,10 @@ export interface EnrichedJobEvaluation extends JobMatchScore {
 }
 
 export interface EnrichedCandidateAnalysis {
+  status?: string | null;
+  progress?: number | null;
+  stage?: string | null;
+  is_complete?: boolean | null;
   scan_id?: string;
   parsed_at?: string;
   full_name?: string | null;
@@ -112,8 +166,41 @@ export interface EnrichedCandidateAnalysis {
   best_match?: EnrichedJobEvaluation | null;
   suitable_openings: EnrichedJobEvaluation[];
   unsuitable_openings?: EnrichedJobEvaluation[];
+  rejection_policy_note: string;
   llm_model_used?: string;
   llm_skipped?: boolean;
+}
+
+export interface OptimizedCandidateProfile {
+  core_skills?: string[];
+  inferred_skills?: string[];
+  relevant_experience_years?: number | null;
+  education_domains?: string[];
+  certifications?: string[];
+  current_role?: string | null;
+  professional_domains?: string[];
+  recommended_department?: string | null;
+  professional_domain?: string | null;
+  strengths?: string[];
+  suitable_job_roles?: string[];
+}
+
+export interface OptimizedVacancyMatch {
+  vacancy_id: number | string;
+  semantic_reason?: string;
+  inferred_skills?: string[];
+  matched_skills?: string[];
+  missing_critical?: string[];
+  semantic_fit_score?: number;
+  career_transition_detected?: boolean;
+  career_transition_note?: string | null;
+}
+
+export interface FieldConfidenceTiers {
+  name?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  location?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  job_title?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  company_name?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
 }
 
 export interface CVUploadResponse {
@@ -125,7 +212,16 @@ export interface CVUploadResponse {
   candidate_name?: string | null;
   email?: string | null;
   phone?: string | null;
+  location?: string | null;
+  job_title?: string | null;
+  company_name?: string | null;
   name_confidence?: number | null;
+  name_confidence_tier?: string | null;
+  location_confidence_tier?: string | null;
+  job_title_confidence_tier?: string | null;
+  company_name_confidence_tier?: string | null;
+  field_confidence?: Record<string, number | null> | null;
+  field_confidence_tiers?: FieldConfidenceTiers | null;
   name_extraction_source?: string | null;
   match_analysis?: CandidateMatchAnalysis | null;
   enriched_match_analysis?: EnrichedCandidateAnalysis | null;
@@ -134,10 +230,10 @@ export interface CVUploadResponse {
 
 export interface HRReviewRequest {
   scan_id: string;
-  job_id: number;
-  corrected_score: number;
-  corrected_classification: 'HIGH' | 'MEDIUM' | 'LOW' | string;
-  feedback_notes?: string | null;
+  job_id: number | string;
+  corrected_score?: number | null;
+  corrected_classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  feedback_notes: string;
 }
 
 export interface TrainingExample {
@@ -234,17 +330,30 @@ export interface CandidateSummary {
   full_name?: string | null;
   email?: string | null;
   phone?: string | null;
+  location?: string | null;
+  job_title?: string | null;
+  company_name?: string | null;
+  name_confidence_tier?: string | null;
+  location_confidence_tier?: string | null;
+  job_title_confidence_tier?: string | null;
+  company_name_confidence_tier?: string | null;
+  field_confidence?: Record<string, number | null> | null;
+  field_confidence_tiers?: FieldConfidenceTiers | null;
   parsed_at?: string;
   page_count?: number;
   is_scanned?: boolean;
   ocr_applied?: boolean;
   primary_department?: string | null;
+  similarity_score?: number | null;
+  search_mode?: string;
   best_match?: {
     job_title?: string;
     department?: string;
     score?: number;
     classification?: string;
     recommendation?: string;
+    domain_mismatch_capped?: boolean;
+    domain_mismatch_reason?: string | null;
   };
 }
 

@@ -13,6 +13,7 @@ from app.core.jobs import DEFAULT_JOB_OPENINGS
 from app.core.logging import logger
 from app.services.embedding_service import EmbeddingService
 from app.services.vacancy_service import VacancyService
+from app.services.job_taxonomy import TaxonomyClassifier
 
 
 VACANCY_CACHE_KEY = "all_jobs"
@@ -46,7 +47,7 @@ class JobRepository:
 
     @classmethod
     def _precompute_job_fields(cls, job: dict[str, Any]) -> dict[str, Any]:
-        """Precomputes and caches tokens used by VacancyPreFilter for fast evaluation."""
+        """Precomputes and caches tokens & taxonomy used by VacancyPreFilter for fast evaluation."""
         stop_words = {
             "and", "team", "for", "the", "with",
             "senior", "junior", "lead", "manager",
@@ -71,7 +72,15 @@ class JobRepository:
             k.lower() for k in pref_keywords if isinstance(k, str)
         ]
 
+        # Populate Taxonomy Metadata
+        domain, job_family = TaxonomyClassifier.classify_vacancy(job)
+        job["domain"] = domain
+        job["job_family"] = job_family
+        job["_precomputed_domain"] = domain
+        job["_precomputed_job_family"] = job_family
+
         return job
+
 
     @classmethod
     def get_all_jobs(cls, db: Session | None = None) -> list[dict[str, Any]]:
@@ -166,9 +175,9 @@ class JobRepository:
         db: Session | None = None,
     ) -> bool:
         """
-        Lightweight staleness check: queries DB for active vacancy count
-        and compares against cached count. Falls back to not-stale if DB
-        is unavailable.
+        Lightweight staleness check: resolves a DB session if db is None, and checks
+        if live DB vacancies (IDs, titles, count) differ from stored_version/stored_jobs.
+        Returns True if database vacancies changed, False if up to date.
         """
         import time
         now = time.monotonic()
@@ -182,30 +191,48 @@ class JobRepository:
             try:
                 db = SessionLocal()
                 close_session = True
-            except Exception:
-                return False
+            except Exception as exc:
+                logger.warning(f"JobRepository._is_stale: Failed resolving DB session: {exc}")
+                db = None
 
         if db is None:
             return False
 
         try:
-            from sqlalchemy import func, or_
-            from app.models.recruit import RecruitVacancyRequest
-            count = db.query(func.count(RecruitVacancyRequest.VacancyRequestID)).filter(
-                RecruitVacancyRequest.VacancyRequestIsActive == True,
-                or_(RecruitVacancyRequest.VacancyRequestIsDeleted == False,
-                    RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None)),
-                or_(RecruitVacancyRequest.VacancyRequestClose == False,
-                    RecruitVacancyRequest.VacancyRequestClose.is_(None)),
-            ).scalar() or 0
-            
-            is_stale_result = count != len(stored_jobs)
+            from sqlalchemy import text
+            query = text("""
+                SELECT VacancyRequestID, ISNULL(VacancyRequestTitle, '')
+                FROM RecruitVacancyRequest
+                WHERE (VacancyRequestIsActive = 1 OR VacancyRequestIsActive IS NULL)
+                  AND (VacancyRequestIsDeleted = 0 OR VacancyRequestIsDeleted IS NULL)
+                  AND (VacancyRequestClose = 0 OR VacancyRequestClose IS NULL)
+                ORDER BY VacancyRequestID
+            """)
+            rows = db.execute(query).fetchall()
+            db_pairs = sorted(f"{r[0]}:{r[1]}" for r in rows)
+            db_version = hashlib.sha256(json.dumps(db_pairs).encode()).hexdigest()
+
+            is_stale_result = (db_version != stored_version) or (len(rows) != len(stored_jobs))
             cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
             return is_stale_result
         except Exception as exc:
-            logger.warning(f"Staleness check failed: {exc}")
-            cls._STALENESS_CACHE[stored_version] = (now, False)
-            return False
+            try:
+                from sqlalchemy import func, or_
+                from app.models.recruit import RecruitVacancyRequest
+                count = db.query(func.count(RecruitVacancyRequest.VacancyRequestID)).filter(
+                    RecruitVacancyRequest.VacancyRequestIsActive == True,
+                    or_(RecruitVacancyRequest.VacancyRequestIsDeleted == False,
+                        RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None)),
+                    or_(RecruitVacancyRequest.VacancyRequestClose == False,
+                        RecruitVacancyRequest.VacancyRequestClose.is_(None)),
+                ).scalar() or 0
+                is_stale_result = count != len(stored_jobs)
+                cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
+                return is_stale_result
+            except Exception as inner_exc:
+                logger.warning(f"Staleness check failed: {exc} | fallback: {inner_exc}")
+                cls._STALENESS_CACHE[stored_version] = (now, False)
+                return False
         finally:
             if close_session:
                 db.close()

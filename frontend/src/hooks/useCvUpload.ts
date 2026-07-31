@@ -136,10 +136,20 @@ export function useCvUpload() {
                 next[fIndex] = 'failed';
                 return next;
               });
-            } else if ('scan_id' in res) {
+            } else if (
+              'scan_id' in res ||
+              'match_analysis' in res ||
+              (res as any).status === 'COMPLETED' ||
+              (res as any).status === 'NEW_CV' ||
+              (res as any).status === 'REPROCESSED' ||
+              (res as any).progress === 100 ||
+              (res as any).is_complete === true
+            ) {
               clearInterval(interval);
               stopTimer();
-              setEnrichedResult(res as EnrichedCandidateAnalysis);
+              if ('scan_id' in res || 'match_analysis' in res) {
+                setEnrichedResult(res as EnrichedCandidateAnalysis);
+              }
               setUploading(false);
               setIsComplete(true);
               setCurrentStepIndex(7);

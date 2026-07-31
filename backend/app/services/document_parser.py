@@ -11,6 +11,7 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 
 
 class MarkdownResult:
@@ -172,10 +173,10 @@ class QualityMetricsCalculator:
         core_sections = {"contact", "summary", "experience", "education", "skills"}
         detected_core = [s for s in sections_detected if s in core_sections]
         section_score = len(detected_core) * 0.10
-
         has_email = bool(re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", clean_text))
         has_phone = bool(re.search(r"(\+?\d{1,4}[\s.-]?)?\(?\d{3,5}\)?[\s.-]?\d{3,5}[\s.-]?\d{3,5}", clean_text))
-        has_location = bool(re.search(r"\b[A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+\b", clean_text))
+        loc_name, loc_conf = ResumeJsonExtractor.extract_location(clean_text.splitlines())
+        has_location = loc_name is not None and loc_conf >= 0.50
         contact_score = (0.10 if has_email else 0) + (0.10 if has_phone else 0) + (0.05 if has_location else 0)
 
         words_per_page = word_count / max(page_count, 1)
@@ -205,28 +206,42 @@ class QualityMetricsCalculator:
         }
 
 
-class ResumeJsonExtractor:
-    JOB_TITLE_KEYWORDS: set[str] = {
-        "IT", "EXECUTIVE", "DEVELOPER", "ENGINEER", "MANAGER", "LEAD", "ANALYST", "SPECIALIST",
-        "CONSULTANT", "ARCHITECT", "OFFICER", "DIRECTOR", "ADMINISTRATOR", "COORDINATOR", "TECHNICIAN",
-        "ASSISTANT", "INTERN", "DESIGNER", "TESTER", "ACCOUNTANT", "SECRETARY", "REPRESENTATIVE",
-        "OPERATOR", "SUPERVISOR", "HEAD", "CHIEF", "SENIOR", "JUNIOR", "ASSOCIATE", "PRINCIPAL",
-        "STAFF", "FULL STACK", "FRONTEND", "BACKEND", "MOBILE", "DEVOPS", "CLOUD", "SOFTWARE",
-        "SYSTEM", "NETWORK", "PROJECT", "PRODUCT", "SALES", "MARKETING", "FINANCE", "HR",
-        "RECRUITER", "OPERATIONS", "GENERAL MANAGER", "CHEMIST", "PLANT", "SOLUTIONS", "DATA",
-        "SCIENTIST", "SCRUM", "MASTER", "VP", "VICE", "PRESIDENT", "CEO", "CTO", "CFO", "COO",
-        "FOUNDER", "CO-FOUNDER", "STUDENT", "FREELANCER", "TRAINEE", "RECEPTIONIST", "CLERK",
-        "ADVISOR", "AUDITOR", "STRATEGIST"
-    }
+class classproperty:
+    def __init__(self, func):
+        self.func = func
 
-    RESUME_HEADER_KEYWORDS: set[str] = {
-        "CURRICULUM", "VITAE", "RESUME", "CV", "BIODATA", "PROFILE", "SUMMARY", "CAREER",
-        "OBJECTIVE", "EXPERIENCE", "EDUCATION", "SKILLS", "PROJECTS", "CERTIFICATIONS",
-        "LANGUAGES", "REFERENCES", "DECLARATION", "PERSONAL", "DETAILS", "CONTACT",
-        "INFORMATION", "ADDRESS", "PHONE", "EMAIL", "PAGE", "PVT", "LTD", "LLC", "INC",
-        "INDUSTRIES", "COMPANY", "UNIVERSITY", "COLLEGE", "INSTITUTE", "SCHOOL", "BACHELOR",
-        "MASTER", "DIPLOMA", "DEGREE", "WORK", "EMPLOYMENT", "TECHNICAL", "HOBBIES", "ACHIEVEMENTS"
-    }
+    def __get__(self, instance, owner):
+        return self.func(owner)
+
+
+class ResumeJsonExtractor:
+    @classproperty
+    def JOB_TITLE_KEYWORDS(cls) -> set[str]:
+        return RuleConfigManager.get_upper_keywords("name", "job_title_denylist")
+
+    @classproperty
+    def RESUME_HEADER_KEYWORDS(cls) -> set[str]:
+        return RuleConfigManager.get_upper_keywords("name", "header_denylist")
+
+    @classproperty
+    def KNOWN_GAZETTEER(cls) -> set[str]:
+        return RuleConfigManager.get_keywords("location", "gazetteer")
+
+    @classproperty
+    def LOCATION_BLACKLIST_KEYWORDS(cls) -> set[str]:
+        return RuleConfigManager.get_keywords("location", "blacklist")
+
+    @classproperty
+    def NARRATIVE_SENTENCE_STARTERS(cls) -> set[str]:
+        return RuleConfigManager.get_keywords("job_title", "narrative_starters")
+
+    @classproperty
+    def NARRATIVE_PHRASES(cls) -> set[str]:
+        return RuleConfigManager.get_keywords("job_title", "narrative_phrases")
+
+    @classproperty
+    def GENERIC_SECTION_HEADERS(cls) -> set[str]:
+        return RuleConfigManager.get_keywords("company_name", "generic_section_headers")
 
     @classmethod
     def extract_candidate_name(
@@ -241,6 +256,17 @@ class ResumeJsonExtractor:
         Deterministically extract and validate the candidate's real name.
         Returns: (candidate_name, confidence_score, confidence_level, extraction_source)
         """
+        name_cfg = RuleConfigManager.get_field_config("name")
+        scores = name_cfg.confidence_scoring
+        email_val_score = scores.get("header_email_validated", 0.95)
+        contact_sec_score = scores.get("header_contact_section", 0.85)
+        email_fb_score = scores.get("email_username_fallback", 0.30)
+        fn_fb_score = scores.get("filename_fallback", 0.30)
+        default_score = scores.get("default_fallback", 0.00)
+
+        job_keywords = cls.JOB_TITLE_KEYWORDS
+        header_keywords = cls.RESUME_HEADER_KEYWORDS
+
         email_tokens: list[str] = []
         if email:
             local_part = email.split("@")[0].lower()
@@ -269,11 +295,11 @@ class ResumeJsonExtractor:
             upper_tokens = [t.upper() for t in tokens]
             
             # Reject if ALL tokens or ANY 1-token line matches job titles or header keywords
-            if len(tokens) == 1 and (upper_tokens[0] in cls.JOB_TITLE_KEYWORDS or upper_tokens[0] in cls.RESUME_HEADER_KEYWORDS):
+            if len(tokens) == 1 and (upper_tokens[0] in job_keywords or upper_tokens[0] in header_keywords):
                 return False
             
-            job_match_count = sum(1 for t in upper_tokens if t in cls.JOB_TITLE_KEYWORDS)
-            header_match_count = sum(1 for t in upper_tokens if t in cls.RESUME_HEADER_KEYWORDS)
+            job_match_count = sum(1 for t in upper_tokens if t in job_keywords)
+            header_match_count = sum(1 for t in upper_tokens if t in header_keywords)
 
             if (job_match_count + header_match_count) >= len(tokens) * 0.5:
                 return False
@@ -319,17 +345,17 @@ class ResumeJsonExtractor:
 
         for cand_name, has_email_match in header_candidates:
             if has_email_match:
-                return (cand_name, 0.95, "HIGH", "header_email_validated")
+                return (cand_name, email_val_score, "HIGH", "header_email_validated")
 
         if header_candidates:
             cand_name, _ = header_candidates[0]
-            return (cand_name, 0.85, "HIGH", "header_contact_section")
+            return (cand_name, contact_sec_score, "HIGH", "header_contact_section")
 
         if email_tokens:
             formatted_tokens = [t.capitalize() for t in email_tokens]
             email_derived_name = " ".join(formatted_tokens)
             if is_valid_name_candidate(email_derived_name):
-                return (email_derived_name, 0.60, "MEDIUM", "email_username_fallback")
+                return (email_derived_name, email_fb_score, "LOW", "email_username_fallback")
 
         if filename:
             clean_fn = re.sub(r"\.(pdf|docx|doc|txt)$", "", filename, flags=re.IGNORECASE)
@@ -338,9 +364,118 @@ class ResumeJsonExtractor:
             if clean_fn:
                 fn_derived_name = " ".join([w.capitalize() for w in clean_fn.split()])
                 if is_valid_name_candidate(fn_derived_name):
-                    return (fn_derived_name, 0.30, "LOW", "filename_fallback")
+                    return (fn_derived_name, fn_fb_score, "LOW", "filename_fallback")
 
-        return ("Unknown Candidate", 0.0, "FALLBACK", "default")
+        return ("Unknown Candidate", default_score, "FALLBACK", "default")
+
+    @classmethod
+    def extract_location(
+        cls,
+        text_lines: list[str],
+        email: str | None = None,
+        phone: str | None = None,
+    ) -> tuple[str | None, float]:
+        """
+        Extract location candidate restricted to contact-block region (near email/phone/top lines).
+        Returns: (location_name, confidence_score)
+        """
+        if not text_lines:
+            return (None, 0.0)
+
+        loc_cfg = RuleConfigManager.get_field_config("location")
+        gazetteer_score = loc_cfg.confidence_scoring.get("gazetteer_match_score", 0.90)
+        generic_score = loc_cfg.confidence_scoring.get("contact_block_generic_score", 0.50)
+
+        known_gazetteer = cls.KNOWN_GAZETTEER
+        location_blacklist = cls.LOCATION_BLACKLIST_KEYWORDS
+
+        contact_indices: set[int] = set()
+
+        for i in range(min(10, len(text_lines))):
+            contact_indices.add(i)
+
+        for i, line in enumerate(text_lines):
+            if (email and email in line) or (phone and phone in line):
+                start = max(0, i - 3)
+                end = min(len(text_lines), i + 4)
+                for idx in range(start, end):
+                    contact_indices.add(idx)
+
+        best_location = None
+        best_confidence = 0.0
+
+        for idx in sorted(contact_indices):
+            if idx >= len(text_lines):
+                continue
+            line = text_lines[idx].strip()
+            if not line or "@" in line or "http" in line:
+                continue
+
+            matches = re.findall(r"\b([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)\b", line)
+            for m in matches:
+                clean_m = m.strip()
+                tokens = [t.lower() for t in re.split(r"[,\s]+", clean_m) if t]
+
+                if any(t in location_blacklist for t in tokens):
+                    continue
+
+                has_gazetteer_match = any(t in known_gazetteer for t in tokens) or clean_m.lower() in known_gazetteer
+
+                conf = gazetteer_score if has_gazetteer_match else generic_score
+
+                if conf > best_confidence:
+                    best_location = clean_m
+                    best_confidence = conf
+
+        return (best_location, best_confidence)
+
+    @classmethod
+    def is_valid_job_title(cls, candidate: str) -> bool:
+        """
+        Validate whether a string is structured like a job title/designation.
+        Rejects full narrative sentences, leading verbs, long descriptions, and invalid punctuation.
+        """
+        title_cfg = RuleConfigManager.get_field_config("job_title")
+        max_words = title_cfg.downstream_gates.max_word_count or 7
+        max_chars = title_cfg.downstream_gates.max_char_length or 60
+
+        if not candidate or len(candidate) < 2 or len(candidate) > max_chars:
+            return False
+
+        if candidate.endswith(".") or candidate.count(",") > 2:
+            return False
+
+        tokens = [t.strip().lower() for t in re.split(r"[\s/\-&()]+", candidate) if t.strip()]
+        if not (1 <= len(tokens) <= max_words):
+            return False
+
+        first_token = tokens[0].lower()
+        if first_token in cls.NARRATIVE_SENTENCE_STARTERS:
+            return False
+
+        narrative_phrases = cls.NARRATIVE_PHRASES
+        cand_lower = candidate.lower()
+        if any(phrase in cand_lower for phrase in narrative_phrases):
+            return False
+
+        has_title_keyword = any(w.upper() in cls.JOB_TITLE_KEYWORDS for w in tokens)
+        words = candidate.split()
+        has_capitalized = any(w[0].isupper() for w in words if w and w[0].isalpha())
+
+        return has_title_keyword or has_capitalized
+
+    @classmethod
+    def is_valid_company_name(cls, candidate: str) -> bool:
+        """Validate whether a string is a plausible company/organization name."""
+        comp_cfg = RuleConfigManager.get_field_config("company_name")
+        max_chars = comp_cfg.downstream_gates.max_char_length or 70
+
+        if not candidate or len(candidate) < 2 or len(candidate) > max_chars:
+            return False
+        clean_cand = candidate.lower().strip(" #*-:•")
+        if clean_cand in cls.GENERIC_SECTION_HEADERS:
+            return False
+        return True
 
     @classmethod
     def extract(
@@ -366,10 +501,11 @@ class ResumeJsonExtractor:
         github_match = re.search(r"(github\.com/[\w-]+)", text, re.IGNORECASE)
         github = github_match.group(0) if github_match else None
 
-        location = None
-        loc_match = re.search(r"\b([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)\b", text)
-        if loc_match:
-            location = loc_match.group(1).strip()
+        location, location_conf = cls.extract_location(
+            text_lines=text_lines,
+            email=email,
+            phone=phone,
+        )
 
         candidate_name, name_conf, conf_level, name_source = cls.extract_candidate_name(
             text_lines=text_lines,
@@ -388,7 +524,7 @@ class ResumeJsonExtractor:
             "name": name_conf,
             "email": 1.0 if email else 0.0,
             "phone": 1.0 if phone else 0.0,
-            "location": 1.0 if location else 0.0,
+            "location": location_conf,
         }
 
         contact_info = {
@@ -453,10 +589,12 @@ class ResumeJsonExtractor:
                     work_experience.append(current_job)
                     current_job = {}
                 if clean_l.startswith("#"):
-                    current_job["company"] = clean_l.replace("#", "").strip()
-                elif re.search(r"\b(20\d{2}|Present)\b", clean_l, re.IGNORECASE):
+                    comp_cand = clean_l.replace("#", "").strip()
+                    if cls.is_valid_company_name(comp_cand):
+                        current_job["company"] = comp_cand
+                elif re.search(r"\b(20\d{2}|Present)\b", clean_l, re.IGNORECASE) and not cls.is_valid_job_title(clean_l):
                     current_job["dates"] = clean_l
-                else:
+                elif cls.is_valid_job_title(clean_l):
                     current_job["job_title"] = clean_l
             elif clean_l.startswith("-") or clean_l.startswith("•"):
                 if "responsibilities" not in current_job:
@@ -733,12 +871,24 @@ class MarkdownGenerator:
             )
 
         import filetype
+        import zipfile
+
+        if extension == "docx":
+            if not zipfile.is_zipfile(BytesIO(content)):
+                raise ValueError("Invalid Word document: The uploaded file is not a valid .docx document structure (corrupted file or invalid archive).")
+            try:
+                with zipfile.ZipFile(BytesIO(content)) as z:
+                    if "word/document.xml" not in z.namelist():
+                        raise ValueError("Invalid Word document: The file structure is missing internal word/document.xml.")
+            except zipfile.BadZipFile:
+                raise ValueError("Invalid Word document: The uploaded .docx file structure is corrupted.")
+            except Exception as zip_err:
+                raise ValueError(f"Invalid Word document: Structural check failed ({zip_err}).")
+
         kind = filetype.guess(content)
         if kind is not None:
             if extension == "pdf" and kind.mime != "application/pdf":
                 raise ValueError("Invalid file signature. The file claims to be a PDF but the magic bytes mismatch.")
-            elif extension == "docx" and kind.mime not in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/zip"]:
-                raise ValueError("Invalid file signature. The file claims to be a DOCX but the magic bytes mismatch.")
             elif extension == "doc" and kind.mime != "application/msword":
                 logger.warning(f"Warning: .doc file has mime {kind.mime}")
         elif extension == "pdf":

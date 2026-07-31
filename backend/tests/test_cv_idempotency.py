@@ -51,9 +51,9 @@ def mock_parser_and_engine(monkeypatch):
 
 
 def test_get_stable_cv_key():
-    assert get_stable_cv_key("resume.pdf", 101, 501) == "cand_101_cv_501"
-    assert get_stable_cv_key("resume.pdf", candidate_id=101) == "cand_101_resume"
-    assert get_stable_cv_key("resume.pdf", cv_id=501) == "cv_501_resume"
+    assert get_stable_cv_key("resume.pdf", 101, 501) == "cv_resume"
+    assert get_stable_cv_key("resume.pdf", candidate_id=101) == "cv_resume"
+    assert get_stable_cv_key("resume.pdf", cv_id=501) == "cv_resume"
     assert get_stable_cv_key("john_doe_cv.pdf") == "cv_john_doe_cv"
 
 

@@ -105,7 +105,23 @@ def _run_background_warmup() -> None:
 
 @app.on_event("startup")
 async def start_background_warmup():
-    """Warm the cache in a background thread so startup is not blocked."""
+    """Verify active Redis connection and warm the cache in a background thread."""
+    from app.core.cache import _REDIS_CLIENT
+    if _REDIS_CLIENT:
+        try:
+            _REDIS_CLIENT.ping()
+            logger.info("[STARTUP] Active Redis instance verified successfully.")
+        except Exception as exc:
+            logger.warning(
+                f"[STARTUP] Redis ping failed ({exc}). "
+                "Operating with L1 Memory & File Caching fallback."
+            )
+    else:
+        logger.warning(
+            "[STARTUP] Redis is not active or unreachable. "
+            "Operating with L1 Memory & File Caching fallback."
+        )
+
     import threading
     thread = threading.Thread(target=_run_background_warmup, daemon=True)
     thread.start()

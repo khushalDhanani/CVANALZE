@@ -29,6 +29,12 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
   const retrievalBadge = getRetrievalBadge(bestMatch.retrieval_source);
   const resolvedName = candidateName || bestMatch.full_name || bestMatch.candidate_name;
 
+  const isDomainCapped = Boolean(
+    bestMatch.domain_mismatch_capped ||
+    (bestMatch.mandatory_failures || []).some((f: any) => f.requirement_id === 'req_domain_mismatch') ||
+    (bestMatch.mandatory_fails || []).some((f: any) => (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')
+  );
+
   return (
     <Card className="border-primary/40 shadow-sm gap-3">
       {!!resolvedName && (
@@ -54,6 +60,9 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
             {retrievalBadge && (
               <Badge label={retrievalBadge.label} tone={retrievalBadge.tone} />
             )}
+            {isDomainCapped && (
+              <Badge label="Cross-domain match — score capped" tone="warning" />
+            )}
           </View>
           <Text className="text-lg font-sans-bold text-text-primary">
             {bestMatch.job_title}
@@ -69,6 +78,21 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
           classification={bestMatch.classification || 'LOW'}
         />
       </View>
+
+      {/* Cross-Domain Guard Explainability Banner */}
+      {isDomainCapped && (
+        <Card className="bg-warning/10 border-warning/30 p-3 gap-1">
+          <View className="flex-row items-center gap-1.5">
+            <AlertTriangle size={14} color={COLORS.warning} />
+            <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
+              Cross-domain match — score capped
+            </Text>
+          </View>
+          <Text className="text-xs font-sans text-warning/90 leading-4">
+            {bestMatch.domain_mismatch_reason || "The candidate's primary background conflicts with the target vacancy department. Suitability score has been automatically capped to prevent false-positive matches."}
+          </Text>
+        </Card>
+      )}
 
       {/* Ranking reason */}
       {!!bestMatch.ranking_reason && (
@@ -94,22 +118,54 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
         </Card>
       )}
 
-      {/* Mandatory Failures */}
-      {bestMatch.mandatory_fails && bestMatch.mandatory_fails.length > 0 && (
-        <Card className="bg-danger/10 border-danger/30 p-3">
-          <View className="flex-row items-center gap-1.5 mb-1">
-            <CpuIcon size={14} color={COLORS.danger} />
-            <Text className="text-xs font-sans-bold text-danger">
-              Mandatory Requirement Failures:
-            </Text>
-          </View>
-          {bestMatch.mandatory_fails.map((fail: MandatoryFailure, idx: number) => (
-            <Text key={idx} className="text-xs font-sans-medium text-danger">
-              • {fail.requirement}: {fail.details}
-            </Text>
-          ))}
-        </Card>
-      )}
+      {/* Mandatory Failures & Missing Criteria */}
+      {(() => {
+        const rawFails: any[] = bestMatch.mandatory_fails || bestMatch.mandatory_failures || [];
+        const failedReqs: any[] = (bestMatch.mandatory_requirements || []).filter((r: any) => r.status === 'FAILED');
+        const missingCrit: string[] = bestMatch.missing_criteria || [];
+
+        const failureList: Array<{ title: string; details: string }> = [];
+
+        if (rawFails.length > 0) {
+          rawFails.forEach((f: any) => {
+            const title = typeof f === 'string' ? f : (f.requirement || f.description || f.requirement_id || 'Mandatory Requirement');
+            const details = typeof f === 'string' ? '' : (f.details || f.reason || f.failure_reason || '');
+            failureList.push({ title, details });
+          });
+        } else if (failedReqs.length > 0) {
+          failedReqs.forEach((r: any) => {
+            failureList.push({
+              title: r.description || r.requirement_id || 'Mandatory Requirement',
+              details: r.failure_reason || r.reason || '',
+            });
+          });
+        } else if (missingCrit.length > 0) {
+          missingCrit.forEach((mc: string) => {
+            failureList.push({ title: 'Missing Criterion', details: mc });
+          });
+        }
+
+        if (failureList.length === 0) return null;
+
+        return (
+          <Card className="bg-danger/10 border-danger/30 p-3 gap-1.5">
+            <View className="flex-row items-center gap-1.5 mb-1">
+              <CpuIcon size={14} color={COLORS.danger} />
+              <Text className="text-xs font-sans-bold text-danger">
+                Mandatory Requirement Failures & Missing Criteria:
+              </Text>
+            </View>
+            {failureList.map((fail, idx) => (
+              <View key={idx} className="flex-row items-start gap-1">
+                <Text className="text-xs font-sans-bold text-danger">•</Text>
+                <Text className="text-xs font-sans-medium text-danger flex-1">
+                  {fail.title}{fail.details ? `: ${fail.details}` : ''}
+                </Text>
+              </View>
+            ))}
+          </Card>
+        );
+      })()}
 
       {/* Component Breakdown */}
       {!!bestMatch.component_scores && (

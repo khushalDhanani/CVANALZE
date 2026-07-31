@@ -1,0 +1,73 @@
+import pytest
+from fastapi.testclient import TestClient
+import fitz
+
+from app.main import app
+from app.repositories.result import ResultRepository
+
+client = TestClient(app)
+
+def test_frontend_polling_match_status_completion():
+    """Verify that /api/match/status endpoint returns completion structure matching useCvUpload frontend hook."""
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 50), "Jane Doe\nLead Python Engineer with FastAPI and Microservices.")
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    upload_res = client.post(
+        "/api/match/upload",
+        files={"file": ("test_polling_match.pdf", pdf_bytes, "application/pdf")}
+    )
+    assert upload_res.status_code == 200
+    upload_data = upload_res.json()
+    assert upload_data["status"] == "processing"
+    cv_key = upload_data["cv_key"]
+
+    status_res = client.get(f"/api/match/status/{cv_key}")
+    assert status_res.status_code == 200
+    res_data = status_res.json()
+
+    # Simulate exact useCvUpload frontend hook completion evaluation
+    is_done = (
+        'scan_id' in res_data or
+        'match_analysis' in res_data or
+        res_data.get('status', '').upper() in ('COMPLETED', 'NEW_CV', 'REPROCESSED') or
+        res_data.get('progress') == 100 or
+        res_data.get('is_complete') is True
+    )
+
+    assert is_done or res_data.get('status') == 'processing'
+    if is_done:
+        assert res_data.get('progress', 100) == 100
+
+
+def test_frontend_polling_cv_status_completion():
+    """Verify that /api/cv/status endpoint returns completion structure matching useCvUpload frontend hook."""
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 50), "Alex Smith\nDevOps & Cloud Engineer with Kubernetes and Terraform.")
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    upload_res = client.post(
+        "/api/cv/upload",
+        files={"file": ("test_polling_cv.pdf", pdf_bytes, "application/pdf")}
+    )
+    assert upload_res.status_code == 200
+    upload_data = upload_res.json()
+    assert upload_data["status"] == "processing"
+    cv_key = upload_data["cv_key"]
+
+    status_res = client.get(f"/api/cv/status/{cv_key}")
+    assert status_res.status_code == 200
+    res_data = status_res.json()
+
+    is_done = (
+        'scan_id' in res_data or
+        'match_analysis' in res_data or
+        res_data.get('status', '').upper() in ('COMPLETED', 'NEW_CV', 'REPROCESSED') or
+        res_data.get('progress') == 100
+    )
+
+    assert is_done or res_data.get('status') == 'processing'

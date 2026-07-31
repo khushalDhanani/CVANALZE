@@ -32,3 +32,8 @@ class JobOpening(BaseModel):
     department_id: int | None = Field(None, description="Live MSSQL DeptID")
     department_name: str | None = Field(None, description="Live MSSQL DeptName")
     location_id: int | None = Field(None, description="Live MSSQL LocID")
+
+    # Taxonomy Metadata
+    domain: str | None = Field(None, description="Taxonomy Domain")
+    job_family: str | None = Field(None, description="Taxonomy Job Family")
+

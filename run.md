@@ -7,9 +7,22 @@ This document outlines the steps required to run the CV Analyzer pipeline, inclu
 Before starting the application, ensure the following services are running:
 
 - **Redis Server**: Used for the task queue and PubSub event streaming.
-  ```bash
-  redis-server
-  ```
+  - Option 1 (macOS Homebrew Service - Recommended):
+    ```bash
+    brew services start redis
+    # Or restart if already running:
+    brew services restart redis
+    ```
+  - Option 2 (Foreground Process):
+    ```bash
+    redis-server
+    ```
+  - Verify Connection:
+    ```bash
+    redis-cli ping
+    # Expected output: PONG
+    ```
+
 - **Ollama**: Used for local LLM semantic matching. Ensure the required model is pulled.
   ```bash
   ollama serve
@@ -17,7 +30,15 @@ Before starting the application, ensure the following services are running:
 
 ## 2. Environment Setup
 
-Ensure your `.env` file is present in the `backend` directory. It should contain the MSSQL connection details (if using the remote DB) and any other configuration overrides.
+Ensure your `.env` file is present in the `backend` directory. It should contain:
+```ini
+DB_SERVER=172.25.1.160
+DB_PORT=1433
+DB_NAME=AIRIS_TEST
+DB_USER=sa
+DB_PASSWORD=your_password
+REDIS_URL=redis://localhost:6379/0
+```
 
 > **macOS Note**: Due to `PyTorch` (used by `docling`) fork-safety issues on macOS, you **MUST** prefix commands that spawn workers or run ML models with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`.
 
@@ -39,8 +60,11 @@ The FastAPI server exposes the REST endpoints and the real-time WebSocket progre
 
 ```bash
 cd backend
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+*(If you get `[Errno 48] address already in use` on port 8000, free port 8000 with: `kill -9 $(lsof -t -i:8000)`)*
+
 *(The API documentation will be available at http://localhost:8000/docs)*
 *(Cache Analytics can be viewed at http://localhost:8000/api/analytics/cache)*
 
