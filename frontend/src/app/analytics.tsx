@@ -12,6 +12,10 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { CacheAnalyticsResponse } from '@/types/api';
 import { Card, Button, Badge, StatCard, DenseRow, Breadcrumbs } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
+import { vectorDbService } from '@/services/vectorDbService';
+import { candidateService } from '@/services/candidateService';
+import { VectorDbStatusResponse, TalentPoolsResponse } from '@/types/api';
+import { useRouter } from 'expo-router';
 
 const STAGE_LABELS: Record<string, string> = {
   stage1_resume_profiling: 'Stage 1: Resume Layout Profiling',
@@ -32,17 +36,25 @@ export default function AnalyticsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [clearing, setClearing] = useState<boolean>(false);
   const [noticeMsg, setNoticeMsg] = useState<string | null>(null);
+  const [vectorStatus, setVectorStatus] = useState<VectorDbStatusResponse | null>(null);
+  const [talentPools, setTalentPools] = useState<TalentPoolsResponse | null>(null);
+  const [syncingVectorDb, setSyncingVectorDb] = useState(false);
+  const router = useRouter();
 
   const fetchTelemetry = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [cacheRes, perfRes] = await Promise.all([
+      const [cacheRes, perfRes, vectorRes, poolsRes] = await Promise.all([
         analyticsService.getCacheAnalytics().catch(() => null),
         analyticsService.getPerformanceMetrics().catch(() => null),
+        vectorDbService.getStatus().catch(() => null),
+        candidateService.getTalentPools().catch(() => null),
       ]);
       setCacheAnalytics(cacheRes);
       setPerformanceMetrics(perfRes);
+      setVectorStatus(vectorRes);
+      setTalentPools(poolsRes);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch telemetry metrics.');
     } finally {
@@ -65,6 +77,20 @@ export default function AnalyticsScreen() {
       setNoticeMsg(err.message || 'Cache invalidation failed.');
     } finally {
       setClearing(false);
+      setTimeout(() => setNoticeMsg(null), 4000);
+    }
+  };
+
+  const handleSyncVectorDb = async () => {
+    setSyncingVectorDb(true);
+    setNoticeMsg(null);
+    try {
+      const res = await vectorDbService.syncEmbeddings();
+      setNoticeMsg(res.message || 'Vector DB sync started.');
+    } catch (err: any) {
+      setNoticeMsg(err.message || 'Failed to sync Vector DB.');
+    } finally {
+      setSyncingVectorDb(false);
       setTimeout(() => setNoticeMsg(null), 4000);
     }
   };
@@ -261,6 +287,100 @@ export default function AnalyticsScreen() {
               <Text className="text-xs font-sans text-info leading-5">
                 {performanceMetrics?.retrieval_order_guarantee?.sequence || 'Semantic retrieval strictly precedes rule scoring engine.'}
               </Text>
+            </Card>
+
+            {/* Vector DB Status Panel */}
+            <Card className="gap-3">
+              <View className="flex-row items-center justify-between border-b border-border pb-2">
+                <View className="flex-row items-center gap-2">
+                  <Database size={16} color={COLORS.success} />
+                  <Text className="text-sm font-sans-bold text-text-primary uppercase tracking-wider">
+                    Vector Database (pgvector)
+                  </Text>
+                </View>
+                <Badge label={vectorStatus?.pgvector_enabled ? 'Enabled' : 'Disabled'} tone={vectorStatus?.pgvector_enabled ? 'success' : 'neutral'} />
+              </View>
+
+              <View className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <View className="bg-background border border-border rounded p-2">
+                  <Text className="text-[10px] font-sans-bold text-text-muted uppercase">Status</Text>
+                  <Text className="text-xs font-sans-medium text-text-primary mt-1">
+                    {vectorStatus?.pg_database_connected ? 'Connected' : 'Disconnected'}
+                  </Text>
+                </View>
+                <View className="bg-background border border-border rounded p-2">
+                  <Text className="text-[10px] font-sans-bold text-text-muted uppercase">Model</Text>
+                  <Text className="text-xs font-sans-medium text-text-primary mt-1">
+                    {vectorStatus?.embedding_model || 'Unknown'}
+                  </Text>
+                </View>
+                <View className="bg-background border border-border rounded p-2">
+                  <Text className="text-[10px] font-sans-bold text-text-muted uppercase">Candidate Vectors</Text>
+                  <Text className="text-xs font-sans-medium text-text-primary mt-1">
+                    {vectorStatus?.candidate_embeddings_count || 0}
+                  </Text>
+                </View>
+                <View className="bg-background border border-border rounded p-2">
+                  <Text className="text-[10px] font-sans-bold text-text-muted uppercase">Vacancy Vectors</Text>
+                  <Text className="text-xs font-sans-medium text-text-primary mt-1">
+                    {vectorStatus?.vacancy_embeddings_count || 0}
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row justify-end mt-2">
+                <Button 
+                  label="Sync Embeddings" 
+                  icon={<RefreshCw size={14} color="white" />} 
+                  onPress={handleSyncVectorDb} 
+                  loading={syncingVectorDb} 
+                  disabled={syncingVectorDb} 
+                  size="sm"
+                />
+              </View>
+            </Card>
+
+            {/* Talent Pools Panel */}
+            <Card className="gap-3">
+              <View className="flex-row items-center justify-between border-b border-border pb-2">
+                <View className="flex-row items-center gap-2">
+                  <HardDrive size={16} color={COLORS.info} />
+                  <Text className="text-sm font-sans-bold text-text-primary uppercase tracking-wider">
+                    Internal Talent Pools
+                  </Text>
+                </View>
+                <Badge label={`${talentPools?.total_pools || 0} Active Pools`} tone="info" />
+              </View>
+
+              <View className="gap-2">
+                {(!talentPools?.talent_pools || talentPools.talent_pools.length === 0) ? (
+                  <Text className="text-xs text-text-muted">No talent pools generated yet.</Text>
+                ) : (
+                  talentPools.talent_pools.map((pool, idx) => (
+                    <View key={idx} className="bg-surface border border-border rounded p-3 gap-2">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-xs font-sans-bold text-text-primary">{pool.pool_name}</Text>
+                        <Badge label={`${pool.candidate_count} Candidates`} tone="neutral" />
+                      </View>
+                      <View className="flex-row flex-wrap gap-2">
+                        {pool.sample_candidates.map((cand, cidx) => (
+                          <View key={cidx} className="bg-background border border-border rounded px-2 py-1 flex-row items-center gap-1.5">
+                            <Text 
+                              className="text-[11px] font-sans-medium text-primary cursor-pointer"
+                              onPress={() => router.push(`/candidates/${encodeURIComponent(cand.candidate_id)}` as any)}
+                            >
+                              {cand.full_name}
+                            </Text>
+                            <Text className="text-[10px] text-text-muted border-l border-border pl-1.5">
+                              {cand.experience_years ? `${cand.experience_years}y` : 'N/A'}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
             </Card>
           </View>
         )}

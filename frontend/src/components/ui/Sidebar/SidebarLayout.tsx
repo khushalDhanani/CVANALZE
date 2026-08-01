@@ -1,7 +1,7 @@
 import { View, Text, Pressable, useWindowDimensions } from 'react-native';
 import { Slot, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, Search, Briefcase, Layers, Settings, Users, X, BarChart3, Database } from 'lucide-react-native';
+import { Home, Search, Briefcase, Layers, Settings, Users, X, BarChart3, Database, GitBranch, BookOpen } from 'lucide-react-native';
 import { useState } from 'react';
 import { COLORS } from '@/constants/colors';
 
@@ -18,6 +18,8 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { name: 'Jobs', route: '/vacancies', icon: Briefcase },
   { name: 'Batch', route: '/batch', icon: Layers },
   { name: 'Analytics', route: '/analytics', icon: BarChart3 },
+  { name: 'Knowledge Graph', route: '/knowledge-graph', icon: GitBranch },
+  { name: 'Domain Explorer', route: '/domain-explorer', icon: BookOpen },
   { name: 'Training Data', route: '/training-data', icon: Database },
   { name: 'Config', route: '/config', icon: Settings },
 ];

@@ -459,4 +459,114 @@ export interface VacancyRecommendationsResponse {
 }
 
 
+// ===== Talent Knowledge Graph Types =====
+export interface GraphNode {
+  id: string;
+  type: 'Candidate' | 'Skill' | 'Company' | 'Vacancy' | 'Department' | string;
+  label: string;
+  properties: Record<string, any>;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  relationship: 'HAS_SKILL' | 'WORKED_AT' | 'MATCHES' | 'SEMANTICALLY_SIMILAR' | 'BELONGS_TO' | 'REQUIRES_SKILL' | string;
+  properties: Record<string, any>;
+}
+
+export interface CandidateGraphResponse {
+  candidate_id: string;
+  full_name: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+export interface VacancyGraphResponse {
+  vacancy_id: string;
+  title: string;
+  department: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+export interface SkillGraphResponse {
+  skill: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  metrics: {
+    candidate_supply_count: number;
+    vacancy_demand_count: number;
+    semantic_cluster_count: number;
+  };
+}
+
+export interface RecruitmentAnalyticsGraphResponse {
+  graph_summary: {
+    total_candidates: number;
+    total_vacancies: number;
+    total_skills_tracked: number;
+    total_departments: number;
+    total_graph_nodes: number;
+    total_graph_edges: number;
+  };
+  top_candidate_skills: { skill: string; candidate_count: number; }[];
+  department_distribution: { department: string; candidate_count: number; }[];
+}
+
+// ===== Domain Knowledge Types =====
+export interface DomainEquivalentRequest {
+  term: string;
+  category: string;
+  threshold?: number;
+  limit?: number;
+}
+
+export interface DomainEquivalent {
+  term: string;
+  similarity_score: number;
+}
+
+export interface DomainEquivalentResponse {
+  term: string;
+  category: string;
+  equivalents: DomainEquivalent[];
+}
+
+// ===== Vector DB Types =====
+export interface VectorDbStatusResponse {
+  pgvector_enabled: boolean;
+  pg_database_connected: boolean;
+  embedding_model: string;
+  candidate_embeddings_count: number;
+  vacancy_embeddings_count: number;
+  semantic_retrieval_top_n: number;
+}
+
+export interface VectorDbSyncResponse {
+  message: string;
+  status: string;
+}
+
+// ===== Talent Pools Types =====
+export interface TalentPoolCandidate {
+  candidate_id: string;
+  full_name: string;
+  skills: string[];
+  experience_years: number | null;
+}
+
+export interface TalentPool {
+  pool_name: string;
+  candidate_count: number;
+  sample_candidates: TalentPoolCandidate[];
+}
+
+export interface TalentPoolsResponse {
+  total_pools: number;
+  talent_pools: TalentPool[];
+}
 

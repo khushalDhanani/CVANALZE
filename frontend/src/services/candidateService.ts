@@ -5,6 +5,7 @@ import {
   CandidateSearchResponse,
   CandidateSummary,
   CVUploadResponse,
+  TalentPoolsResponse,
 } from '@/types/api';
 
 export const candidateService = {
@@ -59,6 +60,13 @@ export const candidateService = {
       `/api/v1/candidates/${encodeURIComponent(candidateId)}/reprocess`,
       {}
     );
+  },
+
+  /**
+   * Fetch internal talent pools grouped by department and skills.
+   */
+  getTalentPools: (): Promise<TalentPoolsResponse> => {
+    return apiClient.get<TalentPoolsResponse>('/api/recommendations/talent-pools');
   },
 };
 

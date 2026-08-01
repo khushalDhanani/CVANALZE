@@ -10,6 +10,7 @@ import {
 } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
+import { matchService } from '@/services/matchService';
 import { CandidateRecommendationsResponse, CVUploadResponse } from '@/types/api';
 import { Card, Button, Badge, DenseRow, FieldConfidenceView, Breadcrumbs } from '@/components/ui';
 import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
@@ -61,6 +62,7 @@ export default function CandidateDetailScreen() {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [reprocessStatusMsg, setReprocessStatusMsg] = useState<string>('Initializing re-analysis...');
   const [stepStates, setStepStates] = useState<StepState[]>(Array(8).fill('pending'));
+  const [isReanalyzing, setIsReanalyzing] = useState<boolean>(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -189,6 +191,22 @@ export default function CandidateDetailScreen() {
       stopTimers();
       setIsReprocessing(false);
       setReprocessError(err.message || 'Failed to trigger re-analysis.');
+    }
+  };
+
+  const handleReanalyze = async () => {
+    if (!scanId) return;
+    setIsReanalyzing(true);
+    try {
+      await matchService.reanalyzeScan(scanId);
+      // Wait a bit before fetching to allow backend processing
+      setTimeout(() => {
+        fetchDetail();
+        setIsReanalyzing(false);
+      }, 1500);
+    } catch (err: any) {
+      console.warn("Reanalysis failed:", err);
+      setIsReanalyzing(false);
     }
   };
 
@@ -619,14 +637,26 @@ export default function CandidateDetailScreen() {
                 <Text className="text-xs font-sans-bold text-primary">{Math.round(bestMatch.overall_score)}%</Text>
               </View>
             )}
-            <View className="w-8 h-8 rounded-md overflow-hidden bg-secondary">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<RefreshCw size={14} color={COLORS.primary} />}
-                onPress={() => setReprocessModalVisible(true)}
-                disabled={isReprocessing}
-              />
+            <View className="flex-row gap-2">
+              <View className="h-8 rounded-md overflow-hidden bg-secondary">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={isReanalyzing ? "Analyzing..." : "Reanalyze"}
+                  icon={!isReanalyzing ? <Sparkles size={14} color={COLORS.primary} /> : undefined}
+                  onPress={handleReanalyze}
+                  disabled={isReanalyzing || isReprocessing}
+                />
+              </View>
+              <View className="w-8 h-8 rounded-md overflow-hidden bg-secondary border border-border">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<RefreshCw size={14} color={COLORS.textMuted} />}
+                  onPress={() => setReprocessModalVisible(true)}
+                  disabled={isReprocessing}
+                />
+              </View>
             </View>
           </View>
 
