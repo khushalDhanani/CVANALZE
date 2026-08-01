@@ -1,4 +1,4 @@
-# backend/app/services/vacancy_prefilter.py
+import hashlib
 import functools
 import re
 import time
@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
 from app.schemas.job_context import JobEvaluationContext
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import EmbeddingService, get_candidate_embedding
 from app.services.job_taxonomy import JobTaxonomy, TaxonomyClassifier
 
 
@@ -38,15 +38,18 @@ class CandidateSearchContext:
         cv_lower = cv_text.lower()
         cv_tokens = set(re.findall(r"\w+", cv_lower))
 
-        # Generate embedding if missing and enabled
+        # Check existing cached candidate embedding first before generating
         if cv_embedding is None and settings.EMBEDDING_ENABLED:
-            try:
-                cv_embedding = EmbeddingService.generate_embedding(
-                    cv_text[:8000], settings.EMBEDDING_MODEL
-                )
-            except (RuntimeError, ValueError, AttributeError, KeyError) as e:
-                logger.warning(f"[PREFILTER] CV embedding generation failed: {e}")
-                cv_embedding = None
+            cv_hash = hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
+            cv_embedding = get_candidate_embedding(cv_hash)
+            if cv_embedding is None:
+                try:
+                    cv_embedding = EmbeddingService.generate_embedding(
+                        cv_text[:8000], settings.EMBEDDING_MODEL
+                    )
+                except (RuntimeError, ValueError, AttributeError, KeyError) as e:
+                    logger.warning(f"[PREFILTER] CV embedding generation failed: {e}")
+                    cv_embedding = None
 
         cand_domain, cand_families = TaxonomyClassifier.classify_candidate(
             cv_text, resume_json=resume_json

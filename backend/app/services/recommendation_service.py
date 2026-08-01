@@ -147,10 +147,12 @@ class RecommendationService:
 
         overall_confidence = float(best_match.get("overall_score") or best_match.get("score") or (best_vacancies[0]["score"] if best_vacancies else 0.0))
 
-        # 3. Semantically Related Skills Recommendations (via DomainEmbeddingService)
+        # 3. Semantically Related Skills Recommendations (via DomainEmbeddingService with no live Ollama generation)
         related_skills_set = set()
         for skill in candidate_skills[:5]:
-            eqs = DomainEmbeddingService.find_semantic_equivalents(term=skill, category="skills", limit=3)
+            eqs = DomainEmbeddingService.find_semantic_equivalents(
+                term=skill, category="skills", limit=3, allow_live_generation=False
+            )
             for eq in eqs:
                 eq_term = eq["term"].title()
                 if eq_term.lower() not in cand_skills_lower_set:
@@ -238,12 +240,14 @@ class RecommendationService:
         recommended_certs = sorted(found_job_certs)[:settings.MAX_RECOMMENDED_CERTS]
 
         # 6. Hiring-focused Metrics
-        if overall_confidence >= 80:
-            hiring_rec = "HIRE"
-        elif overall_confidence >= 60:
-            hiring_rec = "CONSIDER"
+        if overall_confidence >= 85:
+            hiring_rec = "Highly Recommended"
+        elif overall_confidence >= 70:
+            hiring_rec = "Recommended"
+        elif overall_confidence >= 55:
+            hiring_rec = "Potential Fit"
         else:
-            hiring_rec = "REJECT"
+            hiring_rec = "Needs Further Review"
 
         role_dept_fit = f"Strong alignment for {primary_dept} roles based on {prof_domain} experience." if overall_confidence >= 70 else f"Marginal fit for {primary_dept}; requires validation of {prof_domain} transferability."
 
@@ -286,11 +290,31 @@ class RecommendationService:
         if candidate_skills:
             talent_pools.append(f"{candidate_skills[0].title()} Specialists Pool")
 
-        # 8. Actionable Next Steps
+        # 8. Career Transition Opportunities
+        career_transitions = []
+        target_jobs = domain_jobs if len(domain_jobs) > 1 else (all_jobs or domain_jobs)
+        best_title = (best_match.get("job_title") or "").lower()
+        for vac in target_jobs:
+            if not isinstance(vac, dict):
+                continue
+            vac_title = vac.get("title") or vac.get("JobTitle") or "Target Role"
+            vac_dept = vac.get("department") or vac.get("department_name") or primary_dept
+            if vac_title.lower() != best_title and not any(ct["target_role"].lower() == vac_title.lower() for ct in career_transitions):
+                career_transitions.append({
+                    "target_role": vac_title,
+                    "target_department": vac_dept,
+                    "feasibility_score": round(max(40.0, overall_confidence - 10.0), 1),
+                    "transition_path": f"Transition from {prof_domain} to {vac_title} by building {vac_dept} experience.",
+                    "skill_bridge": candidate_skills[:2] if candidate_skills else ["Domain Knowledge"],
+                })
+            if len(career_transitions) >= 3:
+                break
+
+        # 9. Actionable Next Steps & Suggestions
         next_steps = []
-        if hiring_rec == "HIRE":
+        if hiring_rec in ("Highly Recommended", "Recommended", "HIRE"):
             next_steps.append("Fast-track to technical screening.")
-        elif hiring_rec == "CONSIDER":
+        elif hiring_rec in ("Potential Fit", "CONSIDER"):
             next_steps.append("Schedule introductory call to clarify experience gaps.")
         else:
             next_steps.append("Keep in talent pool for future junior roles.")
@@ -309,6 +333,7 @@ class RecommendationService:
             "related_skills": related_skills,
             "missing_qualifications": missing_quals,
             "recommended_certifications": recommended_certs,
+            "career_transitions": career_transitions,
             "talent_pools": talent_pools,
             "hiring_recommendation": hiring_rec,
             "role_department_fit": role_dept_fit,
@@ -317,6 +342,7 @@ class RecommendationService:
             "experience_assessment": experience_assessment,
             "technical_vs_functional_fit": tech_vs_func,
             "next_steps_for_interviewer": next_steps,
+            "actionable_suggestions": next_steps,
         }
 
     @classmethod

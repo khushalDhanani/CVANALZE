@@ -36,7 +36,9 @@ class DomainEmbeddingService:
         return dict(RuleConfigManager.get_domain_embedding_rules().canonical_equivalents)
 
     @classmethod
-    def get_or_generate_domain_embedding(cls, term: str, category: str) -> list[float] | None:
+    def get_or_generate_domain_embedding(
+        cls, term: str, category: str, allow_live_generation: bool = True
+    ) -> list[float] | None:
         if not term or not term.strip():
             return None
 
@@ -62,7 +64,11 @@ class DomainEmbeddingService:
         except Exception as exc:
             logger.warning(f"[DOMAIN_EMBEDDING] DB lookup failed for '{clean_term}': {exc}")
 
-        # 2. Generate embedding via EmbeddingService if missing
+        if not allow_live_generation:
+            logger.debug(f"[DOMAIN_EMBEDDING] Live generation disabled for '{clean_term}' ({cat}). Returning None.")
+            return None
+
+        # 2. Generate embedding via EmbeddingService if missing and live generation allowed
         try:
             emb = EmbeddingService.generate_embedding(
                 clean_term, model_version=model_version, identifier=f"domain:{cat}:{clean_term}"
@@ -86,7 +92,12 @@ class DomainEmbeddingService:
 
     @classmethod
     def find_semantic_equivalents(
-        cls, term: str, category: str = "skills", threshold: float = 0.82, limit: int = 5
+        cls,
+        term: str,
+        category: str = "skills",
+        threshold: float = 0.82,
+        limit: int = 5,
+        allow_live_generation: bool = True,
     ) -> list[dict[str, Any]]:
         if not term or not term.strip():
             return []
@@ -117,7 +128,9 @@ class DomainEmbeddingService:
                 })
 
         # 2. Vector distance query in PostgreSQL pgvector
-        target_emb = cls.get_or_generate_domain_embedding(clean_term, cat)
+        target_emb = cls.get_or_generate_domain_embedding(
+            clean_term, cat, allow_live_generation=allow_live_generation
+        )
         if target_emb:
             try:
                 from app.core.database import pg_SessionLocal

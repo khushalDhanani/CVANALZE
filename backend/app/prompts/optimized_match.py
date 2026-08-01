@@ -59,7 +59,8 @@ def build_optimized_match_prompt(
 
     input_json = json.dumps(structured_input, separators=(",", ":"), ensure_ascii=False)
 
-    prompt = f"""{input_json}
+    prompt = f"""/think
+{input_json}
 
 EVIDENCE-BASED REASONING RULES:
 1. Do NOT make assumptions or infer experience not explicitly supported by the CV.

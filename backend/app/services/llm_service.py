@@ -56,6 +56,9 @@ class OllamaLLMService:
             )
             return DynamicCandidateProfile(**cached_entry.structured_data)
 
+        if not prompt.startswith("/no_think"):
+            prompt = f"/no_think\n{prompt}"
+
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
         payload = {
             "model": model_name,
@@ -67,7 +70,7 @@ class OllamaLLMService:
             "options": {
                 "num_predict": 2048,
                 "num_ctx": 4096,
-                "temperature": 0.1,
+                "temperature": 0.0,
             },
         }
 
@@ -169,18 +172,21 @@ class OllamaLLMService:
             )
             return QwenCVAnalysis(**cached_entry.structured_data)
 
+        if not prompt.startswith("/think"):
+            prompt = f"/think\n{prompt}"
+
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
         payload = {
             "model": model_name,
             "prompt": prompt,
             "format": QwenCVAnalysis.model_json_schema(),
             "stream": False,
-            "think": False,
+            "think": True,
             "keep_alive": "30m",
             "options": {
                 "num_predict": 2048,
                 "num_ctx": 4096,
-                "temperature": 0.1,
+                "temperature": 0.0,
             },
         }
 
@@ -281,18 +287,21 @@ class OllamaLLMService:
             )
             return DynamicMappingResponse(**cached_entry.structured_data)
 
+        if not prompt.startswith("/think"):
+            prompt = f"/think\n{prompt}"
+
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
         payload = {
             "model": model_name,
             "prompt": prompt,
             "format": DynamicMappingResponse.model_json_schema(),
             "stream": False,
-            "think": False,
+            "think": True,
             "keep_alive": "30m",
             "options": {
                 "num_predict": 2048,
                 "num_ctx": 4096,
-                "temperature": 0.1,
+                "temperature": 0.0,
             },
         }
 
@@ -395,18 +404,21 @@ class OllamaLLMService:
             logger.info("LLM semantic analysis is disabled via config.")
             return None
 
+        if not prompt.startswith("/think"):
+            prompt = f"/think\n{prompt}"
+
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
         payload = {
             "model": model_name,
             "prompt": prompt,
             "format": OptimizedLLMMatchResponse.model_json_schema(),
             "stream": False,
-            "think": False,
+            "think": True,
             "keep_alive": "30m",
             "options": {
                 "num_predict": 4096,
                 "num_ctx": 8192,
-                "temperature": 0.1,
+                "temperature": 0.0,
                 "top_p": 0.9,
             },
         }
@@ -504,4 +516,29 @@ class OllamaLLMService:
                 return None
 
         return None
+
+    @staticmethod
+    def unload_model(model_name: str | None = None) -> bool:
+        """
+        Signals Ollama to immediately unload the LLM model from memory (RAM/VRAM)
+        by issuing a POST /api/generate payload with keep_alive: 0.
+        Allows Ollama to go idle immediately when CV matching is finished.
+        """
+        if not settings.LLM_ENABLED:
+            return False
+        model = model_name or settings.OLLAMA_MODEL
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+        payload = {
+            "model": model,
+            "keep_alive": 0,
+        }
+        try:
+            client = _get_httpx_client(timeout=10.0)
+            response = client.post(url, json=payload)
+            response.raise_for_status()
+            logger.info(f"Successfully sent idle unload signal to Ollama for model '{model}'.")
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to send unload signal to Ollama for model '{model}': {exc}")
+            return False
 

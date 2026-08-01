@@ -348,6 +348,14 @@ async def process_cv_file(
 
             saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, result_data)
             result_data["result_file_path"] = str(saved_path)
+
+            # Signal Ollama to unload model and become idle immediately after matching completes
+            try:
+                from app.services.llm_service import OllamaLLMService
+                await asyncio.to_thread(OllamaLLMService.unload_model)
+            except Exception as unload_err:
+                logger.warning(f"Ollama unload signal failed for '{cv_key}': {unload_err}")
+
             return result_data
 
         except Exception as exc:

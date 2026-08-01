@@ -29,7 +29,8 @@ def build_profile_extraction_prompt(cv_text: str) -> str:
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)
 
-    prompt = f"""{input_json}
+    prompt = f"""/no_think
+{input_json}
 
 Provide your analysis in the EXACT JSON format below.
 DO NOT include any markdown formatting like ```json or ```.
