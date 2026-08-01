@@ -157,7 +157,7 @@ export default function CandidateListScreen() {
           label="Refresh"
           variant="secondary"
           size="sm"
-          onPress={() => handleSearchTrigger(searchQuery, filterDept)}
+          onPress={() => refreshCandidates({ query: searchQuery || undefined, department: filterDept || undefined })}
         />
       </View>
 
@@ -169,7 +169,6 @@ export default function CandidateListScreen() {
             value={searchQuery}
             onChangeText={(text) => {
               setSearchQuery(text);
-              handleSearchTrigger(text, filterDept);
             }}
             placeholder="Search by candidate name, skill, title or natural language (e.g. Senior Python Developer)..."
           />
@@ -189,13 +188,12 @@ export default function CandidateListScreen() {
             onChange={(val) => setFilterClassification(val as 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED')}
           />
           <TextField
-            label=""
+            label="Department / Role Filter"
             value={filterDept}
-            onChangeText={(dept) => {
-              setFilterDept(dept);
-              handleSearchTrigger(searchQuery, dept);
+            onChangeText={(text) => {
+              setFilterDept(text);
             }}
-            placeholder="Filter by specific department (e.g. Engineering)..."
+            placeholder="e.g. Engineering, Sales..."
           />
         </View>
 

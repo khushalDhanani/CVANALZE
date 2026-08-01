@@ -1,21 +1,33 @@
 // API Type Definitions for CV Analyzer Backend Integration
 
 export interface JobOpening {
-  VacancyID: number;
-  VacancyTitle: string;
-  DepartmentID?: number | null;
-  DepartmentName?: string | null;
-  ExperienceYearReqMin?: number | null;
-  ExperienceYearReqMax?: number | null;
-  QualificationReq?: string | null;
-  SalaryMin?: number | null;
-  SalaryMax?: number | null;
-  SkillsReq?: string | null;
-  MandatorySkillsReq?: string | null;
-  JobDescription?: string | null;
-  KeyResponsibilities?: string | null;
-  PreferredKeywords?: string | null;
-  TargetDomainExperience?: string | null;
+  id: string;
+  title: string;
+  department: string;
+  required_skills: string[];
+  preferred_keywords: string[];
+  min_experience_years?: number | null;
+  max_experience_years?: number | null;
+  min_ctc?: number | null;
+  max_ctc?: number | null;
+  preferred_gender?: string | null;
+  company_name?: string | null;
+  location_name?: string | null;
+  
+  job_description?: string | null;
+  responsibilities?: string | null;
+  education?: string | null;
+  certifications?: string | null;
+
+  vacancy_id?: number | null;
+  job_profile_id?: number | null;
+  company_id?: number | null;
+  department_id?: number | null;
+  department_name?: string | null;
+  location_id?: number | null;
+
+  domain?: string | null;
+  job_family?: string | null;
 }
 
 export interface CVMatchRequest {
@@ -402,12 +414,6 @@ export interface CandidateSearchResponse {
   candidates: CandidateSummary[];
 }
 
-export interface CareerTransition {
-  target_role: string;
-  transferable_skills: string[];
-  feasibility_score: number;
-  growth_note: string;
-}
 
 export interface MissingQualification {
   requirement: string;
@@ -422,13 +428,18 @@ export interface CandidateRecommendationsResponse {
   primary_department?: string;
   strengths?: string[];
   overall_match_confidence?: number;
-  actionable_suggestions?: string[];
   best_vacancies?: any[];
   related_skills?: string[];
   missing_qualifications?: MissingQualification[];
   recommended_certifications?: string[];
-  career_transitions?: CareerTransition[];
   talent_pools?: string[];
+  hiring_recommendation?: 'HIRE' | 'CONSIDER' | 'REJECT';
+  role_department_fit?: string;
+  interview_focus_areas?: string[];
+  risk_flags?: string[];
+  experience_assessment?: string;
+  technical_vs_functional_fit?: string;
+  next_steps_for_interviewer?: string[];
 }
 
 export interface SkillGapInsight {

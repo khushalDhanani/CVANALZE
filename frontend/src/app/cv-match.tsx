@@ -62,7 +62,7 @@ export default function CvMatchScreen() {
     setTextError(null);
     try {
       const result = await matchService.analyzeCvText(cvText);
-      setTextAnalysis(result);
+      setTextAnalysis(result as any);
     } catch (err: any) {
       setTextError(err.message || 'Failed to analyze CV text');
     } finally {

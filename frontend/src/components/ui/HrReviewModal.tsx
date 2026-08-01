@@ -56,7 +56,7 @@ export function HrReviewModal({
         job_id: Number(job.job_id),
         corrected_score: numScore,
         corrected_classification: classification,
-        feedback_notes: feedbackNotes || null,
+        feedback_notes: feedbackNotes || "",
       });
       setSuccess(true);
       setTimeout(() => {
