@@ -84,6 +84,13 @@ class PipelineStageMetrics(BaseModel):
     json_loading_ms: float = 0.0
     vacancy_retrieval_ms: float = 0.0
     prefilter_ms: float = 0.0
+    candidate_context_ms: float = 0.0
+    vacancy_context_ms: float = 0.0
+    evaluator_requirement_ms: float = 0.0
+    evaluator_transition_ms: float = 0.0
+    evaluator_component_ms: float = 0.0
+    evaluator_cross_domain_ms: float = 0.0
+    evaluator_recommendation_ms: float = 0.0
     prompt_construction_ms: float = 0.0
     token_count: int = 0
     context_char_count: int = 0
@@ -97,6 +104,8 @@ class PipelineStageMetrics(BaseModel):
     vacancies_before_filtering: int = 0
     vacancies_after_filtering: int = 0
     cache_hit: bool = False
+    cache_hits: int = 0
+    cache_misses: int = 0
     average_cv_processing_ms: float = 0.0
 
 

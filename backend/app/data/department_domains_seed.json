@@ -1,0 +1,244 @@
+{
+  "domains": [
+    {
+      "department_id": 9,
+      "department_name": "CIS Team",
+      "domain_name": "Information Technology & Software",
+      "keywords": [
+        "developer",
+        "engineer",
+        "software",
+        "flutter",
+        "react",
+        "frontend",
+        "backend",
+        "full stack",
+        "fullstack",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "dart",
+        "c#",
+        "dotnet",
+        "sql",
+        "api",
+        "mobile",
+        "ios",
+        "android",
+        "devops",
+        "cloud",
+        "aws",
+        "azure",
+        "docker",
+        "kubernetes",
+        "database",
+        "ui/ux",
+        "web",
+        "coding",
+        "code"
+      ],
+      "default_roles": [
+        "Software Developer",
+        "Full Stack Engineer",
+        "Frontend/Mobile Engineer",
+        "Backend Developer"
+      ],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 8,
+      "department_name": "Finance Team",
+      "domain_name": "Finance & Accounting",
+      "keywords": [
+        "finance",
+        "financial",
+        "accounting",
+        "accountant",
+        "audit",
+        "tax",
+        "ca",
+        "cpa",
+        "cfa",
+        "tally",
+        "ledger",
+        "payroll",
+        "budgeting",
+        "forecasting",
+        "treasury",
+        "billing",
+        "valuation"
+      ],
+      "default_roles": [
+        "Financial Analyst",
+        "Accountant",
+        "Finance Manager",
+        "Audit Specialist"
+      ],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 10,
+      "department_name": "HR & IR Team",
+      "domain_name": "Human Resources",
+      "keywords": [
+        "hr",
+        "human resources",
+        "recruitment",
+        "recruiter",
+        "talent acquisition",
+        "onboarding",
+        "employee relations",
+        "performance management",
+        "hrbp",
+        "payroll management",
+        "people operations"
+      ],
+      "default_roles": [
+        "HR Executive",
+        "Talent Acquisition Specialist",
+        "HR Generalist",
+        "Recruiter"
+      ],
+      "priority": 3,
+      "is_active": true
+    },
+    {
+      "department_id": 23,
+      "department_name": "Maintenance Team - 1 (Ramesh Maurya)",
+      "domain_name": "Plant & Maintenance Engineering",
+      "keywords": [
+        "plant",
+        "maintenance",
+        "mechanical",
+        "electrical",
+        "utility",
+        "instrumentation",
+        "boiler",
+        "hvac",
+        "plc",
+        "scada",
+        "equipment",
+        "preventive maintenance",
+        "technician",
+        "machinery",
+        "fabrication"
+      ],
+      "default_roles": [
+        "Plant Maintenance Engineer",
+        "Maintenance Technician",
+        "Mechanical Engineer",
+        "Plant Assistant"
+      ],
+      "priority": 4,
+      "is_active": true
+    },
+    {
+      "department_id": 16,
+      "department_name": "Sales Team",
+      "domain_name": "Sales & Marketing",
+      "keywords": [
+        "sales",
+        "marketing",
+        "business development",
+        "b2b",
+        "b2c",
+        "digital marketing",
+        "seo",
+        "sem",
+        "lead generation",
+        "account management",
+        "branding",
+        "campaigns",
+        "client relationship"
+      ],
+      "default_roles": [
+        "Sales Executive",
+        "Business Development Manager",
+        "Digital Marketing Specialist",
+        "Account Executive"
+      ],
+      "priority": 5,
+      "is_active": true
+    },
+    {
+      "department_id": 6,
+      "department_name": "EHS Team",
+      "domain_name": "Quality & EHS",
+      "keywords": [
+        "quality assurance",
+        "qa",
+        "qc",
+        "ehs",
+        "safety",
+        "environmental",
+        "iso",
+        "compliance",
+        "inspection",
+        "audit",
+        "safety officer",
+        "quality control"
+      ],
+      "default_roles": [
+        "Quality Assurance Engineer",
+        "EHS Specialist",
+        "Quality Control Inspector"
+      ],
+      "priority": 6,
+      "is_active": true
+    },
+    {
+      "department_id": 11,
+      "department_name": "Procurement Team",
+      "domain_name": "Supply Chain & Operations",
+      "keywords": [
+        "supply chain",
+        "logistics",
+        "procurement",
+        "inventory",
+        "warehouse",
+        "store keeper",
+        "purchase",
+        "vendor",
+        "distribution",
+        "operations manager"
+      ],
+      "default_roles": [
+        "Supply Chain Executive",
+        "Logistics Coordinator",
+        "Procurement Officer",
+        "Operations Manager"
+      ],
+      "priority": 7,
+      "is_active": true
+    },
+    {
+      "department_id": null,
+      "department_name": "Healthcare & Clinical",
+      "domain_name": "Healthcare & Clinical",
+      "keywords": [
+        "clinical",
+        "nurse",
+        "nursing",
+        "doctor",
+        "physician",
+        "patient",
+        "medical",
+        "hospital",
+        "pharma",
+        "pharmacist",
+        "laboratory"
+      ],
+      "default_roles": [
+        "Staff Nurse",
+        "Medical Officer",
+        "Clinical Specialist",
+        "Pharmacist"
+      ],
+      "priority": 8,
+      "is_active": true
+    }
+  ]
+}

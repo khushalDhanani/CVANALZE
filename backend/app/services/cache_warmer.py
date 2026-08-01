@@ -7,6 +7,7 @@ from app.core.cache import master_data_cache_manager
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 from app.models.org import OrgCompanyMst, OrgDepartmentMst, OrgJobProfileMst
 from app.repositories.job import JobRepository
 
@@ -129,6 +130,32 @@ def warm_skills() -> list[dict[str, Any]]:
         db.close()
 
 
+def warm_department_domains() -> int:
+    if SessionLocal is None:
+        logger.warning("cache_warmer.warm_department_domains: No DB session.")
+        return 0
+    try:
+        from app.repositories.department_domain import department_domain_repository
+        department_domain_repository.refresh_cache()
+        count = len(department_domain_repository.get_all_domains())
+        logger.info(f"[WARM] Department domains refreshed: {count} domains cached.")
+        return count
+    except Exception as exc:
+        logger.error(f"[WARM] Department domain refresh failed: {exc}")
+        return 0
+
+
+def warm_rule_config() -> int:
+    """Reload, validate, and atomically swap the rule config from rule_config.json."""
+    try:
+        config = RuleConfigManager.load_config()
+        logger.info(f"[WARM] Rule config reloaded: v{config.version}.")
+        return 1
+    except Exception as exc:
+        logger.error(f"[WARM] Rule config reload failed: {exc}")
+        return 0
+
+
 def warm_all() -> dict[str, int]:
     counts: dict[str, int] = {}
     try:
@@ -151,6 +178,14 @@ def warm_all() -> dict[str, int]:
         counts["skills"] = len(warm_skills())
     except Exception as exc:
         logger.error(f"[WARM] Skills refresh failed: {exc}")
+    try:
+        counts["department_domains"] = warm_department_domains()
+    except Exception as exc:
+        logger.error(f"[WARM] Department domain refresh failed: {exc}")
+    try:
+        counts["rule_config"] = warm_rule_config()
+    except Exception as exc:
+        logger.error(f"[WARM] Rule config reload failed: {exc}")
     logger.info(f"[WARM] All master data refreshed: {counts}")
     return counts
 

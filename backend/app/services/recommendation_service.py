@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.core.config import settings
 from app.core.logging import logger
 from app.repositories.job import JobRepository
 from app.repositories.result import ResultRepository
@@ -20,6 +21,9 @@ class RecommendationService:
     Embeddings are used strictly for retrieval and semantic expansion while preserving deterministic validation & scoring.
     """
 
+    # (Hardcoded DOMAIN_CERTIFICATIONS and _FALLBACK_CERTIFICATIONS have been removed.
+    # Certifications and limits are now dynamically derived via JobRepository and app.core.config.settings)
+
     @classmethod
     def get_candidate_recommendations(cls, candidate_id: str) -> dict[str, Any]:
         cid = candidate_id.strip()
@@ -36,7 +40,7 @@ class RecommendationService:
             return {
                 "candidate_id": cv_key,
                 "full_name": cv_key,
-                "primary_department": "General",
+                "primary_department": "Unspecified",
                 "strengths": [],
                 "overall_match_confidence": 0.0,
                 "actionable_suggestions": [],
@@ -61,29 +65,47 @@ class RecommendationService:
             or r.get("candidate_name")
             or cv_key
         )
+        all_jobs = JobRepository.get_all_jobs()
+        # Dynamically derive fallback department from the most common department among active jobs
+        fallback_dept = "Unspecified"
+        if all_jobs:
+            dept_counts = {}
+            for j in all_jobs:
+                d = j.get("department_name") or j.get("department")
+                if d and isinstance(d, str):
+                    dept_counts[d] = dept_counts.get(d, 0) + 1
+            if dept_counts:
+                fallback_dept = max(dept_counts, key=dept_counts.get)
+
         primary_dept = (
             match_analysis.get("primary_department")
             or match_analysis.get("recommended_department")
             or best_match.get("department")
-            or "Engineering"
+            or fallback_dept
         ).title()
+        
         prof_domain = (
             match_analysis.get("professional_domain")
-            or "General Operations"
+            or fallback_dept
         )
 
-        # 1. Extract candidate skills
+        # 1. Extract candidate skills (structured skills + fallback to work experience extraction)
         raw_cand_skills = resume_json.get("skills") or best_match.get("matched_skills") or []
         if isinstance(raw_cand_skills, list):
             candidate_skills = [s for s in raw_cand_skills if isinstance(s, str) and s.strip()]
         elif isinstance(raw_cand_skills, dict):
-            candidate_skills = [
-                s for sub in raw_cand_skills.values()
-                if isinstance(sub, list)
-                for s in sub if isinstance(s, str) and s.strip()
-            ]
+            candidate_skills = []
+            if isinstance(raw_cand_skills.get("all_skills"), list):
+                candidate_skills.extend(s for s in raw_cand_skills["all_skills"] if isinstance(s, str) and s.strip())
+            for sub in raw_cand_skills.values():
+                if isinstance(sub, list):
+                    candidate_skills.extend(s for s in sub if isinstance(s, str) and s.strip() and s not in candidate_skills)
         else:
             candidate_skills = []
+
+        # When structured skills are empty, extract key terms from work experience
+        if not candidate_skills:
+            candidate_skills = cls._extract_skills_from_work_experience(resume_json, r.get("text") or r.get("markdown") or "", all_jobs)
 
         cand_skills_lower_set = {s.lower() for s in candidate_skills}
 
@@ -112,7 +134,7 @@ class RecommendationService:
         # 2. Best Vacancies for Candidate (Deterministic Scoring Engine authority)
         suitable_openings = match_analysis.get("suitable_openings") or []
         best_vacancies = []
-        for vac in suitable_openings[:5]:
+        for vac in suitable_openings[:settings.MAX_RECOMMENDED_VACANCIES]:
             if isinstance(vac, dict):
                 best_vacancies.append({
                     "vacancy_id": vac.get("vacancy_id") or vac.get("id") or vac.get("job_id"),
@@ -135,14 +157,14 @@ class RecommendationService:
                 if eq_term.lower() not in cand_skills_lower_set:
                     related_skills_set.add(eq_term)
 
-        related_skills = list(related_skills_set)[:8]
+        related_skills = list(related_skills_set)[:settings.MAX_RELATED_SKILLS]
 
         # 4. Missing Qualifications & Skill Gap Insights (Aggregated across suitable openings)
         missing_quals = []
         seen_gaps = set()
 
         openings_to_check = suitable_openings if suitable_openings else ([best_match] if best_match else [])
-        for vac in openings_to_check[:3]:
+        for vac in openings_to_check[:settings.MAX_MISSING_QUALS]:
             if not isinstance(vac, dict):
                 continue
             job_title = vac.get("job_title") or "Target Vacancy"
@@ -183,9 +205,8 @@ class RecommendationService:
                         "actionable_suggestion": f"Address {mc} to strengthen profile alignment.",
                     })
 
-        # 5. Dynamic Recommended Certifications (Evidence-based from active JobRepository vacancies)
+        # 5. Dynamic Recommended Certifications (Domain-aware + evidence-based from active vacancies)
         recommended_certs = []
-        all_jobs = JobRepository.get_all_jobs()
         domain_jobs = [
             j for j in all_jobs
             if isinstance(j, dict) and (
@@ -196,13 +217,11 @@ class RecommendationService:
         if not domain_jobs:
             domain_jobs = [j for j in all_jobs if isinstance(j, dict)]
 
-        cert_keywords = [
-            "AWS Certified", "Kubernetes", "CKA", "SysOps", "Terraform", "CCNA",
-            "PMP", "Scrum Master", "PSM", "CSPO", "ISTQB", "Selenium", "SHRM", "PHR",
-            "Azure", "GCP", "Databricks", "CISSP", "CPA", "TOGAF"
-        ]
-
+        # Resolve domain-aware certification keywords dynamically from domain jobs
+        import re
+        cert_pattern = re.compile(r'\b([A-Z][a-zA-Z0-9-]*\s+(?:Certification|Certified|License))\b', re.IGNORECASE)
         found_job_certs = set()
+
         for j in domain_jobs:
             req_text = " ".join([
                 str(j.get("QualificationReq") or ""),
@@ -211,68 +230,75 @@ class RecommendationService:
                 str(j.get("PreferredKeywords") or ""),
                 str(j.get("title") or j.get("JobTitle") or ""),
             ])
-            for kw in cert_keywords:
-                if kw.lower() in req_text.lower():
-                    if not any(kw.lower() in ec.lower() for ec in existing_certs_lower):
-                        found_job_certs.add(kw)
+            matches = cert_pattern.findall(req_text)
+            for m in matches:
+                kw = m.strip().title()
+                if not any(kw.lower() in ec.lower() for ec in existing_certs_lower):
+                    found_job_certs.add(kw)
 
-        recommended_certs = [f"{c} Certification" if not c.lower().endswith("certification") else c for c in sorted(list(found_job_certs))[:4]]
+        recommended_certs = sorted(list(found_job_certs))[:settings.MAX_RECOMMENDED_CERTS]
 
-        # 6. Dynamic Career Transition Opportunities (Calculated skill overlap against active jobs)
-        career_transitions = []
-        cand_role = (best_match.get("job_title") or prof_domain).lower()
+        # 6. Hiring-focused Metrics
+        if overall_confidence >= 80:
+            hiring_rec = "HIRE"
+        elif overall_confidence >= 60:
+            hiring_rec = "CONSIDER"
+        else:
+            hiring_rec = "REJECT"
 
-        for j in all_jobs:
-            if not isinstance(j, dict):
-                continue
-            job_title = j.get("title") or j.get("JobTitle") or j.get("vacancy_name")
-            if not job_title or job_title.lower() in cand_role or cand_role in job_title.lower():
-                continue
+        role_dept_fit = f"Strong alignment for {primary_dept} roles based on {prof_domain} experience." if overall_confidence >= 70 else f"Marginal fit for {primary_dept}; requires validation of {prof_domain} transferability."
 
-            raw_j_skills = j.get("required_skills") or j.get("SkillsReq") or []
-            if isinstance(raw_j_skills, str):
-                j_skills = [s.strip().lower() for s in raw_j_skills.split(",") if s.strip()]
-            elif isinstance(raw_j_skills, list):
-                j_skills = [str(s).strip().lower() for s in raw_j_skills if str(s).strip()]
-            else:
-                j_skills = []
+        # Generate Interview Focus Areas
+        interview_focus_areas = []
+        if missing_quals:
+            interview_focus_areas.append(f"Probe deeply on gaps: {missing_quals[0].get('requirement', 'Technical requirements')}")
+        if candidate_skills:
+            interview_focus_areas.append(f"Validate claimed expertise in {candidate_skills[0].title()} and {candidate_skills[1].title() if len(candidate_skills) > 1 else 'core domain tools'}.")
+        interview_focus_areas.append(f"Assess cultural and departmental fit for {primary_dept}.")
 
-            if not j_skills:
-                continue
+        # Generate Risk Flags
+        risk_flags = []
+        for qual in missing_quals:
+            if "Mandatory" in qual.get("requirement", "") or "Critical" in qual.get("impact", ""):
+                risk_flags.append(qual.get("requirement"))
+        
+        exp_years = (r.get("quality_metrics") or {}).get("experience_years") or 0.0
+        exp_tier = "Junior"
+        for tier, threshold in sorted(settings.EXPERIENCE_BANDS.items(), key=lambda x: x[1], reverse=True):
+            if exp_years >= threshold:
+                exp_tier = tier
+                break
 
-            matching_skills = [s for s in candidate_skills if s.lower() in j_skills or any(s.lower() in js for js in j_skills)]
-            overlap_pct = (len(matching_skills) / len(j_skills)) * 100.0 if j_skills else 0.0
+        if exp_years < 1.0:
+            risk_flags.append("Limited professional experience verified in profile.")
 
-            if overlap_pct >= 40.0:
-                feasibility_score = round(min(95.0, max(40.0, overlap_pct)), 1)
-                transferable = [s.title() for s in matching_skills[:3]] if matching_skills else candidate_skills[:2]
-                career_transitions.append({
-                    "target_role": job_title,
-                    "transferable_skills": transferable,
-                    "feasibility_score": feasibility_score,
-                    "growth_note": f"Demonstrates strong skill overlap ({len(matching_skills)} matching requirements) with core strengths in {', '.join(transferable[:2])}.",
-                })
+        # Experience & Seniority Assessment
+        experience_assessment = f"Assessed as {exp_tier} level with approximately {exp_years} years of relevant domain experience."
 
-        career_transitions.sort(key=lambda x: x["feasibility_score"], reverse=True)
+        # Technical vs Functional Fit
+        tech_vs_func = "Balanced technical and functional foundation."
+        if candidate_skills and len(candidate_skills) > 5:
+            tech_vs_func = "Heavy technical lean; recommend assessing functional communication skills."
 
         # 7. Internal Talent Pools (Evidence-based classification)
-        exp_years = (r.get("quality_metrics") or {}).get("experience_years") or 0.0
-        exp_tier = "Senior" if exp_years >= 5.0 else ("Mid-Level" if exp_years >= 2.0 else "Junior")
         talent_pools = [
             f"{primary_dept} - {exp_tier} Talent Pool",
         ]
         if candidate_skills:
             talent_pools.append(f"{candidate_skills[0].title()} Specialists Pool")
 
-        # 8. Actionable Suggestions
-        actionable_suggestions = []
-        for qual in missing_quals[:2]:
+        # 8. Actionable Next Steps
+        next_steps = []
+        if hiring_rec == "HIRE":
+            next_steps.append("Fast-track to technical screening.")
+        elif hiring_rec == "CONSIDER":
+            next_steps.append("Schedule introductory call to clarify experience gaps.")
+        else:
+            next_steps.append("Keep in talent pool for future junior roles.")
+        
+        for qual in missing_quals[:1]:
             if qual.get("actionable_suggestion"):
-                actionable_suggestions.append(qual["actionable_suggestion"])
-        if recommended_certs:
-            actionable_suggestions.append(f"Consider obtaining {recommended_certs[0]} to enhance domain qualifications.")
-        if career_transitions:
-            actionable_suggestions.append(f"Potential transition path to {career_transitions[0]['target_role']} with {career_transitions[0]['feasibility_score']}% skill feasibility.")
+                next_steps.append(qual["actionable_suggestion"])
 
         return {
             "candidate_id": cv_key,
@@ -280,14 +306,76 @@ class RecommendationService:
             "primary_department": primary_dept,
             "strengths": strengths,
             "overall_match_confidence": overall_confidence,
-            "actionable_suggestions": actionable_suggestions,
             "best_vacancies": best_vacancies,
             "related_skills": related_skills,
             "missing_qualifications": missing_quals,
             "recommended_certifications": recommended_certs,
-            "career_transitions": career_transitions[:3],
             "talent_pools": talent_pools,
+            "hiring_recommendation": hiring_rec,
+            "role_department_fit": role_dept_fit,
+            "interview_focus_areas": interview_focus_areas,
+            "risk_flags": risk_flags,
+            "experience_assessment": experience_assessment,
+            "technical_vs_functional_fit": tech_vs_func,
+            "next_steps_for_interviewer": next_steps,
         }
+
+    @classmethod
+    def _extract_skills_from_work_experience(
+        cls,
+        resume_json: dict[str, Any] | None,
+        cv_text: str,
+        all_jobs: list[dict[str, Any]],
+    ) -> list[str]:
+        """
+        Extracts meaningful skill/technology terms from work experience
+        responsibilities and CV text when structured skills are empty.
+        Uses dynamic required skills from active jobs as the taxonomy.
+        """
+        # Dynamically build skill taxonomy from all active jobs
+        _SKILL_TERMS = set()
+        for j in all_jobs:
+            if not isinstance(j, dict):
+                continue
+            raw_j_skills = j.get("required_skills") or j.get("SkillsReq") or []
+            if isinstance(raw_j_skills, str):
+                for s in raw_j_skills.split(","):
+                    if s.strip():
+                        _SKILL_TERMS.add(s.strip().lower())
+            elif isinstance(raw_j_skills, list):
+                for s in raw_j_skills:
+                    if str(s).strip():
+                        _SKILL_TERMS.add(str(s).strip().lower())
+
+        found_skills: list[str] = []
+        seen: set[str] = set()
+
+        # Build search text from work experience + CV text
+        search_parts: list[str] = []
+        if resume_json:
+            for exp in resume_json.get("work_experience") or []:
+                if not isinstance(exp, dict):
+                    continue
+                for resp in exp.get("responsibilities") or []:
+                    if isinstance(resp, str):
+                        search_parts.append(resp)
+                if exp.get("description"):
+                    search_parts.append(str(exp["description"]))
+        if cv_text:
+            search_parts.append(cv_text)
+
+        search_text = " ".join(search_parts).lower()
+        if not search_text.strip():
+            return []
+
+        for term in _SKILL_TERMS:
+            if term in search_text and term not in seen:
+                found_skills.append(term.title())
+                seen.add(term)
+            if len(found_skills) >= 10:
+                break
+
+        return found_skills
 
     @classmethod
     def get_vacancy_recommendations(cls, vacancy_id: str) -> dict[str, Any]:
@@ -353,11 +441,11 @@ class RecommendationService:
         return {
             "vacancy_id": vid_str,
             "job_title": vac_title,
-            "department": target_job.get("department_name") or target_job.get("department"),
+            "department": target_job.get("department_name") or target_job.get("department") or "Unspecified",
             "top_candidate_matches": top_candidate_matches,
             "similar_candidates": top_candidate_matches[:3],
             "skill_gap_insights": skill_gap_insights,
-            "talent_pools": [f"{target_job.get('department', 'Engineering')} Pool"],
+            "talent_pools": [f"{target_job.get('department_name') or target_job.get('department') or 'General'} Pool"],
         }
 
     @classmethod
@@ -371,7 +459,7 @@ class RecommendationService:
                 continue
             cv_key = str(r.get("id") or r.get("filename") or "")
             dept = str(
-                (r.get("match_analysis") or {}).get("primary_department") or "Engineering"
+                (r.get("match_analysis") or {}).get("primary_department") or "Unspecified"
             ).title()
             pool_name = f"{dept} Talent Pool"
 

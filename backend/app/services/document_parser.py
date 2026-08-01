@@ -110,11 +110,8 @@ class TextSanitizer:
         text = "\n".join(cleaned_lines)
 
         # 3. Normalize common heading variations
-        text = re.sub(r"##\s*WORK\s+EXPERIENCE", "## WORK EXPERIENCE", text, flags=re.IGNORECASE)
-        text = re.sub(r"##\s*EDUCATION", "## EDUCATION", text, flags=re.IGNORECASE)
-        text = re.sub(r"##\s*SKILLS", "## SKILLS", text, flags=re.IGNORECASE)
-        text = re.sub(r"##\s*PROJECTS", "## PROJECTS", text, flags=re.IGNORECASE)
-        text = re.sub(r"##\s*CONTACT", "## CONTACT", text, flags=re.IGNORECASE)
+        for pattern, replacement in RuleConfigManager.get_compiled_heading_normalizations():
+            text = pattern.sub(replacement, text)
 
         # 3.5 Remove consecutive duplicate headings
         lines = text.splitlines()
@@ -154,40 +151,35 @@ class QualityMetricsCalculator:
         words = re.findall(r"\b[a-zA-Z0-9_+-]+\b", clean_text)
         word_count = len(words)
 
-        section_patterns = {
-            "contact": r"\b(contact|email|phone|address|linkedin|github|location)\b",
-            "summary": r"\b(summary|profile|about|objective|overview)\b",
-            "experience": r"\b(experience|employment|work history|career|work experience)\b",
-            "education": r"\b(education|academic|qualification|university|degree|college)\b",
-            "skills": r"\b(skills|technical skills|technologies|expertise|competencies)\b",
-            "certifications": r"\b(certifications|certificates|licenses|courses)\b",
-            "projects": r"\b(projects|key projects|personal projects)\b",
-        }
+        resume_quality = RuleConfigManager.get_resume_quality_rules()
+        section_patterns = RuleConfigManager.get_compiled_section_patterns()
 
         text_lower = clean_text.lower()
         sections_detected = []
         for sec_name, pattern in section_patterns.items():
-            if re.search(pattern, text_lower):
+            if pattern.search(text_lower):
                 sections_detected.append(sec_name)
 
-        core_sections = {"contact", "summary", "experience", "education", "skills"}
+        core_sections = set(resume_quality.core_sections)
         detected_core = [s for s in sections_detected if s in core_sections]
-        section_score = len(detected_core) * 0.10
+        section_score = len(detected_core) * resume_quality.section_weight
         has_email = bool(re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", clean_text))
         has_phone = bool(re.search(r"(\+?\d{1,4}[\s.-]?)?\(?\d{3,5}\)?[\s.-]?\d{3,5}[\s.-]?\d{3,5}", clean_text))
         loc_name, loc_conf = ResumeJsonExtractor.extract_location(clean_text.splitlines())
-        has_location = loc_name is not None and loc_conf >= 0.50
-        contact_score = (0.10 if has_email else 0) + (0.10 if has_phone else 0) + (0.05 if has_location else 0)
+        has_location = loc_name is not None and loc_conf >= resume_quality.location_acceptance_min_confidence
+        contact_weights = resume_quality.contact_weights
+        contact_score = (
+            (contact_weights.get("email", 0.10) if has_email else 0)
+            + (contact_weights.get("phone", 0.10) if has_phone else 0)
+            + (contact_weights.get("location", 0.05) if has_location else 0)
+        )
 
         words_per_page = word_count / max(page_count, 1)
-        if words_per_page >= 150:
-            density_score = 0.25
-        elif words_per_page >= 80:
-            density_score = 0.20
-        elif words_per_page >= 30:
-            density_score = 0.10
-        else:
-            density_score = 0.05
+        density_score = 0.05
+        for tier in resume_quality.density_scores:
+            if words_per_page >= tier.min_words_per_page:
+                density_score = tier.score
+                break
 
         completeness_score = round(min(1.0, section_score + contact_score + density_score), 2)
 

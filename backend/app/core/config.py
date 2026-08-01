@@ -66,6 +66,16 @@ class Settings(BaseSettings):
     # Matching Logic Version (bump when scoring/ranking logic changes)
     MATCHING_VERSION: str = "1.0.0"
 
+    # Recommendation Engine Configuration
+    CAREER_TRANSITION_MIN_OVERLAP: float = 40.0
+    CAREER_TRANSITION_MAX_SCORE: float = 95.0
+    MAX_RECOMMENDED_VACANCIES: int = 5
+    MAX_RELATED_SKILLS: int = 8
+    MAX_RECOMMENDED_CERTS: int = 4
+    MAX_MISSING_QUALS: int = 3
+    MAX_CAREER_TRANSITIONS: int = 3
+    EXPERIENCE_BANDS: dict[str, float] = {"Senior": 5.0, "Mid-Level": 2.0, "Junior": 0.0}
+
     # Training Data Configuration
     TRAINING_DATA_DIR: Path = Path("uploads/training_data")
 

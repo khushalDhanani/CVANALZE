@@ -1,9 +1,11 @@
+# backend/app/repositories/job.py
 import hashlib
 import json
-import re
-from typing import Any
+import threading
+import time
+from datetime import UTC
+from typing import Any, ClassVar
 
-from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.cache import CacheInvalidator, vacancy_cache_manager
@@ -11,26 +13,92 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.jobs import DEFAULT_JOB_OPENINGS
 from app.core.logging import logger
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_sync_service import EmbeddingSyncService
+from app.services.job_preprocessor import JobPreprocessor
 from app.services.vacancy_service import VacancyService
-from app.services.job_taxonomy import TaxonomyClassifier
-
 
 VACANCY_CACHE_KEY = "all_jobs"
 
 
+class RepositoryMetrics:
+    """Thread-safe telemetry metrics for JobRepository operations."""
+
+    _lock = threading.RLock()
+    cache_hits: int = 0
+    cache_misses: int = 0
+    db_fetch_count: int = 0
+    db_fetch_time_total_ms: float = 0.0
+    staleness_check_count: int = 0
+    staleness_check_time_total_ms: float = 0.0
+    total_jobs_loaded: int = 0
+    last_version_hash: str = ""
+    last_loaded_timestamp: str = ""
+
+    @classmethod
+    def record_cache_hit(cls) -> None:
+        with cls._lock:
+            cls.cache_hits += 1
+
+    @classmethod
+    def record_cache_miss(cls) -> None:
+        with cls._lock:
+            cls.cache_misses += 1
+
+    @classmethod
+    def record_db_fetch(cls, duration_ms: float, job_count: int, version: str) -> None:
+        with cls._lock:
+            cls.db_fetch_count += 1
+            cls.db_fetch_time_total_ms += duration_ms
+            cls.total_jobs_loaded = job_count
+            cls.last_version_hash = version
+            from datetime import datetime
+            cls.last_loaded_timestamp = datetime.now(UTC).isoformat()
+
+    @classmethod
+    def record_staleness_check(cls, duration_ms: float) -> None:
+        with cls._lock:
+            cls.staleness_check_count += 1
+            cls.staleness_check_time_total_ms += duration_ms
+
+    @classmethod
+    def get_metrics(cls) -> dict[str, Any]:
+        with cls._lock:
+            avg_db_fetch_ms = (
+                round(cls.db_fetch_time_total_ms / cls.db_fetch_count, 2)
+                if cls.db_fetch_count > 0
+                else 0.0
+            )
+            avg_stale_ms = (
+                round(cls.staleness_check_time_total_ms / cls.staleness_check_count, 2)
+                if cls.staleness_check_count > 0
+                else 0.0
+            )
+            return {
+                "cache_hits": cls.cache_hits,
+                "cache_misses": cls.cache_misses,
+                "db_fetch_count": cls.db_fetch_count,
+                "average_db_fetch_time_ms": avg_db_fetch_ms,
+                "staleness_check_count": cls.staleness_check_count,
+                "average_staleness_check_time_ms": avg_stale_ms,
+                "total_jobs_loaded": cls.total_jobs_loaded,
+                "last_version_hash": cls.last_version_hash,
+                "last_loaded_timestamp": cls.last_loaded_timestamp,
+            }
+
+
 class JobRepository:
     """
-    Repository for accessing Job Openings.
-    Queries live MSSQL DB vacancies when available, with fallback to DEFAULT_JOB_OPENINGS.
-    Uses CacheManager (Memory L1 + Redis L2) with version-aware caching:
-    only re-fetches from DB when the underlying data actually changes.
+    Enterprise Data Access Repository for Job Openings.
+    Queries live MSSQL DB vacancies when available, with graceful fallback to DEFAULT_JOB_OPENINGS.
+    Uses CacheManager (Memory L1 + Redis L2) with version-aware caching.
+    Business logic (taxonomy, embedding sync) is decoupled into dedicated services.
     """
 
     _VACANCY_CACHE_KEY = VACANCY_CACHE_KEY
     _VERSION_CACHE_KEY = "all_jobs_version"
-    _STALENESS_CACHE: dict[str, tuple[float, bool]] = {}
+    _STALENESS_CACHE: ClassVar[dict[str, tuple[float, bool]]] = {}
     _STALENESS_TTL = 10.0
+    _VACANCY_EMBEDDINGS_CACHED = False
 
     @classmethod
     def invalidate_cache(cls) -> None:
@@ -46,43 +114,6 @@ class JobRepository:
         return hashlib.sha256(json.dumps(identity_pairs).encode()).hexdigest()
 
     @classmethod
-    def _precompute_job_fields(cls, job: dict[str, Any]) -> dict[str, Any]:
-        """Precomputes and caches tokens & taxonomy used by VacancyPreFilter for fast evaluation."""
-        stop_words = {
-            "and", "team", "for", "the", "with",
-            "senior", "junior", "lead", "manager",
-            "specialist",
-        }
-
-        dept_name = (job.get("department_name") or job.get("department") or "").lower()
-        job["_precomputed_dept"] = dept_name
-
-        title = job.get("title", "").lower()
-        title_terms = [
-            t for t in re.split(r"[\s/&()\-,]+", title)
-            if len(t) > 2 and t not in stop_words
-        ]
-        job["_precomputed_title_terms"] = title_terms
-
-        req_skills = job.get("required_skills", [])
-        job["_precomputed_req_skills"] = [s.lower() for s in req_skills if isinstance(s, str)]
-
-        pref_keywords = job.get("preferred_keywords", [])
-        job["_precomputed_pref_keywords"] = [
-            k.lower() for k in pref_keywords if isinstance(k, str)
-        ]
-
-        # Populate Taxonomy Metadata
-        domain, job_family = TaxonomyClassifier.classify_vacancy(job)
-        job["domain"] = domain
-        job["job_family"] = job_family
-        job["_precomputed_domain"] = domain
-        job["_precomputed_job_family"] = job_family
-
-        return job
-
-
-    @classmethod
     def get_all_jobs(cls, db: Session | None = None) -> list[dict[str, Any]]:
         cached_entry = vacancy_cache_manager.get(cls._VACANCY_CACHE_KEY)
         if cached_entry is not None:
@@ -90,21 +121,25 @@ class JobRepository:
                 stored_jobs = cached_entry["jobs"]
                 stored_version = cached_entry["version"]
                 if not cls._is_stale(stored_version, stored_jobs, db):
+                    RepositoryMetrics.record_cache_hit()
                     logger.info("JobRepository.get_all_jobs: CACHE HIT. Returning cached vacancies.")
                     return stored_jobs
                 logger.info("JobRepository.get_all_jobs: Stale version detected. Re-fetching.")
             else:
+                RepositoryMetrics.record_cache_hit()
                 logger.info("JobRepository.get_all_jobs: CACHE HIT (legacy format). Returning cached vacancies.")
                 return cached_entry
 
+        RepositoryMetrics.record_cache_miss()
         logger.info("JobRepository.get_all_jobs: CACHE MISS. Fetching from DB.")
+        t0 = time.perf_counter()
 
         close_session = False
         if db is None and SessionLocal is not None:
             try:
                 db = SessionLocal()
                 close_session = True
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Could not create DB session: {exc}")
                 db = None
 
@@ -115,8 +150,9 @@ class JobRepository:
                 service = VacancyService(db)
                 vacancies = service.get_active_vacancies()
                 if vacancies:
-                    job_dicts = [v.model_dump() for v in vacancies]
-                    job_dicts = [cls._precompute_job_fields(j) for j in job_dicts]
+                    raw_dicts = [v.model_dump() for v in vacancies]
+                    # Delegate job preprocessing to JobPreprocessor
+                    job_dicts = JobPreprocessor.preprocess_job_dicts(raw_dicts)
 
                     unique_dept_ids = sorted(
                         {
@@ -147,16 +183,22 @@ class JobRepository:
 
         if job_dicts_to_return is None:
             logger.warning("JobRepository.get_all_jobs: Using static DEFAULT_JOB_OPENINGS fallback.")
-            job_dicts_to_return = [
-                cls._precompute_job_fields(dict(j)) for j in DEFAULT_JOB_OPENINGS
-            ]
+            job_dicts_to_return = JobPreprocessor.preprocess_job_dicts(
+                [dict(j) for j in DEFAULT_JOB_OPENINGS]
+            )
 
         version = cls._compute_vacancy_hash(job_dicts_to_return)
         vacancy_cache_manager.set(
             cls._VACANCY_CACHE_KEY,
             {"jobs": job_dicts_to_return, "version": version},
         )
-        cls._cache_vacancy_embeddings(job_dicts_to_return)
+        # Delegate embedding sync to EmbeddingSyncService
+        EmbeddingSyncService.sync_vacancy_embeddings(job_dicts_to_return)
+        cls._VACANCY_EMBEDDINGS_CACHED = True
+
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        RepositoryMetrics.record_db_fetch(elapsed_ms, len(job_dicts_to_return), version)
+
         return job_dicts_to_return
 
     @classmethod
@@ -175,11 +217,10 @@ class JobRepository:
         db: Session | None = None,
     ) -> bool:
         """
-        Lightweight staleness check: resolves a DB session if db is None, and checks
-        if live DB vacancies (IDs, titles, count) differ from stored_version/stored_jobs.
+        Lightweight staleness check: checks if live DB vacancies (IDs, titles, count) differ from stored_version.
         Returns True if database vacancies changed, False if up to date.
         """
-        import time
+        t0 = time.perf_counter()
         now = time.monotonic()
         if stored_version in cls._STALENESS_CACHE:
             cached_time, cached_result = cls._STALENESS_CACHE[stored_version]
@@ -191,7 +232,7 @@ class JobRepository:
             try:
                 db = SessionLocal()
                 close_session = True
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning(f"JobRepository._is_stale: Failed resolving DB session: {exc}")
                 db = None
 
@@ -209,15 +250,23 @@ class JobRepository:
                 ORDER BY VacancyRequestID
             """)
             rows = db.execute(query).fetchall()
-            db_pairs = sorted(f"{r[0]}:{r[1]}" for r in rows)
-            db_version = hashlib.sha256(json.dumps(db_pairs).encode()).hexdigest()
+            if rows:
+                db_pairs = sorted(f"{r[0]}:{r[1]}" for r in rows)
+                db_version = hashlib.sha256(json.dumps(db_pairs).encode()).hexdigest()
+                is_stale_result = db_version != stored_version
+            else:
+                is_stale_result = False
 
-            is_stale_result = (db_version != stored_version) or (len(rows) != len(stored_jobs))
             cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
+
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            RepositoryMetrics.record_staleness_check(elapsed_ms)
             return is_stale_result
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             try:
+                db.rollback()
                 from sqlalchemy import func, or_
+
                 from app.models.recruit import RecruitVacancyRequest
                 count = db.query(func.count(RecruitVacancyRequest.VacancyRequestID)).filter(
                     RecruitVacancyRequest.VacancyRequestIsActive == True,
@@ -226,81 +275,19 @@ class JobRepository:
                     or_(RecruitVacancyRequest.VacancyRequestClose == False,
                         RecruitVacancyRequest.VacancyRequestClose.is_(None)),
                 ).scalar() or 0
-                is_stale_result = count != len(stored_jobs)
+                is_stale_result = (count != len(stored_jobs)) if count > 0 else False
                 cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
+
+                elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                RepositoryMetrics.record_staleness_check(elapsed_ms)
                 return is_stale_result
-            except Exception as inner_exc:
+            except Exception as inner_exc:  # noqa: BLE001
                 logger.warning(f"Staleness check failed: {exc} | fallback: {inner_exc}")
                 cls._STALENESS_CACHE[stored_version] = (now, False)
                 return False
         finally:
             if close_session:
                 db.close()
-
-    @classmethod
-    def _cache_vacancy_embeddings(cls, job_dicts: list[dict[str, Any]]) -> None:
-        """
-        Generate and cache semantic vector embeddings for all active vacancies.
-        Uses rich canonical text (Title, Description, Skills, Experience, Education, Certifications, Department, Responsibilities),
-        checks content hashes for incremental updates, and persists embeddings to PostgreSQL and cache manager.
-        """
-        if not settings.EMBEDDING_ENABLED:
-            return
-
-        from app.core.cache import embedding_cache_manager as _ecm
-        from app.services.embedding_service import (
-            EmbeddingService as _es,
-            build_vacancy_canonical_text,
-            save_vacancy_embedding,
-            get_vacancy_embedding,
-        )
-
-        model = settings.EMBEDDING_MODEL
-        uncached: list[tuple[int, dict[str, Any], str, str]] = []  # (vac_id, job, canonical_text, content_hash)
-
-        for job in job_dicts:
-            vac_id = job.get("vacancy_id") or job.get("id")
-            try:
-                vac_id_int = int(vac_id) if vac_id is not None else 0
-            except (ValueError, TypeError):
-                vac_id_int = 0
-
-            canonical_text = build_vacancy_canonical_text(job)
-            if not canonical_text:
-                continue
-
-            content_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
-            job["_canonical_text"] = canonical_text
-            job["_content_hash"] = content_hash
-
-            # Check if embedding already exists in cache or DB for this model and content hash
-            cached_emb = _ecm.get(f"{model}:vac:{content_hash}")
-            if cached_emb is None and vac_id_int > 0:
-                pg_emb, stored_hash = get_vacancy_embedding(vac_id_int)
-                if pg_emb is not None and stored_hash == content_hash:
-                    cached_emb = pg_emb
-                    _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
-
-            if cached_emb is None:
-                uncached.append((vac_id_int, job, canonical_text, content_hash))
-
-        if uncached:
-            uncached_texts = [item[2] for item in uncached]
-            embeddings = _es._call_ollama_batch_embed(model, uncached_texts)
-            if embeddings is not None and len(embeddings) == len(uncached):
-                for (vac_id_int, job, _, content_hash), emb in zip(uncached, embeddings):
-                    if emb:
-                        _ecm.set(f"{model}:vac:{content_hash}", emb)
-                        if vac_id_int > 0:
-                            save_vacancy_embedding(vac_id_int, emb, content_hash)
-
-        cls._VACANCY_EMBEDDINGS_CACHED = True
-        logger.info(
-            f"[VACANCY_EMBEDDINGS] Processed {len(job_dicts)} vacancies: "
-            f"{len(uncached)} newly embedded, {len(job_dicts) - len(uncached)} cached/unchanged."
-        )
-
-    _VACANCY_EMBEDDINGS_CACHED = False
 
     @classmethod
     def get_job_by_id(
@@ -316,3 +303,8 @@ class JobRepository:
             ),
             None,
         )
+
+    @classmethod
+    def get_metrics(cls) -> dict[str, Any]:
+        """Exposes telemetry diagnostics and metrics for JobRepository operations."""
+        return RepositoryMetrics.get_metrics()

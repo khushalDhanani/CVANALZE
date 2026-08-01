@@ -932,8 +932,10 @@ def test_cache_warmer_warm_all_handles_no_db():
     with patch("app.services.cache_warmer.SessionLocal", None):
         counts = warm_all()
         assert isinstance(counts, dict)
-        for v in counts.values():
+        db_backed = {k: v for k, v in counts.items() if k != "rule_config"}
+        for v in db_backed.values():
             assert v == 0
+        assert counts["rule_config"] == 1
 
 
 def test_cache_warmer_warm_vacancies_handles_no_db():
@@ -965,6 +967,7 @@ def test_cli_warmup_does_not_raise():
         assert counts["departments"] == 0
         assert counts["companies"] == 0
         assert counts["skills"] == 0
+        assert counts["rule_config"] == 1
 
 
 def test_docx_upload_full_pipeline():

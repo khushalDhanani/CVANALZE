@@ -701,7 +701,7 @@ class CacheInvalidator:
 
 
 _redis_cache = RedisCache(key_prefix="")
-_memory_cache = MemoryCache(max_size=500)
+_memory_cache = MemoryCache(max_size=5000)
 
 _llm_file_cache = FileCache(settings.UPLOADS_DIR / ".llm_cache")
 _cv_file_cache = FileCache(settings.RESULTS_DIR)

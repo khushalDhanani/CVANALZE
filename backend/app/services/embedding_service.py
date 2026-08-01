@@ -1,3 +1,4 @@
+# backend/app/services/embedding_service.py
 import hashlib
 import json
 import math
@@ -14,7 +15,7 @@ from app.core.logging import logger
 
 def get_embedding(text: str, model_name: str | None = None) -> list[float]:
     """
-    Generate vector embedding for given text using Ollama /api/embeddings endpoint with nomic-embed-text.
+    Generate vector embedding for given text using Ollama /api/embed endpoint.
     Check cache first via EmbeddingService.
     """
     emb = EmbeddingService.generate_embedding(text, model_version=model_name)
@@ -22,25 +23,23 @@ def get_embedding(text: str, model_name: str | None = None) -> list[float]:
         return emb
 
     model = model_name or settings.EMBEDDING_MODEL
-    url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embeddings"
-    payload = {"model": model, "prompt": text}
+    url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
+    payload = {"model": model, "input": text}
     try:
         with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
             resp = client.post(url, json=payload)
+            if resp.status_code == 404:
+                logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
+                raise ValueError(f"Model '{model}' not found in Ollama.")
             resp.raise_for_status()
             data = resp.json()
-            embedding = data.get("embedding")
-            if embedding and isinstance(embedding, list):
-                return embedding
-            # Fallback to /api/embed if /api/embeddings didn't return 'embedding' key
-            embed_url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
-            resp2 = client.post(embed_url, json={"model": model, "input": text})
-            resp2.raise_for_status()
-            data2 = resp2.json()
-            embs = data2.get("embeddings")
+            embs = data.get("embeddings")
             if embs and len(embs) > 0:
                 return embs[0]
             raise ValueError(f"Empty embedding returned for model {model}")
+    except httpx.ConnectError:
+        logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
+        raise
     except Exception as exc:
         logger.error(f"get_embedding failed for text '{text[:40]}...': {exc}")
         raise exc
@@ -61,6 +60,9 @@ class EmbeddingService:
     _cache_misses: int = 0
     _last_processing_time_ms: float = 0.0
     _total_processing_time_ms: float = 0.0
+    
+    # Store timestamp of when a model failed to prevent log flooding
+    _failed_models_cache: dict[str, float] = {}
 
     @classmethod
     def get_metrics(cls) -> dict[str, Any]:
@@ -202,33 +204,51 @@ class EmbeddingService:
         return result
 
     @classmethod
+    def _is_model_throttled(cls, model: str) -> bool:
+        """Check if model failed recently (within 60 seconds)."""
+        last_failure = cls._failed_models_cache.get(model)
+        if last_failure and (time.time() - last_failure < 60):
+            return True
+        return False
+
+    @classmethod
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embeddings"
-        payload = {"model": model, "prompt": text}
+        if cls._is_model_throttled(model):
+            return None
+            
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
+        payload = {"model": model, "input": text}
         try:
             with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
                 resp = client.post(url, json=payload)
+                if resp.status_code == 404:
+                    cls._failed_models_cache[model] = time.time()
+                    logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
+                    return None
                 resp.raise_for_status()
                 data = resp.json()
-                embedding = data.get("embedding")
-                if embedding and isinstance(embedding, list):
-                    return embedding
-                embed_url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
-                resp2 = client.post(embed_url, json={"model": model, "input": text})
-                resp2.raise_for_status()
-                data2 = resp2.json()
-                embs = data2.get("embeddings")
+                embs = data.get("embeddings")
                 if embs and len(embs) > 0:
                     return embs[0]
                 return None
+        except httpx.ConnectError:
+            cls._failed_models_cache[model] = time.time()
+            logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
+            return None
+        except httpx.TimeoutException:
+            logger.warning(f"[EMBEDDING] Timeout calling Ollama for model '{model}'")
+            return None
         except Exception as exc:
-            logger.warning(f"Ollama embed call failed for model {model}: {exc}")
+            logger.warning(f"[EMBEDDING] Ollama embed call failed for model {model}: {exc}")
             return None
 
     @classmethod
     def _call_ollama_batch_embed(
         cls, model: str, texts: list[str]
     ) -> list[list[float]] | None:
+        if cls._is_model_throttled(model):
+            return None
+            
         url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
         all_embeddings: list[list[float]] = []
         for i in range(0, len(texts), cls._BATCH_SIZE):
@@ -236,6 +256,10 @@ class EmbeddingService:
             try:
                 with httpx.Client(timeout=httpx.Timeout(60.0, connect=5.0)) as client:
                     resp = client.post(url, json={"model": model, "input": batch})
+                    if resp.status_code == 404:
+                        cls._failed_models_cache[model] = time.time()
+                        logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
+                        break
                     resp.raise_for_status()
                     data = resp.json()
                     batch_embs = data.get("embeddings")
@@ -243,13 +267,17 @@ class EmbeddingService:
                         all_embeddings.extend(batch_embs)
                     else:
                         logger.warning(
-                            f"Ollama batch embed returned {len(batch_embs or [])} embeddings for {len(batch)} texts"
+                            f"[EMBEDDING] Ollama batch embed returned {len(batch_embs or [])} embeddings for {len(batch)} texts"
                         )
                         for text in batch:
                             single = cls._call_ollama_embed(model, text)
                             all_embeddings.append(single if single else [])
+            except httpx.ConnectError:
+                cls._failed_models_cache[model] = time.time()
+                logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
+                break
             except Exception as exc:
-                logger.warning(f"Ollama batch embed failed at offset {i}: {exc}")
+                logger.warning(f"[EMBEDDING] Ollama batch embed failed at offset {i}: {exc}")
                 for text in batch:
                     single = cls._call_ollama_embed(model, text)
                     all_embeddings.append(single if single else [])

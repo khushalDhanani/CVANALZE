@@ -5,7 +5,16 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 from app.services.embedding_service import EmbeddingService
+
+
+class classproperty:
+    def __init__(self, func):
+        self.func = func
+
+    def __get__(self, instance, owner):
+        return self.func(owner)
 
 
 class DomainEmbeddingService:
@@ -14,50 +23,17 @@ class DomainEmbeddingService:
     - skills, job_titles, departments, technologies, certifications, education_domains, industries, functional_areas.
     Enables semantic equivalence and role relationship resolution while keeping deterministic validation
     as the strict source of truth for mandatory requirements.
+    Categories and canonical equivalents are data-driven from the scoring.domain_embedding
+    section in rule_config.json.
     """
 
-    CATEGORIES = {
-        "skills",
-        "job_titles",
-        "departments",
-        "technologies",
-        "certifications",
-        "education_domains",
-        "industries",
-        "functional_areas",
-    }
+    @classproperty
+    def CATEGORIES(cls) -> set[str]:
+        return set(RuleConfigManager.get_domain_embedding_rules().categories)
 
-    CANONICAL_EQUIVALENTS: dict[str, dict[str, str]] = {
-        "skills": {
-            "postgres": "postgresql",
-            "postgres db": "postgresql",
-            "k8s": "kubernetes",
-            "react.js": "react",
-            "reactjs": "react",
-            "node": "nodejs",
-            "node.js": "nodejs",
-            "js": "javascript",
-            "py": "python",
-            "ts": "typescript",
-            "aws": "amazon web services",
-            "gcp": "google cloud platform",
-            "ml": "machine learning",
-            "ai": "artificial intelligence",
-        },
-        "job_titles": {
-            "backend developer": "python backend engineer",
-            "software engineer": "software developer",
-            "frontend developer": "react ui developer",
-            "devops specialist": "infrastructure engineer",
-            "qa engineer": "quality assurance automation engineer",
-        },
-        "technologies": {
-            "docker": "containers",
-            "k8s": "kubernetes",
-            "fastapi": "python web framework",
-            "postgres": "postgresql",
-        },
-    }
+    @classproperty
+    def CANONICAL_EQUIVALENTS(cls) -> dict[str, dict[str, str]]:
+        return dict(RuleConfigManager.get_domain_embedding_rules().canonical_equivalents)
 
     @classmethod
     def get_or_generate_domain_embedding(cls, term: str, category: str) -> list[float] | None:

@@ -1,9 +1,95 @@
 # Work Status
 
 ## Last Updated
-2026-07-31T16:02:00Z
+2026-08-01T04:34:00Z
 
 ## Completed
+- **Refactor `VacancyPreFilter` (`backend/app/services/vacancy_prefilter.py`)**:
+  - Implemented all 14 requested requirements across `backend/app/services/vacancy_prefilter.py` and `backend/tests/test_vacancy_prefilter.py`.
+  - Eliminated duplicate PostgreSQL vector queries via `PgVectorQueryCache.query_pgvector_cached()` with `@functools.lru_cache(maxsize=128)` to query pgvector ONLY ONCE per candidate embedding.
+  - Created `CandidateSearchContext` to pre-compute candidate lowercased text, word token sets, domain/family classification, and embedding ONCE per prefilter run.
+  - Integrated `JobEvaluationContext` across all filtering stages, bypassing repeated `.get()` calls on raw job dictionaries.
+  - Optimized lexical matching with token set intersections (`cand_ctx.cv_tokens.intersection(job.title_words)`), using set membership for single-word skills/department terms and substring scanning for multi-word phrases only.
+  - Extracted Reciprocal Rank Fusion logic into a dedicated helper class `ReciprocalRankFusionService.fuse_ranks()`.
+  - Added adaptive retrieval guard: automatically skips Stage 1 semantic retrieval and Stage 2 RRF fusion when Stage 0 taxonomy filtering yields fewer openings than `limit`.
+  - Added stage-by-stage execution timing logging (`stage0_taxonomy_ms`, `stage1_semantic_ms`, `stage2_lexical_ms`, `stage2_rrf_ms`, `total_prefilter_ms`).
+  - Optimized memory by eliminating shallow `dict(job)` copy loops and updating metadata directly.
+  - Preserved 100% backward compatibility for all public methods (`semantic_vector_search`, `vector_prefilter`, `filter_vacancies`).
+  - Verified **58/58 tests passing** (`pytest`) and **0 ruff errors**.
+- **Refactor `JobTaxonomy` & `TaxonomyClassifier` (`backend/app/services/job_taxonomy.py`)**:
+  - Implemented all 14 requested requirements across `backend/app/services/job_taxonomy.py` and `backend/tests/test_taxonomy_integration.py`.
+  - Introduced strongly-typed DTO models (`VacancyDTO`, `CandidateResumeDTO`, `TaxonomyClassification`).
+  - Bypassed runtime string lowercasing and repeated string concatenation by accepting `JobEvaluationContext` or `VacancyDTO` objects directly using pre-computed `normalized_job_text`, `title_lower`, and `department_lower`.
+  - Precompiled taxonomy rules and implemented fast single-token set intersection matching (`tokens & condition.keywords_set`), falling back to multi-word phrase matching only when necessary.
+  - Implemented dual LRU caching with `@functools.lru_cache(maxsize=1024)` for vacancy classification (keyed on `normalized_job_text`) alongside candidate classification caching (`maxsize=512`). Documented CPython GIL atomic thread safety.
+  - Added startup configuration validation (`validate_taxonomy_config()`) asserting domain/family completeness and precomputed `JobTaxonomy.REVERSE_COMPATIBILITY_MAP` (`job_family -> set[candidate_family]`).
+  - Added telemetry metrics counter (`TaxonomyClassifier.get_metrics()`) and zero-overhead debug logging guarded by `logger.isEnabledFor(logging.DEBUG)`.
+  - Preserved 100% backward compatibility for all public methods (`classify_candidate`, `classify_vacancy`, `are_families_compatible`).
+  - Verified **53/53 tests passing** (`pytest`) and **0 ruff errors**.
+- **Refactor `RuleConfigManager` (`backend/app/core/rule_config_manager.py`)**:
+  - Implemented enterprise-grade thread safety, startup cache warming, immutable cache objects (`MappingProxyType`, `frozenset`, `tuple`), precompiled regex matching, metrics telemetry, hot reload support, cache validation gates, and structured startup logging.
+  - Protected all mutable class-level state (`_active_config`, `_cache`, `_metrics`, `_load_counter`) using `threading.RLock()` to guarantee thread safety and atomic configuration swaps.
+  - Warmed ALL caches immediately during `load_config()` (term matching assets, cross domain guard sets/regexes, resume quality section patterns/heading normalizations, recommendations, scoring parameters, and taxonomy assets).
+  - Precompiled ALL regex patterns once at startup and enforced validation gates (asserting `compiled_pattern_count > 0` and section/guard maps are populated).
+  - Exposed `RuleConfigManager.get_metrics()` returning `config_version`, `config_load_count`, `config_load_time_ms`, `cache_build_time_ms`, `compiled_pattern_count`, `configuration_size_bytes`, file hashes, and timestamps.
+  - Implemented `RuleConfigManager.reload_if_changed()` for hot reload checking file mtime / SHA256 hash.
+  - Preserved 100% public API backward compatibility for all getters (`get_match_rules()`, `get_scoring_parameters()`, `get_recommendations()`, `get_term_matching_assets()`, `get_compiled_cross_domain_guard()`, `get_compiled_section_patterns()`, `get_compiled_heading_normalizations()`, etc.).
+  - Verified **52/52 tests passing** (`pytest`) and **0 ruff errors**.
+- **Match Evaluator Refactoring & Hardening (`match_evaluators.py`)**:
+  - Implemented all 12 requested refactoring requirements across `backend/app/services/match_evaluators.py`, `backend/app/schemas/scoring_config.py`, `backend/app/schemas/job_context.py`, and `backend/app/services/scoring_engine.py`.
+  - Loaded `ScoringConfig` ONCE at top of `analyze_cv` / `evaluate_job_match`, eliminating repeated `ConfigRepository` lookups inside multi-vacancy scoring loops.
+  - Eliminated `isinstance()` checks and `.create()` calls inside evaluators.
+  - Precompiled department term regex patterns in `JobEvaluationContext.dept_term_patterns` for ZERO runtime `re.compile()` calls.
+  - Extracted helper methods (`_create_requirement`, `_create_failure`, `_create_evidence`), renamed `coverage` $\rightarrow$ `component_coverage`, isolated `_calculate_confidence_score`, and made `CrossDomainGuardEvaluator` 100% side-effect free.
+  - Verified **51/51 tests passing** and **0 ruff errors**.
+- **Scale Load Testing & Benchmark Optimization (100, 1,000, 10,000 Vacancies)**:
+  - Created `backend/tests/test_scale_benchmark.py` running automated scale benchmarks across 100, 1,000, and 10,000 synthetic vacancies.
+  - Demonstrated **3,143.3 evaluations/sec throughput** at 10,000 vacancies (only 0.318 ms/vacancy scored) with **75.0% Stage-0 taxonomy pre-filter pruning ratio** and a lightweight **175.8 MB peak RSS memory footprint**. Verified **51/51 tests passing** across core test modules.
+- **Performance Profiling & Production Observability (`PipelineProfiler`)**:
+  - Enhanced `PipelineStageMetrics` (`backend/app/schemas/analysis.py`) to record `candidate_context_ms`, `vacancy_context_ms`, detailed evaluator breakdown timings (`evaluator_requirement_ms`, `evaluator_transition_ms`, `evaluator_component_ms`, `evaluator_cross_domain_ms`, `evaluator_recommendation_ms`), and cache metrics (`cache_hits`, `cache_misses`).
+  - Enhanced `PipelineProfiler` (`backend/app/core/profiler.py`) with accumulated multi-vacancy stage timers, cache event recorders, structured dictionary/JSON exporters (`to_dict`, `to_json`), and formatted telemetry logging.
+  - Wired `profiler` parameter into `ScoringEngine.analyze_cv` in `backend/app/services/scoring_engine.py`.
+  - Added unit test suite `backend/tests/test_profiler.py` verifying profiler stage timing, cache metric recording, JSON serialization, and scoring engine integration. Verified **48/48 tests passing** across core test modules.
+- **Vacancy-Side Preprocessing (`JobEvaluationContext`)**:
+  - Created `backend/app/schemas/job_context.py` to encapsulate vacancy taxonomy domain & job family pre-classification, department domain term splitting, title noise stripping, and guard regex evaluations (`is_non_it_job`, `has_software_req`) **once per vacancy**.
+  - Updated `RequirementEvaluator`, `CareerTransitionEvaluator`, `ComponentScoreEvaluator`, `CrossDomainGuardEvaluator` in `backend/app/services/match_evaluators.py` and `ScoringEngine.analyze_cv` / `evaluate_job_match` in `backend/app/services/scoring_engine.py` to consume `JobEvaluationContext` objects.
+  - Added unit test suite `backend/tests/test_job_context.py` verifying context initialization, taxonomy classification, and 100% scoring engine output parity. Verified **45/45 tests passing** across core test modules.
+- **Final Production Refactoring & Circular Dependency Elimination**:
+  1. **Taxonomy Classification Caching**: Added `@functools.lru_cache(maxsize=512)` decorated `classify_candidate_by_full_text` to `TaxonomyClassifier` in `backend/app/services/job_taxonomy.py`, eliminating per-vacancy redundant taxonomy classification scans during multi-vacancy scoring.
+  2. **`CandidateAnalysisContext` & `CandidateDomainService` Refactoring**: Created `backend/app/services/candidate_domain_service.py` extracting domain profile extraction (`extract_candidate_domain_profile`), domain text building (`build_domain_candidate_text`), and department term parsing (`extract_department_domain_terms`). Completely eliminated the circular dependency between `CandidateAnalysisContext` and `ScoringEngine` by having both depend on `CandidateDomainService` with clean top-level imports.
+  3. **Modular Match Evaluators**: Created `backend/app/services/match_evaluators.py` splitting `evaluate_job_match()` into `RequirementEvaluator`, `CareerTransitionEvaluator`, `ComponentScoreEvaluator`, `CrossDomainGuardEvaluator`, and `RecommendationEvaluator`. Refactored `evaluate_job_match` from a 650-line monolith into a 60-line clean orchestrator method while preserving 100% signature and output contract parity.
+  4. **Precompiled Pattern Indexing**: Precompiled cross-domain guard keyword regexes (`software_candidate_patterns`, `non_it_job_patterns`, `software_requirement_patterns`, `domain_guard_term_patterns`) in `RuleConfigManager.get_compiled_cross_domain_guard()` and cached term pattern compilation via `@functools.lru_cache(maxsize=2048)` in `ScoringEngine._get_compiled_term_pattern`.
+  5. **Configurable Magic Numbers & Recommendation Text**: Moved hardcoded recommendation strings and scoring parameters (`career_transition_role_score`, `role_divergence_score`, `below_min_exp_multiplier`, `overqualification_penalty`, `domain_default_match_score`, `low_coverage_threshold`, `false_positive_score_cap`) into `rule_config.json` backed by `RecommendationTexts` and `ScoringParameters` Pydantic models in `RuleConfigManager`.
+  6. **Automated Verification**: Created `backend/tests/test_candidate_context.py`. Verified 100% test pass across all 42 core tests (`pytest tests/test_candidate_context.py tests/test_scoring_engine.py tests/test_taxonomy_integration.py tests/test_rule_config_manager.py tests/test_department_domain_repository.py`) and verified 0 ruff lint errors.
+- **DepartmentDomainMaster seeded with REAL department links (replaces canonical labels)**:
+  - Live `OrgDepartmentMst` (52 rows, `DeptIsActive`/`DeptIsDeleted` columns) and `OrgMainDepartmentMst` (26 rows) dumped and compared against the 002 seed lookups. Found **none** of the 8 seed dept names matched real dept rows, so 002 would have inserted all rows with NULL DepartmentId.
+  - User chose "Map to real dept IDs". Updated `backend/app/data/department_domains_seed.json` (added `department_id`, changed `department_name` to real active org dept names) and `backend/scripts/migrations/002_create_department_domain_master.sql` (name-based lookups against real dept names; Healthcare seeded with explicit NULL DepartmentId since no pharma/clinical dept exists in the chemical org).
+  - Mapping (domain → real dept): IT & Software → **CIS Team (DeptID 9)**, Finance & Accounting → **Finance Team (8)**, Human Resources → **HR & IR Team (10)**, Plant & Maintenance Engineering → **Maintenance Team - 1 (Ramesh Maurya) (23)**, Sales & Marketing → **Sales Team (16)**, Quality & EHS → **EHS Team (6)**, Supply Chain & Operations → **Procurement Team (11)**, Healthcare & Clinical → **NULL** (linked later).
+  - `recommended_department` now returns real org dept names (was canonical labels like "Information Technology"). To keep the cross-domain guard in `evaluate_job_match` working, its substring checks now use the stable `cand_domain` (`professional_domain`) instead of `cand_dept`; removed the now-unused `cand_dept` local (F841).
+  - Tests updated to the new labels: `test_department_domain_repository.py` (incl. `department_id` pins, renamed `test_extract_candidate_domain_profile_maps_to_real_departments`), `test_taxonomy_integration.py`, `test_domain_matching.py`. Seed fallback + DB mode stay label-consistent.
+  - Validation: `pytest tests/test_department_domain_repository.py tests/test_taxonomy_integration.py` → **18 passed**; `pytest tests/test_domain_matching.py -k "not test_no_suitable_active_vacancy_summary"` → **4 passed** (remaining deselected test is the pre-existing legacy-string failure). ruff: 0 new errors (13 pre-existing, identical to HEAD). Seed JSON sanity check: all 8 domains, correct ids/names/priorities.
+  - NOTE: migration 002 not yet applied to the live MSSQL DB; until then the repository loads from seed. DepartmentId re-pointing (e.g. picking a different maintenance sub-team) is now a simple SQL update, no code change.
+- **DB-Driven Department/Domain Configuration (Replaces `DEPARTMENT_DOMAIN_MAP`)**:
+  - Removed the hardcoded `DEPARTMENT_DOMAIN_MAP` static dict from `backend/app/services/scoring_engine.py`; department/domain detection is now 100% data-driven via `DepartmentDomainRepository`.
+  - New model `DepartmentDomainMaster` (`backend/app/models/domain.py`): Id PK, DepartmentId FK → `OrgDepartmentMst.DeptID`, DomainName, Keywords (JSON text), DefaultRoles (JSON text), Priority, IsActive, CreatedOn, ModifiedOn.
+  - New typed Pydantic schema `DepartmentDomain` (`backend/app/schemas/domain.py`).
+  - New `backend/app/repositories/department_domain.py`: thread-safe in-memory cache (`threading.RLock`) with **precompiled keyword-regex matcher index** (`DomainMatcher`) built once and reused across every CV analysis. Load strategy: DB-first (join `OrgDepartmentMst` for dept names, ordered by Priority/Id), graceful fallback to bundled seed `backend/app/data/department_domains_seed.json` when the DB is unreachable/empty (mirrors `ConfigRepository` degradation). Exposes `get_all_domains()`, `get_domain_by_department()`, `get_domain_matchers()`, `refresh_cache()`; module singleton `department_domain_repository`, injectable via `ScoringEngine.domain_repository` class attribute.
+  - `ScoringEngine.extract_candidate_domain_profile` + `_build_domain_candidate_text` now consume the repository; keyword-count tie-break uses `Priority` to preserve the legacy first-defined-wins ordering. No-domain fallback strings kept as `DEFAULT_*` class constants (generic defaults, not department data).
+  - Wired `warm_department_domains()` into `cache_warmer.warm_all` (also covers startup thread + `/master-data/warm`). Returns 0 gracefully when `SessionLocal` is None.
+  - Migration `backend/scripts/migrations/002_create_department_domain_master.sql`: idempotent CREATE TABLE + guarded FK + seed INSERTs resolving `DepartmentId` from `OrgDepartmentMst` by name.
+  - New tests `backend/tests/test_department_domain_repository.py` (11 tests): seed fallback, legacy-value parity, `get_domain_by_department`, `refresh_cache` reload, precompiled matcher behavior, preserved `extract_candidate_domain_profile` results (IT/Finance/Plant + generic fallback), **new department via seed without any code change**, `_build_domain_candidate_text` inference, and thread-safety smoke test.
+  - Validation: `pytest tests/test_department_domain_repository.py` (11 passed), `tests/test_domain_matching.py` + `tests/test_taxonomy_integration.py` (all passed except pre-existing `test_no_suitable_active_vacancy_summary`), `tests/test_audit_fixes.py` domain/department/match/scoring + cache-warmer subsets passed. Log confirms seed fallback (`[DEPARTMENT_DOMAIN] Loaded 8 active domain(s) from seed.`). New-code lint clean; only pre-existing project-wide `BLE001` broad-except pattern remains in the new repository (consistent with `ConfigRepository`/`cache_warmer`).
+
+- **Automated Integration Tests for Resume Classification & Vacancy Pre-Filtering**:
+  - Created `backend/tests/test_taxonomy_integration.py` (7 tests, all passing) covering the 4 requested Test Cases against CURRENT system behavior:
+    - **TC1 Desktop Support Engineer**: Asserts `TaxonomyClassifier.classify_candidate` returns `DOMAIN_IT_SOFTWARE` with `FAMILY_IT_NETWORKING_AV` (the "Infrastructure / Desktop Support" family), domain profile maps to `recommended_department="Information Technology"` / `professional_domain="Information Technology & Software"`, and Production / QC / Mechanical / Electrical Plant (plus Finance & HR) vacancies are pruned in Stage-0 taxonomy pre-filter before scoring.
+    - **TC2 Software Developer**: Asserts Finance / HR / Production / QC / Mechanical / Electrical Plant vacancies are excluded before retrieval. DOCUMENTED DIVERGENCE: IT Infrastructure vacancies (Desktop Support / Network Engineer) are NOT excluded today because `COMPATIBILITY_MAP` marks the Software and IT Infrastructure families as mutually compatible.
+    - **TC3 Mechanical Engineer**: Asserts `classify_candidate` returns `DOMAIN_OTHER` / `[FAMILY_OTHER]`, so Stage-0 taxonomy pruning is a no-op today (DOCUMENTED DIVERGENCE from the "Software/Desktop/Network excluded" spec); profile maps to Plant & Maintenance with "Mechanical Engineer" in suitable roles; non-IT vacancies pruned for IT candidates survive the pre-filter for a Mechanical candidate.
+    - **TC4 No matching vacancies**: Asserts current contract (`has_genuine_match=False`, `active_vacancy_summary`, processing `status="COMPLETED"`) instead of `{"status":"NO_SUITABLE_VACANCY"}` (DOCUMENTED DIVERGENCE); recommended department / professional domain / suitable job roles still returned; no unrelated vacancy recommended (all classification `LOW`, score < `MATCH_MEDIUM_THRESHOLD`).
+  - Tests are hermetic & fast (~7s): autouse fixture clears caches, disables embeddings (`EMBEDDING_ENABLED=False`), and stubs `OllamaLLMService.run_optimized_match` so the pipeline exercises taxonomy classification → Stage-0 pre-filter → deterministic scoring end-to-end without Ollama/DB/Redis.
+  - Verified via `.venv/bin/pytest tests/test_taxonomy_integration.py` (7 passed) and `ruff check`/`ruff format` clean.
+  - NOTE: `tests/test_domain_matching.py::test_no_suitable_active_vacancy_summary` is currently failing (asserts `active_vacancy_summary == "No suitable active vacancy found."` while the service returns the longer "…matching candidate domain/taxonomy profile…" string; also hangs ~30s per LLM attempt). Not modified as part of this task.
+
 - **Abdul Mannan CV Live Pipeline Audit & Domain Mismatch Evaluation**:
   - Processed `Resume Abdul Mannan 1.pdf` through the live pipeline against the real 107-vacancy dataset (Aarti Industries live DB) and default pre-filter.
   - Extracted profile: B.E. Electronics & Telecommunication Engineering with 4+ years in AV & IT Networking Systems (Dante, Crestron, Q-Sys, Cisco switches, routers, VLANs).
@@ -110,7 +196,17 @@
   - **Automated Test Suite**: Created [`backend/tests/test_dual_upload_key_alignment.py`](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/tests/test_dual_upload_key_alignment.py) asserting 0 key divergence, single result file persistence, and uniform repository resolution (100% test pass).
 
 ## Files Modified
-- `backend/app/main.py`
+- `backend/app/models/domain.py`
+- `backend/app/schemas/domain.py`
+- `backend/app/repositories/department_domain.py`
+- `backend/app/data/department_domains_seed.json`
+- `backend/scripts/migrations/002_create_department_domain_master.sql`
+- `backend/app/services/cache_warmer.py`
+- `backend/app/services/scoring_engine.py`
+- `backend/tests/test_department_domain_repository.py`
+- `backend/tests/test_taxonomy_integration.py`
+- `backend/tests/test_domain_matching.py`
+- `workstatus.md`
 - `backend/app/core/cache.py`
 - `backend/app/core/rule_config.json`
 - `backend/app/core/rule_config_manager.py`
@@ -120,7 +216,6 @@
 - `backend/app/services/candidate_search_service.py`
 - `backend/app/services/cv_service.py`
 - `backend/app/services/document_parser.py`
-- `backend/app/services/scoring_engine.py`
 - `backend/app/services/vacancy_prefilter.py`
 - `backend/tests/test_rule_config_manager.py`
 - `backend/tests/test_frontend_polling_e2e.py`
@@ -134,3 +229,8 @@
 - `frontend/src/app/candidates/[id].tsx`
 - `workstatus.md`
 
+
+- **Data-Driven Role Matching Replacement**:
+  - **Removed Hardcoded Logic**: Completely removed the hardcoded keyword-to-role list `_ROLE_INFERENCE_PATTERNS` in [`candidate_domain_service.py`](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/app/services/candidate_domain_service.py).
+  - **Dynamic Engine Implementation**: Rewrote `_infer_roles_from_resume` to dynamically classify roles using the JSON-configured `TaxonomyClassifier` and intersection with dynamically loaded `DepartmentDomainRepository` matching rules.
+  - **Dynamic Strengths Extraction**: Refactored `_extract_strengths_from_resume` to dynamically obtain the fallback domain from `RuleConfigManager` and construct strengths dynamically rather than via literal string fallbacks.

@@ -280,6 +280,7 @@ class MatchService:
         cand_profile = ScoringEngine.extract_candidate_domain_profile(
             cv_text=cv_text,
             optimized_profile=optimized_profile,
+            resume_json=resume_json,
         )
         recommended_dept = cand_profile.get("recommended_department", "General")
         professional_domain = cand_profile.get("professional_domain", "General Operations")

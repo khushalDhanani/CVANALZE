@@ -1,0 +1,489 @@
+"""
+Automated integration tests for resume classification and vacancy pre-filtering.
+
+Covers the requested Test Cases mapped onto the CURRENT system behavior:
+
+  TC1  Desktop Support Engineer
+       - Classified as Information Technology (profile) with taxonomy domain
+         `IT & Software Services` and family `IT Infrastructure, Networking & AV
+         Systems` (the "Infrastructure / Desktop Support" family in the current
+         4-tier taxonomy).
+       - Production / QC / Mechanical / Electrical Plant (plus Finance & HR)
+         vacancies are pruned in the Stage-0 taxonomy pre-filter, before scoring.
+
+  TC2  Software Developer
+       - Finance, HR, Production, QC, Mechanical and Electrical Plant vacancies
+         are excluded before retrieval.
+       - DOCUMENTED DIVERGENCE: IT Infrastructure vacancies (Desktop Support,
+         Network Engineer) are NOT excluded today because
+         `JobTaxonomy.COMPATIBILITY_MAP` treats the Software Engineering family
+         and the IT Infrastructure family as mutually compatible.
+
+  TC3  Mechanical Engineer
+       - `TaxonomyClassifier.classify_candidate` returns the `General
+         Professional` family (FAMILY_OTHER), so the Stage-0 taxonomy pre-filter
+         does NOT run for this resume today (DOCUMENTED DIVERGENCE from the
+         "Software Developer / Desktop Support / Network Engineer excluded"
+          spec). The domain profile still maps the resume to the Plant &
+          Maintenance domain (recommended department: the Maintenance team).
+       - Non-IT vacancies that ARE pruned for IT candidates survive the
+         pre-filter for a Mechanical Engineer candidate.
+
+  TC4  No matching vacancies
+       - The current response contract does NOT include
+         `{"status": "NO_SUITABLE_VACANCY"}`; it returns
+         `has_genuine_match=False` plus an `active_vacancy_summary` (processing
+         `status` stays "COMPLETED"). Recommended department / professional
+         domain / suitable job roles are still returned, and no unrelated
+         vacancy is recommended (all scores stay LOW, below
+         MATCH_MEDIUM_THRESHOLD).
+
+Run with: pytest tests/test_taxonomy_integration.py -v
+"""
+
+from unittest.mock import patch
+
+import pytest
+
+from app.core.cache import (
+    embedding_cache_manager,
+    match_result_cache_manager,
+    vacancy_cache_manager,
+)
+from app.core.config import settings
+from app.schemas.analysis import EnrichedCandidateAnalysis
+from app.services.job_taxonomy import JobTaxonomy, TaxonomyClassifier
+from app.services.match_service import MatchService
+from app.services.scoring_engine import ScoringEngine
+from app.services.vacancy_prefilter import VacancyPreFilter
+
+# ---------------------------------------------------------------------------
+# Resume fixtures (one per Test Case)
+# ---------------------------------------------------------------------------
+
+DESKTOP_SUPPORT_RESUME = """
+John Doe
+Desktop Support Engineer
+Email: john.doe@example.com
+Skills: Windows, Active Directory, Networking, Hardware Support, Remote Desktop, Troubleshooting
+Experience:
+- Desktop Support Engineer at TechCorp (3 years): Provided end-user desktop support, maintained workstations and peripherals.
+Education: B.Sc. in Information Technology
+"""
+
+SOFTWARE_DEVELOPER_RESUME = """
+Sarah Developer
+Software Developer
+Email: sarah.dev@example.com
+Skills: Python, Java, JavaScript, REST APIs, Git, SQL, Docker
+Experience:
+- Software Developer at AppWorks (4 years): Built web applications and REST APIs.
+Education: B.Tech in Computer Science
+"""
+
+MECHANICAL_RESUME = """
+Ravi Kumar
+Mechanical Engineer
+Email: ravi.kumar@example.com
+Skills: CAD, SolidWorks, Piping, Machinery, Preventive Maintenance, Thermodynamics
+Experience:
+- Mechanical Engineer at PlantCorp (6 years): Maintained rotating machinery, designed piping layouts.
+Education: B.E. Mechanical Engineering
+"""
+
+
+# ---------------------------------------------------------------------------
+# Vacancy fixtures
+# ---------------------------------------------------------------------------
+
+VAC_SOFTWARE = {
+    "id": "v_sw",
+    "vacancy_id": 501,
+    "title": "Software Developer",
+    "department_name": "Information Technology",
+    "department": "Information Technology",
+    "required_skills": ["Python", "Java"],
+    "min_experience_years": 2,
+}
+
+VAC_DESKTOP = {
+    "id": "v_ds",
+    "vacancy_id": 502,
+    "title": "Desktop Support Engineer",
+    "department_name": "Information Technology",
+    "department": "Information Technology",
+    "required_skills": ["Windows", "Active Directory"],
+    "min_experience_years": 1,
+}
+
+VAC_NETWORK = {
+    "id": "v_net",
+    "vacancy_id": 503,
+    "title": "Network Engineer",
+    "department_name": "Information Technology",
+    "department": "Information Technology",
+    "required_skills": ["Cisco", "Routing"],
+    "min_experience_years": 1,
+}
+
+VAC_PRODUCTION = {
+    "id": "v_prod",
+    "vacancy_id": 504,
+    "title": "Production Supervisor",
+    "department_name": "Production",
+    "department": "Production",
+    "required_skills": ["Production Planning", "Lean Manufacturing"],
+    "min_experience_years": 2,
+}
+
+VAC_QC = {
+    "id": "v_qc",
+    "vacancy_id": 505,
+    "title": "Quality Control Chemist",
+    "department_name": "Quality Control",
+    "department": "Quality Control",
+    "required_skills": ["Chemical Analysis", "Sampling"],
+    "min_experience_years": 1,
+}
+
+VAC_MECHANICAL = {
+    "id": "v_mech",
+    "vacancy_id": 506,
+    "title": "Mechanical Engineer",
+    "department_name": "Mechanical Engineering",
+    "department": "Mechanical Engineering",
+    "required_skills": ["CAD", "Preventive Maintenance"],
+    "min_experience_years": 3,
+}
+
+VAC_ELECTRICAL_PLANT = {
+    "id": "v_elec",
+    "vacancy_id": 507,
+    "title": "Electrical Plant Engineer",
+    "department_name": "Electrical Plant",
+    "department": "Electrical Plant",
+    "required_skills": ["Substation", "High Voltage"],
+    "min_experience_years": 2,
+}
+
+VAC_FINANCE = {
+    "id": "v_fin",
+    "vacancy_id": 508,
+    "title": "Finance Analyst",
+    "department_name": "Finance & Accounting",
+    "department": "Finance & Accounting",
+    "required_skills": ["Ledger", "Tally"],
+    "min_experience_years": 1,
+}
+
+VAC_HR = {
+    "id": "v_hr",
+    "vacancy_id": 509,
+    "title": "HR Executive",
+    "department_name": "Human Resources",
+    "department": "Human Resources",
+    "required_skills": ["Recruitment", "Payroll"],
+    "min_experience_years": 1,
+}
+
+ALL_OPENINGS = [
+    VAC_SOFTWARE,
+    VAC_DESKTOP,
+    VAC_NETWORK,
+    VAC_PRODUCTION,
+    VAC_QC,
+    VAC_MECHANICAL,
+    VAC_ELECTRICAL_PLANT,
+    VAC_FINANCE,
+    VAC_HR,
+]
+
+# Vacancies that belong to the candidate's own IT taxonomy space.
+IT_VACANCY_IDS = {501, 502, 503}
+# Vacancies that must never surface for an IT candidate (non-IT domains/families).
+NON_IT_VACANCY_IDS = {504, 505, 506, 507, 508, 509}
+
+
+@pytest.fixture(autouse=True)
+def _isolate_pipeline(monkeypatch):
+    """Keep each test hermetic: clear caches, disable embeddings, stub the LLM."""
+    embedding_cache_manager.clear()
+    vacancy_cache_manager.clear()
+    match_result_cache_manager.clear()
+
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+    with patch(
+        "app.services.llm_service.OllamaLLMService.run_optimized_match",
+        return_value=None,
+    ):
+        yield
+
+    embedding_cache_manager.clear()
+    vacancy_cache_manager.clear()
+    match_result_cache_manager.clear()
+
+
+# ---------------------------------------------------------------------------
+# Test Case 1: Desktop Support Engineer
+# ---------------------------------------------------------------------------
+
+
+def test_desktop_support_classified_as_information_technology():
+    domain, families = TaxonomyClassifier.classify_candidate(DESKTOP_SUPPORT_RESUME)
+    assert domain == JobTaxonomy.DOMAIN_IT_SOFTWARE
+    assert JobTaxonomy.FAMILY_IT_NETWORKING_AV in families
+
+    profile = ScoringEngine.extract_candidate_domain_profile(DESKTOP_SUPPORT_RESUME)
+    assert profile["recommended_department"] == "CIS Team"
+    assert profile["professional_domain"] == "Information Technology & Software"
+
+
+@pytest.mark.asyncio
+async def test_desktop_support_excludes_non_it_vacancies_before_retrieval():
+    analysis = await MatchService.analyze_single_cv(
+        cv_text=DESKTOP_SUPPORT_RESUME,
+        job_openings=ALL_OPENINGS,
+        document_hash="doc_it_desktop_integration",
+        candidate_id="cand_it_desktop_integration",
+    )
+
+    assert isinstance(analysis, EnrichedCandidateAnalysis)
+    returned_ids = {m.vacancy_id for m in analysis.suitable_openings}
+
+    # Production, QC, Mechanical, Electrical Plant (and Finance/HR) are pruned
+    # in Stage-0 taxonomy pre-filtering and never reach the scoring stage.
+    assert returned_ids.isdisjoint(NON_IT_VACANCY_IDS)
+    assert returned_ids == IT_VACANCY_IDS
+
+
+# ---------------------------------------------------------------------------
+# Test Case 2: Software Developer
+# ---------------------------------------------------------------------------
+
+
+def test_software_developer_classified_as_information_technology():
+    domain, families = TaxonomyClassifier.classify_candidate(SOFTWARE_DEVELOPER_RESUME)
+    assert domain == JobTaxonomy.DOMAIN_IT_SOFTWARE
+    assert JobTaxonomy.FAMILY_SOFTWARE_DEV in families
+
+    profile = ScoringEngine.extract_candidate_domain_profile(SOFTWARE_DEVELOPER_RESUME)
+    assert profile["recommended_department"] == "CIS Team"
+
+
+@pytest.mark.asyncio
+async def test_software_developer_excludes_non_it_vacancies_before_retrieval():
+    analysis = await MatchService.analyze_single_cv(
+        cv_text=SOFTWARE_DEVELOPER_RESUME,
+        job_openings=ALL_OPENINGS,
+        document_hash="doc_it_software_integration",
+        candidate_id="cand_it_software_integration",
+    )
+
+    assert isinstance(analysis, EnrichedCandidateAnalysis)
+    returned_ids = {m.vacancy_id for m in analysis.suitable_openings}
+
+    # Finance, HR, Production, QC, Mechanical, Electrical Plant are excluded
+    # before retrieval.
+    assert returned_ids.isdisjoint({504, 505, 506, 507, 508, 509})
+
+    # DOCUMENTED DIVERGENCE from spec: IT Infrastructure vacancies (Desktop
+    # Support / Network Engineer) are NOT excluded today because
+    # JobTaxonomy.COMPATIBILITY_MAP marks them compatible with the Software
+    # Engineering family.
+    assert returned_ids == IT_VACANCY_IDS
+
+
+# ---------------------------------------------------------------------------
+# Test Case 3: Mechanical Engineer
+# ---------------------------------------------------------------------------
+
+
+def test_mechanical_engineer_domain_profile():
+    profile = ScoringEngine.extract_candidate_domain_profile(MECHANICAL_RESUME)
+    assert profile["recommended_department"] == "Maintenance Team - 1 (Ramesh Maurya)"
+    assert profile["professional_domain"] == "Plant & Maintenance Engineering"
+    assert "Mechanical Engineer" in profile["suitable_job_roles"]
+
+
+def test_mechanical_engineer_no_taxonomy_pruning_today():
+    """DOCUMENTED DIVERGENCE from spec: taxonomy Stage-0 pruning is a no-op today.
+
+    The Mechanical Engineer resume is classified as `General Professional`
+    (FAMILY_OTHER), which skips taxonomy compatibility pruning entirely, so the
+    Software Developer / Desktop Support / Network Engineer vacancies are not
+    excluded. This test pins that current behavior.
+    """
+    domain, families = TaxonomyClassifier.classify_candidate(MECHANICAL_RESUME)
+    assert domain == JobTaxonomy.DOMAIN_OTHER
+    assert families == [JobTaxonomy.FAMILY_OTHER]
+
+    # The IT vacancies exist and carry IT taxonomy families.
+    assert TaxonomyClassifier.classify_vacancy(VAC_SOFTWARE) == (
+        JobTaxonomy.DOMAIN_IT_SOFTWARE,
+        JobTaxonomy.FAMILY_SOFTWARE_DEV,
+    )
+    assert TaxonomyClassifier.classify_vacancy(VAC_DESKTOP)[1] == (
+        JobTaxonomy.FAMILY_IT_NETWORKING_AV
+    )
+    assert TaxonomyClassifier.classify_vacancy(VAC_NETWORK)[1] == (
+        JobTaxonomy.FAMILY_IT_NETWORKING_AV
+    )
+
+    selected = VacancyPreFilter.filter_vacancies(
+        MECHANICAL_RESUME, ALL_OPENINGS, top_k=5
+    )
+    selected_ids = [j.get("id") for j in selected]
+
+    # The Mechanical Engineer vacancy ranks #1 on lexical grounds.
+    assert selected_ids[0] == "v_mech"
+
+    # Because no taxonomy pruning runs, non-IT vacancies that ARE pruned for IT
+    # candidates survive the pre-filter for this candidate (e.g. Electrical
+    # Plant / Production / QC / Finance / HR).
+    assert any(
+        j.get("id") in {"v_prod", "v_qc", "v_elec", "v_fin", "v_hr"} for j in selected
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test Case 4: No matching vacancies available
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_no_suitable_vacancy_returns_recommended_department_and_families_only():
+    unrelated_openings = [
+        VAC_PRODUCTION,
+        VAC_QC,
+        VAC_MECHANICAL,
+        VAC_ELECTRICAL_PLANT,
+        VAC_FINANCE,
+        VAC_HR,
+    ]
+
+    analysis = await MatchService.analyze_single_cv(
+        cv_text=SOFTWARE_DEVELOPER_RESUME,
+        job_openings=unrelated_openings,
+        document_hash="doc_no_match_integration",
+        candidate_id="cand_no_match_integration",
+    )
+
+    assert isinstance(analysis, EnrichedCandidateAnalysis)
+
+    # DOCUMENTED DIVERGENCE from spec: current contract has no
+    # {"status": "NO_SUITABLE_VACANCY"} payload. The no-match signal is
+    # has_genuine_match=False + active_vacancy_summary (processing status stays
+    # "COMPLETED").
+    assert analysis.has_genuine_match is False
+    assert analysis.status == "COMPLETED"
+    assert analysis.active_vacancy_summary == (
+        "No suitable active vacancy found matching candidate domain/taxonomy "
+        "profile (Primary Domain: Information Technology & Software). "
+        "Manual HR review recommended."
+    )
+
+    # Recommended department / professional domain / job families are returned.
+    assert analysis.recommended_department == "CIS Team"
+    assert analysis.professional_domain == "Information Technology & Software"
+    assert len(analysis.suitable_job_roles) > 0
+
+    # No unrelated vacancy is recommended as a genuine match.
+    assert len(analysis.suitable_openings) > 0
+    for match in analysis.suitable_openings:
+        assert match.classification == "LOW"
+        assert match.score < settings.MATCH_MEDIUM_THRESHOLD
+
+
+def test_taxonomy_constants_consistent_with_rule_config():
+    """Canonical domains/families in JobTaxonomy must match rule_config scoring.taxonomy."""
+    from app.core.rule_config_manager import RuleConfigManager
+
+    taxonomy = RuleConfigManager.get_taxonomy_rules()
+
+    assert taxonomy.default_domain == JobTaxonomy.DOMAIN_OTHER
+    assert taxonomy.default_family == JobTaxonomy.FAMILY_OTHER
+    assert JobTaxonomy.DOMAIN_IT_SOFTWARE in taxonomy.canonical_domains
+    assert JobTaxonomy.FAMILY_SOFTWARE_DEV in taxonomy.canonical_families
+    assert JobTaxonomy.FAMILY_IT_NETWORKING_AV in taxonomy.canonical_families
+
+    # Compatibility map entries only reference canonical families.
+    known_families = set(taxonomy.canonical_families)
+    for candidate_family, compatible in taxonomy.compatibility_map.items():
+        assert candidate_family in known_families
+        assert set(compatible) <= known_families
+
+
+def test_taxonomy_classifier_roles_and_metrics():
+    """Verify DTO classification, metrics, reverse compatibility map, and specific role classifications."""
+    from app.services.job_taxonomy import CandidateResumeDTO, VacancyDTO
+
+    # 1. Software Engineer
+    domain, families = TaxonomyClassifier.classify_candidate("Senior Python Software Engineer developing backend REST APIs with Django and PostgreSQL.")
+    assert domain == JobTaxonomy.DOMAIN_IT_SOFTWARE
+    assert JobTaxonomy.FAMILY_SOFTWARE_DEV in families
+
+    # 2. Network Engineer
+    domain, families = TaxonomyClassifier.classify_candidate("Cisco Network Engineer managing VLANs, routers, switches, and sysadmin operations.")
+    assert domain == JobTaxonomy.DOMAIN_IT_SOFTWARE
+    assert JobTaxonomy.FAMILY_IT_NETWORKING_AV in families
+
+    # 3. Flutter Developer
+    domain, families = TaxonomyClassifier.classify_candidate("Flutter Developer building iOS and Android applications using Flutter and Dart.")
+    assert domain == JobTaxonomy.DOMAIN_IT_SOFTWARE
+    assert JobTaxonomy.FAMILY_SOFTWARE_DEV in families
+
+    # 4. Plant Electrician
+    domain, families = TaxonomyClassifier.classify_candidate("Plant electrician managing 415V electrical maintenance, motors, and transformer utility upkeep.")
+    assert domain == JobTaxonomy.DOMAIN_PLANT_OPERATIONS
+    assert JobTaxonomy.FAMILY_PLANT_ELECTRICAL in families
+
+    # 5. QC Chemist
+    domain, families = TaxonomyClassifier.classify_candidate("QC Chemist performing HPLC, GC, raw material testing, and laboratory chemical analysis.")
+    assert domain == JobTaxonomy.DOMAIN_QUALITY_LAB
+    assert JobTaxonomy.FAMILY_QC_LAB in families
+
+    # 6. Finance Manager (defaults to DOMAIN_OTHER / FAMILY_OTHER when no candidate rule exists)
+    domain, families = TaxonomyClassifier.classify_candidate("Finance Manager overseeing corporate accounting, taxation, auditing, and ledger balance sheets.")
+    assert domain == JobTaxonomy.DOMAIN_OTHER
+    assert JobTaxonomy.FAMILY_OTHER in families
+
+    # 7. Safety Officer
+    domain, families = TaxonomyClassifier.classify_candidate("EHS Safety Officer enforcing fire safety, HAZOP audits, OSHA compliance, and accident prevention.")
+    assert domain == JobTaxonomy.DOMAIN_EHS_ENVIRONMENT
+    assert JobTaxonomy.FAMILY_FIRE_SAFETY in families
+
+    # 8. Vacancy DTO & Vacancy Classification
+    vac_dto = VacancyDTO(
+        id="job-101",
+        title="Flutter Mobile Engineer",
+        title_lower="flutter mobile engineer",
+        department="Software Engineering",
+        department_lower="software engineering",
+        normalized_job_text="flutter mobile engineer software engineering iOS android cross-platform app development",
+    )
+    vac_class = TaxonomyClassifier.classify_vacancy_dto(vac_dto)
+    assert vac_class.domain == JobTaxonomy.DOMAIN_IT_SOFTWARE
+    assert vac_class.job_family == JobTaxonomy.FAMILY_SOFTWARE_DEV
+
+    # 9. Candidate DTO Classification
+    cand_dto = CandidateResumeDTO.from_resume("Network Administrator configuring Cisco switches and firewalls.")
+    cand_class = TaxonomyClassifier.classify_candidate_dto(cand_dto)
+    assert cand_class.domain == JobTaxonomy.DOMAIN_IT_SOFTWARE
+    assert JobTaxonomy.FAMILY_IT_NETWORKING_AV in cand_class.compatible_families
+
+    # 10. Unknown Jobs Default Handling
+    unknown_job = {"title": "Quantum Astrophysicist", "department": "Outer Space Exploration"}
+    domain_un, family_un = TaxonomyClassifier.classify_vacancy(unknown_job)
+    assert domain_un == JobTaxonomy.DOMAIN_OTHER
+    assert family_un == JobTaxonomy.FAMILY_OTHER
+
+    # 11. Reverse Compatibility Matrix
+    rev_map = JobTaxonomy.REVERSE_COMPATIBILITY_MAP
+    assert JobTaxonomy.FAMILY_SOFTWARE_DEV in rev_map
+    assert JobTaxonomy.FAMILY_SOFTWARE_DEV in rev_map[JobTaxonomy.FAMILY_SOFTWARE_DEV]
+
+    # 12. Metrics Telemetry
+    metrics = TaxonomyClassifier.get_metrics()
+    assert metrics["taxonomy_hits"] > 0
+    assert "average_classification_time_ms" in metrics
+

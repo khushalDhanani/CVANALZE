@@ -1,10 +1,137 @@
+# backend/app/services/vacancy_prefilter.py
+import functools
 import re
+import time
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
+from app.schemas.job_context import JobEvaluationContext
 from app.services.embedding_service import EmbeddingService
-from app.services.job_taxonomy import TaxonomyClassifier, JobTaxonomy
+from app.services.job_taxonomy import JobTaxonomy, TaxonomyClassifier
+
+
+@dataclass
+class CandidateSearchContext:
+    """Encapsulates precomputed candidate state for batch vacancy prefiltering."""
+
+    cv_text: str
+    cv_lower: str
+    cv_tokens: set[str]
+    candidate_experience: float | None = None
+    cv_embedding: list[float] | None = None
+    cand_domain: str = ""
+    cand_families: list[str] = field(default_factory=list)
+    resume_json: dict[str, Any] | None = None
+
+    @classmethod
+    def create(
+        cls,
+        cv_text: str,
+        *,
+        candidate_experience: float | None = None,
+        cv_embedding: list[float] | None = None,
+        resume_json: dict[str, Any] | None = None,
+    ) -> "CandidateSearchContext":
+        cv_lower = cv_text.lower()
+        cv_tokens = set(re.findall(r"\w+", cv_lower))
+
+        # Generate embedding if missing and enabled
+        if cv_embedding is None and settings.EMBEDDING_ENABLED:
+            try:
+                cv_embedding = EmbeddingService.generate_embedding(
+                    cv_text[:8000], settings.EMBEDDING_MODEL
+                )
+            except (RuntimeError, ValueError, AttributeError, KeyError) as e:
+                logger.warning(f"[PREFILTER] CV embedding generation failed: {e}")
+                cv_embedding = None
+
+        cand_domain, cand_families = TaxonomyClassifier.classify_candidate(
+            cv_text, resume_json=resume_json
+        )
+
+        return cls(
+            cv_text=cv_text,
+            cv_lower=cv_lower,
+            cv_tokens=cv_tokens,
+            candidate_experience=candidate_experience,
+            cv_embedding=cv_embedding,
+            cand_domain=cand_domain,
+            cand_families=cand_families,
+            resume_json=resume_json,
+        )
+
+
+class PgVectorQueryCache:
+    """Caches pgvector similarity queries to ensure PostgreSQL is queried ONLY ONCE per embedding."""
+
+    @staticmethod
+    @functools.lru_cache(maxsize=128)
+    def query_pgvector_cached(
+        embedding_tuple: tuple[float, ...], top_limit: int = 200
+    ) -> tuple[tuple[str, int, float], ...]:
+        """
+        Queries pgvector ONCE for candidate embedding, returning tuple of (vacancy_id, rank, distance).
+        Thread-safe under CPython GIL atomic LRU cache operations.
+        """
+        results_list: list[tuple[str, int, float]] = []
+        try:
+            from sqlalchemy import select
+
+            from app.core.database import pg_SessionLocal
+            from app.models.pg import VacancyEmbedding
+
+            if pg_SessionLocal is not None:
+                embedding_list = list(embedding_tuple)
+                with pg_SessionLocal() as session:
+                    dist_col = VacancyEmbedding.embedding.cosine_distance(embedding_list)
+                    stmt = (
+                        select(VacancyEmbedding.vacancy_id, dist_col)
+                        .order_by(dist_col)
+                        .limit(top_limit)
+                    )
+                    rows = session.execute(stmt).all()
+                    for rank, (vid, dist) in enumerate(rows, 1):
+                        results_list.append((str(vid), rank, float(dist or 0.0)))
+        except Exception as e:
+            logger.warning(f"[PREFILTER] pgvector single similarity query failed: {e}")
+
+        return tuple(results_list)
+
+
+class ReciprocalRankFusionService:
+    """Dedicated helper service for Reciprocal Rank Fusion (RRF) scoring."""
+
+    @staticmethod
+    def fuse_ranks(
+        stage1_jobs: list[JobEvaluationContext],
+        lex_ranks: dict[str, int],
+        vec_ranks: dict[str, int],
+        k_constant: float = 60.0,
+    ) -> list[tuple[float, dict[str, Any], JobEvaluationContext]]:
+        """
+        Fuses lexical ranks and vector ranks using RRF formula score = 1/(k + r_lex) + 1/(k + r_vec).
+        Returns list of (fused_score, rrf_details_dict, job_context) sorted descending.
+        """
+        rrf_scored = []
+        for job in stage1_jobs:
+            vid = job.job_id
+            l_rank = lex_ranks.get(vid)
+            v_rank = vec_ranks.get(vid)
+
+            fused_score = 0.0
+            if l_rank:
+                fused_score += 1.0 / (k_constant + l_rank)
+            if v_rank:
+                fused_score += 1.0 / (k_constant + v_rank)
+
+            rrf_details = {"lexical_rank": l_rank, "vector_rank": v_rank}
+            rrf_scored.append((fused_score, rrf_details, job))
+
+        rrf_scored.sort(key=lambda item: item[0], reverse=True)
+        return rrf_scored
 
 
 class VacancyPreFilter:
@@ -20,215 +147,195 @@ class VacancyPreFilter:
     def semantic_vector_search(cls, candidate_embedding: list[float], top_n: int = 50) -> list[str]:
         """
         Performs vector similarity search against active vacancy embeddings.
+        Uses PgVectorQueryCache to ensure pgvector is queried ONLY ONCE.
         Returns a list of vacancy_id strings ordered by proximity.
         """
-        try:
-            from app.core.database import pg_SessionLocal
-            from app.models.pg import VacancyEmbedding
-            from sqlalchemy import select
-
-            if pg_SessionLocal is not None:
-                with pg_SessionLocal() as session:
-                    stmt = (
-                        select(VacancyEmbedding.vacancy_id)
-                        .order_by(VacancyEmbedding.embedding.cosine_distance(candidate_embedding))
-                        .limit(top_n)
-                    )
-                    results = session.execute(stmt).scalars().all()
-                    if results:
-                        return [str(vid) for vid in results]
-        except Exception as e:
-            logger.warning(f"[SEMANTIC_RETRIEVAL] pgvector query failed: {e}")
-
-        return []
+        if not candidate_embedding:
+            return []
+        cached_results = PgVectorQueryCache.query_pgvector_cached(
+            tuple(candidate_embedding), top_limit=max(top_n, 200)
+        )
+        return [vid for vid, rank, dist in cached_results[:top_n]]
 
     @classmethod
     def vector_prefilter(cls, candidate_embedding: list[float], top_k: int = 200) -> dict[str, int]:
         """
         Executes a pgvector cosine distance query against PostgreSQL.
+        Uses PgVectorQueryCache to ensure pgvector is queried ONLY ONCE.
         Returns a dict mapping vacancy_id (str) to its vector rank (1-indexed).
         """
-        ranks = {}
-        try:
-            from app.core.database import pg_SessionLocal
-            from app.models.pg import VacancyEmbedding
-            from sqlalchemy import select
-
-            with pg_SessionLocal() as session:
-                # Get vector distance for all embedded vacancies ordered by proximity
-                stmt = select(VacancyEmbedding.vacancy_id) \
-                       .order_by(VacancyEmbedding.embedding.cosine_distance(candidate_embedding)) \
-                       .limit(top_k)
-                results = session.execute(stmt).scalars().all()
-                for rank, vid in enumerate(results, 1):
-                    ranks[str(vid)] = rank
-        except Exception as e:
-            logger.warning(f"Vector pre-filter failed: {e}")
-        return ranks
+        if not candidate_embedding:
+            return {}
+        cached_results = PgVectorQueryCache.query_pgvector_cached(
+            tuple(candidate_embedding), top_limit=max(top_k, 200)
+        )
+        return {vid: rank for vid, rank, dist in cached_results[:top_k]}
 
     @classmethod
     def filter_vacancies(
         cls,
         cv_text: str,
-        openings: list[dict[str, Any]],
+        openings: list[dict[str, Any]] | list[JobEvaluationContext],
         candidate_experience: float | None = None,
         top_k: int | None = None,
         cv_embedding: list[float] | None = None,
         resume_json: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
+        t_total_start = time.perf_counter()
         if not openings:
             return []
 
         limit = top_k or settings.PREFILTER_TOP_K
-        if len(openings) <= limit:
-            return openings
+
+        # Convert openings to JobEvaluationContexts once if needed
+        job_contexts: list[JobEvaluationContext] = [
+            j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j)
+            for j in openings
+        ]
+
+        # Fast exit if total openings <= limit
+        if len(job_contexts) <= limit:
+            return [j.raw_job if isinstance(j.raw_job, dict) and j.raw_job else j.__dict__ for j in job_contexts]
+
+        # Load prefilter configuration rules ONCE
+        prefilter_rules: PrefilterRules = RuleConfigManager.get_prefilter_rules()
+
+        # Batch candidate preparation
+        cand_ctx = CandidateSearchContext.create(
+            cv_text=cv_text,
+            candidate_experience=candidate_experience,
+            cv_embedding=cv_embedding,
+            resume_json=resume_json,
+        )
 
         # STAGE 0: Job Taxonomy Search Space Filtering
-        cand_domain, cand_families = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
-        stage0_openings = openings
-        if cand_families and cand_families != [JobTaxonomy.FAMILY_OTHER]:
-            compatible_jobs = []
-            for j in openings:
-                j_domain = j.get("_precomputed_domain") or j.get("domain")
-                j_family = j.get("_precomputed_job_family") or j.get("job_family")
-                if not j_family:
-                    j_domain, j_family = TaxonomyClassifier.classify_vacancy(j)
-
-                if TaxonomyClassifier.are_families_compatible(cand_families, j_family) or j_domain == cand_domain:
-                    compatible_jobs.append(j)
-
+        t0 = time.perf_counter()
+        stage0_jobs = job_contexts
+        if cand_ctx.cand_families and cand_ctx.cand_families != [JobTaxonomy.FAMILY_OTHER]:
+            compatible_jobs = [
+                j for j in job_contexts
+                if TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family)
+                or j.vac_tax_domain == cand_ctx.cand_domain
+            ]
             if compatible_jobs:
-                stage0_openings = compatible_jobs
-                logger.info(
-                    f"[TAXONOMY_PREFILTER] Candidate classified as Domain='{cand_domain}', Families={cand_families}. "
-                    f"Filtered {len(openings)} total openings down to {len(stage0_openings)} taxonomy-compatible vacancies."
-                )
+                stage0_jobs = compatible_jobs
 
-        # Generate cv_embedding if missing
-        if cv_embedding is None and settings.EMBEDDING_ENABLED:
-            try:
-                cv_embedding = EmbeddingService.generate_embedding(
-                    cv_text[:8000], settings.EMBEDDING_MODEL
-                )
-            except Exception as e:
-                logger.warning(f"CV embedding generation failed in prefilter: {e}")
-                cv_embedding = None
+        t_stage0_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+        logger.info(
+            f"[PREFILTER_STAGE_0] Candidate Domain='{cand_ctx.cand_domain}', Families={cand_ctx.cand_families}. "
+            f"Filtered {len(job_contexts)} initial openings down to {len(stage0_jobs)} taxonomy-compatible vacancies in {t_stage0_ms} ms."
+        )
 
-        # STAGE 1: Semantic Vector Retrieval (first-stage vacancy selection on Stage 0 vacancies)
-        stage1_openings = stage0_openings
-        if cv_embedding and settings.EMBEDDING_ENABLED and len(stage0_openings) > limit:
+        # Adaptive Retrieval Guard: Skip Stage 1 & 2 if Stage 0 count <= limit
+        if len(stage0_jobs) <= limit:
+            logger.info(
+                f"[PREFILTER_ADAPTIVE] Stage 0 compatible openings ({len(stage0_jobs)}) <= limit ({limit}). "
+                f"Skipping Stage 1 & 2 retrieval."
+            )
+            return [j.raw_job if isinstance(j.raw_job, dict) and j.raw_job else j.__dict__ for j in stage0_jobs]
+
+        # STAGE 1: Semantic Vector Retrieval (Single pgvector Query Reuse)
+        t1 = time.perf_counter()
+        stage1_jobs = stage0_jobs
+        vector_results_tuple: tuple[tuple[str, int, float], ...] = ()
+
+        if cand_ctx.cv_embedding and settings.EMBEDDING_ENABLED:
             top_n = getattr(settings, "SEMANTIC_RETRIEVAL_TOP_N", 50)
-            top_n_ids = cls.semantic_vector_search(cv_embedding, top_n=top_n)
-            if top_n_ids:
-                top_n_set = set(top_n_ids)
-                semantic_candidates = [
-                    job for job in stage0_openings
-                    if str(job.get("vacancy_id") or job.get("id")) in top_n_set
-                ]
+            vector_results_tuple = PgVectorQueryCache.query_pgvector_cached(
+                tuple(cand_ctx.cv_embedding), top_limit=max(top_n, 200)
+            )
+
+            if vector_results_tuple:
+                top_n_vids = {vid for vid, rank, dist in vector_results_tuple[:top_n]}
+                semantic_candidates = [j for j in stage0_jobs if j.job_id in top_n_vids]
                 if semantic_candidates:
-                    stage1_openings = semantic_candidates
-                    logger.info(
-                        f"[SEMANTIC_RETRIEVAL] Stage 1 vector search selected {len(stage1_openings)} candidate vacancies "
-                        f"out of {len(stage0_openings)} taxonomy openings (Top-N={top_n})."
-                    )
+                    stage1_jobs = semantic_candidates
 
-        # STAGE 2: Deterministic VacancyPreFilter (lexical + RRF fusion on Stage 1 candidates)
+        t_stage1_ms = round((time.perf_counter() - t1) * 1000.0, 2)
+        logger.info(
+            f"[PREFILTER_STAGE_1] Semantic Retrieval selected {len(stage1_jobs)} candidate vacancies out of "
+            f"{len(stage0_jobs)} Stage 0 openings in {t_stage1_ms} ms."
+        )
 
-        cv_lower = cv_text.lower()
-        stop_words = {"and", "team", "for", "the", "with", "senior", "junior", "lead", "manager", "specialist"}
+        # STAGE 2: Deterministic VacancyPreFilter (Fast Token-Set Lexical + RRF fusion)
+        t2 = time.perf_counter()
 
-        # 1. Fetch Vector Ranks (pgvector)
-        vec_ranks = {}
-        if cv_embedding:
-            vec_ranks = cls.vector_prefilter(cv_embedding, top_k=max(200, len(stage1_openings)))
+        # Extract precompiled vector ranks dict from the single query result
+        vec_ranks = {vid: rank for vid, rank, dist in vector_results_tuple} if vector_results_tuple else {}
 
-        # 2. Compute Lexical Scores & Ranks
-        lexical_scored = []
-        for job in stage1_openings:
+        # Compute Lexical Scores using Fast Token Set Intersections
+        lexical_scored: list[tuple[float, JobEvaluationContext]] = []
+        for job in stage1_jobs:
             score = 0.0
 
-            # Department match
-            dept_name = job.get("_precomputed_dept")
-            if dept_name is None:
-                dept_name = (job.get("department_name") or job.get("department") or "").lower()
-            if dept_name and dept_name in cv_lower:
-                score += 30.0
+            # 1. Department term match (set intersection with cand_ctx.cv_tokens)
+            if job.dept_terms:
+                if any(t in cand_ctx.cv_tokens for t in job.dept_terms):
+                    score += prefilter_rules.lexical_weights.department_match
+            elif job.department_lower and job.department_lower in cand_ctx.cv_lower:
+                score += prefilter_rules.lexical_weights.department_match
 
-            # Title term match
-            title_terms = job.get("_precomputed_title_terms")
-            if title_terms is None:
-                title = job.get("title", "").lower()
-                title_terms = [
-                    t for t in re.split(r"[\s/&()\-,]+", title)
-                    if len(t) > 2 and t not in stop_words
-                ]
-            title_matches = [t for t in title_terms if t in cv_lower]
-            score += len(title_matches) * 15.0
+            # 2. Title term match (fast set intersection)
+            if job.title_words:
+                title_matches = cand_ctx.cv_tokens.intersection(job.title_words)
+                score += len(title_matches) * prefilter_rules.lexical_weights.title_term_match
 
-            # Required skills match
-            req_skills = job.get("_precomputed_req_skills")
-            if req_skills is None:
-                req_skills = [s.lower() for s in job.get("required_skills", []) if isinstance(s, str)]
-            for skill in req_skills:
-                if skill in cv_lower:
-                    score += 10.0
+            # 3. Required skills match (fast token set intersection for single-word, substring for multi-word)
+            for skill in job.required_skills:
+                skill_lower = skill.lower().strip()
+                if not skill_lower:
+                    continue
+                if " " in skill_lower or "-" in skill_lower or "/" in skill_lower:
+                    if skill_lower in cand_ctx.cv_lower:
+                        score += prefilter_rules.lexical_weights.required_skill_match
+                elif skill_lower in cand_ctx.cv_tokens:
+                    score += prefilter_rules.lexical_weights.required_skill_match
 
-            # Preferred keywords match
-            pref_keywords = job.get("_precomputed_pref_keywords")
-            if pref_keywords is None:
-                pref_keywords = [k.lower() for k in job.get("preferred_keywords", []) if isinstance(k, str)]
-            for kw in pref_keywords:
-                if kw in cv_lower:
-                    score += 5.0
+            # 4. Preferred keywords match
+            for kw in job.preferred_keywords:
+                kw_lower = kw.lower().strip()
+                if not kw_lower:
+                    continue
+                if " " in kw_lower or "-" in kw_lower or "/" in kw_lower:
+                    if kw_lower in cand_ctx.cv_lower:
+                        score += prefilter_rules.lexical_weights.preferred_keyword_match
+                elif kw_lower in cand_ctx.cv_tokens:
+                    score += prefilter_rules.lexical_weights.preferred_keyword_match
 
-            # Experience suitability
-            min_exp = job.get("min_experience_years")
-            max_exp = job.get("max_experience_years")
-            if candidate_experience is not None:
-                if (min_exp is None or candidate_experience >= min_exp) and (max_exp is None or candidate_experience <= max_exp):
-                    score += 10.0
+            # 5. Experience suitability
+            if cand_ctx.candidate_experience is not None:
+                min_e = job.min_experience_years
+                max_e = job.max_experience_years
+                if (min_e is None or cand_ctx.candidate_experience >= min_e) and (
+                    max_e is None or cand_ctx.candidate_experience <= max_e
+                ):
+                    score += prefilter_rules.lexical_weights.experience_suitability
 
             lexical_scored.append((score, job))
 
-        # Sort descending by score to establish lexical ranks
+        # Sort descending to establish 1-indexed lexical ranks
         lexical_scored.sort(key=lambda item: item[0], reverse=True)
-        lex_ranks = {}
-        for rank, (score, job) in enumerate(lexical_scored, 1):
-            vid = str(job.get("vacancy_id") or job.get("id"))
-            lex_ranks[vid] = rank
+        lex_ranks = {job.job_id: rank for rank, (s, job) in enumerate(lexical_scored, 1)}
 
-        # 3. Reciprocal Rank Fusion (RRF)
-        rrf_scored = []
-        k_constant = 60.0
-        for job in stage1_openings:
-            vid = str(job.get("vacancy_id") or job.get("id"))
-            
-            l_rank = lex_ranks.get(vid)
-            v_rank = vec_ranks.get(vid)
-            
-            fused_score = 0.0
-            if l_rank:
-                fused_score += 1.0 / (k_constant + l_rank)
-            if v_rank:
-                fused_score += 1.0 / (k_constant + v_rank)
-                
-            job_copy = dict(job)
-            job_copy["_prefilter_score"] = fused_score
-            job_copy["_rrf_details"] = {"lexical_rank": l_rank, "vector_rank": v_rank}
-            rrf_scored.append((fused_score, job_copy))
+        t_lexical_ms = round((time.perf_counter() - t2) * 1000.0, 2)
 
-        # Sort descending by fused RRF score
-        rrf_scored.sort(key=lambda item: item[0], reverse=True)
+        # 3. Reciprocal Rank Fusion (RRF) via ReciprocalRankFusionService
+        t3 = time.perf_counter()
+        rrf_scored = ReciprocalRankFusionService.fuse_ranks(
+            stage1_jobs=stage1_jobs,
+            lex_ranks=lex_ranks,
+            vec_ranks=vec_ranks,
+            k_constant=prefilter_rules.rrf_k_constant,
+        )
+        t_rrf_ms = round((time.perf_counter() - t3) * 1000.0, 2)
 
-        # Extract top K
-        selected = [item[1] for item in rrf_scored[:limit]]
-
-        # Logging RRF Composition
+        # Extract Top-K Selected Jobs & Attach Metadata without shallow dict copies
+        selected_results: list[dict[str, Any]] = []
         keyword_only, vector_only, both = 0, 0, 0
-        for item in selected:
-            details = item.get("_rrf_details", {})
-            has_l = details.get("lexical_rank") is not None
-            has_v = details.get("vector_rank") is not None
+
+        for fused_score, rrf_details, job in rrf_scored[:limit]:
+            has_l = rrf_details.get("lexical_rank") is not None
+            has_v = rrf_details.get("vector_rank") is not None
             if has_l and has_v:
                 both += 1
             elif has_l:
@@ -236,8 +343,19 @@ class VacancyPreFilter:
             elif has_v:
                 vector_only += 1
 
+            # Prepare return dictionary efficiently
+            job_dict = job.raw_job if isinstance(job.raw_job, dict) and job.raw_job else job.__dict__.copy()
+            job_dict["_prefilter_score"] = fused_score
+            job_dict["_rrf_details"] = rrf_details
+            selected_results.append(job_dict)
+
+        total_ms = round((time.perf_counter() - t_total_start) * 1000.0, 2)
+
         logger.info(
-            f"Vacancy Pre-filter (RRF): {len(stage1_openings)} Stage-1 candidates reduced to {len(selected)} final vacancies (Top K={limit}). "
-            f"Composition: Both={both}, Keyword-Only={keyword_only}, Vector-Only={vector_only}"
+            f"[PREFILTER_COMPLETED] {len(job_contexts)} initial -> {len(stage0_jobs)} Stage 0 -> "
+            f"{len(stage1_jobs)} Stage 1 -> {len(selected_results)} final selected (Top K={limit}) in {total_ms} ms. "
+            f"Composition: Both={both}, Keyword-Only={keyword_only}, Vector-Only={vector_only} | "
+            f"Timings: Stage0={t_stage0_ms}ms, Stage1={t_stage1_ms}ms, Lexical={t_lexical_ms}ms, RRF={t_rrf_ms}ms"
         )
-        return selected
+
+        return selected_results
