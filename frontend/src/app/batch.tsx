@@ -11,11 +11,13 @@ import { Radio, CheckCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useBatchProgress } from '@/hooks/useBatchProgress';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { BatchCandidateResult } from '@/types/api';
-import { Card, Button, DenseRow, SegmentedControl, EmptyState, Badge } from '@/components/ui';
+import { Card, Button, DenseRow, SegmentedControl, EmptyState, Badge, Breadcrumbs } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 export default function BatchScreen() {
+  usePageTitle('Batch Candidate Matching | AIRIS');
   const [candidateLimit, setCandidateLimit] = useState<number>(10);
   const { running, progress, result, error, startBatch } = useBatchProgress();
 
@@ -86,6 +88,7 @@ export default function BatchScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'Batch Processing' }]} />
       <ScrollView className="flex-1 px-3 py-4">
         {/* Header */}
         <View className="mb-4">

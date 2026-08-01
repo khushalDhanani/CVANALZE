@@ -10,11 +10,13 @@ import { Sliders, CheckCircle } from 'lucide-react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMatchConfig } from '@/hooks/useMatchConfig';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { MatchComponentWeights } from '@/types/api';
-import { Card, Button, TextField, DenseRow, WeightControlRow } from '@/components/ui';
+import { Card, Button, TextField, DenseRow, WeightControlRow, Breadcrumbs } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 export default function ConfigScreen() {
+  usePageTitle('Engine Configuration | AIRIS');
   const { config, loading, updating, error, refreshConfig, updateConfig } =
     useMatchConfig();
 
@@ -87,6 +89,7 @@ export default function ConfigScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'Engine Configuration' }]} />
       {/* Sticky Header */}
       <View className="flex-row items-center justify-between px-3 py-2 bg-surface border-b border-border">
         <View>

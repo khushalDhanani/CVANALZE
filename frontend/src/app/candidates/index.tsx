@@ -1,24 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserCheck, FileText, Search, RefreshCw, Mail, Phone, MapPin, Building, Briefcase } from 'lucide-react-native';
 import { useCandidates } from '@/hooks/useCandidates';
 import { useDebounce } from '@/hooks/useDebounce';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { CandidateSummary } from '@/types/api';
-import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl, FieldConfidenceView } from '@/components/ui';
+import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl, FieldConfidenceView, Breadcrumbs } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { COLORS } from '@/constants/colors';
 
 export default function CandidateListScreen() {
+  usePageTitle('Candidate Directory | AIRIS');
   const router = useRouter();
+  const params = useLocalSearchParams<{ query?: string; classification?: string; department?: string }>();
   const { candidates, loading, error, searchMode, refreshCandidates } = useCandidates();
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterClassification, setFilterClassification] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED'>('ALL');
-  const [filterDept, setFilterDept] = useState<string>('');
+
+  const [searchQuery, setSearchQuery] = useState<string>(params.query || '');
+  const [filterClassification, setFilterClassification] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED'>(
+    (params.classification as any) || 'ALL'
+  );
+  const [filterDept, setFilterDept] = useState<string>(params.department || '');
 
   const debouncedSearch = useDebounce(searchQuery, 300);
   const debouncedDept = useDebounce(filterDept, 300);
+
+  // Synchronize state changes with URL query parameters
+  useEffect(() => {
+    const nextParams: Record<string, string> = {};
+    if (debouncedSearch) nextParams.query = debouncedSearch;
+    if (filterClassification && filterClassification !== 'ALL') nextParams.classification = filterClassification;
+    if (debouncedDept) nextParams.department = debouncedDept;
+
+    router.setParams(nextParams);
+  }, [debouncedSearch, filterClassification, debouncedDept]);
 
   useEffect(() => {
     refreshCandidates({
@@ -26,6 +42,18 @@ export default function CandidateListScreen() {
       department: debouncedDept || undefined,
     });
   }, [debouncedSearch, debouncedDept, refreshCandidates]);
+
+  const handleOpenCandidateDetail = (candId: string) => {
+    const queryParams: Record<string, string> = {};
+    if (searchQuery) queryParams.query = searchQuery;
+    if (filterClassification !== 'ALL') queryParams.classification = filterClassification;
+    if (filterDept) queryParams.department = filterDept;
+
+    router.push({
+      pathname: '/candidates/[id]',
+      params: { id: candId, ...queryParams },
+    } as any);
+  };
 
   const filteredCandidates = (candidates || []).filter((cand) => {
     if (!cand) return false;
@@ -114,7 +142,7 @@ export default function CandidateListScreen() {
         <DenseRow
           title={titleNode}
           subtitle={subtitleNode}
-          onPress={() => router.push(`/candidates/${encodeURIComponent(item.id)}` as any)}
+          onPress={() => handleOpenCandidateDetail(item.id)}
           trailing={
             item.best_match?.score != null ? (
               <View className="items-end gap-1">
@@ -137,6 +165,7 @@ export default function CandidateListScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'Candidate Directory' }]} />
       {/* Sticky Header */}
       <View className="flex-row items-center justify-between px-3 py-2 bg-surface border-b border-border">
         <View>

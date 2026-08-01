@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,33 +10,53 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Briefcase, Target, CheckCircle, IndianRupee, Sparkles, X, UserCheck, AlertTriangle } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { jobsService } from '@/services/jobsService';
 import { useJobs } from '@/hooks/useJobs';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { JobOpening, VacancyRecommendationsResponse } from '@/types/api';
-import { TextField, Card, Button, Badge, EmptyState, DenseRow } from '@/components/ui';
+import { TextField, Card, Button, Badge, EmptyState, DenseRow, Breadcrumbs } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { COLORS } from '@/constants/colors';
 
 export default function VacanciesScreen() {
+  usePageTitle('Job Vacancies | AIRIS');
+  const router = useRouter();
+  const params = useLocalSearchParams<{ query?: string; department?: string; domain?: string }>();
   const { jobs, loading, error, refreshJobs } = useJobs();
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterDept, setFilterDept] = useState<string>('');
-  const [filterDomain, setFilterDomain] = useState<string>('');
+
+  const [searchQuery, setSearchQuery] = useState<string>(params.query || '');
+  const [filterDept, setFilterDept] = useState<string>(params.department || '');
+  const [filterDomain, setFilterDomain] = useState<string>(params.domain || '');
   
   const [clearingCache, setClearingCache] = useState<boolean>(false);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
 
-  const router = useRouter();
+  // Synchronize state changes with URL query parameters
+  useEffect(() => {
+    const nextParams: Record<string, string> = {};
+    if (searchQuery) nextParams.query = searchQuery;
+    if (filterDept) nextParams.department = filterDept;
+    if (filterDomain) nextParams.domain = filterDomain;
+
+    router.setParams(nextParams);
+  }, [searchQuery, filterDept, filterDomain]);
 
   const handleOpenDetails = (jobId: string | number) => {
-    router.push(`/vacancies/${jobId}`);
+    const queryParams: Record<string, string> = {};
+    if (searchQuery) queryParams.query = searchQuery;
+    if (filterDept) queryParams.department = filterDept;
+    if (filterDomain) queryParams.domain = filterDomain;
+
+    router.push({
+      pathname: '/vacancies/[id]',
+      params: { id: String(jobId), ...queryParams },
+    } as any);
   };
 
   const handleOpenRecommendations = (jobId: string | number) => {
-    // Optionally we can pass a query param or handle it all on the details page
-    router.push(`/vacancies/${jobId}`);
+    handleOpenDetails(jobId);
   };
 
   const { width } = useWindowDimensions();
@@ -200,6 +220,7 @@ export default function VacanciesScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'Job Vacancies' }]} />
       {/* Sticky Header */}
       <View className="flex-row items-center justify-between px-3 py-2 bg-surface border-b border-border">
         <View>

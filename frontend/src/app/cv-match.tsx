@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -8,11 +8,13 @@ import {
   View,
 } from 'react-native';
 import { Edit3, FileText, FolderIcon } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useCvUpload } from '@/hooks/useCvUpload';
 import { matchService } from '@/services/matchService';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { CandidateMatchAnalysis, JobMatchScore } from '@/types/api';
 import {
   Card,
@@ -24,12 +26,22 @@ import {
   MatchAnalysisCard,
   StepProgressCard,
   StepState,
+  Breadcrumbs,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 export default function CvMatchScreen() {
-  // Make 'file' the first and default active tab as requested
-  const [activeTab, setActiveTab] = useState<'file' | 'text'>('file');
+  usePageTitle('CV Match Analysis | AIRIS');
+  const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: 'file' | 'text' }>();
+
+  const [activeTab, setActiveTab] = useState<'file' | 'text'>(params.tab || 'file');
+
+  useEffect(() => {
+    if (activeTab) {
+      router.setParams({ tab: activeTab });
+    }
+  }, [activeTab]);
   const [cvText, setCvText] = useState<string>('');
   const [useLlmEnrichment, setUseLlmEnrichment] = useState<boolean>(true);
   const [analyzingText, setAnalyzingText] = useState<boolean>(false);
@@ -132,6 +144,7 @@ export default function CvMatchScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'CV Match Analysis' }]} />
       <ScrollView className="flex-1 px-3 py-4">
         <View className="gap-4 mb-4">
           {/* Header */}

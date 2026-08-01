@@ -9,8 +9,9 @@ import {
 } from 'lucide-react-native';
 import { jobsService } from '@/services/jobsService';
 import { JobOpening, VacancyRecommendationsResponse } from '@/types/api';
-import { Badge } from '@/components/ui';
+import { Badge, Breadcrumbs } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { COLORS } from '@/constants/colors';
 
 const CollapsibleBullets = ({ text, previewCount = 3 }: { text: string; previewCount?: number }) => {
@@ -47,12 +48,28 @@ const CollapsibleBullets = ({ text, previewCount = 3 }: { text: string; previewC
 
 export default function VacancyDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; query?: string; department?: string; domain?: string }>();
+  const { id, query, department, domain } = params;
   const { width } = useWindowDimensions();
   const isDesktop = width > 768;
 
   const [jobDetails, setJobDetails] = useState<JobOpening | null>(null);
   const [loadingDetails, setLoadingDetails] = useState<boolean>(true);
+
+  usePageTitle(jobDetails?.title ? `Vacancy #${id}: ${jobDetails.title} | AIRIS` : 'Job Vacancy | AIRIS');
+
+  const getReturnHref = () => {
+    const q = new URLSearchParams();
+    if (query) q.set('query', query);
+    if (department) q.set('department', department);
+    if (domain) q.set('domain', domain);
+    const str = q.toString();
+    return `/vacancies${str ? `?${str}` : ''}`;
+  };
+
+  const handleBack = () => {
+    router.push(getReturnHref() as any);
+  };
 
   const [recData, setRecData] = useState<VacancyRecommendationsResponse | null>(null);
   const [loadingRec, setLoadingRec] = useState<boolean>(true);
@@ -138,11 +155,17 @@ export default function VacancyDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+      <Breadcrumbs
+        items={[
+          { label: 'Job Vacancies', href: getReturnHref() },
+          { label: jobDetails?.title ? `#${id} - ${jobDetails.title}` : `#${id}` },
+        ]}
+      />
       {/* Compact Hero Header */}
       <View className="bg-surface border-b border-border px-4 py-3">
         <View className="flex-row items-start justify-between mb-2">
           <View className="flex-row items-center gap-2 flex-1 pr-4">
-            <Pressable onPress={() => router.back()} className="p-1 active:bg-background rounded">
+            <Pressable onPress={handleBack} className="p-1 active:bg-background rounded">
               <ArrowLeft size={16} color={COLORS.textPrimary} />
             </Pressable>
             <View className="bg-success/10 px-1.5 py-0.5 rounded border border-success/20">

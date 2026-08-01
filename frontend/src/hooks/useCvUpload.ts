@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_CONFIG } from '@/constants/config';
 import { cvService } from '@/services/cvService';
 import { matchService } from '@/services/matchService';
@@ -50,6 +50,7 @@ export function useCvUpload() {
   ]);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -65,6 +66,21 @@ export function useCvUpload() {
       timerRef.current = null;
     }
   }, []);
+
+  const stopPollTimer = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  // Cleanup timers on component unmount to prevent polling leaks
+  useEffect(() => {
+    return () => {
+      stopPollTimer();
+      stopTimer();
+    };
+  }, [stopPollTimer, stopTimer]);
 
   const updateStepState = useCallback((stepIdx: number, state: StepState, isLlmEnriched: boolean) => {
     setStepStates((prev) => {
@@ -88,11 +104,12 @@ export function useCvUpload() {
 
   const pollCvStatus = useCallback(
     async (cvKey: string, isEnriched: boolean = false) => {
+      stopPollTimer();
       let attempts = 0;
-      const interval = setInterval(async () => {
+      pollIntervalRef.current = setInterval(async () => {
         attempts++;
         if (attempts > API_CONFIG.MAX_POLL_RETRIES) {
-          clearInterval(interval);
+          stopPollTimer();
           stopTimer();
           setUploading(false);
           setError('Processing is taking longer than expected. The backend may still be working — please check the candidates list later.');
@@ -108,7 +125,7 @@ export function useCvUpload() {
           if (isEnriched) {
             const res = await matchService.getMatchStatus(cvKey);
             if ('status' in res && (res as CVProcessingResponse).status?.toUpperCase() === 'FAILED') {
-              clearInterval(interval);
+              stopPollTimer();
               stopTimer();
               setUploading(false);
               const failedRes = res as CVProcessingResponse;
@@ -145,7 +162,7 @@ export function useCvUpload() {
               (res as any).progress === 100 ||
               (res as any).is_complete === true
             ) {
-              clearInterval(interval);
+              stopPollTimer();
               stopTimer();
               if ('scan_id' in res || 'match_analysis' in res) {
                 setEnrichedResult(res as EnrichedCandidateAnalysis);
@@ -201,7 +218,7 @@ export function useCvUpload() {
           } else {
             const res = await cvService.getCvStatus(cvKey);
             if ('status' in res && (res as CVProcessingResponse).status?.toUpperCase() === 'FAILED') {
-              clearInterval(interval);
+              stopPollTimer();
               stopTimer();
               setUploading(false);
               const failedRes = res as CVProcessingResponse;
@@ -239,7 +256,7 @@ export function useCvUpload() {
               (res as any).status === 'REPROCESSED' ||
               (res as any).progress === 100
             ) {
-              clearInterval(interval);
+              stopPollTimer();
               stopTimer();
               setBasicResult(res as CVUploadResponse);
               setUploading(false);
@@ -288,7 +305,7 @@ export function useCvUpload() {
             }
           }
         } catch (err: any) {
-          clearInterval(interval);
+          stopPollTimer();
           stopTimer();
           setUploading(false);
           setError(err.message || 'Status check failed');
@@ -300,11 +317,12 @@ export function useCvUpload() {
         }
       }, API_CONFIG.POLL_INTERVAL_MS);
     },
-    [stopTimer, updateStepState, setCurrentStepIndex]
+    [stopPollTimer, stopTimer, updateStepState, setCurrentStepIndex]
   );
 
   const uploadAndProcess = useCallback(
     async (file: FilePickerAsset, enrichWithLlm: boolean = true) => {
+      stopPollTimer();
       setUploading(true);
       setIsComplete(false);
       setError(null);

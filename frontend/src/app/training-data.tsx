@@ -10,12 +10,14 @@ import {
 import { Database, FileText, CheckCircle2, ChevronDown, ChevronUp, UserCheck, Sparkles, MessageSquare } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { matchService } from '@/services/matchService';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { TrainingExample } from '@/types/api';
-import { Card, Button, Badge, EmptyState } from '@/components/ui';
+import { Card, Button, Badge, EmptyState, Breadcrumbs } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { COLORS } from '@/constants/colors';
 
 export default function TrainingDataScreen() {
+  usePageTitle('HR Training Data | AIRIS');
   const [examples, setExamples] = useState<TrainingExample[]>([]);
   const [count, setCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
@@ -148,6 +150,7 @@ export default function TrainingDataScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'HR Training Data' }]} />
       {/* Sticky Header */}
       <View className="flex-row items-center justify-between px-3 py-2 bg-surface border-b border-border">
         <View className="flex-row items-center gap-2">

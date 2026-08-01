@@ -8,8 +8,9 @@ import {
 import { BarChart3, CpuIcon, Database, HardDrive, RefreshCw, Zap, CheckCircle2, ShieldCheck } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { analyticsService, PerformanceMetricsResponse } from '@/services/analyticsService';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { CacheAnalyticsResponse } from '@/types/api';
-import { Card, Button, Badge, StatCard, DenseRow } from '@/components/ui';
+import { Card, Button, Badge, StatCard, DenseRow, Breadcrumbs } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 const STAGE_LABELS: Record<string, string> = {
@@ -24,6 +25,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 export default function AnalyticsScreen() {
+  usePageTitle('Analytics & Telemetry | AIRIS');
   const [cacheAnalytics, setCacheAnalytics] = useState<CacheAnalyticsResponse | null>(null);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetricsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -74,6 +76,7 @@ export default function AnalyticsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'Analytics & Telemetry' }]} />
       {/* Sticky Header */}
       <View className="flex-row items-center justify-between px-3 py-2 bg-surface border-b border-border">
         <View className="flex-row items-center gap-2">

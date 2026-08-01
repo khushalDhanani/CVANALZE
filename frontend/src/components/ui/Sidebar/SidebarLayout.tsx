@@ -71,7 +71,9 @@ export function SidebarLayout() {
 
           <View className="flex-1 py-4 gap-2 px-3">
             {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.route;
+              const isActive = item.route === '/' 
+                ? (pathname === '/' || pathname === '') 
+                : (pathname === item.route || pathname.startsWith(`${item.route}/`));
               const Icon = item.icon;
 
               return (

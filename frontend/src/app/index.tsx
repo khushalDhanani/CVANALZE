@@ -7,11 +7,13 @@ import { apiClient } from '@/services/apiClient';
 import { matchService } from '@/services/matchService';
 import { useJobs } from '@/hooks/useJobs';
 import { useCandidates } from '@/hooks/useCandidates';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { LlmHealthResponse, SystemHealthResponse } from '@/types/api';
-import { Card, DenseRow, Badge, Button, StatCard } from '@/components/ui';
+import { Card, DenseRow, Badge, Button, StatCard, Breadcrumbs } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 export default function HomeScreen() {
+  usePageTitle('Dashboard | AIRIS');
   const router = useRouter();
   const { jobs, loading: jobsLoading } = useJobs();
   const { candidates, loading: candidatesLoading } = useCandidates();
@@ -65,6 +67,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[]} />
       <ScrollView className="flex-1 px-3">
         <View className="gap-4 py-4">
 
@@ -241,7 +244,10 @@ export default function HomeScreen() {
                   key={(job as any).VacancyID || (job as any).id || i}
                   title={(job as any).VacancyTitle || (job as any).title || 'Unknown'}
                   subtitle={(job as any).DepartmentName || (job as any).department || 'General'}
-                  onPress={() => router.push(`/vacancies`)}
+                  onPress={() => {
+                    const vId = (job as any).id || (job as any).VacancyID;
+                    router.push(vId ? `/vacancies/${vId}` as any : `/vacancies`);
+                  }}
                 />
               ))}
               {jobs.length === 0 && !jobsLoading && (

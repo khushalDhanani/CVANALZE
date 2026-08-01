@@ -433,7 +433,7 @@ export interface CandidateRecommendationsResponse {
   missing_qualifications?: MissingQualification[];
   recommended_certifications?: string[];
   talent_pools?: string[];
-  hiring_recommendation?: 'HIRE' | 'CONSIDER' | 'REJECT';
+  hiring_recommendation?: 'Highly Recommended' | 'Recommended' | 'Potential Fit' | 'Needs Further Review' | 'HIRE' | 'CONSIDER' | 'REJECT';
   role_department_fit?: string;
   interview_focus_areas?: string[];
   risk_flags?: string[];
