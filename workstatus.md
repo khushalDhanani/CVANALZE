@@ -1,9 +1,32 @@
 # Work Status
 
 ## Last Updated
-2026-08-01T04:34:00Z
+2026-08-01T13:10:00Z
 
 ## Completed
+- **Application-Wide Navigation & Routing Audit**:
+  - **Active Sidebar & Parent Route Highlighting (`SidebarLayout.tsx`)**: Refactored route matching logic with `isRouteActive` helper so parent links (**Candidates**, **Jobs**) remain highlighted on nested detail routes (`/candidates/[id]`, `/vacancies/[id]`).
+  - **URL Search Parameter Synchronization (`app/candidates/index.tsx`, `app/vacancies/index.tsx`)**: Integrated `useLocalSearchParams` and `router.setParams` across candidate and job vacancy directories. Enables direct URL access, shareable links with query params, and browser Back/Forward navigation state restoration.
+  - **Navigation State Preservation on Detail Pages (`candidates/[id].tsx`, `vacancies/[id].tsx`)**: Extracted active filter parameters (`query`, `classification`, `department`, `domain`) from `useLocalSearchParams` and implemented `handleBack` helper to navigate back to list screens with active search parameters preserved.
+  - **Breadcrumbs System (`Breadcrumbs.tsx`, `ui/index.ts`)**: Built a reusable, accessible `Breadcrumbs` component with Home icon and clickable node links, integrated across all 10 module screens.
+  - **Dynamic Page Titles (`usePageTitle.ts`)**: Built `usePageTitle` hook to update `document.title` on web dynamically upon screen transitions (e.g. `"Candidate Directory | AIRIS"`, `"Candidate: [Name] | AIRIS"`).
+  - **Internal Link Fixes (`app/index.tsx`)**: Fixed Top Vacancies dashboard card to navigate directly to `/vacancies/[id]` instead of generic `/vacancies`.
+  - **Automated Verification**: Ran `npx tsc --noEmit` across frontend codebase verifying **0 type errors**.
+- **Audit & Implementation of Polling & Background Task Cleanup for CV Matching**:
+  - **Frontend Polling & Timer Management (`useCvUpload.ts`, `candidates/[id].tsx`)**: Refactored status polling using `pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)` with `stopPollTimer()` callback and `useEffect` unmount cleanup handler. Replaced all raw `clearInterval` calls to guarantee background HTTP status requests (`/api/match/status/{cvKey}` and `/api/cv/status/{cvKey}`) terminate cleanly when processing reaches 100% completion or when user leaves the component.
+  - **Read-Only Post-Matching Ollama Embedding Prevention (`domain_embedding_service.py`, `recommendation_service.py`)**: Added `allow_live_generation: bool = True` parameter to `get_or_generate_domain_embedding` and `find_semantic_equivalents`. Passed `allow_live_generation=False` in `RecommendationService.get_candidate_recommendations` so viewing candidate details post-matching uses pre-cached database records and canonical rules without firing live `/api/embed` HTTP requests to Ollama.
+  - **Pre-Filter Candidate Embedding Reuse (`vacancy_prefilter.py`)**: Enhanced `CandidateSearchContext` to check existing candidate embeddings in PostgreSQL/cache by content hash before attempting new embedding generation.
+  - **Ollama Model Memory Unload (`llm_service.py`, `cv_service.py`)**: Added `OllamaLLMService.unload_model` sending `{"model": model_name, "keep_alive": 0}` to Ollama `/api/generate` upon 100% completion of CV matching, allowing Ollama to immediately release RAM/VRAM and become idle.
+  - **Human-Readable Hiring Recommendation Tiers (`recommendation_service.py`, `candidates/[id].tsx`, `api.ts`)**: Configured 4-tier hiring recommendations (`Highly Recommended` >= 85%, `Recommended` >= 70%, `Potential Fit` >= 55%, `Needs Further Review` < 55%) across backend recommendation service, TypeScript types, next-steps logic, and candidate UI badge styling.
+  - **Automated Test Verification**: Added unit tests in `test_qwen_llm_service.py` (`test_ollama_unload_model_sends_keep_alive_zero` and `test_domain_embedding_read_only_disables_live_generation`). Verified **26/26 tests passing** across `test_qwen_llm_service.py`, `test_vacancy_prefilter.py`, `test_ai_recommendations.py`, and `test_taxonomy_integration.py`.
+
+
+- **Qwen3:4b Ollama Configuration (/no_think for Extraction, /think for Scoring, Structured Output, Temp 0.0)**:
+  - Preserved default model setting `OLLAMA_MODEL = "qwen3:4b"` in `app/core/config.py`.
+  - Configured Candidate Profile Extraction (`OllamaLLMService.extract_candidate_profile`) with `/no_think` prompt prefix, Ollama payload `"think": False`, `"format": DynamicCandidateProfile.model_json_schema()`, and options `"temperature": 0.0`.
+  - Configured Match Analysis and Scoring (`OllamaLLMService.call_qwen`, `call_qwen_dynamic`, `run_optimized_match`) with `/think` prompt prefix, Ollama payload `"think": True`, `"format": Model.model_json_schema()`, and options `"temperature": 0.0`.
+  - Enforced structured JSON output via Pydantic model schemas across all 4 Ollama API methods (`extract_candidate_profile`, `call_qwen`, `call_qwen_dynamic`, `run_optimized_match`).
+  - Added unit test suite `backend/tests/test_qwen_llm_service.py` verifying model name, payload think flags, temperature 0.0, JSON schemas, and prompt prefixes. Verified **44/44 core backend tests passing** and 0 ruff errors.
 - **Refactor `VacancyPreFilter` (`backend/app/services/vacancy_prefilter.py`)**:
   - Implemented all 14 requested requirements across `backend/app/services/vacancy_prefilter.py` and `backend/tests/test_vacancy_prefilter.py`.
   - Eliminated duplicate PostgreSQL vector queries via `PgVectorQueryCache.query_pgvector_cached()` with `@functools.lru_cache(maxsize=128)` to query pgvector ONLY ONCE per candidate embedding.
@@ -221,12 +244,12 @@
 - `backend/tests/test_frontend_polling_e2e.py`
 - `backend/tests/test_docx_validation.py`
 - `backend/tests/test_dual_upload_key_alignment.py`
-- `frontend/src/types/api.ts`
-- `frontend/src/components/ui/FieldConfidenceView.tsx`
-- `frontend/src/components/ui/MatchAnalysisCard.tsx`
-- `frontend/src/components/ui/index.ts`
-- `frontend/src/app/candidates/index.tsx`
-- `frontend/src/app/candidates/[id].tsx`
+- `backend/app/services/llm_service.py`
+- `backend/app/prompts/profile_extraction.py`
+- `backend/app/prompts/optimized_match.py`
+- `backend/app/prompts/match_analysis.py`
+- `backend/app/prompts/dynamic_mapping.py`
+- `backend/tests/test_qwen_llm_service.py`
 - `workstatus.md`
 
 
