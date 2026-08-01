@@ -1,10 +1,12 @@
 import asyncio
+
 import fitz  # PyMuPDF
 import pytest
-from app.services.cv_service import process_cv_file, get_stable_cv_key
-from app.services.embedding_service import get_candidate_embedding
-from app.core.database import pg_engine
 from sqlalchemy import text
+
+from app.core.database import pg_engine
+from app.services.cv_service import get_stable_cv_key, process_cv_file
+from app.services.embedding_service import get_candidate_embedding
 
 
 def create_sample_pdf_bytes() -> bytes:
@@ -55,7 +57,7 @@ async def test_candidate_side_embedding_end_to_end():
         ).fetchone()
 
     assert row is not None, f"No row found in candidate_embeddings table for '{expected_cv_key}'"
-    print(f"\n[PHASE 4 PROOF]")
+    print("\n[PHASE 4 PROOF]")
     print(f"Processed CV Key: {expected_cv_key}")
     print(f"Embedding Vector Retrievable: True (Dimensions: {len(candidate_emb)})")
     print(f"PostgreSQL Candidate Record: cv_key={row[0]}, model={row[1]}")

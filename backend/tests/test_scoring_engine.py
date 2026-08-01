@@ -1,4 +1,3 @@
-from app.core.config import settings
 from app.services.scoring_engine import ScoringEngine
 
 

@@ -1,11 +1,11 @@
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.schemas.cv import CVMatchRequest, CVUploadResponse, CVProcessingResponse
-from app.schemas.match import CandidateMatchAnalysis
-from app.services.cv_service import process_cv_file, get_stable_cv_key
 from app.repositories.result import ResultRepository
+from app.schemas.cv import CVMatchRequest, CVProcessingResponse, CVUploadResponse
+from app.schemas.match import CandidateMatchAnalysis
+from app.services.cv_service import get_stable_cv_key, process_cv_file
 from app.services.scoring_engine import ScoringEngine
 
 router = APIRouter(prefix="/cv", tags=["CV"])

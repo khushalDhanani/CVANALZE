@@ -6,9 +6,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.repositories.result import ResultRepository
 from app.repositories.llm_cache import LLMCacheRepository
-from app.schemas.analysis import OptimizedCandidateProfile, OptimizedLLMMatchResponse, OptimizedVacancyMatch
+from app.repositories.result import ResultRepository
+from app.schemas.analysis import (
+    OptimizedCandidateProfile,
+    OptimizedLLMMatchResponse,
+    OptimizedVacancyMatch,
+)
 from app.services.document_parser import MarkdownResult
 
 client = TestClient(app)
@@ -16,7 +20,7 @@ client = TestClient(app)
 
 def test_document_cache_roundtrip():
     """Test that document cache stores and retrieves the full extraction result."""
-    from app.core.cache import doc_cache_manager, _REDIS_CLIENT
+    from app.core.cache import doc_cache_manager
 
     mock_redis = MagicMock()
     with patch("app.core.cache._REDIS_CLIENT", mock_redis):
@@ -316,8 +320,8 @@ def test_vacancy_cache_is_stale():
 
 def test_vacancy_cache_get_all_jobs_cached():
     """Test that cached vacancy data with valid version is returned without DB hit."""
-    from app.repositories.job import JobRepository
     from app.core.cache import vacancy_cache_manager
+    from app.repositories.job import JobRepository
 
     sample_jobs = [
         {"vacancy_id": 1, "title": "Python Developer"},
@@ -336,8 +340,8 @@ def test_vacancy_cache_get_all_jobs_cached():
 
 def test_vacancy_cache_stale_triggers_refetch():
     """Test that stale version triggers DB re-fetch."""
-    from app.repositories.job import JobRepository
     from app.core.cache import vacancy_cache_manager
+    from app.repositories.job import JobRepository
 
     sample_jobs = [
         {"vacancy_id": 1, "title": "Python Developer"},
@@ -353,8 +357,8 @@ def test_vacancy_cache_stale_triggers_refetch():
 
 def test_vacancy_cache_invalidate():
     """Test that invalidate_cache clears both jobs and version cache."""
-    from app.repositories.job import JobRepository
     from app.core.cache import vacancy_cache_manager
+    from app.repositories.job import JobRepository
 
     sample_jobs = [{"vacancy_id": 1, "title": "Python Developer"}]
     version = JobRepository._compute_vacancy_hash(sample_jobs)
@@ -372,8 +376,8 @@ def test_vacancy_cache_invalidate():
 
 def test_vacancy_cache_no_db_fallback():
     """Test that get_all_jobs falls back to defaults when no DB available."""
-    from app.repositories.job import JobRepository
     from app.core.cache import vacancy_cache_manager
+    from app.repositories.job import JobRepository
 
     vacancy_cache_manager.delete(JobRepository._VACANCY_CACHE_KEY)
 
@@ -385,7 +389,6 @@ def test_vacancy_cache_no_db_fallback():
 def test_embedding_cache_roundtrip():
     """Test that generate_embedding caches and returns the same result."""
     from app.services.embedding_service import EmbeddingService
-    from app.core.cache import embedding_cache_manager
 
     mock_response = MagicMock()
     mock_response.json.return_value = {"embeddings": [[0.1, 0.2, 0.3]]}
@@ -404,8 +407,8 @@ def test_embedding_cache_roundtrip():
 
 def test_embedding_cache_different_model_version():
     """Test that different model versions produce different cache entries."""
-    from app.services.embedding_service import EmbeddingService
     from app.core.cache import embedding_cache_manager
+    from app.services.embedding_service import EmbeddingService
 
     embedding_cache_manager.clear()
 
@@ -426,8 +429,8 @@ def test_embedding_cache_different_model_version():
 
 def test_embedding_cache_content_change():
     """Test that different content produces different cache entries."""
-    from app.services.embedding_service import EmbeddingService
     from app.core.cache import embedding_cache_manager
+    from app.services.embedding_service import EmbeddingService
 
     embedding_cache_manager.clear()
 
@@ -470,8 +473,8 @@ def test_embedding_disabled_when_config_off():
 
 def test_embedding_cache_different_content_same_model():
     """Test that same model, different content => no collision."""
-    from app.services.embedding_service import EmbeddingService
     from app.core.cache import embedding_cache_manager
+    from app.services.embedding_service import EmbeddingService
 
     embedding_cache_manager.clear()
 
@@ -531,7 +534,6 @@ def test_match_result_cache_roundtrip():
     """Test that match result cache stores and retrieves the full EnrichedCandidateAnalysis."""
     from app.core.cache import match_result_cache_manager
     from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
-    from app.schemas.match import JobMatchResult
 
     match_result_cache_manager.clear()
 
@@ -708,7 +710,11 @@ def test_cache_invalidator_candidate():
 
 def test_cache_invalidator_vacancies():
     """Test that invalidate_vacancies clears vacancy cache and match results."""
-    from app.core.cache import CacheInvalidator, vacancy_cache_manager, match_result_cache_manager
+    from app.core.cache import (
+        CacheInvalidator,
+        match_result_cache_manager,
+        vacancy_cache_manager,
+    )
 
     vacancy_cache_manager.set("all_jobs", {"jobs": []})
     vacancy_cache_manager.set("all_jobs_version", "v1")
@@ -722,7 +728,11 @@ def test_cache_invalidator_vacancies():
 
 def test_cache_invalidator_prompt():
     """Test that invalidate_prompt clears llm_cache and match_result."""
-    from app.core.cache import CacheInvalidator, llm_cache_manager, match_result_cache_manager
+    from app.core.cache import (
+        CacheInvalidator,
+        llm_cache_manager,
+        match_result_cache_manager,
+    )
 
     llm_cache_manager.set("llm_key", {"response": "data"})
     match_result_cache_manager.set("match_key", {"score": 85})
@@ -735,7 +745,11 @@ def test_cache_invalidator_prompt():
 
 def test_cache_invalidator_llm_model():
     """Test that invalidate_llm_model clears llm_cache and match_result."""
-    from app.core.cache import CacheInvalidator, llm_cache_manager, match_result_cache_manager
+    from app.core.cache import (
+        CacheInvalidator,
+        llm_cache_manager,
+        match_result_cache_manager,
+    )
 
     llm_cache_manager.set("llm_key", {"response": "data"})
     match_result_cache_manager.set("match_key", {"score": 85})
@@ -775,12 +789,11 @@ def test_cache_invalidator_embedding_model():
 def test_invalidate_cv_multi_tier():
     """Test that invalidate_cv purges values across L1 memory, L2 redis, and L3 file cache tiers."""
     from unittest.mock import MagicMock, patch
+
     from app.core.cache import (
         CacheInvalidator,
-        doc_cache_manager,
-        cv_result_cache_manager,
-        _memory_cache,
         _cv_file_cache,
+        _memory_cache,
     )
 
     doc_hash = "multitier_hash_123"
@@ -805,7 +818,8 @@ def test_invalidate_cv_multi_tier():
 def test_cache_manager_tier_simplification():
     """Test that CacheManager.active_providers bypasses FileCache when Redis is active and retains it when Redis is down."""
     from unittest.mock import MagicMock
-    from app.core.cache import CacheManager, MemoryCache, RedisCache, FileCache
+
+    from app.core.cache import CacheManager, FileCache, MemoryCache, RedisCache
 
     mem = MemoryCache()
     redis = RedisCache()
@@ -856,7 +870,7 @@ def test_cache_delete_by_pattern():
 
 def test_cache_index_roundtrip():
     """Test that CacheIndex stores and retrieves cache key associations."""
-    from app.core.cache import CacheIndex, _REDIS_CLIENT
+    from app.core.cache import CacheIndex
 
     mock_redis = MagicMock()
     mock_redis.smembers.return_value = {"key_a_v2"}
@@ -972,8 +986,10 @@ def test_cli_warmup_does_not_raise():
 
 def test_docx_upload_full_pipeline():
     """Test that uploading a .docx file completes all pipeline stages cleanly."""
-    import docx
     from io import BytesIO
+
+    import docx
+
     from app.services.document_parser import MarkdownGenerator
 
     doc = docx.Document()
@@ -1018,8 +1034,8 @@ def test_get_stable_cv_key_case_normalization():
 
 def test_result_repository_resolve_result_with_prefix_variation(tmp_path, monkeypatch):
     """Verify ResultRepository.resolve_result handles filename prefix variations."""
-    from app.repositories.result import ResultRepository
     from app.core.config import settings
+    from app.repositories.result import ResultRepository
 
     monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
     res_file = tmp_path / "cv_13347_Yagnik_Resume.json"

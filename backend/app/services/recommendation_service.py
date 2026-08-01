@@ -1,7 +1,6 @@
 from typing import Any
 
 from app.core.config import settings
-from app.core.logging import logger
 from app.repositories.job import JobRepository
 from app.repositories.result import ResultRepository
 from app.services.domain_embedding_service import DomainEmbeddingService
@@ -28,7 +27,7 @@ class RecommendationService:
     def get_candidate_recommendations(cls, candidate_id: str) -> dict[str, Any]:
         cid = candidate_id.strip()
         result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
-        cv_key = result_filename[:-5] if result_filename.endswith(".json") else result_filename
+        cv_key = result_filename.removesuffix(".json")
 
         r = ResultRepository.read_result_by_filename(result_filename)
         if not r:
@@ -236,7 +235,7 @@ class RecommendationService:
                 if not any(kw.lower() in ec.lower() for ec in existing_certs_lower):
                     found_job_certs.add(kw)
 
-        recommended_certs = sorted(list(found_job_certs))[:settings.MAX_RECOMMENDED_CERTS]
+        recommended_certs = sorted(found_job_certs)[:settings.MAX_RECOMMENDED_CERTS]
 
         # 6. Hiring-focused Metrics
         if overall_confidence >= 80:

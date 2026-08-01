@@ -18,7 +18,7 @@ import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
 import { COLORS } from '@/constants/colors';
 
-type TabType = 'overview' | 'resume' | 'analysis' | 'vacancies' | 'timeline';
+type TabType = 'overview' | 'timeline';
 
 export default function CandidateDetailScreen() {
   const router = useRouter();
@@ -223,15 +223,15 @@ export default function CandidateDetailScreen() {
         {data?.resume_json?.experience && data.resume_json.experience.length > 0 && (
           <Card className="p-3 gap-3 border-border shadow-none">
             <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Experience</Text>
-            {data.resume_json.experience.slice(0, 3).map((exp: any, idx: number) => (
+            {data.resume_json.experience.slice(0, 5).map((exp: any, idx: number) => (
                 <View key={idx} className="border-l-2 border-border pl-3 pb-3">
                     <Text className="text-xs font-sans-bold text-text-primary">{exp.job_title}</Text>
                     <Text className="text-xs font-sans text-text-muted">{exp.company_name} • {exp.duration || 'N/A'}</Text>
                 </View>
             ))}
-            {data.resume_json.experience.length > 3 && (
-                <Text className="text-[10px] text-primary font-sans-medium cursor-pointer" onPress={() => setActiveTab('resume')}>
-                    + {data.resume_json.experience.length - 3} more roles in Resume
+            {data.resume_json.experience.length > 5 && (
+                <Text className="text-[10px] text-primary font-sans-medium cursor-pointer" onPress={() => setShowFullText(true)}>
+                    + {data.resume_json.experience.length - 5} more roles
                 </Text>
             )}
           </Card>
@@ -241,7 +241,7 @@ export default function CandidateDetailScreen() {
         <Card className="p-3 gap-3 border-border shadow-none">
             <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Education</Text>
             {(data?.resume_json?.education || []).length > 0 ? (
-                data!.resume_json!.education!.slice(0, 2).map((edu: any, idx: number) => (
+                data!.resume_json!.education!.slice(0, 3).map((edu: any, idx: number) => (
                     <View key={idx}>
                         <Text className="text-xs font-sans-bold text-text-primary">{edu.degree}</Text>
                         <Text className="text-[10px] font-sans text-text-muted">{edu.institution} • {edu.passing_year}</Text>
@@ -255,7 +255,7 @@ export default function CandidateDetailScreen() {
                 <View className="mt-2 border-t border-border pt-2 gap-1.5">
                     <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">Certifications</Text>
                     <View className="flex-row flex-wrap gap-1">
-                        {data!.resume_json!.certifications!.slice(0, 3).map((cert: string, idx: number) => (
+                        {data!.resume_json!.certifications!.slice(0, 5).map((cert: string, idx: number) => (
                             <Badge key={idx} label={cert} tone="neutral" />
                         ))}
                     </View>
@@ -263,12 +263,30 @@ export default function CandidateDetailScreen() {
             )}
         </Card>
 
+        {/* Resume Extracted Text */}
+        <Card className="p-0 border-border shadow-none overflow-hidden">
+          <View className="flex-row justify-between items-center p-3 border-b border-border bg-background">
+            <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Extracted CV Text</Text>
+            <Button
+                label={showFullText ? 'Collapse' : 'Expand Full'}
+                variant="ghost"
+                size="sm"
+                onPress={() => setShowFullText(!showFullText)}
+            />
+          </View>
+          <ScrollView className="p-3" style={{ maxHeight: showFullText ? undefined : 200 }}>
+              <Text className="text-[11px] font-mono text-text-primary leading-5">
+                  {data?.markdown || data?.text || 'No text extracted.'}
+              </Text>
+          </ScrollView>
+        </Card>
+
       </View>
 
-      {/* Right Column (Hiring Intelligence) */}
+      {/* Right Column (Hiring Intelligence & Matches) */}
       <View className="w-full md:w-[55%] lg:w-7/12 gap-4">
         
-        {/* Recommendation Engine (from recommendations API) */}
+        {/* Recommendation Engine */}
         {recommendationsLoading ? (
              <Card className="p-3 border-info/30 shadow-none items-center justify-center py-8">
                  <ActivityIndicator size="small" color={COLORS.info} />
@@ -335,6 +353,59 @@ export default function CandidateDetailScreen() {
             </Card>
         ) : null}
 
+        {/* AI Career Summary & Domain Insights */}
+        {(analysis?.ai_career_summary || analysis?.recommended_department || analysis?.professional_domain) && (
+            <Card className="p-3 border-border shadow-none gap-3">
+                 <View className="flex-row items-center gap-1.5 border-b border-border pb-2">
+                     <CpuIcon size={14} color={COLORS.textMuted} />
+                     <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">AI Domain Analysis</Text>
+                 </View>
+                 
+                 {analysis?.ai_career_summary && (
+                     <Text className="text-xs font-sans text-text-primary leading-5 mb-2">{analysis.ai_career_summary}</Text>
+                 )}
+                 
+                 <View className="flex-row items-center justify-between">
+                     <Text className="text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
+                     <Badge label={analysis?.recommended_department || analysis?.primary_department || 'General'} tone="info" />
+                 </View>
+                 <View className="flex-row items-center justify-between mt-1">
+                     <Text className="text-xs font-sans-medium text-text-muted">Professional Domain:</Text>
+                     <Text className="text-xs font-sans-bold text-text-primary">{analysis?.professional_domain || "N/A"}</Text>
+                 </View>
+                 {analysis?.suitable_job_roles && (
+                     <View className="mt-2 border-t border-border pt-2">
+                         <Text className="text-xs font-sans-medium text-text-muted mb-1">Suitable Job Roles:</Text>
+                         <View className="flex-row flex-wrap gap-1">
+                             {analysis.suitable_job_roles.map((role: string, idx: number) => (
+                                 <Badge key={idx} label={role} tone="neutral" />
+                             ))}
+                         </View>
+                     </View>
+                 )}
+                 {recommendations?.talent_pools && (
+                     <View className="mt-2 border-t border-border pt-2">
+                         <Text className="text-xs font-sans-medium text-text-muted mb-1">Assigned Talent Pools:</Text>
+                         <View className="flex-row flex-wrap gap-1">
+                             {recommendations.talent_pools.map((pool: string, idx: number) => (
+                                 <Badge key={idx} label={pool} tone="success" />
+                             ))}
+                         </View>
+                     </View>
+                 )}
+                 {recommendations?.related_skills && (
+                     <View className="mt-2 border-t border-border pt-2">
+                         <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider mb-1">Semantically Related Skills:</Text>
+                         <View className="flex-row flex-wrap gap-1">
+                             {recommendations.related_skills.map((skill, idx) => (
+                                 <Badge key={idx} label={skill} tone="neutral" />
+                             ))}
+                         </View>
+                     </View>
+                 )}
+            </Card>
+        )}
+
         {/* Best Match Vacancy */}
         {bestMatch && analysis?.has_genuine_match && (
             <Card className="p-3 border-primary/40 shadow-none gap-2">
@@ -366,91 +437,6 @@ export default function CandidateDetailScreen() {
             </Card>
         )}
 
-      </View>
-    </View>
-  );
-
-  const renderResumeTab = () => (
-    <Card className="p-0 border-border shadow-none overflow-hidden">
-      <View className="flex-row justify-between items-center p-3 border-b border-border bg-background">
-        <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Extracted CV Text</Text>
-        <Button
-            label={showFullText ? 'Collapse' : 'Expand Full'}
-            variant="ghost"
-            size="sm"
-            onPress={() => setShowFullText(!showFullText)}
-        />
-      </View>
-      <ScrollView className="p-3" style={{ maxHeight: showFullText ? undefined : 400 }}>
-          <Text className="text-[11px] font-mono text-text-primary leading-5">
-              {data?.markdown || data?.text || 'No text extracted.'}
-          </Text>
-      </ScrollView>
-    </Card>
-  );
-
-  const renderAnalysisTab = () => (
-    <View className="gap-4">
-        {analysis?.ai_career_summary && (
-            <Card className="p-3 border-border shadow-none">
-                <View className="flex-row items-center gap-1.5 border-b border-border pb-2 mb-2">
-                    <CpuIcon size={14} color={COLORS.textMuted} />
-                    <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">AI Career Summary</Text>
-                </View>
-                <Text className="text-xs font-sans text-text-primary leading-5">{analysis.ai_career_summary}</Text>
-            </Card>
-        )}
-        
-        <Card className="p-3 border-border shadow-none gap-3">
-             <View className="flex-row items-center gap-1.5 border-b border-border pb-2">
-                 <Target size={14} color={COLORS.textMuted} />
-                 <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Domain & Roles</Text>
-             </View>
-             
-             <View className="flex-row items-center justify-between">
-                 <Text className="text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
-                 <Badge label={analysis?.recommended_department || analysis?.primary_department || 'General'} tone="info" />
-             </View>
-             <View className="flex-row items-center justify-between mt-1">
-                 <Text className="text-xs font-sans-medium text-text-muted">Professional Domain:</Text>
-                 <Text className="text-xs font-sans-bold text-text-primary">{analysis?.professional_domain || "N/A"}</Text>
-             </View>
-             {analysis?.suitable_job_roles && (
-                 <View className="mt-2 border-t border-border pt-2">
-                     <Text className="text-xs font-sans-medium text-text-muted mb-1">Suitable Job Roles:</Text>
-                     <View className="flex-row flex-wrap gap-1">
-                         {analysis.suitable_job_roles.map((role: string, idx: number) => (
-                             <Badge key={idx} label={role} tone="neutral" />
-                         ))}
-                     </View>
-                 </View>
-             )}
-             {recommendations?.talent_pools && (
-                 <View className="mt-2 border-t border-border pt-2">
-                     <Text className="text-xs font-sans-medium text-text-muted mb-1">Assigned Talent Pools:</Text>
-                     <View className="flex-row flex-wrap gap-1">
-                         {recommendations.talent_pools.map((pool: string, idx: number) => (
-                             <Badge key={idx} label={pool} tone="success" />
-                         ))}
-                     </View>
-                 </View>
-             )}
-             {recommendations?.related_skills && (
-                 <View className="mt-2 border-t border-border pt-2">
-                     <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider mb-1">Semantically Related Skills:</Text>
-                     <View className="flex-row flex-wrap gap-1">
-                         {recommendations.related_skills.map((skill, idx) => (
-                             <Badge key={idx} label={skill} tone="neutral" />
-                         ))}
-                     </View>
-                 </View>
-             )}
-        </Card>
-    </View>
-  );
-
-  const renderVacanciesTab = () => (
-    <View className="gap-4">
         {/* Active Vacancy Summary Card */}
         <Card className="p-3 border-border shadow-none">
             <View className="flex-row items-center justify-between border-b border-border pb-2 mb-2">
@@ -458,7 +444,7 @@ export default function CandidateDetailScreen() {
                     <Target size={14} color={analysis?.has_genuine_match ? COLORS.success : COLORS.warning} />
                     <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Active Vacancy Summary</Text>
                 </View>
-                <Badge label={analysis?.has_genuine_match ? 'Genuine Match' : 'No Active Match'} tone={analysis?.has_genuine_match ? 'success' : 'warning'} />
+                <Badge label={analysis?.has_genuine_match ? 'Genuine Match' : 'No Match'} tone={analysis?.has_genuine_match ? 'success' : 'warning'} />
             </View>
             <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-warning/5 border border-warning/20'}`}>
                 <Text className="text-xs text-text-primary leading-5">{analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}</Text>
@@ -493,6 +479,8 @@ export default function CandidateDetailScreen() {
                 </View>
             </Card>
         )}
+
+      </View>
     </View>
   );
 
@@ -615,9 +603,6 @@ export default function CandidateDetailScreen() {
       <View className="bg-white border-b border-border px-4 flex-row gap-4 overflow-x-auto">
           {[
               { id: 'overview', label: 'Overview', icon: <Activity size={14} color={activeTab === 'overview' ? COLORS.primary : COLORS.textMuted} /> },
-              { id: 'resume', label: 'Resume', icon: <FileText size={14} color={activeTab === 'resume' ? COLORS.primary : COLORS.textMuted} /> },
-              { id: 'analysis', label: 'AI Analysis', icon: <CpuIcon size={14} color={activeTab === 'analysis' ? COLORS.primary : COLORS.textMuted} /> },
-              { id: 'vacancies', label: 'Vacancies', icon: <Briefcase size={14} color={activeTab === 'vacancies' ? COLORS.primary : COLORS.textMuted} /> },
               { id: 'timeline', label: 'Timeline', icon: <Layers size={14} color={activeTab === 'timeline' ? COLORS.primary : COLORS.textMuted} /> },
           ].map(tab => (
               <Pressable 
@@ -647,9 +632,6 @@ export default function CandidateDetailScreen() {
         ) : (
           <View className="pb-8">
               {activeTab === 'overview' && renderOverviewTab()}
-              {activeTab === 'resume' && renderResumeTab()}
-              {activeTab === 'analysis' && renderAnalysisTab()}
-              {activeTab === 'vacancies' && renderVacanciesTab()}
               {activeTab === 'timeline' && renderTimelineTab()}
           </View>
         )}

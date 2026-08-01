@@ -1,16 +1,18 @@
-import time
 import os
 import sys
+import time
 
 # Ensure backend directory is in sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from sqlalchemy import text
-from app.core.database import pg_engine
-from app.core.tasks import sync_all_vacancies
 from redis import Redis
 from rq import Queue
+from sqlalchemy import text
+
 from app.core.config import settings
+from app.core.database import pg_engine
+from app.core.tasks import sync_all_vacancies
+
 
 def main():
     start_time = time.time()

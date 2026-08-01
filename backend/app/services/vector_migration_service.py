@@ -37,8 +37,7 @@ class VectorDatabaseMigrationService:
                 continue
 
             cv_key = str(r.get("id") or r.get("filename") or "")
-            if cv_key.endswith(".json"):
-                cv_key = cv_key[:-5]
+            cv_key = cv_key.removesuffix(".json")
 
             markdown_text = str(r.get("markdown") or r.get("text") or "")
             if not markdown_text.strip():

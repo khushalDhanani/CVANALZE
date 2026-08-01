@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import re
 from datetime import UTC, datetime
@@ -7,14 +8,17 @@ from typing import Any
 from redis import Redis
 from rq import Queue
 
-from app.core.cache import CacheInvalidator, doc_cache_manager
+from app.core.cache import CacheInvalidator
 from app.core.config import settings
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
-from app.services.document_parser import MarkdownGenerator, MarkdownResult, QualityMetricsCalculator, ResumeJsonExtractor
+from app.services.document_parser import (
+    MarkdownGenerator,
+    MarkdownResult,
+    QualityMetricsCalculator,
+    ResumeJsonExtractor,
+)
 from app.services.embedding_service import EmbeddingService
-
-import asyncio
 
 _cv_locks: dict[str, asyncio.Lock] = {}
 _MAX_CV_LOCKS = 1000
@@ -194,8 +198,8 @@ async def process_cv_file(
             )
             stage_durations_ms["resume_extraction_ms"] = round((asyncio.get_event_loop().time() - t_ext_start) * 1000.0, 2)
 
-            from app.services.match_service import MatchService
             from app.services.embedding_service import save_candidate_embedding
+            from app.services.match_service import MatchService
 
             def _generate_and_store_embedding():
                 emb = EmbeddingService.generate_embedding(
@@ -460,8 +464,9 @@ async def scan_uploads_directory(
     conn = Redis.from_url(redis_url)
     q = Queue(connection=conn)
 
-    import redis.asyncio as aioredis
     import json
+
+    import redis.asyncio as aioredis
     
     async_redis = aioredis.from_url(redis_url, decode_responses=True)
     pubsub = async_redis.pubsub()

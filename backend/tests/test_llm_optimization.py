@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,7 +13,6 @@ from app.schemas.analysis import (
 )
 from app.services.llm_service import OllamaLLMService
 from app.services.match_service import MatchService
-from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
 
 
@@ -80,7 +78,6 @@ def test_pipeline_profiler():
 def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
 
-    vacancies = [{"id": 101, "vacancy_id": 101, "title": "Python Dev", "required_skills": ["Python"]}]
 
     key1 = LLMCacheRepository.compute_composite_hash(
         document_hash="abc123",

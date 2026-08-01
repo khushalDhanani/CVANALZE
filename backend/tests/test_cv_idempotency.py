@@ -1,11 +1,9 @@
 import asyncio
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from app.core.config import settings
-from app.repositories.result import ResultRepository
 from app.services.cv_service import get_stable_cv_key, process_cv_file
 from app.services.document_parser import MarkdownGenerator, MarkdownResult
 from app.services.scoring_engine import ScoringEngine
@@ -13,7 +11,11 @@ from app.services.scoring_engine import ScoringEngine
 
 @pytest.fixture(autouse=True)
 def clear_caches():
-    from app.core.cache import cv_result_cache_manager, doc_cache_manager, embedding_cache_manager
+    from app.core.cache import (
+        cv_result_cache_manager,
+        doc_cache_manager,
+        embedding_cache_manager,
+    )
     cv_result_cache_manager.clear()
     doc_cache_manager.clear()
     embedding_cache_manager.clear()

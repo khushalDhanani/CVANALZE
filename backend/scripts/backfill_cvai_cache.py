@@ -1,8 +1,9 @@
-import os
-import sys
 import json
 import logging
+import os
+import sys
 from datetime import datetime
+
 from sqlalchemy import text
 
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -104,7 +105,7 @@ def backfill():
                     if not date_str:
                         return datetime.utcnow()
                     try:
-                        return datetime.fromisoformat(date_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                        return datetime.fromisoformat(date_str).replace(tzinfo=None)
                     except Exception:
                         return datetime.utcnow()
 

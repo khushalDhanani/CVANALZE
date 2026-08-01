@@ -1,10 +1,17 @@
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.logging import logger
+from app.models.org import (
+    OrgCompanyMst,
+    OrgDepartmentMst,
+    OrgDesignationMst,
+    OrgJobProfileMst,
+    OrgLocationMst,
+)
 from app.models.recruit import RecruitVacancyRequest
-from app.models.org import OrgJobProfileMst, OrgDepartmentMst, OrgCompanyMst, OrgLocationMst, OrgDesignationMst
 from app.schemas.job import JobOpening
+
 
 class VacancyService:
     def __init__(self, db: Session):

@@ -1,5 +1,4 @@
 import hashlib
-import json
 import logging
 from typing import Any
 
@@ -7,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import settings
-from app.core.database import SessionLocal, pg_SessionLocal
+from app.core.database import pg_SessionLocal
 from app.models.pg import VacancyEmbedding
 from app.services.embedding_service import get_embedding
 
@@ -100,7 +99,7 @@ def embed_vacancy(vacancy_id: int | str, job_dict: dict[str, Any] | None = None)
     except Exception as exc:
         pg_db.rollback()
         logger.error(f"embed_vacancy: Error processing vacancy_id={vid_int}: {exc}")
-        raise exc
+        raise
     finally:
         pg_db.close()
 

@@ -1,6 +1,7 @@
 from typing import Any
-from pydantic import BaseModel, Field
+
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from app.services.domain_embedding_service import DomainEmbeddingService
 
@@ -28,7 +29,7 @@ def list_domain_categories() -> list[str]:
     """
     List all supported domain knowledge categories.
     """
-    return sorted(list(DomainEmbeddingService.CATEGORIES))
+    return sorted(DomainEmbeddingService.CATEGORIES)
 
 
 @router.post("/equivalents", response_model=DomainEquivalentResponse)
@@ -40,7 +41,7 @@ def get_semantic_equivalents(request: DomainEquivalentRequest) -> DomainEquivale
     if cat not in DomainEmbeddingService.CATEGORIES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid domain category '{cat}'. Supported categories: {sorted(list(DomainEmbeddingService.CATEGORIES))}",
+            detail=f"Invalid domain category '{cat}'. Supported categories: {sorted(DomainEmbeddingService.CATEGORIES)}",
         )
 
     equivalents = DomainEmbeddingService.find_semantic_equivalents(

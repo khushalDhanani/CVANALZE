@@ -1,4 +1,3 @@
-from app.core.cache import master_data_cache_manager
 from app.core.config import settings
 from app.main import app
 from app.services.cv_service import scan_uploads_directory

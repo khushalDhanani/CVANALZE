@@ -69,8 +69,7 @@ class SimilarCandidateService:
                 continue
 
             other_key = str(r.get("id") or r.get("filename") or "")
-            if other_key.endswith(".json"):
-                other_key = other_key[:-5]
+            other_key = other_key.removesuffix(".json")
 
             # Skip comparing candidate against itself
             if other_key == cv_key:

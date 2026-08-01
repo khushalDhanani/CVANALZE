@@ -1,19 +1,16 @@
-import os
-import json
 import asyncio
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from typing import Any
-import redis.asyncio as aioredis
 
-from app.core.database import get_db
-from app.models.recruit import RecruitCandidateMst
-from app.services.vacancy_service import VacancyService
-from app.services.match_service import MatchService
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.recruit import RecruitCandidateMst
+from app.services.match_service import MatchService
+from app.services.vacancy_service import VacancyService
 
 router = APIRouter(prefix="/batch", tags=["Batch Processing"])
 

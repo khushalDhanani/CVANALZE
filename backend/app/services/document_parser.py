@@ -91,9 +91,7 @@ class TextSanitizer:
             fixed_parts = []
             for part in parts:
                 tokens = part.split()
-                if len(tokens) >= 3 and all(len(t) == 1 for t in tokens):
-                    fixed_parts.append("".join(tokens))
-                elif len(tokens) >= 2 and all(len(t) == 1 for t in tokens) and len(part.replace(" ", "")) >= 3:
+                if len(tokens) >= 3 and all(len(t) == 1 for t in tokens) or len(tokens) >= 2 and all(len(t) == 1 for t in tokens) and len(part.replace(" ", "")) >= 3:
                     fixed_parts.append("".join(tokens))
                 else:
                     fixed_parts.append(part)
@@ -300,10 +298,7 @@ class ResumeJsonExtractor:
                 return False
             if email and (candidate_str in email or email in candidate_str):
                 return False
-            if location and (candidate_str in location or location in candidate_str):
-                return False
-
-            return True
+            return not (location and (candidate_str in location or location in candidate_str))
 
         contact_line_idx = -1
         for i, line in enumerate(text_lines):
@@ -465,9 +460,7 @@ class ResumeJsonExtractor:
         if not candidate or len(candidate) < 2 or len(candidate) > max_chars:
             return False
         clean_cand = candidate.lower().strip(" #*-:•")
-        if clean_cand in cls.GENERIC_SECTION_HEADERS:
-            return False
-        return True
+        return clean_cand not in cls.GENERIC_SECTION_HEADERS
 
     @classmethod
     def extract(
@@ -576,7 +569,7 @@ class ResumeJsonExtractor:
             clean_l = line.strip()
             if not clean_l:
                 continue
-            if clean_l.startswith("##") or clean_l.startswith("###") or re.search(r"\b(20\d{2}|19\d{2})\b", clean_l):
+            if clean_l.startswith(("##", "###")) or re.search(r"\b(20\d{2}|19\d{2})\b", clean_l):
                 if current_job.get("company") or current_job.get("job_title"):
                     work_experience.append(current_job)
                     current_job = {}
@@ -588,7 +581,7 @@ class ResumeJsonExtractor:
                     current_job["dates"] = clean_l
                 elif cls.is_valid_job_title(clean_l):
                     current_job["job_title"] = clean_l
-            elif clean_l.startswith("-") or clean_l.startswith("•"):
+            elif clean_l.startswith(("-", "•")):
                 if "responsibilities" not in current_job:
                     current_job["responsibilities"] = []
                 current_job["responsibilities"].append(clean_l.lstrip("-• ").strip())
@@ -627,7 +620,7 @@ class ResumeJsonExtractor:
                     current_edu["dates"] = is_date_match.group(0)
             elif is_date_match:
                 current_edu["dates"] = clean_l
-            elif clean_l.startswith("-") or clean_l.startswith("•"):
+            elif clean_l.startswith(("-", "•")):
                 if "details" not in current_edu:
                     current_edu["details"] = []
                 current_edu["details"].append(clean_l.lstrip("-• ").strip())
@@ -671,7 +664,7 @@ class ResumeJsonExtractor:
             clean_l = line.strip()
             if not clean_l:
                 continue
-            if clean_l.startswith("##") or clean_l.startswith("###"):
+            if clean_l.startswith(("##", "###")):
                 if current_proj.get("name"):
                     projects.append(current_proj)
                     current_proj = {}
@@ -679,7 +672,7 @@ class ResumeJsonExtractor:
             elif "|" in clean_l and not clean_l.startswith("-"):
                 techs = [t.strip() for t in clean_l.split("|") if t.strip()]
                 current_proj["technologies"] = techs
-            elif clean_l.startswith("-") or clean_l.startswith("•"):
+            elif clean_l.startswith(("-", "•")):
                 if "bullet_points" not in current_proj:
                     current_proj["bullet_points"] = []
                 current_proj["bullet_points"].append(clean_l.lstrip("-• ").strip())
@@ -774,10 +767,10 @@ def _extract_native_docx(content: bytes) -> str:
     """
     try:
         import docx
-        from docx.oxml.text.paragraph import CT_P
         from docx.oxml.table import CT_Tbl
-        from docx.text.paragraph import Paragraph
+        from docx.oxml.text.paragraph import CT_P
         from docx.table import Table
+        from docx.text.paragraph import Paragraph
 
         doc = docx.Document(BytesIO(content))
         lines = []
@@ -813,9 +806,9 @@ def _extract_native_txt(content: bytes) -> str:
 
 
 def _extract_native_doc(content: bytes) -> str:
+    import os
     import subprocess
     import tempfile
-    import os
     try:
         with tempfile.NamedTemporaryFile(suffix=".doc", delete=False) as temp_file:
             temp_file.write(content)
@@ -862,8 +855,9 @@ class MarkdownGenerator:
                 f"Unsupported file extension '.{extension}'. Allowed formats: {allowed}."
             )
 
-        import filetype
         import zipfile
+
+        import filetype
 
         if extension == "docx":
             if not zipfile.is_zipfile(BytesIO(content)):

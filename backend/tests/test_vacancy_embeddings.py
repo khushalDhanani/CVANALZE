@@ -1,16 +1,15 @@
 import hashlib
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from app.core.cache import embedding_cache_manager, vacancy_cache_manager
-from app.core.config import settings
 from app.repositories.job import JobRepository
 from app.services.embedding_service import (
     EmbeddingService,
     build_vacancy_canonical_text,
-    save_vacancy_embedding,
     get_vacancy_embedding,
+    save_vacancy_embedding,
 )
 
 
@@ -129,9 +128,9 @@ def test_save_and_get_vacancy_embedding_cache_fallback():
     content_hash = hashlib.sha256(b"mock canonical text").hexdigest()
 
     # Save embedding
-    saved = save_vacancy_embedding(vac_id, mock_vec, content_hash=content_hash)
+    save_vacancy_embedding(vac_id, mock_vec, content_hash=content_hash)
 
     # Query embedding from cache/DB
-    retrieved_vec, retrieved_hash = get_vacancy_embedding(vac_id)
+    retrieved_vec, _retrieved_hash = get_vacancy_embedding(vac_id)
 
     assert retrieved_vec == mock_vec

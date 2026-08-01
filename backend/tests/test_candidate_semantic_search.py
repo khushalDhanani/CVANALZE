@@ -1,10 +1,13 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.cache import embedding_cache_manager, match_result_cache_manager, vacancy_cache_manager
-from app.core.config import settings
+from app.core.cache import (
+    embedding_cache_manager,
+    match_result_cache_manager,
+    vacancy_cache_manager,
+)
 from app.main import app
 from app.schemas.candidate_search import CandidateSearchRequest
 from app.services.candidate_search_service import CandidateSearchService

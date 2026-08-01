@@ -1,8 +1,10 @@
 import time
-from app.repositories.job import JobRepository
-from app.core.tasks import embed_vacancy
-from app.core.database import pg_engine
+
 from sqlalchemy import text
+
+from app.core.database import pg_engine
+from app.core.tasks import embed_vacancy
+from app.repositories.job import JobRepository
 
 
 def run_backfill():

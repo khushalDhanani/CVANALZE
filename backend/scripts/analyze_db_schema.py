@@ -1,6 +1,9 @@
 import json
+
 from sqlalchemy import text
+
 from app.core.database import engine
+
 
 def analyze_db():
     tables_to_check = [
@@ -25,7 +28,7 @@ def analyze_db():
     with engine.connect() as conn:
         # 1. Discover tables
         print("Discovering tables...")
-        query_tables = f"""
+        query_tables = """
         SELECT TABLE_NAME 
         FROM INFORMATION_SCHEMA.TABLES 
         WHERE TABLE_TYPE = 'BASE TABLE'

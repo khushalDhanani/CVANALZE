@@ -1,5 +1,6 @@
 # backend/tests/test_vacancy_prefilter.py
 import pytest
+
 from app.schemas.job_context import JobEvaluationContext
 from app.services.vacancy_prefilter import (
     CandidateSearchContext,
@@ -55,8 +56,8 @@ def test_reciprocal_rank_fusion_service():
 
     assert len(fused) == 2
     # RRF score = 1/(60+1) + 1/(60+2) = 0.01639344 + 0.01612903 = 0.03252247
-    score1, details1, j1 = fused[0]
-    score2, details2, j2 = fused[1]
+    score1, details1, _j1 = fused[0]
+    score2, _details2, _j2 = fused[1]
 
     assert abs(score1 - score2) < 1e-6  # Identical fused score
     assert details1["lexical_rank"] in (1, 2)

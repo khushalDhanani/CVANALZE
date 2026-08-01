@@ -1,7 +1,6 @@
 import fnmatch
 import hashlib
 import json
-import os
 import re
 import time
 from abc import ABC, abstractmethod
@@ -14,7 +13,6 @@ from filelock import FileLock
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.metrics import _metrics
-
 
 _REDIS_CLIENT: Any = None
 if settings.REDIS_URL:

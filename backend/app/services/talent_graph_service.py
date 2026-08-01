@@ -1,10 +1,8 @@
 from typing import Any
 
-from app.core.logging import logger
 from app.repositories.job import JobRepository
 from app.repositories.result import ResultRepository
 from app.services.domain_embedding_service import DomainEmbeddingService
-from app.services.similar_candidate_service import SimilarCandidateService
 
 
 class TalentKnowledgeGraphService:
@@ -20,7 +18,7 @@ class TalentKnowledgeGraphService:
     def get_candidate_360_graph(cls, candidate_id: str) -> dict[str, Any]:
         cid = candidate_id.strip()
         result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
-        cv_key = result_filename[:-5] if result_filename.endswith(".json") else result_filename
+        cv_key = result_filename.removesuffix(".json")
 
         r = ResultRepository.read_result_by_filename(result_filename)
         if not r:

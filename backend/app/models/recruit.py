@@ -1,6 +1,8 @@
-from sqlalchemy import Column, String, BigInteger, Boolean, Numeric, ForeignKey
+from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Numeric, String
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
+
 
 class RecruitVacancyRequest(Base):
     __tablename__ = "RecruitVacancyRequest"

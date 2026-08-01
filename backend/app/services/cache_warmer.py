@@ -4,7 +4,6 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.cache import master_data_cache_manager
-from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager

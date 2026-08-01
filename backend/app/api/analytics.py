@@ -1,9 +1,10 @@
 from typing import Any
+
 from fastapi import APIRouter
 
-from app.core.cache import _memory_cache, _REDIS_CLIENT
-from app.core.metrics import _metrics
+from app.core.cache import _REDIS_CLIENT, _memory_cache
 from app.core.logging import logger
+from app.core.metrics import _metrics
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 

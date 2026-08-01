@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import httpx
-from fastapi import APIRouter, File, HTTPException, UploadFile, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -14,7 +14,7 @@ from app.schemas.analysis import (
     TrainingExample,
 )
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse
-from app.services.cv_service import process_cv_file, get_stable_cv_key
+from app.services.cv_service import get_stable_cv_key, process_cv_file
 from app.services.match_service import MatchService
 
 router = APIRouter(prefix="/match", tags=["Matching"])

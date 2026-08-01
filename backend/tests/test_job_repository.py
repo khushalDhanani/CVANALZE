@@ -1,4 +1,5 @@
 import pytest
+
 from app.core.cache import vacancy_cache_manager
 from app.repositories.job import JobRepository
 from app.services.job_preprocessor import JobPreprocessor

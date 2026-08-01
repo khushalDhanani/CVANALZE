@@ -1,6 +1,9 @@
-import pytest
 from io import BytesIO
+
+import pytest
+
 from app.services.document_parser import MarkdownGenerator
+
 
 def test_invalid_docx_structure_validation_error():
     """Verify that fake or corrupted .docx files fail structural validation with explicit 'Invalid Word document' message."""

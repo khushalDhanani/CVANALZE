@@ -1,14 +1,15 @@
-import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from app.core.cache import embedding_cache_manager, match_result_cache_manager, vacancy_cache_manager
-from app.core.config import settings
+from app.core.cache import (
+    embedding_cache_manager,
+    match_result_cache_manager,
+    vacancy_cache_manager,
+)
 from app.schemas.analysis import EnrichedCandidateAnalysis
 from app.services.match_service import MatchService
 from app.services.scoring_engine import ScoringEngine
-from app.services.vacancy_prefilter import VacancyPreFilter
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +47,7 @@ async def test_full_hybrid_matching_pipeline_execution_sequence():
 
     mock_emb = [0.1] * 768
 
-    with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb) as mock_emb_gen:
+    with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb):
         with patch("app.services.vacancy_prefilter.VacancyPreFilter.semantic_vector_search", return_value=["101", "102"]) as mock_stage1_vector:
             analysis = await MatchService.analyze_single_cv(
                 cv_text=cv_text,

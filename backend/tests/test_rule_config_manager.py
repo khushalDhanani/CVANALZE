@@ -1,6 +1,8 @@
 import copy
+
 import pytest
-from app.core.rule_config_manager import RuleConfigManager, UnifiedRuleConfig
+
+from app.core.rule_config_manager import RuleConfigManager
 
 
 def test_rule_config_manager_loads_valid_default_config():
@@ -203,7 +205,7 @@ def test_resume_quality_invariant_rejects_unordered_density_tiers():
 
 
 def test_rule_config_manager_metrics_and_reload():
-    config = RuleConfigManager.load_config()
+    RuleConfigManager.load_config()
     metrics = RuleConfigManager.get_metrics()
 
     assert metrics["config_version"] == "1.1.0"

@@ -1,17 +1,15 @@
-import math
-from typing import Any
 
 from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,
     CandidateSearchResponse,
     CandidateSearchResultItem,
 )
-from app.core.rule_config_manager import RuleConfigManager
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
 
 
@@ -84,8 +82,7 @@ class CandidateSearchService:
                 continue
 
             cv_key = str(r.get("id") or r.get("filename") or "")
-            if cv_key.endswith(".json"):
-                cv_key = cv_key[:-5]
+            cv_key = cv_key.removesuffix(".json")
 
             raw_match = r.get("match_analysis")
             match_analysis = raw_match if isinstance(raw_match, dict) else {}

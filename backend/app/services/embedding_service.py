@@ -1,6 +1,5 @@
 # backend/app/services/embedding_service.py
 import hashlib
-import json
 import math
 import threading
 import time
@@ -42,7 +41,7 @@ def get_embedding(text: str, model_name: str | None = None) -> list[float]:
         raise
     except Exception as exc:
         logger.error(f"get_embedding failed for text '{text[:40]}...': {exc}")
-        raise exc
+        raise
 
 
 class EmbeddingService:
@@ -207,9 +206,7 @@ class EmbeddingService:
     def _is_model_throttled(cls, model: str) -> bool:
         """Check if model failed recently (within 60 seconds)."""
         last_failure = cls._failed_models_cache.get(model)
-        if last_failure and (time.time() - last_failure < 60):
-            return True
-        return False
+        return bool(last_failure and time.time() - last_failure < 60)
 
     @classmethod
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
@@ -308,6 +305,7 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
     try:
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert
+
         from app.models.pg import CandidateEmbedding
 
         stmt = insert(CandidateEmbedding).values(
@@ -445,6 +443,7 @@ def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash
     try:
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert
+
         from app.models.pg import VacancyEmbedding
 
         stmt = insert(VacancyEmbedding).values(

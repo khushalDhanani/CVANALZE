@@ -1,6 +1,4 @@
-import pytest
 from app.services.scoring_engine import ScoringEngine
-from app.schemas.match import RequirementTier, RequirementStatus
 
 
 def test_mandatory_failure_reduces_score_and_requires_hr_review():
@@ -147,7 +145,7 @@ def test_dual_evidence_tracing():
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=5.0)
 
     assert len(result.evidence) > 0
-    for req_id, dual_ev in result.evidence.items():
+    for dual_ev in result.evidence.values():
         assert dual_ev.cv_evidence != ""
         assert dual_ev.vacancy_evidence != ""
 

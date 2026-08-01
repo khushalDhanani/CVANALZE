@@ -1,9 +1,11 @@
-import io
 from pathlib import Path
+
 from fastapi.testclient import TestClient
-from app.main import app
+
 from app.core.config import settings
+from app.main import app
 from app.repositories.result import ResultRepository
+
 
 def test_dual_upload_key_alignment_and_single_entry():
     """

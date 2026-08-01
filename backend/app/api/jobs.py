@@ -8,6 +8,7 @@ router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 from fastapi.concurrency import run_in_threadpool
 
+
 @router.get("", response_model=list[JobOpening])
 async def list_jobs():
     """Retrieve all available job openings."""

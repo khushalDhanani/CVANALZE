@@ -1,13 +1,13 @@
 from typing import Any
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
+from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,
     CandidateSearchResponse,
 )
 from app.services.candidate_search_service import CandidateSearchService
-from app.repositories.result import ResultRepository
-
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
@@ -68,7 +68,7 @@ def get_candidate_detail(candidate_id: str):
     
     if not result:
         # Fallback search by scan_id / stem
-        stem = cid[:-5] if cid.endswith(".json") else cid
+        stem = cid.removesuffix(".json")
         matches = ResultRepository.find_results_by_scan_id(stem)
         if matches:
             first_match = matches[0]
@@ -78,9 +78,9 @@ def get_candidate_detail(candidate_id: str):
         raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
 
     if "similar_candidates" not in result or result.get("similar_candidates") is None:
-        from app.services.similar_candidate_service import SimilarCandidateService
         from app.services.embedding_service import get_candidate_embedding
-        stem = cid[:-5] if cid.endswith(".json") else cid
+        from app.services.similar_candidate_service import SimilarCandidateService
+        stem = cid.removesuffix(".json")
         cand_emb = get_candidate_embedding(stem)
         if cand_emb:
             result["similar_candidates"] = SimilarCandidateService.detect_similar_candidates(stem, cand_emb)
@@ -96,20 +96,20 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     Invalidate and delete all existing cache entries related to candidate CV,
     preserve original CV file, and reprocess CV from scratch using latest pipeline.
     """
-    from app.core.config import settings
     from app.core.cache import (
         cv_result_cache_manager,
         doc_cache_manager,
-        llm_cache_manager,
         embedding_cache_manager,
+        llm_cache_manager,
         match_result_cache_manager,
     )
+    from app.core.config import settings
     from app.core.logging import logger
     from app.services.cv_service import process_cv_file
 
     cid = candidate_id.strip()
     result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
-    cv_key = result_filename[:-5] if result_filename.endswith(".json") else result_filename
+    cv_key = result_filename.removesuffix(".json")
     
     existing_result = ResultRepository.read_result_by_filename(result_filename)
     if not existing_result:

@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.database import engine
 
-
 LEADING_PHRASES = (
     "ability to",
     "excellent",
@@ -40,7 +39,7 @@ NOISE_TERMS = {
 
 def _clean_phrase(value: str) -> str:
     phrase = re.sub(r"\s+", " ", value.strip(" >•*.#;:-\t\r\n"))
-    phrase = re.sub(r"^(?:and|or|with|using|particularly)\s+", "", phrase, flags=re.I)
+    phrase = re.sub(r"^(?:and|or|with|using|particularly)\s+", "", phrase, flags=re.IGNORECASE)
 
     lowered = phrase.lower()
     for leading in LEADING_PHRASES:
@@ -48,7 +47,7 @@ def _clean_phrase(value: str) -> str:
             phrase = phrase[len(leading) :].strip(" .;:-")
             break
 
-    phrase = re.sub(r"\b(?:e\.g\.|i\.e\.)\b", "", phrase, flags=re.I)
+    phrase = re.sub(r"\b(?:e\.g\.|i\.e\.)\b", "", phrase, flags=re.IGNORECASE)
     phrase = re.sub(r"\s+", " ", phrase.strip(" .;:-\t\r\n"))
     return phrase
 
@@ -63,7 +62,7 @@ def extract_required_skill_terms(description: str) -> str:
 
         parenthetical_parts = re.findall(r"\(([^)]*)\)", line)
         line = re.sub(r"\(([^)]*)\)", r", \1, ", line)
-        line = re.sub(r"\bincluding\b", ",", line, flags=re.I)
+        line = re.sub(r"\bincluding\b", ",", line, flags=re.IGNORECASE)
 
         fragments = re.split(r",|;|\band\b", line)
         for parenthetical in parenthetical_parts:

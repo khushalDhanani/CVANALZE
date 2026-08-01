@@ -1,9 +1,8 @@
 import json
-import os
 from pathlib import Path
 from typing import Any
 
-from app.core.cache import cv_result_cache_manager, _REDIS_CLIENT
+from app.core.cache import _REDIS_CLIENT, cv_result_cache_manager
 from app.core.config import settings
 from app.core.logging import logger
 
@@ -86,7 +85,7 @@ class ResultRepository:
         """
         clean_key = cv_key.strip()
         filename = f"{clean_key}.json" if not clean_key.endswith(".json") else clean_key
-        stem = filename[:-5] if filename.endswith(".json") else filename
+        stem = filename.removesuffix(".json")
 
         # 1. Direct filename read
         direct_res = cls.read_result_by_filename(filename)

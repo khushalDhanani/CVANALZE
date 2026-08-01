@@ -1,5 +1,4 @@
-import pytest
-from app.services.embedding_service import get_embedding, EmbeddingService
+from app.services.embedding_service import EmbeddingService, get_embedding
 
 
 def test_embedding_similarity_comparison():
@@ -18,7 +17,7 @@ def test_embedding_similarity_comparison():
     sim_flutter_mobile = EmbeddingService.cosine_similarity(emb1, emb2)
     sim_flutter_plant = EmbeddingService.cosine_similarity(emb1, emb3)
 
-    print(f"\n[EMBEDDING SIMILARITY PROOF]")
+    print("\n[EMBEDDING SIMILARITY PROOF]")
     print(f"Similarity ('{text1}' vs '{text2}'): {sim_flutter_mobile:.6f}")
     print(f"Similarity ('{text1}' vs '{text3}'): {sim_flutter_plant:.6f}")
 

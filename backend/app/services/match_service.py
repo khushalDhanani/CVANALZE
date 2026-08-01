@@ -1,5 +1,4 @@
 import asyncio
-import re
 from pathlib import Path
 from typing import Any
 
@@ -13,11 +12,10 @@ from app.repositories.job import JobRepository
 from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
-from app.services.llm_service import OllamaLLMService
 from app.services.document_parser import ResumeJsonExtractor
+from app.services.llm_service import OllamaLLMService
 from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
-
 
 
 class MatchService:

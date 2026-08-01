@@ -1,5 +1,4 @@
 import asyncio
-import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -8,16 +7,16 @@ from unittest.mock import patch
 backend_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(backend_dir))
 
+from app.repositories.job import JobRepository
 from app.services.cv_service import process_cv_file
 from app.services.document_parser import MarkdownResult
-from app.repositories.job import JobRepository
 
 FIXTURES_DIR = backend_dir / "tests" / "fixtures"
 
 async def test_candidate(name: str, fixture_file: str, cv_id: str):
-    print(f"\n=========================================")
+    print("\n=========================================")
     print(f"Testing Candidate: {name} (Fixture: {fixture_file})")
-    print(f"=========================================")
+    print("=========================================")
     
     fixture_path = FIXTURES_DIR / fixture_file
     with open(fixture_path, "r", encoding="utf-8") as f:
@@ -47,14 +46,14 @@ async def run_tests():
     print(f"Loaded {len(openings)} vacancies.")
     
     # 1. Domain-Collision Case
-    res_flutter = await test_candidate(
+    await test_candidate(
         "Domain-Collision (Flutter Tech Role)", 
         "domain_collision_flutter.md", 
         "fixture_flutter"
     )
     
     # 2. Skill-Specific Tech Case
-    res_aspnet = await test_candidate(
+    await test_candidate(
         "Skill-Specific (ASP.NET)", 
         "skill_specific_aspnet.md", 
         "fixture_aspnet"
@@ -73,7 +72,7 @@ async def run_tests():
             break
             
     if empty_req_vid:
-        res_empty = await test_candidate(
+        await test_candidate(
             "Empty-Requirements", 
             "empty_requirements.md", 
             "fixture_empty"

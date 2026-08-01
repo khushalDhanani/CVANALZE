@@ -8,9 +8,12 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
 from app.repositories.llm_cache import LLMCacheEntry, LLMCacheRepository
-from app.schemas.analysis import QwenCVAnalysis, DynamicMappingResponse, OptimizedLLMMatchResponse
+from app.schemas.analysis import (
+    DynamicMappingResponse,
+    OptimizedLLMMatchResponse,
+    QwenCVAnalysis,
+)
 from app.schemas.profile import DynamicCandidateProfile
-
 
 _httpx_client_instance: httpx.Client | None = None
 
@@ -408,7 +411,7 @@ class OllamaLLMService:
             },
         }
 
-        timeout_cfg = httpx.Timeout(timeout=settings.OLLAMA_REQUEST_TIMEOUT, connect=5.0)
+        httpx.Timeout(timeout=settings.OLLAMA_REQUEST_TIMEOUT, connect=5.0)
 
         for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
             t_req_start = time.perf_counter()

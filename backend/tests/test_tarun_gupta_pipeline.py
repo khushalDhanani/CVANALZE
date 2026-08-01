@@ -1,10 +1,11 @@
 import asyncio
+
 import pytest
+
 from app.repositories.job import JobRepository
+from app.services.embedding_service import get_embedding
 from app.services.match_service import MatchService
 from app.services.vacancy_prefilter import VacancyPreFilter
-from app.services.embedding_service import get_embedding
-
 
 TARUN_GUPTA_CV_TEXT = """
 Tarun Gupta
@@ -83,8 +84,8 @@ async def test_tarun_gupta_flutter_retrieval_and_ranking():
 
 
 
-    print(f"\n[PHASE 5 PROOF]")
-    print(f"Vacancy 1065 ('Flutter Developer') in Pre-filter Shortlist: True")
+    print("\n[PHASE 5 PROOF]")
+    print("Vacancy 1065 ('Flutter Developer') in Pre-filter Shortlist: True")
     print(f"Pre-filter Shortlist Rank: #{flutter_shortlist_rank} out of {len(shortlist)}")
 
 

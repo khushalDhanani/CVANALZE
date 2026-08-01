@@ -1,7 +1,7 @@
 import httpx
 from fastapi import FastAPI
-from sqlalchemy import text
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.analysis import router as match_router
 from app.api.analytics import router as analytics_router

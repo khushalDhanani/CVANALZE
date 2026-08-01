@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Any, Callable
+from typing import Any
 
 from app.core.cache import embedding_cache_manager
 from app.core.config import settings

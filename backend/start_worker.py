@@ -1,13 +1,14 @@
-import sys
 import warnings
+
 from redis import Redis
-from rq import Worker, Queue
+from rq import Queue, Worker
 
 # Suppress harmless leaked semaphore warnings from docling/pytorch inside RQ workers
 warnings.filterwarnings("ignore", category=UserWarning, module="multiprocessing.resource_tracker")
 
 from app.core.config import settings
 from app.core.logging import logger
+
 
 def main():
     logger.info("Starting RQ worker...")

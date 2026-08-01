@@ -1,9 +1,7 @@
-import pytest
-from fastapi.testclient import TestClient
 import fitz
+from fastapi.testclient import TestClient
 
 from app.main import app
-from app.repositories.result import ResultRepository
 
 client = TestClient(app)
 

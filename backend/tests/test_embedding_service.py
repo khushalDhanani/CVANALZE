@@ -1,11 +1,9 @@
-import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from app.core.cache import embedding_cache_manager
-from app.core.config import settings
-from app.services.embedding_service import EmbeddingService, save_candidate_embedding, get_candidate_embedding
+from app.services.embedding_service import EmbeddingService
 
 
 @pytest.fixture(autouse=True)
@@ -89,7 +87,6 @@ def test_embedding_version_tracking():
 @pytest.mark.asyncio
 async def test_single_embedding_in_cv_pipeline():
     from app.services.match_service import MatchService
-    from app.services.vacancy_prefilter import VacancyPreFilter
 
     mock_emb = [0.5, 0.5, 0.5]
     openings = [{"id": "job1", "title": "Developer", "department": "IT", "required_skills": ["Python"]}]

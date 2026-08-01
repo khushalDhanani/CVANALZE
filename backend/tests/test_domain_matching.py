@@ -1,4 +1,5 @@
 import pytest
+
 from app.schemas.analysis import EnrichedCandidateAnalysis
 from app.services.match_service import MatchService
 from app.services.scoring_engine import ScoringEngine
