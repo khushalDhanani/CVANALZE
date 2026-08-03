@@ -204,7 +204,16 @@
           "with",
           "services",
           "backend",
-          "of"
+          "of",
+          "work",
+          "working",
+          "job",
+          "service",
+          "task",
+          "role",
+          "duty",
+          "item",
+          "helper"
         ],
         "aliases": {
           "widgets": ["widget", "widgets", "ui"],
@@ -225,7 +234,15 @@
           "software engineer",
           "mobile developer",
           "dart",
-          "react native"
+          "react native",
+          "web designer",
+          "web developer",
+          "ui designer",
+          "ui/ux designer",
+          "ui ux designer",
+          "ui/ux developer",
+          "ui ux developer",
+          "ux designer"
         ],
         "non_it_job_keywords": [
           "plant",
@@ -493,7 +510,7 @@
               "conditions": [
                 {
                   "scope": "candidate_full_text",
-                  "keywords": ["software developer", "software engineer", "full stack developer", "frontend developer", "backend developer", ".net developer", "flutter developer", "python developer", "react developer", "node.js developer"],
+                  "keywords": ["software developer", "software engineer", "full stack developer", "frontend developer", "backend developer", ".net developer", "flutter developer", "python developer", "react developer", "node.js developer", "web designer", "web developer", "ui designer", "ui/ux designer", "ui ux designer", "ui/ux developer", "ui ux developer", "ux designer", "web design", "ui design"],
                   "mode": "any"
                 }
               ]
