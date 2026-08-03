@@ -26,14 +26,11 @@ async def check_llm_health():
     if not settings.LLM_ENABLED:
         return {"status": "disabled", "message": "LLM matching is disabled in config."}
 
-    url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
+    from app.services.llm_service import OllamaLLMService
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            model_names = [m.get("name") for m in models]
-
+        model_names = OllamaLLMService.get_available_models()
+        is_healthy = OllamaLLMService.check_health()
+        if is_healthy or model_names:
             return {
                 "status": "online",
                 "model_configured": settings.OLLAMA_MODEL,
@@ -42,8 +39,10 @@ async def check_llm_health():
                 ),
                 "available_models": model_names,
             }
+        return {"status": "offline", "error": "Ollama server unreachable"}
     except Exception as exc:  # noqa: BLE001
         return {"status": "offline", "error": str(exc)}
+
 
 
 @router.post("/analyze", response_model=EnrichedCandidateAnalysis)

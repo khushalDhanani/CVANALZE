@@ -125,23 +125,18 @@ async def start_background_warmup():
 
     if settings.LLM_ENABLED:
         try:
-            url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    models = [m.get("name") for m in resp.json().get("models", [])]
-                    # The API returns tags like "nomic-embed-text:latest"
-                    if not any(settings.EMBEDDING_MODEL in m for m in models):
-                        logger.error(
-                            f"[STARTUP CRITICAL] Configured embedding model '{settings.EMBEDDING_MODEL}' is MISSING in Ollama! "
-                            f"Run: ollama pull {settings.EMBEDDING_MODEL}"
-                        )
-                    else:
-                        logger.info(f"[STARTUP] Ollama embedding model '{settings.EMBEDDING_MODEL}' verified successfully.")
+            from app.services.llm_service import OllamaLLMService
+            models = OllamaLLMService.get_available_models()
+            if models:
+                if not any(settings.EMBEDDING_MODEL in m for m in models):
+                    logger.error(
+                        f"[STARTUP CRITICAL] Configured embedding model '{settings.EMBEDDING_MODEL}' is MISSING in Ollama! "
+                        f"Run: ollama pull {settings.EMBEDDING_MODEL}"
+                    )
                 else:
-                    logger.warning(f"[STARTUP] Ollama server returned {resp.status_code}. Embeddings may fail.")
-        except httpx.ConnectError:
-            logger.error(f"[STARTUP CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}. Embeddings will fail.")
+                    logger.info(f"[STARTUP] Ollama embedding model '{settings.EMBEDDING_MODEL}' verified successfully.")
+            else:
+                logger.warning("[STARTUP] Ollama server returned no models or is unreachable. Embeddings may fail.")
         except Exception as exc:
             logger.warning(f"[STARTUP] Could not verify Ollama status: {exc}")
 
@@ -185,16 +180,8 @@ async def health():
 
     ollama_status = "disabled"
     if settings.LLM_ENABLED:
-        try:
-            url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    ollama_status = "online"
-                else:
-                    ollama_status = f"http_{resp.status_code}"
-        except Exception as exc:
-            ollama_status = f"offline: {exc}"
+        from app.services.llm_service import OllamaLLMService
+        ollama_status = "online" if OllamaLLMService.check_health() else "offline"
 
     return {
         "status": "ok",

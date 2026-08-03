@@ -29,6 +29,36 @@ def _get_httpx_client(timeout: float = 600.0) -> httpx.Client:
 
 
 class OllamaLLMService:
+    @classmethod
+    def check_health(cls) -> bool:
+        """
+        Check if Ollama server is running and accessible.
+        """
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
+        try:
+            client = _get_httpx_client(timeout=5.0)
+            response = client.get(url)
+            return response.status_code == 200
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Ollama health check failed: {exc}")
+            return False
+
+    @classmethod
+    def get_available_models(cls) -> list[str]:
+        """
+        Fetch list of currently available models from Ollama /api/tags endpoint.
+        """
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
+        try:
+            client = _get_httpx_client(timeout=5.0)
+            response = client.get(url)
+            response.raise_for_status()
+            data = response.json()
+            return [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to fetch available Ollama models: {exc}")
+            return []
+
     @staticmethod
     def extract_candidate_profile(
         prompt: str,

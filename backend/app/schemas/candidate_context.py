@@ -62,6 +62,11 @@ class CandidateAnalysisContext:
                 *optimized_profile.certifications,
             ])
             current_role = optimized_profile.current_role
+            
+            # Prioritize deterministic experience from quality metrics
+            if exp_years is None and resume_json and "quality_metrics" in resume_json:
+                exp_years = resume_json["quality_metrics"].get("experience_years")
+                
             if exp_years is None and optimized_profile.relevant_experience_years is not None:
                 try:
                     exp_years = float(optimized_profile.relevant_experience_years)
@@ -78,6 +83,11 @@ class CandidateAnalysisContext:
                 *dynamic_profile.education_domains,
             ])
             current_role = dynamic_profile.current_role
+            
+            # Prioritize deterministic experience from quality metrics
+            if exp_years is None and resume_json and "quality_metrics" in resume_json:
+                exp_years = resume_json["quality_metrics"].get("experience_years")
+                
             if exp_years is None and dynamic_profile.relevant_experience_years is not None:
                 try:
                     exp_years = float(dynamic_profile.relevant_experience_years)

@@ -124,7 +124,30 @@ async def process_cv_file(
                     existing_data["progress"] = 100
                     existing_data["stage"] = "complete"
                     existing_data["is_complete"] = True
-                    existing_data["result_file_path"] = str(result_path)
+                    
+                    # 1. Disk/Cache Persistence Parity
+                    saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, existing_data)
+                    existing_data["result_file_path"] = str(saved_path)
+                    
+                    # 2. Vector DB Synchronization Parity
+                    from app.services.embedding_service import get_candidate_embedding, EmbeddingService, save_candidate_embedding
+                    cand_emb = await asyncio.to_thread(get_candidate_embedding, cv_key)
+                    if cand_emb is None:
+                        logger.info(f"[CACHE_HIT] Missing vector embedding for '{cv_key}'. Syncing to pgvector...")
+                        markdown_text = str(existing_data.get("markdown") or existing_data.get("text") or "")
+                        if markdown_text:
+                            new_emb = await asyncio.to_thread(EmbeddingService.generate_embedding, markdown_text, model_version=None, identifier=cv_key)
+                            if new_emb:
+                                await asyncio.to_thread(save_candidate_embedding, cv_key, new_emb, cv_hash)
+                                logger.info(f"[CACHE_HIT] Successfully synchronized embedding for '{cv_key}'.")
+                    
+                    # 3. Post-Processing Cleanup Parity
+                    try:
+                        from app.services.llm_service import OllamaLLMService
+                        await asyncio.to_thread(OllamaLLMService.unload_model)
+                    except Exception as unload_err:
+                        logger.warning(f"Ollama unload signal failed during cache hit for '{cv_key}': {unload_err}")
+                        
                     return existing_data
 
                 if not hash_matches:
@@ -222,6 +245,11 @@ async def process_cv_file(
             resume_json = ResumeJsonExtractor.extract(
                 markdown_text, quality_metrics, filename=filename
             )
+            
+            from app.services.experience_calculator import ExperienceCalculator
+            calculated_exp = ExperienceCalculator.calculate_total_experience(resume_json, markdown_text)
+            quality_metrics["experience_years"] = calculated_exp
+            
             stage_durations_ms["resume_extraction_ms"] = round((asyncio.get_event_loop().time() - t_ext_start) * 1000.0, 2)
 
             from app.services.embedding_service import save_candidate_embedding

@@ -49,3 +49,40 @@
 * Keep solutions simple, maintainable, reusable, and production-ready.
 * Make the smallest safe change that satisfies the request.
 * Ask for clarification only when required to avoid incorrect implementation.
+
+## Ollama Backend Architecture & Standardization Policy
+
+Before implementing any feature that interacts with Ollama:
+1. Audit the existing backend to identify every Ollama integration.
+2. List every affected file before making changes.
+3. Reuse existing services, repositories, schemas, configuration, caching, retry logic, and HTTP clients.
+4. Never create duplicate Ollama clients, endpoint wrappers, configuration, or business logic.
+5. Normalize every Ollama request through the existing centralized services.
+6. Preserve backward compatibility and existing API contracts.
+7. Follow the project's architecture, naming conventions, dependency injection, and coding style.
+8. Refactor when necessary to keep Ollama integration centralized and maintainable.
+9. Update tests whenever behavior changes.
+10. After implementation, verify that every Ollama endpoint behaves consistently across the entire backend.
+
+### Standardization Rules
+- **One configuration source**: `app.core.config.settings`
+- **One HTTP client**: Shared client instance with connection pooling and configurable timeout.
+- **One retry strategy**: Uniform retry loop using `OLLAMA_MAX_RETRIES` and exponential backoff.
+- **One timeout strategy**: `OLLAMA_REQUEST_TIMEOUT` across all LLM operations.
+- **One caching strategy**: `LLMCacheRepository` for LLM generation; `EmbeddingService` cache manager for vectors.
+- **One error handling strategy**: Standardized connection error catching, logging, and fallback mechanisms.
+- **One request/response format**: Standardized payload builder and Pydantic schema validation.
+- **One logging strategy**: Unified `logger` format for HIT/MISS, duration, and error traces.
+- **One model selection strategy**: Centralized model defaults with runtime override support.
+- **One streaming/non-streaming implementation**: Centralized non-streaming JSON generation wrapper.
+- **One embedding implementation**: Centralized `EmbeddingService` handling all `/api/embed` interactions.
+- **One generation implementation**: Centralized `OllamaLLMService` handling all `/api/generate` and `/api/tags` interactions.
+
+### Required Output Order for Every Task
+1. Architecture impact analysis
+2. Files to modify
+3. Implementation plan
+4. Code changes
+5. Verification checklist
+6. Any refactoring performed
+

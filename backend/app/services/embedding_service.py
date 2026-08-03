@@ -15,33 +15,17 @@ from app.core.logging import logger
 def get_embedding(text: str, model_name: str | None = None) -> list[float]:
     """
     Generate vector embedding for given text using Ollama /api/embed endpoint.
-    Check cache first via EmbeddingService.
+    Normalized to delegate through EmbeddingService for caching and connection reuse.
     """
     emb = EmbeddingService.generate_embedding(text, model_version=model_name)
     if emb is not None:
         return emb
 
+    # If embedding generation returned None (e.g., service unavailable or model error), raise RuntimeError or return empty list
     model = model_name or settings.EMBEDDING_MODEL
-    url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
-    payload = {"model": model, "input": text}
-    try:
-        with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
-            resp = client.post(url, json=payload)
-            if resp.status_code == 404:
-                logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
-                raise ValueError(f"Model '{model}' not found in Ollama.")
-            resp.raise_for_status()
-            data = resp.json()
-            embs = data.get("embeddings")
-            if embs and len(embs) > 0:
-                return embs[0]
-            raise ValueError(f"Empty embedding returned for model {model}")
-    except httpx.ConnectError:
-        logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
-        raise
-    except Exception as exc:
-        logger.error(f"get_embedding failed for text '{text[:40]}...': {exc}")
-        raise
+    logger.error(f"[EMBEDDING CRITICAL] Failed to generate embedding for model '{model}'.")
+    raise RuntimeError(f"Failed to generate embedding for model '{model}'. Check Ollama service availability.")
+
 
 
 class EmbeddingService:

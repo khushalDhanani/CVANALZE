@@ -155,6 +155,10 @@ def test_build_optimized_match_prompt():
 
 @pytest.mark.asyncio
 async def test_end_to_end_optimized_match_service(monkeypatch):
+    from app.core.cache import match_result_cache_manager
+    match_result_cache_manager.clear()
+    monkeypatch.setattr(settings, "LLM_SKIP_COVERAGE_THRESHOLD", 1.1)
+
     cv_text = """
     ## HITESH GHOGHARI
     Senior Frontend Developer
@@ -202,3 +206,4 @@ async def test_end_to_end_optimized_match_service(monkeypatch):
     assert best.score >= 70.0
     assert best.classification == "HIGH"
     assert "React" in best.matched_skills
+
