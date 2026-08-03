@@ -65,7 +65,7 @@ services:
   worker:
     build: ./backend
     container_name: cv_analyzer_worker
-    command: ["uv", "run", "rq", "worker", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
     environment: *backend-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -78,7 +78,7 @@ services:
       pgvector:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "uv run rq info --url $$REDIS_URL >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "rq info --url $$REDIS_URL >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -87,7 +87,7 @@ services:
   migrate-postgres:
     build: ./backend
     profiles: ["tools"]
-    command: ["uv", "run", "python", "scripts/run_migrations.py", "--dialect", "postgres"]
+    command: ["python", "scripts/run_migrations.py", "--dialect", "postgres"]
     environment: *backend-environment
     depends_on:
       pgvector:

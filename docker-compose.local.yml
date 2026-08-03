@@ -1,0 +1,67 @@
+# Lightweight Apple Silicon override for machines with 8 GB of unified memory.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker
+
+x-local-backend-environment: &local-backend-environment
+  APP_ENVIRONMENT: development
+  AUTH_ENABLED: "false"
+  INITIALIZE_DATABASE_ON_STARTUP: "false"
+  STARTUP_CACHE_WARMUP_ENABLED: "false"
+  LLM_ENABLED: '${LLM_ENABLED:-false}'
+  EMBEDDING_ENABLED: '${EMBEDDING_ENABLED:-false}'
+  OLLAMA_KEEP_ALIVE: '${OLLAMA_KEEP_ALIVE:-2m}'
+  OLLAMA_MAX_CONNECTIONS: '${OLLAMA_MAX_CONNECTIONS:-2}'
+  OLLAMA_MAX_KEEPALIVE_CONNECTIONS: '${OLLAMA_MAX_KEEPALIVE_CONNECTIONS:-1}'
+  MAX_CONCURRENT_LLM_WORKERS: '${MAX_CONCURRENT_LLM_WORKERS:-1}'
+  DOCUMENT_PARSER_WORKERS: '${DOCUMENT_PARSER_WORKERS:-1}'
+  DOCUMENT_TABLE_STRUCTURE_ENABLED: '${DOCUMENT_TABLE_STRUCTURE_ENABLED:-false}'
+  PREFER_NATIVE_TEXT_EXTRACTION: '${PREFER_NATIVE_TEXT_EXTRACTION:-true}'
+  DOCLING_NUM_THREADS: '${DOCLING_NUM_THREADS:-1}'
+  DOCLING_INFERENCE_COMPILE_TORCH_MODELS: '${DOCLING_INFERENCE_COMPILE_TORCH_MODELS:-false}'
+  OMP_NUM_THREADS: '${OMP_NUM_THREADS:-1}'
+  OPENBLAS_NUM_THREADS: '${OPENBLAS_NUM_THREADS:-1}'
+  MKL_NUM_THREADS: '${MKL_NUM_THREADS:-1}'
+  NUMEXPR_NUM_THREADS: '${NUMEXPR_NUM_THREADS:-1}'
+  MALLOC_ARENA_MAX: '${MALLOC_ARENA_MAX:-2}'
+
+services:
+  api:
+    build:
+      context: ./backend
+      args:
+        INSTALL_MSSQL_ODBC: "false"
+    environment:
+      <<: *local-backend-environment
+    mem_limit: 768m
+    cpus: 0.75
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=5).read()"]
+
+  worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_MSSQL_ODBC: "false"
+    command: ["rq", "worker", "--max-jobs", "${RQ_WORKER_MAX_JOBS:-10}", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
+    environment:
+      <<: *local-backend-environment
+    volumes:
+      - docling_cache:/root/.cache/docling
+    mem_limit: 2g
+    cpus: 1.25
+    pids_limit: 256
+
+  pgvector:
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "work_mem=2MB", "-c", "maintenance_work_mem=32MB", "-c", "max_connections=20"]
+    mem_limit: 384m
+    cpus: 0.50
+    pids_limit: 96
+
+  redis:
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "no"]
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 64
+
+volumes:
+  docling_cache:

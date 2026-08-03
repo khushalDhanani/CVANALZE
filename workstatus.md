@@ -1,9 +1,49 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T15:54:32+05:30
+2026-08-03T16:33:48+05:30
 
-## Current Task — Pending Work Reconciliation
+## Current Task — Lightweight Apple Silicon Docker Optimization
+- Added an explicit `docker-compose.local.yml` override for 8 GB Apple Silicon machines while retaining `docker-compose.yml` as the production-oriented base.
+- Limited the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.
+- Disabled local startup warmup, LLM generation, embeddings, Torch compilation, and Docling table-structure analysis by default; each remains configurable.
+- Capped Docling, parser, OpenMP, BLAS, NumExpr, and LLM concurrency at one in the lightweight profile.
+- Added native-first PDF/DOCX extraction for the lightweight profile so text-rich documents avoid loading Torch; sparse/scanned PDFs still use Docling/OCR.
+- Made the Docling fast and OCR converters lazy, thread-safe singletons instead of initializing the fast converter at module import.
+- Added a persistent Docling model-cache volume and configured the RQ worker to recycle after ten jobs to contain long-running memory growth.
+- Routed Torch and torchvision through PyTorch's official CPU-only package index. The lockfile removed 19 NVIDIA/CUDA packages plus Triton.
+- Converted the backend image to a multi-stage build with production dependencies only, direct runtime executables, and no compiler/dev toolchain or uv binary.
+- Added an `INSTALL_MSSQL_ODBC` build argument; the lightweight profile omits the unused Microsoft driver while the base image retains it by default.
+- Added `.dockerignore` containment for local environments, tests, docs, caches, uploads, and generated data.
+- Built the ARM API and worker images successfully at approximately 541 MB each with shared layers.
+- Started the constrained API, worker, PostgreSQL, and Redis services and confirmed all four are healthy.
+- Verified clean RQ worker shutdown/restart and queue re-registration.
+- Measured final idle use at approximately 422 MiB combined: API 339.5 MiB, worker 48.7 MiB, PostgreSQL 22.1 MiB, and Redis 12.0 MiB.
+- Exercised an existing retained two-page PDF without exposing content: first Docling/model-cache initialization peaked around 609 MiB worker memory; cached Docling took
+  27.9 seconds; native-first extraction took 2.16 seconds and returned the correct two-page/native-parser metadata.
+- Added regressions for lazy converter reuse, single-worker defaults, and native-first Docling bypass.
+- Verified 33 focused parser/upload tests and the complete mocked suite of 303 tests; all passed with 6 third-party deprecation warnings.
+- Verified Ruff lint, Ruff formatting, the CPU-only lockfile, base Compose configuration, lightweight Compose configuration, and `git diff --check`.
+- No migration was run.
+
+## Files Created / Modified for Current Task
+- Created: `docker-compose.local.yml`, `backend/.dockerignore`, `backend/tests/test_lightweight_runtime.py`.
+- Modified deployment/dependencies: `backend/Dockerfile`, `backend/pyproject.toml`, `backend/uv.lock`, `docker-compose.yml`.
+- Modified parser/configuration: `backend/app/core/config.py`, `backend/app/services/document_conversion.py`, `backend/.env.example`.
+- Modified documentation/status: `README.md`, `workstatus.md`.
+
+## Pending Work
+- PostgreSQL migration `007_create_vector_embeddings.sql` still requires separate explicit authorization; the local schema was not changed.
+- Enable LLM or embeddings in the lightweight profile only when needed and prefer a smaller installed Ollama model; host Ollama memory is outside Docker limits.
+
+## Important Decisions
+- Preserve full production parsing by default: native-first extraction and disabled table structure are local-profile overrides, not global behavior changes.
+- Keep a 2 GiB worker ceiling because sparse/scanned PDFs can still load Docling/OCR; the observed text-PDF Docling path remained well below it.
+- Keep Mesa/OpenCV runtime libraries because scanned-PDF OCR is supported; removing them would reduce image size but break a documented capability.
+- Keep the local API smaller than the worker because normal uploads enqueue work and parsing occurs in the single RQ worker.
+- Leave the optimized four-service stack running and healthy for local use.
+
+## Previous Task — Pending Work Reconciliation
 - Audited every historical `Pending Work` section and classified each item as completed, conditional, deployment-owned, migration-gated, or still actionable.
 - Confirmed the previously pending Phase 0–7 focused checks through the complete mocked backend suite: 300 tests passed with 6 third-party deprecation warnings.
 - Established an explicit Ruff baseline for correctness and import hygiene, applied Ruff formatting, and verified both lint and format checks pass.
@@ -19,14 +59,14 @@
 
 ## Files Modified for Current Task
 - `backend/pyproject.toml`
-- Ruff-formatted backend Python sources and tests (mechanical formatting/import cleanup; explicit approval is required before discarding this broad diff).
 - `workstatus.md`
 - Operational artifacts moved, not deleted: three ignored `backend/uploads/results/*.md` files archived under `/private/tmp/cv-analyzer-legacy-markdown-20260803/`.
+- The temporary broad Ruff mechanical diff was not retained; the subsequent task began with a focused worktree.
 
-## Pending Work
-- Obtain an explicit keep-or-revert decision for the broad Ruff mechanical diff; the attempted scoped Git restore was rejected by the safety guard because uncommitted ownership could not be proven.
-- Optimize Linux container dependency resolution to use an approved CPU-only Torch source, then rerun the API/worker image build and worker restart smoke test.
-- Run PostgreSQL migration `007_create_vector_embeddings.sql` only with separate explicit authorization; current local tables exist but migration history reports version 007 pending.
+## Historical Pending Work — Reconciled 2026-08-03
+- The broad Ruff diff is no longer present; no keep-or-revert decision remains.
+- CPU-only Torch resolution, image builds, constrained service startup, and worker restart verification were completed by the lightweight Apple Silicon task above.
+- PostgreSQL migration `007_create_vector_embeddings.sql` remains explicitly authorization-gated and is listed in the current pending work.
 
 ## External Deployment Requirements
 - Rotate the previously exposed database credential in the real secret manager/database and decide whether coordinated Git-history rewriting is required.

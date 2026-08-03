@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     EXTRACTION_PARSER_VERSION: str = "1.0.0"
     EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
     AUTO_OCR_MIN_TEXT_CHARS: int = 100
+    DOCUMENT_PARSER_WORKERS: int = 1
+    DOCUMENT_TABLE_STRUCTURE_ENABLED: bool = True
+    PREFER_NATIVE_TEXT_EXTRACTION: bool = False
 
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True

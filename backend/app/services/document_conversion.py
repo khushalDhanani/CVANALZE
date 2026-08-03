@@ -2,6 +2,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from io import BytesIO
+from threading import Lock
 from typing import Any
 
 from docling.datamodel.base_models import DocumentStream
@@ -64,25 +65,39 @@ class MarkdownResult:
 def _init_fast_converter() -> DocumentConverter:
     options = PdfPipelineOptions()
     options.do_ocr = False
+    options.do_table_structure = settings.DOCUMENT_TABLE_STRUCTURE_ENABLED
     return DocumentConverter(format_options={"pdf": PdfFormatOption(pipeline_options=options)})
 
 
 def _init_ocr_converter() -> DocumentConverter:
     options = PdfPipelineOptions()
     options.do_ocr = True
+    options.do_table_structure = settings.DOCUMENT_TABLE_STRUCTURE_ENABLED
     options.ocr_options = RapidOcrOptions(force_full_page_ocr=True)
     return DocumentConverter(format_options={"pdf": PdfFormatOption(pipeline_options=options)})
 
 
-_fast_converter = _init_fast_converter()
+_fast_converter_instance: DocumentConverter | None = None
 _ocr_converter_instance: DocumentConverter | None = None
-_parser_thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="docling_parser")
+_converter_lock = Lock()
+_parser_thread_pool = ThreadPoolExecutor(max_workers=max(1, settings.DOCUMENT_PARSER_WORKERS), thread_name_prefix="docling_parser")
+
+
+def _get_fast_converter() -> DocumentConverter:
+    global _fast_converter_instance
+    if _fast_converter_instance is None:
+        with _converter_lock:
+            if _fast_converter_instance is None:
+                _fast_converter_instance = _init_fast_converter()
+    return _fast_converter_instance
 
 
 def _get_ocr_converter() -> DocumentConverter:
     global _ocr_converter_instance
     if _ocr_converter_instance is None:
-        _ocr_converter_instance = _init_ocr_converter()
+        with _converter_lock:
+            if _ocr_converter_instance is None:
+                _ocr_converter_instance = _init_ocr_converter()
     return _ocr_converter_instance
 
 
@@ -140,6 +155,19 @@ def _extract_native_docx(content: bytes) -> str:
         return ""
 
 
+def _get_pdf_page_count(content: bytes) -> int:
+    try:
+        import fitz
+
+        document = fitz.open(stream=content, filetype="pdf")
+        try:
+            return max(1, document.page_count)
+        finally:
+            document.close()
+    except Exception:
+        return 1
+
+
 class DocumentConversionService:
     @classmethod
     def generate(cls, filename: str, content: bytes) -> MarkdownResult:
@@ -160,7 +188,11 @@ class DocumentConversionService:
             native_char_count = len(native_text)
 
         logger.info(f"[STAGE 1: NATIVE EXTRACTION] '{filename}': type={pdf_type}, chars={native_char_count}, images={has_images}")
-        fast_text, fast_duration_ms, docling_document = cls._convert_fast(filename, content)
+        use_native_text = settings.PREFER_NATIVE_TEXT_EXTRACTION and native_char_count >= settings.AUTO_OCR_MIN_TEXT_CHARS
+        if use_native_text:
+            fast_text, fast_duration_ms, docling_document = native_text, 0.0, None
+        else:
+            fast_text, fast_duration_ms, docling_document = cls._convert_fast(filename, content)
         fast_length = len(fast_text)
         ocr_decision = cls._ocr_decision(extension, pdf_type, fast_length, native_char_count)
         ocr_text = ""
@@ -173,7 +205,7 @@ class DocumentConversionService:
             if ocr_document and len(ocr_text) > fast_length:
                 docling_document = ocr_document
 
-        parser_used = "docling_fast"
+        parser_used = f"native_{extension}" if use_native_text else "docling_fast"
         raw_text = fast_text
         if ocr_applied and len(ocr_text) > max(fast_length, native_char_count):
             raw_text, parser_used = ocr_text, "docling_ocr"
@@ -185,7 +217,7 @@ class DocumentConversionService:
         if not clean_text or (len(clean_text) < 20 and "<!-- image -->" in raw_text):
             raise ValueError(f"No readable text or content could be extracted from CV document '{filename}'.")
 
-        page_count = len(docling_document.pages) if docling_document and getattr(docling_document, "pages", None) else 1
+        page_count = len(docling_document.pages) if docling_document and getattr(docling_document, "pages", None) else _get_pdf_page_count(content) if extension == "pdf" else 1
         is_scanned = pdf_type == "SCANNED_PDF" or (
             extension == "pdf" and ("<!-- image -->" in raw_text or (ocr_applied and native_char_count < 50) or bool(docling_document and getattr(docling_document, "pictures", None)))
         )
@@ -232,7 +264,7 @@ class DocumentConversionService:
     def _convert_fast(filename: str, content: bytes) -> tuple[str, float, Any]:
         started = time.perf_counter()
         try:
-            result = _fast_converter.convert(DocumentStream(name=filename, stream=BytesIO(content)))
+            result = _get_fast_converter().convert(DocumentStream(name=filename, stream=BytesIO(content)))
             document = result.document
             text = document.export_to_markdown().strip() if document else ""
             duration = round((time.perf_counter() - started) * 1000.0, 2)

@@ -164,6 +164,9 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `MAX_HR_FEEDBACK_LENGTH_CHARS` | `10000` | Maximum HR review feedback length. |
 | `INITIALIZE_DATABASE_ON_STARTUP` | `true` local | Allows local schema initialization; ignored in production/staging. |
 | `STARTUP_CACHE_WARMUP_ENABLED` | `true` | Starts best-effort cache warmup during lifespan startup. |
+| `DOCUMENT_PARSER_WORKERS` | `1` | Maximum concurrent Docling conversions in one API/worker process. Keep at `1` on memory-constrained machines. |
+| `DOCUMENT_TABLE_STRUCTURE_ENABLED` | `true` | Enables Docling's table-structure model; the lightweight Compose override disables it to reduce memory. |
+| `PREFER_NATIVE_TEXT_EXTRACTION` | `false` | Uses sufficient PyMuPDF/python-docx text without loading Docling; enabled by the lightweight Compose override. |
 | `AUTO_MIGRATE` | `false` | Opt-in local automatic migration; ignored in production/staging. |
 
 ### Databases, Redis, and RQ
@@ -284,6 +287,31 @@ must retain access to that shared volume because RQ payloads contain only job ID
 
 Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `DB_*` variables to the API/worker through a deployment override and run the MSSQL
 migration command as a separate release step.
+
+### Lightweight Docker on Apple Silicon
+
+For an 8 GB M1-class Mac, layer the local override over the production-safe base file:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml build api worker
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker
+```
+
+The override limits the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.
+It disables startup warmup, LLM generation, embeddings, Torch compilation, and Docling's table-structure model by default. Text-rich PDFs and DOCX files use the
+existing native extractors without loading Torch; sparse/scanned PDFs still fall through to Docling/OCR. The profile also caps Docling, OpenMP, BLAS, and LLM
+concurrency; recycles the RQ worker after ten jobs; persists downloaded Docling models in a named cache volume; and omits the unused MSSQL ODBC driver. The Linux
+image resolves Torch and torchvision from PyTorch's CPU-only index, so it does not download CUDA libraries.
+
+Deterministic extraction and scoring remain available. To opt into host Ollama features, start with one feature and a small installed model:
+
+```bash
+LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker
+```
+
+Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. Local AI still consumes host unified memory outside the container limits, so avoid running
+generation and embeddings together when memory pressure is high. The base `docker-compose.yml` remains the production-oriented configuration and retains MSSQL
+ODBC support.
 
 ## Verification commands
 
