@@ -24,13 +24,12 @@ async def run_candidate_test(name: str, fixture_file: str, cv_id: str):
 
     mock_extraction = MarkdownResult(
         markdown=cv_text,
-        structured_doc={},
         page_count=1,
         is_scanned=False,
         ocr_applied=False
     )
     
-    with patch("app.services.document_parser.MarkdownGenerator.parse", return_value=mock_extraction):
+    with patch("app.services.document_parser.MarkdownGenerator.generate_with_timeout", return_value=mock_extraction):
         # We pass the fixture text natively
         result = await process_cv_file(
             filename=f"{cv_id}_mock.md",

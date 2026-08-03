@@ -1,46 +1,26 @@
 import time
-from unittest.mock import MagicMock
 
 import pytest
 
+from app.services.cv_service import scan_uploads_directory
 from app.services.document_parser import MarkdownGenerator
 
 
 def test_document_parser_timeout(monkeypatch):
-    def slow_parse(filename, content):
+    def slow_generate(filename, content):
         time.sleep(1.5)
         return "slow content"
 
-    monkeypatch.setattr(MarkdownGenerator, "parse", slow_parse)
+    monkeypatch.setattr(MarkdownGenerator, "generate", slow_generate)
 
     with pytest.raises(TimeoutError, match="timed out"):
         MarkdownGenerator.generate_with_timeout("slow.pdf", b"content", timeout_seconds=0.2)
 
 
 @pytest.mark.asyncio
-async def test_batch_processing_throttling_and_chunking(tmp_path, monkeypatch):
-    dummy_pdf_1 = tmp_path / "resume_1.pdf"
-    dummy_pdf_2 = tmp_path / "resume_2.pdf"
-    dummy_pdf_3 = tmp_path / "resume_3.pdf"
+async def test_batch_scan_returns_empty_for_missing_directory(tmp_path):
+    missing_directory = tmp_path / "missing"
 
-    for f in [dummy_pdf_1, dummy_pdf_2, dummy_pdf_3]:
-        f.write_bytes(b"%PDF-1.4 dummy content")
+    result = await scan_uploads_directory(missing_directory)
 
-    mock_process = MagicMock(
-        return_value={
-            "characters": 100,
-            "result_file_path": "uploads/results/mock.json",
-            "match_analysis": {
-                "best_match": {
-                    "job_title": "Software Engineer",
-                    "score": 85.0,
-                    "classification": "HIGH",
-                }
-            },
-        }
-    )
-
-    monkeypatch.setattr("app.services.cv_service.process_cv_file", mock_process)
-    assert dummy_pdf_1.exists()
-    assert dummy_pdf_2.exists()
-    assert dummy_pdf_3.exists()
+    assert result == []

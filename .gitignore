@@ -50,6 +50,8 @@ venv.bak/
 # Application Specific
 backend/uploads/
 backend/scripts/db_analysis_output.json
+backend/final_output.json
+backend/llm_cache.db
 
 # =========================
 # Frontend (Node / React / Expo)
