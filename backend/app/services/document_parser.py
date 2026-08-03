@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
 from app.services.dynamic_geo_heading_service import DynamicGeoAndHeadingService
+from app.services.upload_service import UploadService
 
 
 class MarkdownResult:
@@ -346,7 +347,7 @@ class ResumeJsonExtractor:
                 return (email_derived_name, email_fb_score, "LOW", "email_username_fallback")
 
         if filename:
-            clean_fn = re.sub(r"\.(pdf|docx|doc|txt)$", "", filename, flags=re.IGNORECASE)
+            clean_fn = re.sub(r"\.(pdf|docx)$", "", filename, flags=re.IGNORECASE)
             clean_fn = re.sub(r"[-_](cv|resume|updated|\d+)", "", clean_fn, flags=re.IGNORECASE)
             clean_fn = re.sub(r"[-_]+", " ", clean_fn).strip()
             if clean_fn:
@@ -799,87 +800,16 @@ def _extract_native_docx(content: bytes) -> str:
         return ""
 
 
-def _extract_native_txt(content: bytes) -> str:
-    try:
-        return content.decode("utf-8").strip()
-    except UnicodeDecodeError:
-        return content.decode("latin-1", errors="replace").strip()
-
-
-def _extract_native_doc(content: bytes) -> str:
-    import os
-    import subprocess
-    import tempfile
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".doc", delete=False) as temp_file:
-            temp_file.write(content)
-            temp_file_path = temp_file.name
-
-        try:
-            result = subprocess.run(["antiword", temp_file_path], capture_output=True, text=True, check=True)
-            return result.stdout.strip()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            try:
-                result = subprocess.run(["catdoc", temp_file_path], capture_output=True, text=True, check=True)
-                return result.stdout.strip()
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                logger.warning("Neither antiword nor catdoc is available for .doc extraction.")
-                return ""
-        finally:
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-    except Exception as exc:
-        logger.warning(f"Native .doc extraction failed: {exc}")
-        return ""
-
-
 _parser_thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="docling_parser")
 
 
 class MarkdownGenerator:
     @classmethod
     def generate(cls, filename: str, content: bytes) -> MarkdownResult:
-        if not content or len(content) == 0:
-            raise ValueError("Uploaded file is empty (0 bytes).")
-
-        if len(content) > settings.MAX_FILE_SIZE_BYTES:
-            max_mb = settings.MAX_FILE_SIZE_BYTES // (1024 * 1024)
-            raise ValueError(f"File size exceeds maximum limit of {max_mb} MB.")
-
-        if "." not in filename:
-            raise ValueError("Filename must have a valid extension.")
-
-        extension = filename.lower().rsplit(".", 1)[-1]
-        if extension not in settings.ALLOWED_EXTENSIONS:
-            allowed = ", ".join(sorted(settings.ALLOWED_EXTENSIONS))
-            raise ValueError(
-                f"Unsupported file extension '.{extension}'. Allowed formats: {allowed}."
-            )
-
-        import zipfile
-
-        import filetype
-
-        if extension == "docx":
-            if not zipfile.is_zipfile(BytesIO(content)):
-                raise ValueError("Invalid Word document: The uploaded file is not a valid .docx document structure (corrupted file or invalid archive).")
-            try:
-                with zipfile.ZipFile(BytesIO(content)) as z:
-                    if "word/document.xml" not in z.namelist():
-                        raise ValueError("Invalid Word document: The file structure is missing internal word/document.xml.")
-            except zipfile.BadZipFile:
-                raise ValueError("Invalid Word document: The uploaded .docx file structure is corrupted.")
-            except Exception as zip_err:
-                raise ValueError(f"Invalid Word document: Structural check failed ({zip_err}).")
-
-        kind = filetype.guess(content)
-        if kind is not None:
-            if extension == "pdf" and kind.mime != "application/pdf":
-                raise ValueError("Invalid file signature. The file claims to be a PDF but the magic bytes mismatch.")
-            elif extension == "doc" and kind.mime != "application/msword":
-                logger.warning(f"Warning: .doc file has mime {kind.mime}")
-        elif extension == "pdf":
-            raise ValueError("Invalid file signature. Missing PDF magic bytes.")
+        normalized = UploadService.normalize_filename(filename)
+        UploadService.validate_content(normalized.safe_filename, content)
+        filename = normalized.safe_filename
+        extension = normalized.extension
 
         logger.info(
             f"Starting MarkdownGenerator extraction pipeline for '{filename}' ({len(content)} bytes)..."
@@ -895,33 +825,25 @@ class MarkdownGenerator:
         elif extension == "docx":
             native_text = _extract_native_docx(content)
             native_char_count = len(native_text)
-        elif extension == "txt":
-            native_text = _extract_native_txt(content)
-            native_char_count = len(native_text)
-        elif extension == "doc":
-            native_text = _extract_native_doc(content)
-            native_char_count = len(native_text)
 
         logger.info(f"[STAGE 1: NATIVE EXTRACTION] '{filename}': type={pdf_type}, chars={native_char_count}, images={has_images}")
 
-        docling_supported = extension in ["pdf", "docx"]
         fast_markdown_text = ""
         fast_duration_ms = 0.0
         docling_doc = None
         ocr_applied = False
 
-        if docling_supported:
-            t_fast_start = time.perf_counter()
-            try:
-                doc_stream = DocumentStream(name=filename, stream=BytesIO(content))
-                conv_result = _fast_converter.convert(doc_stream)
-                docling_doc = conv_result.document
-                fast_markdown_text = docling_doc.export_to_markdown().strip() if docling_doc else ""
-                fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
-                logger.info(f"[STAGE 2: DOCLING FAST] '{filename}': chars={len(fast_markdown_text)}, duration={fast_duration_ms}ms")
-            except Exception as exc:
-                fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
-                logger.warning(f"[STAGE 2: DOCLING FAST] Error for '{filename}': {exc} ({fast_duration_ms}ms)")
+        t_fast_start = time.perf_counter()
+        try:
+            doc_stream = DocumentStream(name=filename, stream=BytesIO(content))
+            conv_result = _fast_converter.convert(doc_stream)
+            docling_doc = conv_result.document
+            fast_markdown_text = docling_doc.export_to_markdown().strip() if docling_doc else ""
+            fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
+            logger.info(f"[STAGE 2: DOCLING FAST] '{filename}': chars={len(fast_markdown_text)}, duration={fast_duration_ms}ms")
+        except Exception as exc:
+            fast_duration_ms = round((time.perf_counter() - t_fast_start) * 1000.0, 2)
+            logger.warning(f"[STAGE 2: DOCLING FAST] Error for '{filename}': {exc} ({fast_duration_ms}ms)")
 
         ocr_markdown_text = ""
         ocr_duration_ms = 0.0
@@ -958,7 +880,7 @@ class MarkdownGenerator:
         if ocr_applied and len(ocr_markdown_text) > max(fast_len, native_char_count):
             raw_final_text = ocr_markdown_text
             parser_used = "docling_ocr"
-        elif docling_supported and fast_len >= settings.AUTO_OCR_MIN_TEXT_CHARS:
+        elif fast_len >= settings.AUTO_OCR_MIN_TEXT_CHARS:
             raw_final_text = fast_markdown_text
             parser_used = "docling_fast"
         else:

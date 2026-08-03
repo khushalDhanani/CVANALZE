@@ -1,9 +1,43 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T11:37:33+05:30
+2026-08-03T11:56:32+05:30
 
-## Current Task — Phase 0 Characterization and Containment
+## Current Task — Phase 1 Secure Uploads
+- Added `UploadService` as the single upload acceptance path for `/api/cv/upload` and `/api/match/upload`.
+- Replaced unbounded upload reads with configurable bounded chunk reads and HTTP 413 responses at the configured size limit.
+- Added cross-platform basename extraction, Unicode/character normalization, deterministic CV keys, and content-addressed server storage names.
+- Added pre-persistence extension, declared-MIME, detected-signature, PDF structure/resource, and DOCX archive/structure/resource validation.
+- Added atomic raw-file persistence, configurable age retention, success/failure cleanup policies, and result metadata linking a CV to its retained raw file.
+- Changed candidate reprocessing to require and revalidate retained source bytes before cache/result invalidation; missing or invalid sources return HTTP 409 and preserve the existing result.
+- Removed synthetic-PDF fallback reprocessing and legacy native `.doc`/`.txt` parser branches.
+- Standardized supported uploads on PDF and DOCX; aligned settings, `.env.example`, Docker notes, README, tests, and Phase 1 documentation.
+- Added focused tests for bounded reads, 413 behavior on both routes, filename safety, MIME/signature rejection, atomic storage, PDF/DOCX limits,
+  cleanup policy, unsupported legacy formats, dual-route storage identity, and safe missing-source reprocessing.
+- Per repository instructions, did not run the application, tests, linting, builds, dependency restore, migrations, or external services.
+
+## Files Created / Modified for Current Task
+- Created: `backend/app/services/upload_service.py`, `backend/docs/phase1-secure-uploads.md`, `backend/tests/test_upload_service.py`.
+- Modified: `README.md`, `backend/.env.example`, `backend/Dockerfile`, `backend/app/core/config.py`, `backend/app/api/cv.py`,
+  `backend/app/api/analysis.py`, `backend/app/api/candidates.py`, `backend/app/services/cv_service.py`, `backend/app/services/document_parser.py`.
+- Modified tests: `backend/tests/test_audit_fixes.py`, `backend/tests/test_cv_extraction.py`, `backend/tests/test_docx_validation.py`,
+  `backend/tests/test_dual_upload_key_alignment.py`, `backend/tests/test_frontend_polling_e2e.py`.
+- Modified task record: `workstatus.md`.
+
+## Pending Work
+- Run the focused Phase 1 tests, broader backend suite, and Ruff only when explicitly authorized.
+- Add isolated malware scanning/content disarm if uploads will be accepted from an untrusted public boundary.
+- Configure matching request-body limits at the reverse proxy and schedule retention cleanup independently if uploads are infrequent.
+- Continue Phase 0 pending credential rotation and future access-policy enforcement.
+
+## Important Decisions
+- PDF and DOCX remain supported; binary `.doc` and plain-text `.txt` uploads are rejected.
+- Existing upload paths, HTTP 200 acknowledgement fields, polling contracts, and deterministic CV keys remain compatible.
+- Raw uploads default to 30-day retention and are retained after both success and failure unless cleanup flags are enabled.
+- Reprocessing never fabricates a document from extracted text; it uses only a retained, currently valid raw source.
+- Raw storage uses `{cv_key}_{sha256}.{extension}` with atomic replacement and does not trust client paths.
+
+## Previous Task — Phase 0 Characterization and Containment
 - Captured 48 custom HTTP/WebSocket endpoints, current successful response shapes, polling states, compatibility aliases, and proposed access tiers in `backend/docs/phase0-api-contracts.md`.
 - Added additive canonical error/job-state contracts and legacy adapters in `backend/app/schemas/contracts.py`; no existing endpoint behavior was changed.
 - Added a complete public/recruiter/administrator endpoint policy in `backend/app/core/access_policy.py`; enforcement is intentionally deferred to the authorization phase.
@@ -14,7 +48,7 @@
 - Added safe ignore rules and `backend/.env.example`.
 - Did not run the application, tests, linting, builds, dependency restore, migrations, or external services.
 
-## Files Created / Modified / Removed from Version Control for Current Task
+## Files Created / Modified / Removed from Version Control for Phase 0
 - Created: `backend/.env.example`, `backend/app/core/access_policy.py`, `backend/app/schemas/contracts.py`, `backend/docs/phase0-api-contracts.md`, `backend/docs/phase0-security-containment.md`, `backend/tests/test_phase0_contracts.py`.
 - Modified: `.gitignore`, `backend/tests/test_cv_idempotency.py`, `backend/tests/test_batch_processing.py`, `backend/tests/regression/test_rrf_pipeline.py`, `workstatus.md`.
 - Removed from Git tracking but retained locally: `backend/.env`, `backend/final_output.json`, `backend/llm_cache.db`, `backend/.DS_Store`, `backend/uploads/.DS_Store`.

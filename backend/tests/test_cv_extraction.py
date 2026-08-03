@@ -4,6 +4,7 @@ import pytest
 from docx import Document
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
 from app.services.document_parser import (
     MarkdownGenerator,
@@ -148,9 +149,10 @@ def test_document_parser_rejects_invalid_extension():
         MarkdownGenerator.generate("resume.exe", b"sample content")
 
 
-def test_api_upload_cv_endpoint(sample_docx_bytes: bytes):
+def test_api_upload_cv_endpoint(sample_docx_bytes: bytes, monkeypatch, tmp_path):
     from unittest.mock import patch
 
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
     client = TestClient(app)
     with patch("app.api.cv.background_process_cv"):
         response = client.post(
@@ -232,4 +234,3 @@ Senior Analyst.
     assert contact["name"] == "Jane Smith"
     assert contact["name_confidence"] == 0.30
     assert contact["extraction_source"] == "filename_fallback"
-

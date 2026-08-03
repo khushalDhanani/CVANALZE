@@ -16,6 +16,7 @@ from app.schemas.analysis import (
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse
 from app.services.cv_service import get_stable_cv_key, process_cv_file
 from app.services.match_service import MatchService
+from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/match", tags=["Matching"])
 
@@ -60,14 +61,21 @@ async def analyze_cv_text(payload: CVMatchRequest):
         ) from exc
 
 
-async def background_upload_and_analyze(filename: str, content: bytes, content_type: str | None):
+async def background_upload_and_analyze(
+    filename: str,
+    content: bytes,
+    content_type: str | None,
+    storage_filename: str | None = None,
+):
     try:
         await process_cv_file(
             filename=filename,
             content=content,
             content_type=content_type,
+            storage_filename=storage_filename,
         )
     except Exception as exc:
+        UploadService.cleanup_after_processing(storage_filename, succeeded=False)
         logger.exception(f"Background match processing failed: {exc}")
 
 
@@ -77,29 +85,21 @@ async def upload_and_analyze(
     file: UploadFile = File(...)  # noqa: B008
 ):
     """Upload CV, parse with Docling, and perform LLM-enriched semantic matching in background."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Filename is required.")
-
     try:
-        content = await file.read()
-        cv_key = get_stable_cv_key(file.filename)
-
-        # Preserve raw upload file for re-run analysis
+        normalized = UploadService.normalize_filename(file.filename)
+        cv_key = get_stable_cv_key(normalized.safe_filename)
+        accepted = await UploadService.accept_and_persist(file, storage_key=cv_key)
         try:
-            settings.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-            raw_path = settings.UPLOADS_DIR / file.filename
-            raw_path.write_bytes(content)
-            logger.info(f"Saved raw upload file to '{raw_path}'.")
-        except Exception as write_err:
-            logger.warning(f"Failed writing upload file to UPLOADS_DIR: {write_err}")
-
-        background_tasks.add_task(
-            background_upload_and_analyze,
-            filename=file.filename,
-            content=content,
-            content_type=file.content_type,
-        )
-
+            background_tasks.add_task(
+                background_upload_and_analyze,
+                filename=accepted.safe_filename,
+                content=accepted.content,
+                content_type=accepted.detected_content_type,
+                storage_filename=accepted.storage_filename,
+            )
+        except Exception:
+            UploadService.remove_stored_upload(accepted.storage_filename)
+            raise
 
         return CVProcessingResponse(
             message="10% - Upload and match processing started in the background...",
@@ -108,10 +108,8 @@ async def upload_and_analyze(
             progress=10
         )
 
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception(f"Failed to process CV upload: {exc}")
         raise HTTPException(

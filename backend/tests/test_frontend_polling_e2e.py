@@ -1,22 +1,27 @@
 import fitz
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 
+from app.core.config import settings
 from app.main import app
 
 client = TestClient(app)
 
-def test_frontend_polling_match_status_completion():
+def test_frontend_polling_match_status_completion(tmp_path, monkeypatch):
     """Verify that /api/match/status endpoint returns completion structure matching useCvUpload frontend hook."""
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path / "results")
     doc = fitz.open()
     page = doc.new_page()
     page.insert_text((50, 50), "Jane Doe\nLead Python Engineer with FastAPI and Microservices.")
     pdf_bytes = doc.tobytes()
     doc.close()
 
-    upload_res = client.post(
-        "/api/match/upload",
-        files={"file": ("test_polling_match.pdf", pdf_bytes, "application/pdf")}
-    )
+    with patch("app.api.analysis.background_upload_and_analyze"):
+        upload_res = client.post(
+            "/api/match/upload",
+            files={"file": ("test_polling_match.pdf", pdf_bytes, "application/pdf")}
+        )
     assert upload_res.status_code == 200
     upload_data = upload_res.json()
     assert upload_data["status"] == "processing"
@@ -40,18 +45,21 @@ def test_frontend_polling_match_status_completion():
         assert res_data.get('progress', 100) == 100
 
 
-def test_frontend_polling_cv_status_completion():
+def test_frontend_polling_cv_status_completion(tmp_path, monkeypatch):
     """Verify that /api/cv/status endpoint returns completion structure matching useCvUpload frontend hook."""
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path / "results")
     doc = fitz.open()
     page = doc.new_page()
     page.insert_text((50, 50), "Alex Smith\nDevOps & Cloud Engineer with Kubernetes and Terraform.")
     pdf_bytes = doc.tobytes()
     doc.close()
 
-    upload_res = client.post(
-        "/api/cv/upload",
-        files={"file": ("test_polling_cv.pdf", pdf_bytes, "application/pdf")}
-    )
+    with patch("app.api.cv.background_process_cv"):
+        upload_res = client.post(
+            "/api/cv/upload",
+            files={"file": ("test_polling_cv.pdf", pdf_bytes, "application/pdf")}
+        )
     assert upload_res.status_code == 200
     upload_data = upload_res.json()
     assert upload_data["status"] == "processing"

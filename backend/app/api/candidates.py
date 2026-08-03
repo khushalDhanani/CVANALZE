@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
@@ -116,6 +117,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     from app.core.config import settings
     from app.core.logging import logger
     from app.services.cv_service import process_cv_file
+    from app.services.upload_service import UploadService, UploadValidationError
 
     cid = candidate_id.strip()
     result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
@@ -141,8 +143,30 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         }
 
     filename = existing_result.get("filename") or f"{cv_key}.pdf"
-    content_type = existing_result.get("content_type")
     cv_hash = existing_result.get("cv_hash")
+
+    # Resolve and validate retained source bytes before altering the current result or caches.
+    try:
+        retained_upload = await asyncio.to_thread(
+            UploadService.load_reprocessable_upload,
+            storage_filename=existing_result.get("storage_filename"),
+            original_filename=filename,
+            cv_key=cv_key,
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"The retained source CV is no longer valid for reprocessing: {exc}",
+        ) from exc
+    if retained_upload is None:
+        raise HTTPException(
+            status_code=409,
+            detail="The retained source CV is unavailable; the existing result was preserved and cannot be reprocessed.",
+        )
+
+    filename = retained_upload.safe_filename
+    content_type = retained_upload.detected_content_type
+    raw_bytes = retained_upload.content
 
     # Invalidate and delete all cache entries for this CV
     cv_result_cache_manager.delete(result_filename)
@@ -162,51 +186,12 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         except Exception as e:
             logger.warning(f"Could not remove old result file '{disk_path}': {e}")
 
-    # Locate raw file content from UPLOADS_DIR or fallback to extracted text
-    raw_bytes = None
-    raw_file_candidates = [
-        settings.UPLOADS_DIR / filename,
-        settings.UPLOADS_DIR / f"{cv_key}.pdf",
-        settings.UPLOADS_DIR / f"{cv_key}.docx",
-    ]
-    for path in raw_file_candidates:
-        if path.exists() and path.is_file():
-            try:
-                raw_bytes = path.read_bytes()
-                logger.info(f"[REPROCESS] Found preserved raw file at '{path}'.")
-                break
-            except Exception as e:
-                logger.warning(f"Failed reading raw upload file '{path}': {e}")
-
-    if not raw_bytes:
-        fallback_text = existing_result.get("markdown") or existing_result.get("text") or ""
-        if fallback_text:
-            try:
-                import fitz
-                doc = fitz.open()
-                page = doc.new_page()
-                page.insert_text((50, 50), fallback_text[:3000])
-                raw_bytes = doc.tobytes()
-                doc.close()
-                filename = f"{cv_key}.pdf"
-                content_type = "application/pdf"
-                logger.info(f"[REPROCESS] Created synthetic PDF from extracted text for candidate '{cv_key}'.")
-            except Exception as pdf_err:
-                logger.warning(f"Failed generating synthetic PDF from text: {pdf_err}")
-                raw_bytes = fallback_text.encode("utf-8")
-                filename = f"{cv_key}.pdf"
-                content_type = "application/pdf"
-
-
-
-    if not raw_bytes:
-        raise HTTPException(status_code=400, detail="Original CV content is missing and cannot be reprocessed.")
-
     # Save active processing marker
     processing_marker = {
         "id": cv_key,
         "scan_id": cv_key,
         "filename": filename,
+        "storage_filename": retained_upload.storage_filename,
         "status": "processing",
         "message": "10% - Caches purged. Reprocessing CV from scratch...",
         "progress": 10,
@@ -223,6 +208,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         force_reprocess=True,
         candidate_id=existing_result.get("candidate_id"),
         cv_id=existing_result.get("cv_id"),
+        storage_filename=retained_upload.storage_filename,
     )
 
     return {
@@ -231,4 +217,3 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         "status": "processing",
         "progress": 10,
     }
-

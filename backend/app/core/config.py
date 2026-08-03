@@ -11,7 +11,29 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = ["*"]
     REDIS_URL: str | None = "redis://localhost:6379/0"
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
-    ALLOWED_EXTENSIONS: set[str] = {"pdf", "docx", "doc", "txt"}
+    UPLOAD_READ_CHUNK_SIZE_BYTES: int = 1024 * 1024
+    UPLOAD_FILENAME_MAX_CHARS: int = 120
+    ALLOWED_EXTENSIONS: set[str] = {"pdf", "docx"}
+    ALLOWED_MIME_TYPES: dict[str, list[str]] = {
+        "pdf": ["application/pdf", "application/x-pdf", "application/octet-stream"],
+        "docx": [
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/octet-stream",
+        ],
+    }
+    MAX_DOCX_EXPANDED_SIZE_BYTES: int = 75 * 1024 * 1024
+    MAX_DOCX_ENTRIES: int = 2000
+    MAX_DOCX_COMPRESSION_RATIO: float = 200.0
+    MAX_PDF_PAGES: int = 100
+    MAX_PDF_XREF_OBJECTS: int = 10000
+    MAX_PDF_IMAGES: int = 1000
+    MAX_PDF_TOTAL_PAGE_AREA_POINTS: float = 500_000_000.0
+    MAX_PDF_EMBEDDED_FILES: int = 0
+    RAW_UPLOAD_RETENTION_DAYS: int = 30
+    RAW_UPLOAD_DELETE_ON_SUCCESS: bool = False
+    RAW_UPLOAD_DELETE_ON_FAILURE: bool = False
     UPLOADS_DIR: Path = Path("uploads")
     RESULTS_DIR: Path = Path("uploads/results")
 

@@ -1,6 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
-from app.core.config import settings
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis
@@ -8,6 +7,7 @@ from app.schemas.cv import CVMatchRequest, CVProcessingResponse, CVUploadRespons
 from app.schemas.match import CandidateMatchAnalysis
 from app.services.cv_service import get_stable_cv_key, process_cv_file
 from app.services.scoring_engine import ScoringEngine
+from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/cv", tags=["CV"])
 
@@ -18,6 +18,7 @@ async def background_process_cv(*args, **kwargs):
         await process_cv_file(*args, **kwargs)
     except Exception as exc:
         from app.core.logging import logger
+        UploadService.cleanup_after_processing(kwargs.get("storage_filename"), succeeded=False)
         logger.exception(f"Background CV processing failed: {exc}")
 
 
@@ -28,43 +29,23 @@ async def upload_cv(
     candidate_id: str | None = Form(None),
     cv_id: str | None = Form(None),
 ):
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Filename is required.",
-        )
-
-    from pathlib import Path
-    ext = Path(file.filename).suffix.lower().lstrip(".")
-    if ext not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file extension '.{ext}'. Allowed formats: docx, pdf.",
-        )
-
-
     try:
-        content = await file.read()
-        cv_key = get_stable_cv_key(file.filename, candidate_id, cv_id)
-
-        # Preserve raw upload file for re-run analysis
+        normalized = UploadService.normalize_filename(file.filename)
+        cv_key = get_stable_cv_key(normalized.safe_filename, candidate_id, cv_id)
+        accepted = await UploadService.accept_and_persist(file, storage_key=cv_key)
         try:
-            settings.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-            raw_path = settings.UPLOADS_DIR / file.filename
-            raw_path.write_bytes(content)
-            logger.info(f"Saved raw upload file to '{raw_path}'.")
-        except Exception as write_err:
-            logger.warning(f"Failed writing upload file to UPLOADS_DIR: {write_err}")
-
-        background_tasks.add_task(
-            background_process_cv,
-            filename=file.filename,
-            content=content,
-            content_type=file.content_type,
-            candidate_id=candidate_id,
-            cv_id=cv_id,
-        )
-
+            background_tasks.add_task(
+                background_process_cv,
+                filename=accepted.safe_filename,
+                content=accepted.content,
+                content_type=accepted.detected_content_type,
+                candidate_id=candidate_id,
+                cv_id=cv_id,
+                storage_filename=accepted.storage_filename,
+            )
+        except Exception:
+            UploadService.remove_stored_upload(accepted.storage_filename)
+            raise
 
         return CVProcessingResponse(
             message="10% - CV processing started in the background...",
@@ -72,14 +53,9 @@ async def upload_cv(
             status="processing",
             progress=10
         )
-
-
-    except HTTPException:
-        raise
-
-    except ValueError as exc:
+    except UploadValidationError as exc:
         raise HTTPException(
-            status_code=400,
+            status_code=exc.status_code,
             detail=str(exc),
         ) from exc
 

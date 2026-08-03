@@ -19,6 +19,7 @@ from app.services.document_parser import (
     ResumeJsonExtractor,
 )
 from app.services.embedding_service import EmbeddingService
+from app.services.upload_service import UploadService
 
 from contextlib import asynccontextmanager
 
@@ -88,6 +89,7 @@ async def process_cv_file(
     candidate_id: str | int | None = None,
     cv_id: str | int | None = None,
     force_reprocess: bool = False,
+    storage_filename: str | None = None,
 ) -> dict[str, Any]:
     cv_key = get_stable_cv_key(filename, candidate_id, cv_id)
     cv_hash = hashlib.sha256(content).hexdigest()
@@ -124,6 +126,7 @@ async def process_cv_file(
                     existing_data["progress"] = 100
                     existing_data["stage"] = "complete"
                     existing_data["is_complete"] = True
+                    existing_data["storage_filename"] = storage_filename or existing_data.get("storage_filename")
                     
                     # 1. Disk/Cache Persistence Parity
                     saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, existing_data)
@@ -147,7 +150,12 @@ async def process_cv_file(
                         await asyncio.to_thread(OllamaLLMService.unload_model)
                     except Exception as unload_err:
                         logger.warning(f"Ollama unload signal failed during cache hit for '{cv_key}': {unload_err}")
-                        
+
+                    await asyncio.to_thread(
+                        UploadService.cleanup_after_processing,
+                        storage_filename,
+                        succeeded=True,
+                    )
                     return existing_data
 
                 if not hash_matches:
@@ -177,6 +185,7 @@ async def process_cv_file(
                     "progress": progress,
                     "stage": stage,
                     "filename": filename,
+                    "storage_filename": storage_filename,
                 }
                 try:
                     await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, interim_data)
@@ -352,6 +361,7 @@ async def process_cv_file(
                 "candidate_id": str(candidate_id) if candidate_id is not None else None,
                 "cv_id": str(cv_id) if cv_id is not None else None,
                 "filename": filename,
+                "storage_filename": storage_filename,
                 "content_type": content_type,
                 "cv_hash": cv_hash,
                 "full_name": extracted_name if extracted_name != "Unknown Candidate" else None,
@@ -402,6 +412,11 @@ async def process_cv_file(
 
             saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, result_data)
             result_data["result_file_path"] = str(saved_path)
+            await asyncio.to_thread(
+                UploadService.cleanup_after_processing,
+                storage_filename,
+                succeeded=True,
+            )
 
             # Signal Ollama to unload model and become idle immediately after matching completes
             try:
@@ -432,6 +447,7 @@ async def process_cv_file(
                 "id": cv_key,
                 "scan_id": cv_key,
                 "filename": filename,
+                "storage_filename": storage_filename,
                 "content_type": content_type,
                 "candidate_id": str(candidate_id) if candidate_id is not None else None,
                 "cv_id": str(cv_id) if cv_id is not None else None,
@@ -461,6 +477,11 @@ async def process_cv_file(
                 await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, failure_data)
             except Exception as save_exc:
                 logger.error(f"Failed to persist failure status result for '{cv_key}': {save_exc}")
+            await asyncio.to_thread(
+                UploadService.cleanup_after_processing,
+                storage_filename,
+                succeeded=False,
+            )
             raise
 
 
@@ -613,4 +634,3 @@ async def scan_uploads_directory(
 
     print()
     return results
-

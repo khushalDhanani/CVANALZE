@@ -1,54 +1,42 @@
-from pathlib import Path
+from io import BytesIO
+from unittest.mock import patch
 
+from docx import Document
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
-from app.repositories.result import ResultRepository
 
 
-def test_dual_upload_key_alignment_and_single_entry():
+def test_dual_upload_key_alignment_and_single_raw_file(monkeypatch, tmp_path):
     """
     Verify that uploading an identical CV file via /api/cv/upload (fast-track)
     and /api/match/upload (enriched) produces the exact same cv_key, creates
-    only 1 JSON file in RESULTS_DIR, and resolves to the exact same single repository entry.
+    only one server-named raw upload because content-addressed storage is shared.
     """
     client = TestClient(app)
     
-    cv_filename = "dual_upload_test_resume.txt"
-    cv_text_content = (
-        b"Utkarsh Patil\n"
-        b"Senior Software Developer\n"
-        b"Email: utkarsh@example.com\n"
-        b"Location: Vadodara, Gujarat\n"
-        b"Skills: Python, FastAPI, React, Node.js, PostgreSQL, Docker\n"
-        b"Experience: 6 years developing scalable web applications and REST APIs.\n"
-    )
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
+    cv_filename = "dual_upload_test_resume.docx"
+    document = Document()
+    document.add_paragraph("Utkarsh Patil - Senior Software Developer")
+    output = BytesIO()
+    document.save(output)
+    cv_content = output.getvalue()
+    content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-    # 1. Upload via /api/cv/upload
-    resp1 = client.post("/api/cv/upload", files={"file": (cv_filename, cv_text_content, "text/plain")})
-    assert resp1.status_code == 200, f"/api/cv/upload failed: {resp1.text}"
-    key1 = resp1.json()["cv_key"]
+    with patch("app.api.cv.background_process_cv"), patch("app.api.analysis.background_upload_and_analyze"):
+        resp1 = client.post("/api/cv/upload", files={"file": (cv_filename, cv_content, content_type)})
+        assert resp1.status_code == 200, f"/api/cv/upload failed: {resp1.text}"
+        key1 = resp1.json()["cv_key"]
 
-    # 2. Upload via /api/match/upload
-    resp2 = client.post("/api/match/upload", files={"file": (cv_filename, cv_text_content, "text/plain")})
-    assert resp2.status_code == 200, f"/api/match/upload failed: {resp2.text}"
-    key2 = resp2.json()["cv_key"]
+        resp2 = client.post("/api/match/upload", files={"file": (cv_filename, cv_content, content_type)})
+        assert resp2.status_code == 200, f"/api/match/upload failed: {resp2.text}"
+        key2 = resp2.json()["cv_key"]
 
     # 3. Key equality invariant
     assert key1 == key2 == "cv_dual_upload_test_resume", f"Key mismatch! key1='{key1}', key2='{key2}'"
 
-    # 4. Result file count invariant
-    json_files = list(settings.RESULTS_DIR.glob(f"*{Path(cv_filename).stem}*.json"))
-    assert len(json_files) == 1, f"Expected exactly 1 JSON file, found {len(json_files)}: {[f.name for f in json_files]}"
-    assert json_files[0].name == "cv_dual_upload_test_resume.json"
-
-    # 5. Repository resolution invariant
-    res1 = ResultRepository.read_result_by_filename(f"{key1}.json")
-    res2 = ResultRepository.read_result_by_filename(f"{key2}.json")
-    resolved = ResultRepository.resolve_result(key1)
-
-    assert res1 is not None
-    assert res2 is not None
-    assert resolved is not None
-    assert res1["scan_id"] == res2["scan_id"] == resolved["scan_id"] == "cv_dual_upload_test_resume"
+    raw_files = list(tmp_path.glob("cv_dual_upload_test_resume_*.docx"))
+    assert len(raw_files) == 1
+    assert raw_files[0].read_bytes() == cv_content

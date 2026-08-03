@@ -2,7 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies (ODBC Driver & build tools)
+# Install system dependencies (ODBC Driver & build tools). Uploads support PDF/DOCX only;
+# legacy .doc converters are intentionally excluded.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg2 \

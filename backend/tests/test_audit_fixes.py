@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
 from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
@@ -238,19 +239,24 @@ def test_redis_llm_repository_caching():
         assert read_data == mock_data
 
 
-def test_cv_upload_background_task_returns_processing_status():
+def test_cv_upload_background_task_returns_processing_status(tmp_path, monkeypatch):
     """Test that /cv/upload endpoint immediately returns a processing status, preventing 504 timeouts."""
     import fitz
+    from unittest.mock import patch
+
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path / "results")
     doc = fitz.open()
     page = doc.new_page()
     page.insert_text((50, 50), "John Doe\nSoftware Engineer with Python and FastAPI experience.")
     pdf_content = doc.tobytes()
     doc.close()
     
-    response = client.post(
-        "/api/cv/upload",
-        files={"file": ("test_background.pdf", pdf_content, "application/pdf")}
-    )
+    with patch("app.api.cv.background_process_cv"):
+        response = client.post(
+            "/api/cv/upload",
+            files={"file": ("test_background.pdf", pdf_content, "application/pdf")}
+        )
     
     # We should get a 200 OK immediately, instead of waiting for Docling/LLM
     assert response.status_code == 200, response.text
@@ -984,13 +990,16 @@ def test_cli_warmup_does_not_raise():
         assert counts["rule_config"] == 1
 
 
-def test_docx_upload_full_pipeline():
+def test_docx_upload_full_pipeline(tmp_path, monkeypatch):
     """Test that uploading a .docx file completes all pipeline stages cleanly."""
     from io import BytesIO
 
     import docx
+    from unittest.mock import patch
 
     from app.services.document_parser import MarkdownGenerator
+
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")
 
     doc = docx.Document()
     doc.add_heading("Jane Smith", level=1)
@@ -1011,10 +1020,11 @@ def test_docx_upload_full_pipeline():
     assert result.page_count >= 1
 
     # Verify endpoint handles .docx upload
-    response = client.post(
-        "/api/cv/upload",
-        files={"file": ("jane_smith_resume.docx", docx_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
-    )
+    with patch("app.api.cv.background_process_cv"):
+        response = client.post(
+            "/api/cv/upload",
+            files={"file": ("jane_smith_resume.docx", docx_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+        )
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "processing"
@@ -1048,4 +1058,3 @@ def test_result_repository_resolve_result_with_prefix_variation(tmp_path, monkey
     r2 = ResultRepository.resolve_result("CV_13347_Yagnik_Resume")
     assert r2 is not None
     assert r2["id"] == "cv_13347_Yagnik_Resume"
-
