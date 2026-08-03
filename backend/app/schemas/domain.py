@@ -12,14 +12,14 @@ class DepartmentDomain(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int | None = Field(default=None, description="DepartmentDomainMaster.Id")
-    department_id: int | None = Field(
-        default=None, description="FK to OrgDepartmentMst.DeptID"
-    )
+    department_id: int | None = Field(default=None, description="FK to OrgDepartmentMst.DeptID")
     department_name: str = Field(
-        default="", description="Resolved department name (e.g. 'Information Technology')"
+        default="",
+        description="Resolved department name (e.g. 'Information Technology')",
     )
     domain_name: str = Field(
-        default="", description="Professional domain name (e.g. 'Information Technology & Software')"
+        default="",
+        description="Professional domain name (e.g. 'Information Technology & Software')",
     )
     keywords: list[str] = Field(default_factory=list, description="Keyword terms used for candidate matching")
     default_roles: list[str] = Field(default_factory=list, description="Suggested job roles for the domain")

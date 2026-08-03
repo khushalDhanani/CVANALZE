@@ -15,8 +15,14 @@ from app.services.ollama_transport import OllamaTransport
 
 
 def _disable_llm_cache(monkeypatch) -> None:
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: None)
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.save_cached_entry", lambda key, entry: None)
+    monkeypatch.setattr(
+        "app.repositories.llm_cache.LLMCacheRepository.get_cached_entry",
+        lambda key: None,
+    )
+    monkeypatch.setattr(
+        "app.repositories.llm_cache.LLMCacheRepository.save_cached_entry",
+        lambda key, entry: None,
+    )
 
 
 def _mock_transport_client(monkeypatch, response_data: dict) -> MagicMock:
@@ -51,7 +57,11 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
     }
     client = _mock_transport_client(
         monkeypatch,
-        {"response": json.dumps(dummy_profile), "eval_count": 100, "eval_duration": 1_000_000_000},
+        {
+            "response": json.dumps(dummy_profile),
+            "eval_count": 100,
+            "eval_duration": 1_000_000_000,
+        },
     )
 
     result = OllamaLLMService.extract_candidate_profile(
@@ -80,7 +90,11 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
     }
     client = _mock_transport_client(
         monkeypatch,
-        {"response": json.dumps(dummy_analysis), "eval_count": 100, "eval_duration": 1_000_000_000},
+        {
+            "response": json.dumps(dummy_analysis),
+            "eval_count": 100,
+            "eval_duration": 1_000_000_000,
+        },
     )
 
     result = OllamaLLMService.call_qwen(
@@ -111,7 +125,11 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
     }
     client = _mock_transport_client(
         monkeypatch,
-        {"response": json.dumps(dummy_mapping), "eval_count": 100, "eval_duration": 1_000_000_000},
+        {
+            "response": json.dumps(dummy_mapping),
+            "eval_count": 100,
+            "eval_duration": 1_000_000_000,
+        },
     )
 
     result = OllamaLLMService.call_qwen_dynamic(
@@ -148,7 +166,11 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
     }
     client = _mock_transport_client(
         monkeypatch,
-        {"response": json.dumps(dummy_optimized), "eval_count": 120, "eval_duration": 1_500_000_000},
+        {
+            "response": json.dumps(dummy_optimized),
+            "eval_count": 120,
+            "eval_duration": 1_500_000_000,
+        },
     )
 
     result = OllamaLLMService.run_optimized_match(
@@ -187,7 +209,10 @@ def test_domain_embedding_read_only_disables_live_generation(monkeypatch):
         called = True
         return [0.1, 0.2, 0.3]
 
-    monkeypatch.setattr("app.services.embedding_service.EmbeddingService.generate_embedding", mock_generate)
+    monkeypatch.setattr(
+        "app.services.embedding_service.EmbeddingService.generate_embedding",
+        mock_generate,
+    )
 
     result = DomainEmbeddingService.find_semantic_equivalents(
         term="uncached_skill_test_xyz",

@@ -51,7 +51,11 @@ def test_domain_mismatch_penalty_software_vs_plant():
         "title": "Plant Assistant",
         "department": "Plant & Maintenance",
         "department_name": "Plant & Maintenance",
-        "required_skills": ["Boiler Operation", "Mechanical Fitting", "Equipment Maintenance"],
+        "required_skills": [
+            "Boiler Operation",
+            "Mechanical Fitting",
+            "Equipment Maintenance",
+        ],
         "min_experience_years": 1,
     }
 

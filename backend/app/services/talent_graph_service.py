@@ -41,17 +41,19 @@ class TalentKnowledgeGraphService:
         edges: list[dict[str, Any]] = []
 
         cand_node_id = f"candidate:{cv_key}"
-        nodes.append({
-            "id": cand_node_id,
-            "type": "Candidate",
-            "label": extracted_name,
-            "properties": {
-                "email": contact_info.get("email"),
-                "phone": contact_info.get("phone"),
-                "primary_department": match_analysis.get("primary_department"),
-                "experience_years": r.get("quality_metrics", {}).get("experience_years"),
-            },
-        })
+        nodes.append(
+            {
+                "id": cand_node_id,
+                "type": "Candidate",
+                "label": extracted_name,
+                "properties": {
+                    "email": contact_info.get("email"),
+                    "phone": contact_info.get("phone"),
+                    "primary_department": match_analysis.get("primary_department"),
+                    "experience_years": r.get("quality_metrics", {}).get("experience_years"),
+                },
+            }
+        )
 
         # 1. Skills Nodes & HAS_SKILL Edges
         skills = resume_json.get("skills") or best_match.get("matched_skills") or []
@@ -61,19 +63,23 @@ class TalentKnowledgeGraphService:
             clean_skill = skill.strip()
             skill_node_id = f"skill:{clean_skill.lower()}"
 
-            nodes.append({
-                "id": skill_node_id,
-                "type": "Skill",
-                "label": clean_skill,
-                "properties": {"category": "technical"},
-            })
+            nodes.append(
+                {
+                    "id": skill_node_id,
+                    "type": "Skill",
+                    "label": clean_skill,
+                    "properties": {"category": "technical"},
+                }
+            )
 
-            edges.append({
-                "source": cand_node_id,
-                "target": skill_node_id,
-                "relationship": "HAS_SKILL",
-                "properties": {"weight": 1.0},
-            })
+            edges.append(
+                {
+                    "source": cand_node_id,
+                    "target": skill_node_id,
+                    "relationship": "HAS_SKILL",
+                    "properties": {"weight": 1.0},
+                }
+            )
 
         # 2. Company Nodes & WORKED_AT Edges
         work_history = resume_json.get("work_experience") or []
@@ -83,19 +89,23 @@ class TalentKnowledgeGraphService:
                     company_name = str(work["company"]).strip()
                     comp_node_id = f"company:{company_name.lower()}"
 
-                    nodes.append({
-                        "id": comp_node_id,
-                        "type": "Company",
-                        "label": company_name,
-                        "properties": {"role": work.get("role") or work.get("job_title")},
-                    })
+                    nodes.append(
+                        {
+                            "id": comp_node_id,
+                            "type": "Company",
+                            "label": company_name,
+                            "properties": {"role": work.get("role") or work.get("job_title")},
+                        }
+                    )
 
-                    edges.append({
-                        "source": cand_node_id,
-                        "target": comp_node_id,
-                        "relationship": "WORKED_AT",
-                        "properties": {"role": work.get("role")},
-                    })
+                    edges.append(
+                        {
+                            "source": cand_node_id,
+                            "target": comp_node_id,
+                            "relationship": "WORKED_AT",
+                            "properties": {"role": work.get("role")},
+                        }
+                    )
 
         # 3. Vacancy Matches & MATCHES Edges (Deterministic score authority preserved)
         suitable_openings = match_analysis.get("suitable_openings") or []
@@ -106,27 +116,31 @@ class TalentKnowledgeGraphService:
                 vac_score = float(vac.get("score") or vac.get("overall_score") or 0.0)
                 vac_node_id = f"vacancy:{vac_id}"
 
-                nodes.append({
-                    "id": vac_node_id,
-                    "type": "Vacancy",
-                    "label": vac_title,
-                    "properties": {
-                        "score": vac_score,
-                        "department": vac.get("department") or vac.get("department_name"),
-                        "classification": vac.get("classification"),
-                    },
-                })
+                nodes.append(
+                    {
+                        "id": vac_node_id,
+                        "type": "Vacancy",
+                        "label": vac_title,
+                        "properties": {
+                            "score": vac_score,
+                            "department": vac.get("department") or vac.get("department_name"),
+                            "classification": vac.get("classification"),
+                        },
+                    }
+                )
 
-                edges.append({
-                    "source": cand_node_id,
-                    "target": vac_node_id,
-                    "relationship": "MATCHES",
-                    "properties": {
-                        "score": vac_score,
-                        "classification": vac.get("classification"),
-                        "source_of_truth": "DeterministicScoringEngine",
-                    },
-                })
+                edges.append(
+                    {
+                        "source": cand_node_id,
+                        "target": vac_node_id,
+                        "relationship": "MATCHES",
+                        "properties": {
+                            "score": vac_score,
+                            "classification": vac.get("classification"),
+                            "source_of_truth": "DeterministicScoringEngine",
+                        },
+                    }
+                )
 
         # 4. Similar Candidates & SEMANTICALLY_SIMILAR Edges (Discovered via vector embeddings)
         similar_cands = r.get("similar_candidates") or []
@@ -136,26 +150,30 @@ class TalentKnowledgeGraphService:
                 sim_score = float(sim.get("similarity_score") or 0.0)
                 other_node_id = f"candidate:{other_key}"
 
-                nodes.append({
-                    "id": other_node_id,
-                    "type": "Candidate",
-                    "label": sim.get("full_name") or other_key,
-                    "properties": {
-                        "similarity_score": sim_score,
-                        "is_duplicate_flag": sim.get("is_duplicate_flag", False),
-                    },
-                })
+                nodes.append(
+                    {
+                        "id": other_node_id,
+                        "type": "Candidate",
+                        "label": sim.get("full_name") or other_key,
+                        "properties": {
+                            "similarity_score": sim_score,
+                            "is_duplicate_flag": sim.get("is_duplicate_flag", False),
+                        },
+                    }
+                )
 
-                edges.append({
-                    "source": cand_node_id,
-                    "target": other_node_id,
-                    "relationship": "SEMANTICALLY_SIMILAR",
-                    "properties": {
-                        "similarity": sim_score,
-                        "discovery_mechanism": "VectorEmbeddings",
-                        "is_duplicate": sim.get("is_duplicate_flag", False),
-                    },
-                })
+                edges.append(
+                    {
+                        "source": cand_node_id,
+                        "target": other_node_id,
+                        "relationship": "SEMANTICALLY_SIMILAR",
+                        "properties": {
+                            "similarity": sim_score,
+                            "discovery_mechanism": "VectorEmbeddings",
+                            "is_duplicate": sim.get("is_duplicate_flag", False),
+                        },
+                    }
+                )
 
         return {
             "candidate_id": cv_key,
@@ -186,30 +204,36 @@ class TalentKnowledgeGraphService:
         dept_name = target_job.get("department_name") or target_job.get("department") or "Engineering"
         vac_node_id = f"vacancy:{vid_str}"
 
-        nodes.append({
-            "id": vac_node_id,
-            "type": "Vacancy",
-            "label": vac_title,
-            "properties": {
-                "department": dept_name,
-                "min_experience_years": target_job.get("min_experience_years"),
-            },
-        })
+        nodes.append(
+            {
+                "id": vac_node_id,
+                "type": "Vacancy",
+                "label": vac_title,
+                "properties": {
+                    "department": dept_name,
+                    "min_experience_years": target_job.get("min_experience_years"),
+                },
+            }
+        )
 
         # 1. Department Node & BELONGS_TO Edge
         dept_node_id = f"department:{dept_name.lower()}"
-        nodes.append({
-            "id": dept_node_id,
-            "type": "Department",
-            "label": dept_name,
-            "properties": {},
-        })
-        edges.append({
-            "source": vac_node_id,
-            "target": dept_node_id,
-            "relationship": "BELONGS_TO",
-            "properties": {},
-        })
+        nodes.append(
+            {
+                "id": dept_node_id,
+                "type": "Department",
+                "label": dept_name,
+                "properties": {},
+            }
+        )
+        edges.append(
+            {
+                "source": vac_node_id,
+                "target": dept_node_id,
+                "relationship": "BELONGS_TO",
+                "properties": {},
+            }
+        )
 
         # 2. Required Skills Nodes & REQUIRES_SKILL Edges
         req_skills = target_job.get("required_skills") or []
@@ -219,19 +243,23 @@ class TalentKnowledgeGraphService:
             clean_s = skill.strip()
             skill_node_id = f"skill:{clean_s.lower()}"
 
-            nodes.append({
-                "id": skill_node_id,
-                "type": "Skill",
-                "label": clean_s,
-                "properties": {"tier": "MANDATORY"},
-            })
+            nodes.append(
+                {
+                    "id": skill_node_id,
+                    "type": "Skill",
+                    "label": clean_s,
+                    "properties": {"tier": "MANDATORY"},
+                }
+            )
 
-            edges.append({
-                "source": vac_node_id,
-                "target": skill_node_id,
-                "relationship": "REQUIRES_SKILL",
-                "properties": {"tier": "MANDATORY"},
-            })
+            edges.append(
+                {
+                    "source": vac_node_id,
+                    "target": skill_node_id,
+                    "relationship": "REQUIRES_SKILL",
+                    "properties": {"tier": "MANDATORY"},
+                }
+            )
 
         # 3. Top Candidate Matches & MATCHES Edges
         all_results = ResultRepository.list_all_results()
@@ -255,19 +283,29 @@ class TalentKnowledgeGraphService:
             contact_info = resume_json.get("contact_info") or {}
             cname = contact_info.get("name") or contact_info.get("full_name") or cv_key
 
-            nodes.append({
-                "id": cand_node_id,
-                "type": "Candidate",
-                "label": cname,
-                "properties": {"score": score, "classification": s.get("classification")},
-            })
+            nodes.append(
+                {
+                    "id": cand_node_id,
+                    "type": "Candidate",
+                    "label": cname,
+                    "properties": {
+                        "score": score,
+                        "classification": s.get("classification"),
+                    },
+                }
+            )
 
-            edges.append({
-                "source": cand_node_id,
-                "target": vac_node_id,
-                "relationship": "MATCHES",
-                "properties": {"score": score, "classification": s.get("classification")},
-            })
+            edges.append(
+                {
+                    "source": cand_node_id,
+                    "target": vac_node_id,
+                    "relationship": "MATCHES",
+                    "properties": {
+                        "score": score,
+                        "classification": s.get("classification"),
+                    },
+                }
+            )
 
         return {
             "vacancy_id": vid_str,
@@ -287,12 +325,14 @@ class TalentKnowledgeGraphService:
         nodes: list[dict[str, Any]] = []
         edges: list[dict[str, Any]] = []
 
-        nodes.append({
-            "id": skill_node_id,
-            "type": "Skill",
-            "label": clean_skill,
-            "properties": {"category": "technical"},
-        })
+        nodes.append(
+            {
+                "id": skill_node_id,
+                "type": "Skill",
+                "label": clean_skill,
+                "properties": {"category": "technical"},
+            }
+        )
 
         # 1. Semantically Similar Skills (Discovered via Vector Embeddings)
         equivalents = DomainEmbeddingService.find_semantic_equivalents(term=clean_skill, category="skills", limit=4)
@@ -301,19 +341,26 @@ class TalentKnowledgeGraphService:
             eq_sim = float(eq["similarity_score"])
             eq_node_id = f"skill:{eq_term.lower()}"
 
-            nodes.append({
-                "id": eq_node_id,
-                "type": "Skill",
-                "label": eq_term.title(),
-                "properties": {"similarity_score": eq_sim},
-            })
+            nodes.append(
+                {
+                    "id": eq_node_id,
+                    "type": "Skill",
+                    "label": eq_term.title(),
+                    "properties": {"similarity_score": eq_sim},
+                }
+            )
 
-            edges.append({
-                "source": skill_node_id,
-                "target": eq_node_id,
-                "relationship": "SEMANTICALLY_SIMILAR",
-                "properties": {"similarity": eq_sim, "discovery_mechanism": "VectorEmbeddings"},
-            })
+            edges.append(
+                {
+                    "source": skill_node_id,
+                    "target": eq_node_id,
+                    "relationship": "SEMANTICALLY_SIMILAR",
+                    "properties": {
+                        "similarity": eq_sim,
+                        "discovery_mechanism": "VectorEmbeddings",
+                    },
+                }
+            )
 
         # 2. Candidate Supply & Vacancy Demand
         all_results = ResultRepository.list_all_results()
@@ -330,18 +377,22 @@ class TalentKnowledgeGraphService:
                     contact_info = (r.get("resume_json") or {}).get("contact_info") or {}
                     cname = contact_info.get("name") or cv_key
 
-                    nodes.append({
-                        "id": cand_node_id,
-                        "type": "Candidate",
-                        "label": cname,
-                        "properties": {},
-                    })
-                    edges.append({
-                        "source": cand_node_id,
-                        "target": skill_node_id,
-                        "relationship": "HAS_SKILL",
-                        "properties": {},
-                    })
+                    nodes.append(
+                        {
+                            "id": cand_node_id,
+                            "type": "Candidate",
+                            "label": cname,
+                            "properties": {},
+                        }
+                    )
+                    edges.append(
+                        {
+                            "source": cand_node_id,
+                            "target": skill_node_id,
+                            "relationship": "HAS_SKILL",
+                            "properties": {},
+                        }
+                    )
 
         all_jobs = JobRepository.get_all_jobs()
         vac_count = 0
@@ -353,18 +404,22 @@ class TalentKnowledgeGraphService:
                     vid = str(j.get("vacancy_id") or j.get("id"))
                     vac_node_id = f"vacancy:{vid}"
 
-                    nodes.append({
-                        "id": vac_node_id,
-                        "type": "Vacancy",
-                        "label": j.get("title", "Vacancy"),
-                        "properties": {},
-                    })
-                    edges.append({
-                        "source": vac_node_id,
-                        "target": skill_node_id,
-                        "relationship": "REQUIRES_SKILL",
-                        "properties": {},
-                    })
+                    nodes.append(
+                        {
+                            "id": vac_node_id,
+                            "type": "Vacancy",
+                            "label": j.get("title", "Vacancy"),
+                            "properties": {},
+                        }
+                    )
+                    edges.append(
+                        {
+                            "source": vac_node_id,
+                            "target": skill_node_id,
+                            "relationship": "REQUIRES_SKILL",
+                            "properties": {},
+                        }
+                    )
 
         return {
             "skill": clean_skill,

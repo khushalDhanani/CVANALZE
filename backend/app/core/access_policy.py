@@ -106,10 +106,7 @@ def resolve_access_tier(method: str, request_path: str) -> AccessTier | None:
         policy_segments = _path_segments(policy.path)
         if len(policy_segments) != len(request_segments):
             continue
-        segments_match = all(
-            (expected.startswith("{") and expected.endswith("}")) or expected == actual
-            for expected, actual in zip(policy_segments, request_segments)
-        )
+        segments_match = all((expected.startswith("{") and expected.endswith("}")) or expected == actual for expected, actual in zip(policy_segments, request_segments))
         if segments_match:
             return policy.access
     return None

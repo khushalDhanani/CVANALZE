@@ -19,9 +19,7 @@ def _clean_cv_text(cv_text: str) -> str:
     return cleaned
 
 
-def build_optimized_match_prompt(
-    cv_text: str, filtered_vacancies: list[dict[str, Any]]
-) -> tuple[str, int, int]:
+def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str, Any]]) -> tuple[str, int, int]:
     """
     Builds a single, compact JSON prompt for Qwen to extract candidate profile,
     classify vacancy requirements, extract dual evidence, and perform semantic evaluation.
@@ -58,6 +56,7 @@ def build_optimized_match_prompt(
     }
 
     from app.core.rule_config_manager import RuleConfigManager
+
     canonical_domains = RuleConfigManager.get_taxonomy_rules().canonical_domains
     domain_list_str = ", ".join(f'"{d}"' for d in canonical_domains)
 
@@ -131,4 +130,3 @@ Expected JSON Schema:
     token_estimate = max(1, char_count // 4)
 
     return prompt, token_estimate, char_count
-

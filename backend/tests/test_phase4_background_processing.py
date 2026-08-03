@@ -35,7 +35,9 @@ def _submission_kwargs(content: bytes = b"phase-4-cv") -> dict[str, str | None]:
     }
 
 
-def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempotent(monkeypatch):
+def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempotent(
+    monkeypatch,
+):
     enqueued: list[str] = []
 
     class FakeQueue:
@@ -50,7 +52,11 @@ def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempote
             enqueued.append(processing_job_id)
 
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
     monkeypatch.setattr(processing_queue, "Queue", FakeQueue)
 
     first = ProcessingQueueService.submit_upload(**_submission_kwargs())
@@ -63,7 +69,11 @@ def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempote
 
 def test_changed_content_gets_an_isolated_processing_job(monkeypatch):
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
 
     first = ProcessingQueueService.submit_upload(**_submission_kwargs(b"version-one"))
     second = ProcessingQueueService.submit_upload(**_submission_kwargs(b"version-two"))
@@ -75,7 +85,11 @@ def test_changed_content_gets_an_isolated_processing_job(monkeypatch):
 
 def test_duplicate_force_reprocess_reuses_an_active_job(monkeypatch):
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
 
     first = ProcessingQueueService.submit_upload(**_submission_kwargs(), force_reprocess=True)
     second = ProcessingQueueService.submit_upload(**_submission_kwargs(), force_reprocess=True)
@@ -86,7 +100,11 @@ def test_duplicate_force_reprocess_reuses_an_active_job(monkeypatch):
 
 def test_redis_outage_uses_only_the_explicit_development_fallback(monkeypatch):
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
 
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
 
@@ -95,13 +113,19 @@ def test_redis_outage_uses_only_the_explicit_development_fallback(monkeypatch):
     assert submission.record.state == JobState.QUEUED
 
 
-def test_production_redis_outage_fails_instead_of_using_fastapi_background_tasks(monkeypatch):
+def test_production_redis_outage_fails_instead_of_using_fastapi_background_tasks(
+    monkeypatch,
+):
     from app.services.processing_queue import ProcessingQueueUnavailableError
 
     monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
     monkeypatch.setattr(settings, "RQ_DEVELOPMENT_FALLBACK_ENABLED", False)
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
 
     with pytest.raises(ProcessingQueueUnavailableError):
         ProcessingQueueService.submit_upload(**_submission_kwargs())
@@ -115,7 +139,11 @@ def test_production_redis_outage_fails_instead_of_using_fastapi_background_tasks
 def test_worker_revalidates_source_and_persists_completion(monkeypatch, tmp_path):
     content = b"phase-4-cv"
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs(content))
     source = StoredUpload(
         safe_filename="phase_4.pdf",
@@ -143,7 +171,11 @@ def test_worker_revalidates_source_and_persists_completion(monkeypatch, tmp_path
 def test_worker_marks_retry_state_before_rq_rethrows(monkeypatch):
     content = b"phase-4-cv"
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs(content))
     source = StoredUpload(
         safe_filename="phase_4.pdf",

@@ -112,7 +112,10 @@ class OllamaTransport:
                     cls._client.close()
                 cls._client = httpx.Client(
                     base_url=fingerprint[0],
-                    timeout=httpx.Timeout(settings.OLLAMA_REQUEST_TIMEOUT, connect=settings.OLLAMA_REQUEST_TIMEOUT),
+                    timeout=httpx.Timeout(
+                        settings.OLLAMA_REQUEST_TIMEOUT,
+                        connect=settings.OLLAMA_REQUEST_TIMEOUT,
+                    ),
                     limits=httpx.Limits(
                         max_connections=max(1, settings.OLLAMA_MAX_CONNECTIONS),
                         max_keepalive_connections=max(1, settings.OLLAMA_MAX_KEEPALIVE_CONNECTIONS),
@@ -160,10 +163,7 @@ class OllamaTransport:
                 value = parser(response_data)
                 duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
                 cls._record_success(operation, duration_ms)
-                logger.info(
-                    f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} "
-                    f"status=SUCCESS duration_ms={duration_ms}"
-                )
+                logger.info(f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} status=SUCCESS duration_ms={duration_ms}")
                 return OllamaTransportResult(
                     value=value,
                     response_data=response_data,
@@ -206,10 +206,7 @@ class OllamaTransport:
 
             assert last_error is not None
             should_retry = last_error.retryable and attempt <= max_retries
-            logger.warning(
-                f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} "
-                f"status={'RETRY' if should_retry else 'FAILED'} error={type(last_error).__name__}"
-            )
+            logger.warning(f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} status={'RETRY' if should_retry else 'FAILED'} error={type(last_error).__name__}")
             if not should_retry:
                 break
             cls._record_retry()
@@ -221,10 +218,7 @@ class OllamaTransport:
         cls._record_failure(operation, duration_ms)
         if last_error is None:
             last_error = OllamaUnavailableError("Ollama request failed.", operation=operation)
-        logger.error(
-            f"[OLLAMA] operation={operation} status=FAILED duration_ms={duration_ms} "
-            f"error={type(last_error).__name__}"
-        )
+        logger.error(f"[OLLAMA] operation={operation} status=FAILED duration_ms={duration_ms} error={type(last_error).__name__}")
         raise last_error
 
     @classmethod
@@ -318,8 +312,7 @@ class OllamaTransport:
         if cleaned.startswith("```"):
             first_newline = cleaned.find("\n")
             cleaned = cleaned[first_newline + 1 :] if first_newline >= 0 else cleaned[3:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
+            cleaned = cleaned.removesuffix("```")
             cleaned = cleaned.strip()
         try:
             return json.loads(cleaned)
@@ -342,14 +335,9 @@ class OllamaTransport:
     def get_metrics(cls) -> dict[str, Any]:
         with cls._metrics_lock:
             metrics = {key: value for key, value in cls._metrics.items() if key != "operations"}
-            metrics["operations"] = {
-                operation: operation_metrics.copy()
-                for operation, operation_metrics in cls._metrics["operations"].items()
-            }
+            metrics["operations"] = {operation: operation_metrics.copy() for operation, operation_metrics in cls._metrics["operations"].items()}
             completed = int(metrics["successes"]) + int(metrics["failures"])
-            metrics["average_duration_ms"] = (
-                round(float(metrics["total_duration_ms"]) / completed, 2) if completed else 0.0
-            )
+            metrics["average_duration_ms"] = round(float(metrics["total_duration_ms"]) / completed, 2) if completed else 0.0
             return metrics
 
     @classmethod

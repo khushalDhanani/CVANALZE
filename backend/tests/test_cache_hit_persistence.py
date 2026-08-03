@@ -1,11 +1,12 @@
-import pytest
-import asyncio
 import hashlib
 import json
-from pathlib import Path
-from app.services.cv_service import process_cv_file, get_stable_cv_key
-from app.repositories.result import ResultRepository
+
+import pytest
+
 from app.core.config import settings
+from app.repositories.result import ResultRepository
+from app.services.cv_service import get_stable_cv_key, process_cv_file
+
 
 @pytest.mark.asyncio
 async def test_cache_hit_persistence_and_sync(monkeypatch):
@@ -29,17 +30,22 @@ async def test_cache_hit_persistence_and_sync(monkeypatch):
         "schema_version": settings.EXTRACTION_SCHEMA_VERSION,
         "status": "COMPLETED",
         "progress": 100,
-        "markdown": "Mock parsed markdown"
+        "markdown": "Mock parsed markdown",
     }
-    
+
     # Inject directly into ResultRepository read path via monkeypatch
     async def mock_read(*args, **kwargs):
         return mock_data.copy()
-        
-    monkeypatch.setattr(ResultRepository, "read_result_by_filename", lambda fn: mock_data.copy() if fn == result_filename else None)
-    
+
+    monkeypatch.setattr(
+        ResultRepository,
+        "read_result_by_filename",
+        lambda fn: mock_data.copy() if fn == result_filename else None,
+    )
+
     # Mock embedding generation to not actually call Ollama
     from app.services.embedding_service import EmbeddingService
+
     monkeypatch.setattr(EmbeddingService, "generate_embedding", lambda text, **kwargs: [0.1] * 768)
 
     # 2. Trigger process_cv_file
@@ -51,7 +57,7 @@ async def test_cache_hit_persistence_and_sync(monkeypatch):
 
     # Verify atomic_save_result successfully recreated the file on disk
     assert result_path.exists(), "Cache hit failed to rebuild the JSON file on disk"
-    
+
     # Verify the saved content on disk
     saved_data = json.loads(result_path.read_text())
     assert saved_data["status"] == "COMPLETED"

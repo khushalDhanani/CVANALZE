@@ -94,12 +94,7 @@ class ScoringEngine:
             header = re.sub(r"\s+", " ", line.lstrip("# ").strip())
             normalized_header = header.lower()
             compact_header = re.sub(r"\s+", "", normalized_header)
-            if (
-                not header
-                or normalized_header in section_denylist
-                or compact_header in compact_denylist
-                or any(term in normalized_header for term in substring_denylist)
-            ):
+            if not header or normalized_header in section_denylist or compact_header in compact_denylist or any(term in normalized_header for term in substring_denylist):
                 continue
             headers.append(header)
 
@@ -139,9 +134,7 @@ class ScoringEngine:
         return re.compile(pattern, re.IGNORECASE)
 
     @classmethod
-    def _extract_term_matches(
-        cls, normalized_text: str, terms: list[str]
-    ) -> tuple[list[str], list[str]]:
+    def _extract_term_matches(cls, normalized_text: str, terms: list[str]) -> tuple[list[str], list[str]]:
         matched = []
         missing = []
 
@@ -218,11 +211,7 @@ class ScoringEngine:
             )
 
         job_ctx = job if isinstance(job, JobEvaluationContext) else JobEvaluationContext.create(job)
-        typed_scoring_config = (
-            scoring_config
-            if isinstance(scoring_config, ScoringConfig)
-            else ScoringConfig.load(scoring_config)
-        )
+        typed_scoring_config = scoring_config if isinstance(scoring_config, ScoringConfig) else ScoringConfig.load(scoring_config)
 
         # 1. Requirement Evaluations
         req_results = RequirementEvaluator.evaluate(
@@ -358,17 +347,12 @@ class ScoringEngine:
         job_openings: list[dict[str, Any]] | list[JobEvaluationContext] | None = None,
         profiler: Any | None = None,
     ) -> CandidateMatchAnalysis:
-        openings = (
-            job_openings if job_openings is not None else JobRepository.get_all_jobs()
-        )
+        openings = job_openings if job_openings is not None else JobRepository.get_all_jobs()
         scoring_config = ScoringConfig.load()
 
         if profiler:
             with profiler.time_stage("vacancy_context"):
-                job_contexts = [
-                    j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j)
-                    for j in openings
-                ]
+                job_contexts = [j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j) for j in openings]
             with profiler.time_stage("candidate_context"):
                 context = CandidateAnalysisContext.create(
                     cv_text,
@@ -387,10 +371,7 @@ class ScoringEngine:
                     for job_ctx in job_contexts
                 ]
         else:
-            job_contexts = [
-                j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j)
-                for j in openings
-            ]
+            job_contexts = [j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j) for j in openings]
             context = CandidateAnalysisContext.create(
                 cv_text,
                 dynamic_profile=dynamic_profile,

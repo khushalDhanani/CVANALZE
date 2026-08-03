@@ -255,7 +255,11 @@ async def test_reprocess_missing_raw_returns_409_without_deleting_result(monkeyp
     deleted: list[str] = []
     monkeypatch.setattr(CacheInvalidator, "invalidate_cv", lambda value: invalidated.append(value))
     monkeypatch.setattr(cv_result_cache_manager, "delete", lambda value: deleted.append(value))
-    monkeypatch.setattr(cv_result_cache_manager, "delete_by_pattern", lambda value: deleted.append(value))
+    monkeypatch.setattr(
+        cv_result_cache_manager,
+        "delete_by_pattern",
+        lambda value: deleted.append(value),
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await reprocess_candidate("cv_resume", BackgroundTasks())

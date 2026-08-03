@@ -9,7 +9,7 @@ import argparse
 import hashlib
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -226,17 +226,22 @@ def run_migrations(dialect: str, db_url: str, dry_run: bool = False):
                     batches = split_mssql_batches(content)
                     for batch in batches:
                         conn.execute(text(batch))
-                    now = datetime.now(timezone.utc)
+                    now = datetime.now(UTC)
                     conn.execute(
                         text("""
                         INSERT INTO cvai.schema_migrations (version, migration_name, applied_at, checksum)
                         VALUES (:version, :name, :applied_at, :checksum)
                     """),
-                        {"version": version, "name": migration_name, "applied_at": now, "checksum": checksum},
+                        {
+                            "version": version,
+                            "name": migration_name,
+                            "applied_at": now,
+                            "checksum": checksum,
+                        },
                     )
                 else:
                     conn.execute(text(content))
-                    now = datetime.now(timezone.utc)
+                    now = datetime.now(UTC)
                     conn.execute(
                         text("""
                         INSERT INTO cvai.schema_migrations (version, migration_name, applied_at, checksum)
@@ -244,7 +249,12 @@ def run_migrations(dialect: str, db_url: str, dry_run: bool = False):
                         ON CONFLICT (version) DO UPDATE 
                         SET applied_at = EXCLUDED.applied_at, checksum = EXCLUDED.checksum;
                     """),
-                        {"version": version, "name": migration_name, "applied_at": now, "checksum": checksum},
+                        {
+                            "version": version,
+                            "name": migration_name,
+                            "applied_at": now,
+                            "checksum": checksum,
+                        },
                     )
 
             print(f"✅ Applied [{version}] {file_path.name} successfully.")
@@ -331,10 +341,28 @@ def run_rollback(dialect: str, db_url: str, steps: str = "1", dry_run: bool = Fa
 
 def main():
     parser = argparse.ArgumentParser(description="CV Analyzer Database Migration & Rollback Runner")
-    parser.add_argument("--dialect", choices=["mssql", "postgres"], help="Explicitly specify target database dialect")
-    parser.add_argument("--status", "-s", action="store_true", help="Display migration status table and exit")
-    parser.add_argument("--audit", "-a", action="store_true", help="Audit database schema for drift, missing elements, and checksum tampering")
-    parser.add_argument("--dry-run", action="store_true", help="Preview migrations or rollback without executing")
+    parser.add_argument(
+        "--dialect",
+        choices=["mssql", "postgres"],
+        help="Explicitly specify target database dialect",
+    )
+    parser.add_argument(
+        "--status",
+        "-s",
+        action="store_true",
+        help="Display migration status table and exit",
+    )
+    parser.add_argument(
+        "--audit",
+        "-a",
+        action="store_true",
+        help="Audit database schema for drift, missing elements, and checksum tampering",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview migrations or rollback without executing",
+    )
     parser.add_argument(
         "--rollback",
         "-r",
@@ -353,6 +381,7 @@ def main():
 
     if args.audit:
         from scripts.verify_schema_drift import audit_schema_drift
+
         healthy = audit_schema_drift(dialect)
         sys.exit(0 if healthy else 1)
     elif args.status:
@@ -361,7 +390,6 @@ def main():
         run_rollback(dialect, db_url, steps=args.rollback, dry_run=args.dry_run)
     else:
         run_migrations(dialect, db_url, dry_run=args.dry_run)
-
 
 
 if __name__ == "__main__":

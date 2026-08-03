@@ -51,9 +51,7 @@ def test_vacancy_prefilter():
         },
     ]
 
-    filtered = VacancyPreFilter.filter_vacancies(
-        cv_text=cv_text, openings=vacancies, top_k=2
-    )
+    filtered = VacancyPreFilter.filter_vacancies(cv_text=cv_text, openings=vacancies, top_k=2)
 
     assert len(filtered) == 2
     top_titles = [j["title"] for j in filtered]
@@ -77,7 +75,6 @@ def test_pipeline_profiler():
 
 def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
-
 
     key1 = LLMCacheRepository.compute_composite_hash(
         document_hash="abc123",
@@ -156,6 +153,7 @@ def test_build_optimized_match_prompt():
 @pytest.mark.asyncio
 async def test_end_to_end_optimized_match_service(monkeypatch):
     from app.core.cache import match_result_cache_manager
+
     match_result_cache_manager.clear()
     monkeypatch.setattr(settings, "LLM_SKIP_COVERAGE_THRESHOLD", 1.1)
 
@@ -183,7 +181,9 @@ async def test_end_to_end_optimized_match_service(monkeypatch):
     )
 
     monkeypatch.setattr(
-        OllamaLLMService, "run_optimized_match", MagicMock(return_value=mock_llm_response)
+        OllamaLLMService,
+        "run_optimized_match",
+        MagicMock(return_value=mock_llm_response),
     )
 
     openings = [
@@ -206,4 +206,3 @@ async def test_end_to_end_optimized_match_service(monkeypatch):
     assert best.score >= 70.0
     assert best.classification == "HIGH"
     assert "React" in best.matched_skills
-

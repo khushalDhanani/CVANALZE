@@ -12,7 +12,6 @@ from app.services.processing_queue import (
     ProcessingQueueUnavailableError,
     run_processing_job_fallback,
 )
-from app.services.scoring_engine import ScoringEngine
 from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/cv", tags=["CV"])
@@ -25,7 +24,7 @@ def background_process_cv(job_id: str) -> None:
 @router.post("/upload", response_model=CVProcessingResponse)
 async def upload_cv(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),  # noqa: B008
+    file: UploadFile = File(...),
     candidate_id: str | None = Form(None),
     cv_id: str | None = Form(None),
 ):
@@ -91,6 +90,7 @@ async def match_cv_text(payload: CVMatchRequest):
 
     try:
         from app.services.match_service import MatchService
+
         return await MatchService.analyze_single_cv(payload.cv_text)
     except Exception as exc:
         logger.exception(f"Failed to analyze CV text: {exc}")

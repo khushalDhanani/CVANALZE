@@ -1,6 +1,8 @@
 # backend/tests/test_dynamic_taxonomy_service.py
-import pytest
-from app.services.dynamic_taxonomy_service import DynamicTaxonomyService, DynamicTaxonomyResult
+from app.services.dynamic_taxonomy_service import (
+    DynamicTaxonomyResult,
+    DynamicTaxonomyService,
+)
 
 
 def test_resolve_exact_or_fallback():

@@ -53,9 +53,7 @@ class VectorDatabaseMigrationService:
                 continue
 
             try:
-                new_emb = EmbeddingService.generate_embedding(
-                    markdown_text, model_version=model_version, identifier=cv_key
-                )
+                new_emb = EmbeddingService.generate_embedding(markdown_text, model_version=model_version, identifier=cv_key)
                 if new_emb:
                     save_candidate_embedding(cv_key, new_emb, cv_hash)
                     metrics["synced"] += 1
@@ -65,10 +63,7 @@ class VectorDatabaseMigrationService:
                 logger.warning(f"[VECTOR_SYNC] Failed embedding candidate '{cv_key}': {exc}")
                 metrics["failed"] += 1
 
-        logger.info(
-            f"[VECTOR_SYNC] Candidate embedding sync complete: {metrics['synced']} synced, "
-            f"{metrics['skipped']} skipped/unchanged, {metrics['failed']} failed."
-        )
+        logger.info(f"[VECTOR_SYNC] Candidate embedding sync complete: {metrics['synced']} synced, {metrics['skipped']} skipped/unchanged, {metrics['failed']} failed.")
         return metrics
 
     @classmethod
@@ -83,10 +78,7 @@ class VectorDatabaseMigrationService:
         total = len(jobs)
         sync_metrics = JobRepository._cache_vacancy_embeddings(jobs)
         if not isinstance(sync_metrics, dict):
-            logger.warning(
-                "[VECTOR_SYNC] Vacancy embedding helper returned no metrics; "
-                "using the legacy all-skipped compatibility result."
-            )
+            logger.warning("[VECTOR_SYNC] Vacancy embedding helper returned no metrics; using the legacy all-skipped compatibility result.")
             sync_metrics = {"total": total, "synced": 0, "skipped": total, "failed": 0}
 
         metrics = {
@@ -96,10 +88,7 @@ class VectorDatabaseMigrationService:
             "failed": max(0, int(sync_metrics.get("failed", 0))),
         }
 
-        logger.info(
-            f"[VECTOR_SYNC] Vacancy embedding sync complete: {metrics['synced']} newly embedded, "
-            f"{metrics['skipped']} cached/unchanged, {metrics['failed']} failed."
-        )
+        logger.info(f"[VECTOR_SYNC] Vacancy embedding sync complete: {metrics['synced']} newly embedded, {metrics['skipped']} cached/unchanged, {metrics['failed']} failed.")
         return metrics
 
     @classmethod
@@ -121,13 +110,9 @@ class VectorDatabaseMigrationService:
         """Run an acknowledged background sync without leaking failures into the ASGI response lifecycle."""
         try:
             result = cls.sync_all_embeddings()
-            logger.info(
-                f"[VECTOR_SYNC] Background synchronization finished with status='{result.get('status', 'unknown')}'."
-            )
+            logger.info(f"[VECTOR_SYNC] Background synchronization finished with status='{result.get('status', 'unknown')}'.")
         except Exception as exc:
-            logger.exception(
-                f"[VECTOR_SYNC] Background synchronization failed: {type(exc).__name__}"
-            )
+            logger.exception(f"[VECTOR_SYNC] Background synchronization failed: {type(exc).__name__}")
 
     @classmethod
     def get_migration_status(cls) -> dict[str, Any]:

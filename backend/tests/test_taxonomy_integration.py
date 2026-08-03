@@ -315,16 +315,10 @@ def test_mechanical_engineer_no_taxonomy_pruning_today():
         JobTaxonomy.DOMAIN_IT_SOFTWARE,
         JobTaxonomy.FAMILY_SOFTWARE_DEV,
     )
-    assert TaxonomyClassifier.classify_vacancy(VAC_DESKTOP)[1] == (
-        JobTaxonomy.FAMILY_IT_NETWORKING_AV
-    )
-    assert TaxonomyClassifier.classify_vacancy(VAC_NETWORK)[1] == (
-        JobTaxonomy.FAMILY_IT_NETWORKING_AV
-    )
+    assert TaxonomyClassifier.classify_vacancy(VAC_DESKTOP)[1] == (JobTaxonomy.FAMILY_IT_NETWORKING_AV)
+    assert TaxonomyClassifier.classify_vacancy(VAC_NETWORK)[1] == (JobTaxonomy.FAMILY_IT_NETWORKING_AV)
 
-    selected = VacancyPreFilter.filter_vacancies(
-        MECHANICAL_RESUME, ALL_OPENINGS, top_k=5
-    )
+    selected = VacancyPreFilter.filter_vacancies(MECHANICAL_RESUME, ALL_OPENINGS, top_k=5)
     selected_ids = [j.get("id") for j in selected]
 
     # The Mechanical/Electrical Plant Engineer vacancy ranks #1 on prefilter.
@@ -447,7 +441,10 @@ def test_taxonomy_classifier_roles_and_metrics():
     assert JobTaxonomy.FAMILY_IT_NETWORKING_AV in cand_class.compatible_families
 
     # 10. Unknown Jobs Default Handling
-    unknown_job = {"title": "Quantum Astrophysicist", "department": "Outer Space Exploration"}
+    unknown_job = {
+        "title": "Quantum Astrophysicist",
+        "department": "Outer Space Exploration",
+    }
     domain_un, family_un = TaxonomyClassifier.classify_vacancy(unknown_job)
     assert domain_un == JobTaxonomy.DOMAIN_OTHER
     assert family_un == JobTaxonomy.FAMILY_OTHER
@@ -461,4 +458,3 @@ def test_taxonomy_classifier_roles_and_metrics():
     metrics = TaxonomyClassifier.get_metrics()
     assert metrics["taxonomy_hits"] > 0
     assert "average_classification_time_ms" in metrics
-

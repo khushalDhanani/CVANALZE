@@ -86,7 +86,12 @@ def test_candidate_context_keeps_dates_authoritative_and_uses_llm_only_as_fallba
     )
     assert dated_context.candidate_experience == 1.9
 
-    undated_resume = {"contact_info": {}, "work_experience": [], "education": [], "skills": {"all_skills": []}}
+    undated_resume = {
+        "contact_info": {},
+        "work_experience": [],
+        "education": [],
+        "skills": {"all_skills": []},
+    }
     undated_normalized = ResumeNormalizer.normalize(undated_resume, "Ten years stated without dated roles")
     fallback_context = CandidateAnalysisContext.create(
         "Ten years stated without dated roles",
@@ -127,23 +132,32 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
 
     def evaluate(cls, **kwargs):
         scoring_calls.append(
-            (id(kwargs["context"]), id(kwargs["job"]), kwargs["context"].candidate_experience)
+            (
+                id(kwargs["context"]),
+                id(kwargs["job"]),
+                kwargs["context"].candidate_experience,
+            )
         )
-        return MatchService._empty_job_match().model_copy(
-            update={"job_id": kwargs["job"].job_id, "vacancy_id": kwargs["job"].job_id}
-        )
+        return MatchService._empty_job_match().model_copy(update={"job_id": kwargs["job"].job_id, "vacancy_id": kwargs["job"].job_id})
 
-    monkeypatch.setattr("app.services.match_service.ScoringEngine.evaluate_job_match", classmethod(evaluate))
-    monkeypatch.setattr("app.services.match_service.ConfigRepository.get_setting", lambda key, default=None: default)
-    llm_response = OptimizedLLMMatchResponse(
-        candidate_profile=OptimizedCandidateProfile(relevant_experience_years=12.0)
+    monkeypatch.setattr(
+        "app.services.match_service.ScoringEngine.evaluate_job_match",
+        classmethod(evaluate),
     )
+    monkeypatch.setattr(
+        "app.services.match_service.ConfigRepository.get_setting",
+        lambda key, default=None: default,
+    )
+    llm_response = OptimizedLLMMatchResponse(candidate_profile=OptimizedCandidateProfile(relevant_experience_years=12.0))
     monkeypatch.setattr(
         "app.services.match_service.OllamaLLMService.run_optimized_match",
         MagicMock(return_value=llm_response),
     )
     monkeypatch.setattr("app.services.match_service.match_result_cache_manager.get", lambda key: None)
-    monkeypatch.setattr("app.services.match_service.match_result_cache_manager.set", lambda key, value: None)
+    monkeypatch.setattr(
+        "app.services.match_service.match_result_cache_manager.set",
+        lambda key, value: None,
+    )
     monkeypatch.setattr(settings, "LLM_SKIP_COVERAGE_THRESHOLD", 2.0)
 
     result = await MatchService.analyze_single_cv(
@@ -166,7 +180,11 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
 async def test_match_service_does_not_reparse_supplied_resume(monkeypatch):
     resume_json = ResumeJsonExtractor.extract(_structured_resume_text())
     normalized = NormalizedResume.model_validate(resume_json["normalized"])
-    monkeypatch.setattr(ResumeJsonExtractor, "extract", MagicMock(side_effect=AssertionError("resume reparsed")))
+    monkeypatch.setattr(
+        ResumeJsonExtractor,
+        "extract",
+        MagicMock(side_effect=AssertionError("resume reparsed")),
+    )
 
     result = await MatchService.analyze_single_cv(
         _structured_resume_text(),

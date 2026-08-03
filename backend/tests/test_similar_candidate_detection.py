@@ -40,8 +40,16 @@ def test_detect_similar_candidates_above_threshold():
             "id": "cand_similar",
             "filename": "similar_cv.pdf",
             "markdown": "Senior Python Engineer (Updated version)",
-            "match_analysis": {"primary_department": "Engineering", "best_match": {"job_title": "Python Developer"}},
-            "resume_json": {"contact_info": {"name": "Similar Candidate", "email": "similar@example.com"}},
+            "match_analysis": {
+                "primary_department": "Engineering",
+                "best_match": {"job_title": "Python Developer"},
+            },
+            "resume_json": {
+                "contact_info": {
+                    "name": "Similar Candidate",
+                    "email": "similar@example.com",
+                }
+            },
         },
         {
             "id": "cand_different",
@@ -60,7 +68,10 @@ def test_detect_similar_candidates_above_threshold():
 
     result_by_id = {item["id"]: item for item in mock_results}
     with (
-        patch("app.repositories.result.ResultRepository.resolve_result", side_effect=result_by_id.get),
+        patch(
+            "app.repositories.result.ResultRepository.resolve_result",
+            side_effect=result_by_id.get,
+        ),
         patch.object(SimilarCandidateService, "_vector_search_pg", side_effect=mock_vector_pg),
     ):
         similar = SimilarCandidateService.detect_similar_candidates(
@@ -90,8 +101,15 @@ def test_duplicate_flag_identification():
 
     result_by_id = {item["id"]: item for item in mock_results}
     with (
-        patch("app.repositories.result.ResultRepository.resolve_result", side_effect=result_by_id.get),
-        patch.object(SimilarCandidateService, "_vector_search_pg", return_value={"cand_dup": 0.97}),
+        patch(
+            "app.repositories.result.ResultRepository.resolve_result",
+            side_effect=result_by_id.get,
+        ),
+        patch.object(
+            SimilarCandidateService,
+            "_vector_search_pg",
+            return_value={"cand_dup": 0.97},
+        ),
     ):
         similar = SimilarCandidateService.detect_similar_candidates(
             cv_key="cand_original",
@@ -116,7 +134,10 @@ def test_no_false_merges_records_preserved():
 
     result_by_id = {item["id"]: item for item in mock_results}
     with (
-        patch("app.repositories.result.ResultRepository.resolve_result", side_effect=result_by_id.get),
+        patch(
+            "app.repositories.result.ResultRepository.resolve_result",
+            side_effect=result_by_id.get,
+        ),
         patch.object(SimilarCandidateService, "_vector_search_pg", return_value={"cand_2": 0.92}),
     ):
         _ = SimilarCandidateService.detect_similar_candidates("cand_1", [0.1] * 768)
@@ -145,7 +166,10 @@ def test_candidate_360_similar_candidates_api():
         ],
     }
 
-    with patch("app.repositories.result.ResultRepository.read_result_by_filename", return_value=mock_result):
+    with patch(
+        "app.repositories.result.ResultRepository.read_result_by_filename",
+        return_value=mock_result,
+    ):
         resp = client.get("/api/candidates/cand_360")
         assert resp.status_code == 200
         data = resp.json()

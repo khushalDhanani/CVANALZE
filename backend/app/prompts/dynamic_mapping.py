@@ -3,25 +3,28 @@ from typing import Any
 
 PROMPT_VERSION = "2.0"
 
+
 def build_dynamic_mapping_prompt(cv_text: str, active_vacancies: list[dict[str, Any]]) -> str:
     """
-    Builds a strict JSON-only prompt for Qwen to dynamically map a CV against 
+    Builds a strict JSON-only prompt for Qwen to dynamically map a CV against
     a list of available active DB vacancies.
     """
-    
+
     simplified_vacancies = []
     for vac in active_vacancies:
-        simplified_vacancies.append({
-            "vacancy_id": vac.get("vacancy_id"),
-            "job_profile_id": vac.get("job_profile_id"),
-            "company_id": vac.get("company_id"),
-            "department_id": vac.get("department_id"),
-            "location_id": vac.get("location_id"),
-            "job_title": vac.get("title"),
-            "department": vac.get("department"),
-            "requirements": vac.get("required_skills", []),
-            "skills": vac.get("preferred_keywords", [])
-        })
+        simplified_vacancies.append(
+            {
+                "vacancy_id": vac.get("vacancy_id"),
+                "job_profile_id": vac.get("job_profile_id"),
+                "company_id": vac.get("company_id"),
+                "department_id": vac.get("department_id"),
+                "location_id": vac.get("location_id"),
+                "job_title": vac.get("title"),
+                "department": vac.get("department"),
+                "requirements": vac.get("required_skills", []),
+                "skills": vac.get("preferred_keywords", []),
+            }
+        )
 
     structured_input = {
         "task_instructions": (
@@ -63,5 +66,3 @@ Expected JSON Schema:
 }}
 """
     return prompt
-
-

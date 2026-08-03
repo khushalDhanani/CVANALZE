@@ -36,9 +36,7 @@ class DomainEmbeddingService:
         return dict(RuleConfigManager.get_domain_embedding_rules().canonical_equivalents)
 
     @classmethod
-    def get_or_generate_domain_embedding(
-        cls, term: str, category: str, allow_live_generation: bool = True
-    ) -> list[float] | None:
+    def get_or_generate_domain_embedding(cls, term: str, category: str, allow_live_generation: bool = True) -> list[float] | None:
         if not term or not term.strip():
             return None
 
@@ -71,7 +69,9 @@ class DomainEmbeddingService:
         # 2. Generate embedding via EmbeddingService if missing and live generation allowed
         try:
             emb = EmbeddingService.generate_embedding(
-                clean_term, model_version=model_version, identifier=f"domain:{cat}:{clean_term}"
+                clean_term,
+                model_version=model_version,
+                identifier=f"domain:{cat}:{clean_term}",
             )
             if emb and pg_SessionLocal is not None:
                 content_hash = hashlib.sha256(clean_term.encode("utf-8")).hexdigest()
@@ -111,26 +111,28 @@ class DomainEmbeddingService:
         canonical_map = cls.CANONICAL_EQUIVALENTS.get(cat, {})
         if clean_term in canonical_map:
             eq_term = canonical_map[clean_term]
-            equivalents.append({
-                "term": eq_term,
-                "similarity_score": 0.98,
-                "category": cat,
-                "source": "canonical_rules",
-            })
-
-        for alias, canon in canonical_map.items():
-            if canon == clean_term and alias != clean_term:
-                equivalents.append({
-                    "term": alias,
+            equivalents.append(
+                {
+                    "term": eq_term,
                     "similarity_score": 0.98,
                     "category": cat,
                     "source": "canonical_rules",
-                })
+                }
+            )
+
+        for alias, canon in canonical_map.items():
+            if canon == clean_term and alias != clean_term:
+                equivalents.append(
+                    {
+                        "term": alias,
+                        "similarity_score": 0.98,
+                        "category": cat,
+                        "source": "canonical_rules",
+                    }
+                )
 
         # 2. Vector distance query in PostgreSQL pgvector
-        target_emb = cls.get_or_generate_domain_embedding(
-            clean_term, cat, allow_live_generation=allow_live_generation
-        )
+        target_emb = cls.get_or_generate_domain_embedding(clean_term, cat, allow_live_generation=allow_live_generation)
         if target_emb:
             try:
                 from app.core.database import pg_SessionLocal
@@ -156,12 +158,14 @@ class DomainEmbeddingService:
                             dist = float(row.distance) if row.distance is not None else 1.0
                             sim = round(max(0.0, 1.0 - dist), 4)
                             if sim >= threshold and not any(e["term"] == other_term for e in equivalents):
-                                equivalents.append({
-                                    "term": other_term,
-                                    "similarity_score": sim,
-                                    "category": cat,
-                                    "source": "vector_similarity",
-                                })
+                                equivalents.append(
+                                    {
+                                        "term": other_term,
+                                        "similarity_score": sim,
+                                        "category": cat,
+                                        "source": "vector_similarity",
+                                    }
+                                )
             except Exception as exc:
                 logger.warning(f"[DOMAIN_EMBEDDING] Vector equivalent query failed: {exc}")
 
@@ -169,9 +173,7 @@ class DomainEmbeddingService:
         return equivalents[:limit]
 
     @classmethod
-    def expand_skills_with_semantic_equivalents(
-        cls, skills: list[str], threshold: float = 0.82
-    ) -> set[str]:
+    def expand_skills_with_semantic_equivalents(cls, skills: list[str], threshold: float = 0.82) -> set[str]:
         """
         Expands a list of skill strings into a set containing all original skills plus their semantic equivalents.
         """

@@ -58,4 +58,3 @@ class NormalizedResume(BaseModel):
     education: list[NormalizedEducation] = Field(default_factory=list)
     employment: list[NormalizedEmployment] = Field(default_factory=list)
     experience: NormalizedExperienceSummary = Field(default_factory=NormalizedExperienceSummary)
-

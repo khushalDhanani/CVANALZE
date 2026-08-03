@@ -52,6 +52,7 @@ class RepositoryMetrics:
             cls.total_jobs_loaded = job_count
             cls.last_version_hash = version
             from datetime import datetime
+
             cls.last_loaded_timestamp = datetime.now(UTC).isoformat()
 
     @classmethod
@@ -63,16 +64,8 @@ class RepositoryMetrics:
     @classmethod
     def get_metrics(cls) -> dict[str, Any]:
         with cls._lock:
-            avg_db_fetch_ms = (
-                round(cls.db_fetch_time_total_ms / cls.db_fetch_count, 2)
-                if cls.db_fetch_count > 0
-                else 0.0
-            )
-            avg_stale_ms = (
-                round(cls.staleness_check_time_total_ms / cls.staleness_check_count, 2)
-                if cls.staleness_check_count > 0
-                else 0.0
-            )
+            avg_db_fetch_ms = round(cls.db_fetch_time_total_ms / cls.db_fetch_count, 2) if cls.db_fetch_count > 0 else 0.0
+            avg_stale_ms = round(cls.staleness_check_time_total_ms / cls.staleness_check_count, 2) if cls.staleness_check_count > 0 else 0.0
             return {
                 "cache_hits": cls.cache_hits,
                 "cache_misses": cls.cache_misses,
@@ -107,10 +100,7 @@ class JobRepository:
 
     @classmethod
     def _compute_vacancy_hash(cls, job_dicts: list[dict[str, Any]]) -> str:
-        identity_pairs = sorted(
-            f"{j.get('vacancy_id') or j.get('id')}:{j.get('title', '')}"
-            for j in job_dicts
-        )
+        identity_pairs = sorted(f"{j.get('vacancy_id') or j.get('id')}:{j.get('title', '')}" for j in job_dicts)
         return hashlib.sha256(json.dumps(identity_pairs).encode()).hexdigest()
 
     @classmethod
@@ -155,7 +145,7 @@ class JobRepository:
             try:
                 db = SessionLocal()
                 close_session = True
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"Could not create DB session: {exc}")
                 db = None
 
@@ -170,38 +160,22 @@ class JobRepository:
                     # Delegate job preprocessing to JobPreprocessor
                     job_dicts = JobPreprocessor.preprocess_job_dicts(raw_dicts)
 
-                    unique_dept_ids = sorted(
-                        {
-                            j.get("department_id")
-                            for j in job_dicts
-                            if j.get("department_id") is not None
-                        }
-                    )
-                    logger.info(
-                        f"JobRepository.get_all_jobs: Active Vacancies: {len(job_dicts)} | "
-                        f"Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}"
-                    )
+                    unique_dept_ids = sorted({j.get("department_id") for j in job_dicts if j.get("department_id") is not None})
+                    logger.info(f"JobRepository.get_all_jobs: Active Vacancies: {len(job_dicts)} | Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}")
                     job_dicts_to_return = job_dicts
                 else:
-                    logger.warning(
-                        "JobRepository.get_all_jobs: 0 active vacancies returned from MSSQL DB. "
-                        "Falling back to default jobs."
-                    )
+                    logger.warning("JobRepository.get_all_jobs: 0 active vacancies returned from MSSQL DB. Falling back to default jobs.")
             except Exception as exc:
                 logger.error(f"JobRepository.get_all_jobs error querying DB: {exc}")
                 if settings.DB_NAME:
-                    raise RuntimeError(
-                        f"Failed to query active vacancies from configured MSSQL DB: {exc}"
-                    ) from exc
+                    raise RuntimeError(f"Failed to query active vacancies from configured MSSQL DB: {exc}") from exc
             finally:
                 if close_session:
                     db.close()
 
         if job_dicts_to_return is None:
             logger.warning("JobRepository.get_all_jobs: Using static DEFAULT_JOB_OPENINGS fallback.")
-            job_dicts_to_return = JobPreprocessor.preprocess_job_dicts(
-                [dict(j) for j in DEFAULT_JOB_OPENINGS]
-            )
+            job_dicts_to_return = JobPreprocessor.preprocess_job_dicts([dict(j) for j in DEFAULT_JOB_OPENINGS])
 
         version = cls._compute_vacancy_hash(job_dicts_to_return)
         vacancy_cache_manager.set(
@@ -248,7 +222,7 @@ class JobRepository:
             try:
                 db = SessionLocal()
                 close_session = True
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"JobRepository._is_stale: Failed resolving DB session: {exc}")
                 db = None
 
@@ -257,6 +231,7 @@ class JobRepository:
 
         try:
             from sqlalchemy import text
+
             query = text("""
                 SELECT VacancyRequestID, ISNULL(VacancyRequestTitle, '')
                 FROM RecruitVacancyRequest
@@ -278,26 +253,36 @@ class JobRepository:
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             RepositoryMetrics.record_staleness_check(elapsed_ms)
             return is_stale_result
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             try:
                 db.rollback()
                 from sqlalchemy import func, or_
 
                 from app.models.recruit import RecruitVacancyRequest
-                count = db.query(func.count(RecruitVacancyRequest.VacancyRequestID)).filter(
-                    RecruitVacancyRequest.VacancyRequestIsActive == True,
-                    or_(RecruitVacancyRequest.VacancyRequestIsDeleted == False,
-                        RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None)),
-                    or_(RecruitVacancyRequest.VacancyRequestClose == False,
-                        RecruitVacancyRequest.VacancyRequestClose.is_(None)),
-                ).scalar() or 0
+
+                count = (
+                    db.query(func.count(RecruitVacancyRequest.VacancyRequestID))
+                    .filter(
+                        RecruitVacancyRequest.VacancyRequestIsActive == True,
+                        or_(
+                            RecruitVacancyRequest.VacancyRequestIsDeleted == False,
+                            RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None),
+                        ),
+                        or_(
+                            RecruitVacancyRequest.VacancyRequestClose == False,
+                            RecruitVacancyRequest.VacancyRequestClose.is_(None),
+                        ),
+                    )
+                    .scalar()
+                    or 0
+                )
                 is_stale_result = (count != len(stored_jobs)) if count > 0 else False
                 cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
 
                 elapsed_ms = (time.perf_counter() - t0) * 1000.0
                 RepositoryMetrics.record_staleness_check(elapsed_ms)
                 return is_stale_result
-            except Exception as inner_exc:  # noqa: BLE001
+            except Exception as inner_exc:
                 logger.warning(f"Staleness check failed: {exc} | fallback: {inner_exc}")
                 cls._STALENESS_CACHE[stored_version] = (now, False)
                 return False
@@ -306,17 +291,10 @@ class JobRepository:
                 db.close()
 
     @classmethod
-    def get_job_by_id(
-        cls, job_id: str, db: Session | None = None
-    ) -> dict[str, Any] | None:
+    def get_job_by_id(cls, job_id: str, db: Session | None = None) -> dict[str, Any] | None:
         jobs = cls.get_all_jobs(db=db)
         return next(
-            (
-                job
-                for job in jobs
-                if str(job.get("id")) == str(job_id)
-                or str(job.get("vacancy_id")) == str(job_id)
-            ),
+            (job for job in jobs if str(job.get("id")) == str(job_id) or str(job.get("vacancy_id")) == str(job_id)),
             None,
         )
 
@@ -329,4 +307,5 @@ class JobRepository:
     def _cache_vacancy_embeddings(cls, jobs: list[dict[str, Any]]) -> dict[str, int]:
         """Compatibility wrapper returning batch vacancy-embedding sync metrics."""
         from app.services.embedding_sync_service import EmbeddingSyncService
+
         return EmbeddingSyncService.sync_vacancy_embeddings(jobs)

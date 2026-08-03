@@ -2,10 +2,11 @@ import asyncio
 import hashlib
 import threading
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Iterator
+from typing import Any
 
 from redis import Redis
 from rq import Queue, Retry
@@ -329,11 +330,7 @@ def process_cv_job(job_id: str) -> dict[str, Any]:
                 state,
                 progress=current.progress if will_retry else 100,
                 stage="retry_wait" if will_retry else "failed",
-                message=(
-                    f"Processing attempt {attempt} failed; waiting to retry."
-                    if will_retry
-                    else f"CV processing failed after {attempt} attempt(s)."
-                ),
+                message=(f"Processing attempt {attempt} failed; waiting to retry." if will_retry else f"CV processing failed after {attempt} attempt(s)."),
                 error=error,
             )
             if not will_retry:

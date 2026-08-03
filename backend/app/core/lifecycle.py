@@ -28,9 +28,7 @@ def initialize_database_schema() -> None:
     """Allow local initialization only; production schema changes require the migration CLI."""
     if settings.IS_PRODUCTION:
         if settings.INITIALIZE_DATABASE_ON_STARTUP or settings.AUTO_MIGRATE:
-            logger.warning(
-                "[STARTUP] Production schema initialization flags are ignored; run the migration CLI explicitly."
-            )
+            logger.warning("[STARTUP] Production schema initialization flags are ignored; run the migration CLI explicitly.")
         return
     if settings.INITIALIZE_DATABASE_ON_STARTUP:
         init_db()
@@ -40,9 +38,7 @@ def initialize_database_schema() -> None:
 
 def verify_runtime_security() -> None:
     if settings.AUTH_REQUIRED and not settings.RECRUITER_API_KEYS and not settings.ADMINISTRATOR_API_KEYS:
-        logger.error(
-            "[STARTUP] Authentication is required but no API keys are configured; protected endpoints will fail closed."
-        )
+        logger.error("[STARTUP] Authentication is required but no API keys are configured; protected endpoints will fail closed.")
     if any(origin.strip() == "*" for origin in settings.ALLOWED_ORIGINS):
         logger.warning("[STARTUP] Wildcard CORS origins are ignored; configure explicit trusted origins.")
 
@@ -56,15 +52,9 @@ def verify_redis() -> None:
             logger.info("[STARTUP] Active Redis instance verified successfully.")
             return
         except Exception as exc:
-            logger.warning(
-                f"[STARTUP] Redis ping failed ({type(exc).__name__}). "
-                "Operating with L1 memory and file caching fallback."
-            )
+            logger.warning(f"[STARTUP] Redis ping failed ({type(exc).__name__}). Operating with L1 memory and file caching fallback.")
             return
-    logger.warning(
-        "[STARTUP] Redis is not active or reachable. "
-        "Operating with L1 memory and file caching fallback."
-    )
+    logger.warning("[STARTUP] Redis is not active or reachable. Operating with L1 memory and file caching fallback.")
 
 
 def verify_ollama_models() -> None:
@@ -86,10 +76,7 @@ def verify_ollama_models() -> None:
             if any(model in available for available in models):
                 logger.info(f"[STARTUP] Ollama {purpose} model '{model}' verified successfully.")
             else:
-                logger.error(
-                    f"[STARTUP] Configured {purpose} model '{model}' is unavailable. "
-                    f"Run: ollama pull {model}"
-                )
+                logger.error(f"[STARTUP] Configured {purpose} model '{model}' is unavailable. Run: ollama pull {model}")
     except Exception as exc:
         logger.warning(f"[STARTUP] Could not verify Ollama status: {type(exc).__name__}")
 

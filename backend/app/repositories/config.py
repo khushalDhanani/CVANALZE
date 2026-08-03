@@ -14,9 +14,7 @@ class ConfigRepository:
     CACHE_TTL = 3600
 
     @classmethod
-    def get_setting(
-        cls, key: str, default: Any = None, db: Session | None = None
-    ) -> Any:
+    def get_setting(cls, key: str, default: Any = None, db: Session | None = None) -> Any:
         cached = config_cache_manager.get(key)
         if cached is not None:
             return cached
@@ -31,9 +29,7 @@ class ConfigRepository:
 
         if db is not None:
             try:
-                record = (
-                    db.query(SystemConfig).filter(SystemConfig.setting_key == key).first()
-                )
+                record = db.query(SystemConfig).filter(SystemConfig.setting_key == key).first()
                 if record:
                     val = json.loads(record.setting_value)
                 else:
@@ -68,9 +64,7 @@ class ConfigRepository:
 
         if db is not None:
             try:
-                record = (
-                    db.query(SystemConfig).filter(SystemConfig.setting_key == key).first()
-                )
+                record = db.query(SystemConfig).filter(SystemConfig.setting_key == key).first()
                 if record:
                     record.setting_value = val_str
                 else:

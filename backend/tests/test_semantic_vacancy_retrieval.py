@@ -19,16 +19,43 @@ def clear_caches():
 
 def test_stage1_semantic_retrieval_narrows_openings():
     openings = [
-        {"id": "vac_1", "vacancy_id": 1, "title": "Senior Python Backend Developer", "department": "Engineering", "required_skills": ["Python"]},
-        {"id": "vac_2", "vacancy_id": 2, "title": "React Frontend Developer", "department": "UI Team", "required_skills": ["React"]},
-        {"id": "vac_3", "vacancy_id": 3, "title": "DevOps Kubernetes Engineer", "department": "Infrastructure", "required_skills": ["Kubernetes"]},
-        {"id": "vac_4", "vacancy_id": 4, "title": "HR Talent Specialist", "department": "People", "required_skills": ["Recruiting"]},
+        {
+            "id": "vac_1",
+            "vacancy_id": 1,
+            "title": "Senior Python Backend Developer",
+            "department": "Engineering",
+            "required_skills": ["Python"],
+        },
+        {
+            "id": "vac_2",
+            "vacancy_id": 2,
+            "title": "React Frontend Developer",
+            "department": "UI Team",
+            "required_skills": ["React"],
+        },
+        {
+            "id": "vac_3",
+            "vacancy_id": 3,
+            "title": "DevOps Kubernetes Engineer",
+            "department": "Infrastructure",
+            "required_skills": ["Kubernetes"],
+        },
+        {
+            "id": "vac_4",
+            "vacancy_id": 4,
+            "title": "HR Talent Specialist",
+            "department": "People",
+            "required_skills": ["Recruiting"],
+        },
     ]
 
     mock_emb = [0.1] * 768
 
     vector_rows = (("1", 1, 0.1), ("2", 2, 0.2))
-    with patch("app.services.vacancy_prefilter.PgVectorQueryCache.query_pgvector_cached", return_value=vector_rows) as mock_stage1:
+    with patch(
+        "app.services.vacancy_prefilter.PgVectorQueryCache.query_pgvector_cached",
+        return_value=vector_rows,
+    ) as mock_stage1:
         selected = VacancyPreFilter.filter_vacancies(
             cv_text="Python and React developer with 5 years experience",
             openings=openings,
@@ -46,8 +73,20 @@ def test_stage1_semantic_retrieval_narrows_openings():
 
 def test_fallback_when_embedding_disabled():
     openings = [
-        {"id": "vac_1", "vacancy_id": 1, "title": "Python Developer", "department": "Engineering", "required_skills": ["Python"]},
-        {"id": "vac_2", "vacancy_id": 2, "title": "Java Developer", "department": "Engineering", "required_skills": ["Java"]},
+        {
+            "id": "vac_1",
+            "vacancy_id": 1,
+            "title": "Python Developer",
+            "department": "Engineering",
+            "required_skills": ["Python"],
+        },
+        {
+            "id": "vac_2",
+            "vacancy_id": 2,
+            "title": "Java Developer",
+            "department": "Engineering",
+            "required_skills": ["Java"],
+        },
     ]
 
     with (

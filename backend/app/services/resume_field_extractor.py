@@ -73,7 +73,15 @@ class ResumeFieldExtractor:
         )
         indices = list(range(min(10, len(text_lines))))
         if contact_index >= 0:
-            indices = list(range(max(0, contact_index - 5), min(len(text_lines), contact_index + 6))) + indices
+            indices = (
+                list(
+                    range(
+                        max(0, contact_index - 5),
+                        min(len(text_lines), contact_index + 6),
+                    )
+                )
+                + indices
+            )
 
         candidates: list[tuple[str, bool]] = []
         seen_indices: set[int] = set()
@@ -90,18 +98,43 @@ class ResumeFieldExtractor:
 
         for candidate, matches_email in candidates:
             if matches_email:
-                return candidate, scores.get("header_email_validated", 0.95), "HIGH", "header_email_validated"
+                return (
+                    candidate,
+                    scores.get("header_email_validated", 0.95),
+                    "HIGH",
+                    "header_email_validated",
+                )
         if candidates:
-            return candidates[0][0], scores.get("header_contact_section", 0.85), "HIGH", "header_contact_section"
+            return (
+                candidates[0][0],
+                scores.get("header_contact_section", 0.85),
+                "HIGH",
+                "header_contact_section",
+            )
 
         email_name = " ".join(token.capitalize() for token in email_tokens)
         if email_name and cls._is_valid_name(email_name, email, phone, location):
-            return email_name, scores.get("email_username_fallback", 0.30), "LOW", "email_username_fallback"
+            return (
+                email_name,
+                scores.get("email_username_fallback", 0.30),
+                "LOW",
+                "email_username_fallback",
+            )
 
         filename_name = cls._name_from_filename(filename)
         if filename_name and cls._is_valid_name(filename_name, email, phone, location):
-            return filename_name, scores.get("filename_fallback", 0.30), "LOW", "filename_fallback"
-        return "Unknown Candidate", scores.get("default_fallback", 0.0), "FALLBACK", "default"
+            return (
+                filename_name,
+                scores.get("filename_fallback", 0.30),
+                "LOW",
+                "filename_fallback",
+            )
+        return (
+            "Unknown Candidate",
+            scores.get("default_fallback", 0.0),
+            "FALLBACK",
+            "default",
+        )
 
     @classmethod
     def extract_location(
@@ -151,9 +184,7 @@ class ResumeFieldExtractor:
             return False
         if any(phrase in title_without_dates.lower() for phrase in cls.NARRATIVE_PHRASES):
             return False
-        return any(token.upper() in cls.JOB_TITLE_KEYWORDS for token in tokens) or any(
-            word[0].isupper() for word in title_without_dates.split() if word and word[0].isalpha()
-        )
+        return any(token.upper() in cls.JOB_TITLE_KEYWORDS for token in tokens) or any(word[0].isupper() for word in title_without_dates.split() if word and word[0].isalpha())
 
     @classmethod
     def is_valid_company_name(cls, candidate: str) -> bool:
@@ -176,13 +207,8 @@ class ResumeFieldExtractor:
         email = email_match.group(0) if email_match else None
         phone = phone_match.group(0).strip() if phone_match else None
         location, location_confidence = cls.extract_location(text_lines, email, phone)
-        name, name_confidence, confidence_level, name_source = cls.extract_candidate_name(
-            text_lines, email, phone, location, filename
-        )
-        logger.info(
-            f"[NAME_EXTRACTION] Extracted '{name}' "
-            f"(confidence={name_confidence:.2f}, level='{confidence_level}', source='{name_source}')"
-        )
+        name, name_confidence, confidence_level, name_source = cls.extract_candidate_name(text_lines, email, phone, location, filename)
+        logger.info(f"[NAME_EXTRACTION] Extracted '{name}' (confidence={name_confidence:.2f}, level='{confidence_level}', source='{name_source}')")
 
         sections = cls._split_sections(text_lines)
         result = {

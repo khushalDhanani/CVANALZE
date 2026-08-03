@@ -33,7 +33,11 @@ def test_job_evaluation_context_creation():
 def test_job_evaluation_context_from_jobs():
     jobs = [
         {"id": "j1", "title": "DevOps Engineer", "department_name": "CIS Team"},
-        {"id": "j2", "title": "Mechanical Technician", "department_name": "Maintenance Team"},
+        {
+            "id": "j2",
+            "title": "Mechanical Technician",
+            "department_name": "Maintenance Team",
+        },
     ]
     contexts = JobEvaluationContext.from_jobs(jobs)
 

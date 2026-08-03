@@ -38,20 +38,68 @@ async def test_full_hybrid_matching_pipeline_execution_sequence(monkeypatch):
     """
 
     openings = [
-        {"id": "vac_101", "vacancy_id": 101, "title": "Senior Python Backend Engineer", "department": "Engineering", "required_skills": ["Python", "FastAPI", "PostgreSQL", "Docker"], "min_experience_years": 5.0},
-        {"id": "vac_102", "vacancy_id": 102, "title": "DevOps Engineer", "department": "Infrastructure", "required_skills": ["Kubernetes", "Terraform", "AWS"], "min_experience_years": 4.0},
-        {"id": "vac_103", "vacancy_id": 103, "title": "Frontend Developer", "department": "UI", "required_skills": ["React", "CSS"], "min_experience_years": 2.0},
-        {"id": "vac_104", "vacancy_id": 104, "title": "Data Analyst", "department": "Analytics", "required_skills": ["Tableau", "Excel"], "min_experience_years": 1.0},
-        {"id": "vac_105", "vacancy_id": 105, "title": "QA Automation Engineer", "department": "Quality", "required_skills": ["Selenium", "Cypress"], "min_experience_years": 3.0},
-        {"id": "vac_106", "vacancy_id": 106, "title": "Product Manager", "department": "Product", "required_skills": ["Roadmapping", "Jira"], "min_experience_years": 5.0},
+        {
+            "id": "vac_101",
+            "vacancy_id": 101,
+            "title": "Senior Python Backend Engineer",
+            "department": "Engineering",
+            "required_skills": ["Python", "FastAPI", "PostgreSQL", "Docker"],
+            "min_experience_years": 5.0,
+        },
+        {
+            "id": "vac_102",
+            "vacancy_id": 102,
+            "title": "DevOps Engineer",
+            "department": "Infrastructure",
+            "required_skills": ["Kubernetes", "Terraform", "AWS"],
+            "min_experience_years": 4.0,
+        },
+        {
+            "id": "vac_103",
+            "vacancy_id": 103,
+            "title": "Frontend Developer",
+            "department": "UI",
+            "required_skills": ["React", "CSS"],
+            "min_experience_years": 2.0,
+        },
+        {
+            "id": "vac_104",
+            "vacancy_id": 104,
+            "title": "Data Analyst",
+            "department": "Analytics",
+            "required_skills": ["Tableau", "Excel"],
+            "min_experience_years": 1.0,
+        },
+        {
+            "id": "vac_105",
+            "vacancy_id": 105,
+            "title": "QA Automation Engineer",
+            "department": "Quality",
+            "required_skills": ["Selenium", "Cypress"],
+            "min_experience_years": 3.0,
+        },
+        {
+            "id": "vac_106",
+            "vacancy_id": 106,
+            "title": "Product Manager",
+            "department": "Product",
+            "required_skills": ["Roadmapping", "Jira"],
+            "min_experience_years": 5.0,
+        },
     ]
 
     mock_emb = [0.1] * 768
     monkeypatch.setattr(settings, "PREFILTER_TOP_K", 1)
 
-    with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb):
+    with patch(
+        "app.services.embedding_service.EmbeddingService.generate_embedding",
+        return_value=mock_emb,
+    ):
         vector_results = (("101", 1, 0.1), ("102", 2, 0.2))
-        with patch("app.services.vacancy_prefilter.PgVectorQueryCache.query_pgvector_cached", return_value=vector_results) as mock_stage1_vector:
+        with patch(
+            "app.services.vacancy_prefilter.PgVectorQueryCache.query_pgvector_cached",
+            return_value=vector_results,
+        ) as mock_stage1_vector:
             analysis = await MatchService.analyze_single_cv(
                 cv_text=cv_text,
                 job_openings=openings,

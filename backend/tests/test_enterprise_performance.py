@@ -33,8 +33,15 @@ async def test_async_batch_embedding_generation():
     Verifies async batch embedding generation with concurrent worker execution and multi-level caching.
     """
     mock_emb = [0.1] * 768
-    with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb):
-        texts = ["Python Backend Developer", "React Frontend Developer", "DevOps Engineer"]
+    with patch(
+        "app.services.embedding_service.EmbeddingService.generate_embedding",
+        return_value=mock_emb,
+    ):
+        texts = [
+            "Python Backend Developer",
+            "React Frontend Developer",
+            "DevOps Engineer",
+        ]
         results = await EnterprisePerformanceService.generate_embeddings_batch_async(texts, max_concurrent=3)
 
         assert len(results) == 3

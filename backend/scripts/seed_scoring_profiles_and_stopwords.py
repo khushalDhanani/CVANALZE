@@ -47,16 +47,18 @@ def seed_scoring_profiles_and_stopwords():
         default_profile = db.query(ScoringProfileMaster).filter(ScoringProfileMaster.profile_code == "DEFAULT").first()
         if not default_profile:
             logger.info("Seeding DEFAULT scoring profile...")
-            db.add(ScoringProfileMaster(
-                profile_code="DEFAULT",
-                profile_name="Default Enterprise Scoring Profile",
-                description="Default weights, multipliers, penalties, and thresholds.",
-                lexical_weights_json=json.dumps(lexical_dict),
-                penalties_json=json.dumps(penalties_dict),
-                thresholds_json=json.dumps(scoring_params_dict),
-                is_default=True,
-                is_active=True,
-            ))
+            db.add(
+                ScoringProfileMaster(
+                    profile_code="DEFAULT",
+                    profile_name="Default Enterprise Scoring Profile",
+                    description="Default weights, multipliers, penalties, and thresholds.",
+                    lexical_weights_json=json.dumps(lexical_dict),
+                    penalties_json=json.dumps(penalties_dict),
+                    thresholds_json=json.dumps(scoring_params_dict),
+                    is_default=True,
+                    is_active=True,
+                )
+            )
 
         db.commit()
         logger.info("Successfully seeded StopWords and ScoringProfiles into MSSQL!")

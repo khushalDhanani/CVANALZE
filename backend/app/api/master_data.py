@@ -33,5 +33,6 @@ async def get_skills():
 @router.post("/warm")
 async def warm_cache():
     from app.services.cache_warmer import warm_all
+
     counts = await run_in_threadpool(warm_all)
     return {"message": "Cache warmed", "counts": counts}

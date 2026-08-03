@@ -6,7 +6,6 @@ Audits live database tables, columns, and migration checksums against expected s
 
 import sys
 from pathlib import Path
-from typing import Any
 
 from sqlalchemy import create_engine, text
 
@@ -16,22 +15,63 @@ backend_dir = script_dir.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from app.core.config import settings
-from scripts.run_migrations import compute_checksum, detect_dialect, get_applied_migrations, get_migration_files
+from scripts.run_migrations import (
+    compute_checksum,
+    detect_dialect,
+    get_applied_migrations,
+    get_migration_files,
+)
 
 EXPECTED_CATALOG: dict[str, dict[str, list[str]]] = {
     "cvai": {
-        "cv_documents": ["id", "cv_hash", "filename", "content_type", "page_count", "is_scanned", "ocr_applied", "text", "structured_doc"],
-        "candidates": ["id", "cv_document_id", "raw_skills_json", "raw_education_json", "raw_experience_json", "raw_profile_json"],
-        "match_results": ["id", "candidate_id", "vacancy_id", "overall_score", "component_scores_json"],
-        "match_results_history": ["id", "match_result_id", "previous_score", "new_score"],
+        "cv_documents": [
+            "id",
+            "cv_hash",
+            "filename",
+            "content_type",
+            "page_count",
+            "is_scanned",
+            "ocr_applied",
+            "text",
+            "structured_doc",
+        ],
+        "candidates": [
+            "id",
+            "cv_document_id",
+            "raw_skills_json",
+            "raw_education_json",
+            "raw_experience_json",
+            "raw_profile_json",
+        ],
+        "match_results": [
+            "id",
+            "candidate_id",
+            "vacancy_id",
+            "overall_score",
+            "component_scores_json",
+        ],
+        "match_results_history": [
+            "id",
+            "match_result_id",
+            "previous_score",
+            "new_score",
+        ],
         "domains": ["domain_id", "domain_code", "domain_name", "is_active"],
         "job_families": ["family_id", "domain_id", "family_code", "family_name"],
-        "designations": ["designation_id", "family_id", "designation_code", "designation_name"],
+        "designations": [
+            "designation_id",
+            "family_id",
+            "designation_code",
+            "designation_name",
+        ],
         "designation_synonyms": ["synonym_id", "designation_id", "synonym_text"],
         "skills": ["skill_id", "skill_name"],
         "designation_skills": ["designation_id", "skill_id"],
-        "family_compatibilities": ["source_family_id", "target_family_id", "compatibility_score"],
+        "family_compatibilities": [
+            "source_family_id",
+            "target_family_id",
+            "compatibility_score",
+        ],
         "geo_locations": ["location_id", "city_name"],
         "section_headings": ["heading_id", "heading_text"],
         "name_denylists": ["denylist_id", "word"],
@@ -40,7 +80,14 @@ EXPECTED_CATALOG: dict[str, dict[str, list[str]]] = {
         "schema_migrations": ["migration_name"],
     },
     "default": {
-        "DepartmentDomainMaster": ["Id", "DomainName", "Keywords", "DefaultRoles", "Priority", "IsActive"],
+        "DepartmentDomainMaster": [
+            "Id",
+            "DomainName",
+            "Keywords",
+            "DefaultRoles",
+            "Priority",
+            "IsActive",
+        ],
     },
 }
 
@@ -90,26 +137,20 @@ def audit_schema_drift(dialect: str | None = None) -> bool:
 
         # 2. Audit Expected Tables & Columns
         print("\n🔍 Phase 1: Checking Table & Column Structure...")
-        all_schemas_in_db = set(db_tables_by_schema.keys())
-
         for exp_schema, expected_tables in EXPECTED_CATALOG.items():
             for table_name, expected_cols in expected_tables.items():
                 table_found = False
-                found_actual_schema = None
-
                 if exp_schema == "default":
                     # Check in dbo or public or root
                     for candidate_schema in ["dbo", "public", "cvai"]:
                         if candidate_schema in db_tables_by_schema:
                             if table_name in db_tables_by_schema[candidate_schema] or table_name.lower() in db_tables_by_schema[candidate_schema]:
                                 table_found = True
-                                found_actual_schema = candidate_schema
                                 break
                 else:
                     if exp_schema in db_tables_by_schema:
                         if table_name in db_tables_by_schema[exp_schema] or table_name.lower() in db_tables_by_schema[exp_schema]:
                             table_found = True
-                            found_actual_schema = exp_schema
 
                 if not table_found:
                     issue = f"MISSING TABLE: Table '{exp_schema}.{table_name}' was not found in database."

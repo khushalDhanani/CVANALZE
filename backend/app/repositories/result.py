@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from app.core.cache import CacheIndex, _REDIS_CLIENT, cv_result_cache_manager
+from app.core.cache import _REDIS_CLIENT, CacheIndex, cv_result_cache_manager
 from app.core.config import settings
 from app.core.cv_identity import CVIdentity, CVIdentityCollisionError
 from app.core.logging import logger
@@ -101,9 +101,7 @@ class ResultRepository:
             if existing.get("cv_hash") == content_hash or allow_legacy_content_change:
                 return
 
-        raise CVIdentityCollisionError(
-            f"CV identity collision for '{identity.canonical_key}'. Supply distinct candidate_id/cv_id values or reprocess the existing record."
-        )
+        raise CVIdentityCollisionError(f"CV identity collision for '{identity.canonical_key}'. Supply distinct candidate_id/cv_id values or reprocess the existing record.")
 
     @staticmethod
     def _optional_str(value: Any) -> str | None:

@@ -31,18 +31,22 @@ def test_candidate_search_context_creation():
 
 
 def test_reciprocal_rank_fusion_service():
-    job1 = JobEvaluationContext.create({
-        "id": "job-1",
-        "title": "Backend Developer",
-        "department": "Engineering",
-        "required_skills": ["Python", "FastAPI"],
-    })
-    job2 = JobEvaluationContext.create({
-        "id": "job-2",
-        "title": "Frontend Developer",
-        "department": "Engineering",
-        "required_skills": ["React", "TypeScript"],
-    })
+    job1 = JobEvaluationContext.create(
+        {
+            "id": "job-1",
+            "title": "Backend Developer",
+            "department": "Engineering",
+            "required_skills": ["Python", "FastAPI"],
+        }
+    )
+    job2 = JobEvaluationContext.create(
+        {
+            "id": "job-2",
+            "title": "Frontend Developer",
+            "department": "Engineering",
+            "required_skills": ["React", "TypeScript"],
+        }
+    )
 
     lex_ranks = {"job-1": 1, "job-2": 2}
     vec_ranks = {"job-1": 2, "job-2": 1}

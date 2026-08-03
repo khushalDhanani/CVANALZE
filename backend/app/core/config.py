@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    
+
     PROJECT_NAME: str = "CV Analyzer"
     VERSION: str = "0.1.0"
     ALLOWED_ORIGINS: list[str] = ["http://localhost:8081"]
@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     PREFILTER_TOP_K: int = 5
     OPTIMIZED_PROMPT_VERSION: str = "3.5"
     MAX_CONCURRENT_LLM_WORKERS: int = 2
-    
+
     # LLM Bypass Configuration
     LLM_SKIP_MARGIN_THRESHOLD: float = 15.0
     LLM_SKIP_COVERAGE_THRESHOLD: float = 0.50
@@ -128,7 +128,11 @@ class Settings(BaseSettings):
     MAX_RECOMMENDED_CERTS: int = 4
     MAX_MISSING_QUALS: int = 3
     MAX_CAREER_TRANSITIONS: int = 3
-    EXPERIENCE_BANDS: dict[str, float] = {"Senior": 5.0, "Mid-Level": 2.0, "Junior": 0.0}
+    EXPERIENCE_BANDS: dict[str, float] = {
+        "Senior": 5.0,
+        "Mid-Level": 2.0,
+        "Junior": 0.0,
+    }
 
     # Training Data Configuration
     TRAINING_DATA_DIR: Path = Path("uploads/training_data")
@@ -141,7 +145,7 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = ""
     DB_ENCRYPT: bool = True
     DB_TRUST_CERT: bool = True
-    
+
     # Database Configuration (Postgres)
     PG_DB_URL: str = "postgresql://postgres:postgres@localhost:5432/cv_analyzer"
 
@@ -158,11 +162,7 @@ class Settings(BaseSettings):
 
     @property
     def TRUSTED_ORIGINS(self) -> list[str]:
-        return [
-            origin.strip().rstrip("/")
-            for origin in self.ALLOWED_ORIGINS
-            if origin.strip() and origin.strip() != "*"
-        ]
+        return [origin.strip().rstrip("/") for origin in self.ALLOWED_ORIGINS if origin.strip() and origin.strip() != "*"]
 
     @property
     def DB_URL(self) -> str:
@@ -170,9 +170,11 @@ class Settings(BaseSettings):
             return ""
         # Using pyodbc and mssql+pyodbc dialect with ODBC Driver 18
         import urllib.parse
+
         encoded_password = urllib.parse.quote_plus(self.DB_PASSWORD)
         enc = "yes" if self.DB_ENCRYPT else "no"
         trust = "yes" if self.DB_TRUST_CERT else "no"
         return f"mssql+pyodbc://{self.DB_USER}:{encoded_password}@{self.DB_SERVER}:{self.DB_PORT}/{self.DB_NAME}?driver=ODBC+Driver+18+for+SQL+Server&Encrypt={enc}&TrustServerCertificate={trust}"
+
 
 settings = Settings()

@@ -1,4 +1,3 @@
-
 from sqlalchemy import select
 
 from app.core.config import settings
@@ -66,9 +65,7 @@ class CandidateSearchService:
         if request.query and request.query.strip() and settings.EMBEDDING_ENABLED:
             query_str = request.query.strip()
             try:
-                query_embedding = EmbeddingService.generate_embedding(
-                    query_str, model_version=settings.EMBEDDING_MODEL
-                )
+                query_embedding = EmbeddingService.generate_embedding(query_str, model_version=settings.EMBEDDING_MODEL)
                 if query_embedding:
                     search_mode = "semantic"
                     vector_scores = cls._vector_search_pg(query_embedding, top_k=200)
@@ -90,13 +87,7 @@ class CandidateSearchService:
 
             resume_json = r.get("resume_json") or {}
             contact_info = resume_json.get("contact_info") or {}
-            extracted_name = (
-                r.get("full_name")
-                or r.get("candidate_name")
-                or contact_info.get("name")
-                or contact_info.get("full_name")
-                or match_analysis.get("full_name")
-            )
+            extracted_name = r.get("full_name") or r.get("candidate_name") or contact_info.get("name") or contact_info.get("full_name") or match_analysis.get("full_name")
             email = r.get("email") or contact_info.get("email")
             phone = r.get("phone") or contact_info.get("phone")
 
@@ -112,14 +103,18 @@ class CandidateSearchService:
                     # Fallback lookup from cache/DB or on-the-fly similarity
                     cand_emb = get_candidate_embedding(cv_key)
                     if cand_emb is not None:
-                        sim_score = round(EmbeddingService.cosine_similarity(query_embedding, cand_emb), 4)
+                        sim_score = round(
+                            EmbeddingService.cosine_similarity(query_embedding, cand_emb),
+                            4,
+                        )
                     elif markdown_text:
                         # Generate candidate embedding dynamically
-                        gen_emb = EmbeddingService.generate_embedding(
-                            markdown_text[:3000], identifier=cv_key
-                        )
+                        gen_emb = EmbeddingService.generate_embedding(markdown_text[:3000], identifier=cv_key)
                         if gen_emb:
-                            sim_score = round(EmbeddingService.cosine_similarity(query_embedding, gen_emb), 4)
+                            sim_score = round(
+                                EmbeddingService.cosine_similarity(query_embedding, gen_emb),
+                                4,
+                            )
 
             # Keyword Search Filter (if search_mode == "keyword" and query is provided)
             if search_mode == "keyword" and request.query and request.query.strip():
@@ -136,12 +131,7 @@ class CandidateSearchService:
             # Department Filter
             if request.department:
                 dept_req = request.department.strip().lower()
-                cand_dept = str(
-                    match_analysis.get("primary_department")
-                    or best_match.get("department")
-                    or best_match.get("department_name")
-                    or ""
-                ).lower()
+                cand_dept = str(match_analysis.get("primary_department") or best_match.get("department") or best_match.get("department_name") or "").lower()
                 if dept_req not in cand_dept and cand_dept not in dept_req:
                     continue
 
@@ -173,14 +163,7 @@ class CandidateSearchService:
 
             # Required Skills Filter
             if request.skills:
-                cand_skills = [
-                    s.lower()
-                    for s in (
-                        best_match.get("matched_skills", [])
-                        + resume_json.get("skills", [])
-                    )
-                    if isinstance(s, str)
-                ]
+                cand_skills = [s.lower() for s in (best_match.get("matched_skills", []) + resume_json.get("skills", [])) if isinstance(s, str)]
                 missing_any_skill = False
                 for req_s in request.skills:
                     s_lower = req_s.strip().lower()
@@ -210,10 +193,29 @@ class CandidateSearchService:
             raw_fc = r.get("field_confidence") or contact_info.get("field_confidence") or {}
             raw_fct = r.get("field_confidence_tiers") or contact_info.get("field_confidence_tiers") or {}
 
-            name_tier = r.get("name_confidence_tier") or raw_fct.get("name") or contact_info.get("name_confidence_level") or RuleConfigManager.get_confidence_tier("name", r.get("name_confidence") or raw_fc.get("name"))
+            name_tier = (
+                r.get("name_confidence_tier")
+                or raw_fct.get("name")
+                or contact_info.get("name_confidence_level")
+                or RuleConfigManager.get_confidence_tier("name", r.get("name_confidence") or raw_fc.get("name"))
+            )
             loc_tier = r.get("location_confidence_tier") or raw_fct.get("location") or RuleConfigManager.get_confidence_tier("location", r.get("location_confidence") or raw_fc.get("location"))
-            title_tier = r.get("job_title_confidence_tier") or raw_fct.get("job_title") or RuleConfigManager.get_confidence_tier("job_title", r.get("job_title_confidence") or raw_fc.get("job_title"))
-            comp_tier = r.get("company_name_confidence_tier") or raw_fct.get("company_name") or RuleConfigManager.get_confidence_tier("company_name", r.get("company_name_confidence") or raw_fc.get("company_name"))
+            title_tier = (
+                r.get("job_title_confidence_tier")
+                or raw_fct.get("job_title")
+                or RuleConfigManager.get_confidence_tier(
+                    "job_title",
+                    r.get("job_title_confidence") or raw_fc.get("job_title"),
+                )
+            )
+            comp_tier = (
+                r.get("company_name_confidence_tier")
+                or raw_fct.get("company_name")
+                or RuleConfigManager.get_confidence_tier(
+                    "company_name",
+                    r.get("company_name_confidence") or raw_fc.get("company_name"),
+                )
+            )
 
             fct = {
                 "name": name_tier if extracted_name and extracted_name.lower() != "unknown candidate" else "LOW",
@@ -251,7 +253,8 @@ class CandidateSearchService:
                         "score": best_match.get("score") or best_match.get("overall_score"),
                         "classification": best_match.get("classification"),
                         "recommendation": best_match.get("recommendation"),
-                        "domain_mismatch_capped": best_match.get("domain_mismatch_capped") or any(
+                        "domain_mismatch_capped": best_match.get("domain_mismatch_capped")
+                        or any(
                             (f.get("requirement_id") == "req_domain_mismatch" if isinstance(f, dict) else False)
                             for f in (best_match.get("mandatory_failures") or best_match.get("mandatory_fails") or [])
                         ),

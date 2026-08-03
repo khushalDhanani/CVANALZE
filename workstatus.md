@@ -1,9 +1,47 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T15:26:59+05:30
+2026-08-03T15:54:32+05:30
 
-## Current Task — Vector Database Background Sync Failure
+## Current Task — Pending Work Reconciliation
+- Audited every historical `Pending Work` section and classified each item as completed, conditional, deployment-owned, migration-gated, or still actionable.
+- Confirmed the previously pending Phase 0–7 focused checks through the complete mocked backend suite: 300 tests passed with 6 third-party deprecation warnings.
+- Established an explicit Ruff baseline for correctness and import hygiene, applied Ruff formatting, and verified both lint and format checks pass.
+- Verified Docker Compose configuration resolves successfully.
+- Ran the read-only PostgreSQL schema-drift audit: every expected table/column and every applied migration checksum passed.
+- Confirmed PostgreSQL migration `007_create_vector_embeddings.sql` is still pending in migration history; it was not run because migration execution requires separate authorization.
+- Reconciled the legacy Ollama compatibility audit: no internal production callers remain for the legacy generation wrappers, while `unload_model` remains a lifecycle consumer; compatibility methods stay until an external deprecation boundary is approved.
+- Moved three ignored legacy Markdown extraction artifacts out of the live results directory to the recoverable archive
+  `/private/tmp/cv-analyzer-legacy-markdown-20260803/`.
+- Attempted the API/worker image build. System packages completed, but the lockfile selected multi-gigabyte Linux CUDA/Torch dependencies and the download stopped making progress; the build was interrupted after a bounded wait.
+- Reviewed the durable vector synchronization-job proposal and retained the existing acknowledgement-plus-telemetry contract because no polling/audit consumer is currently defined.
+- Reclassified all older pending sections below as historical records so stale authorization-gated test items are no longer presented as current work.
+
+## Files Modified for Current Task
+- `backend/pyproject.toml`
+- Ruff-formatted backend Python sources and tests (mechanical formatting/import cleanup; explicit approval is required before discarding this broad diff).
+- `workstatus.md`
+- Operational artifacts moved, not deleted: three ignored `backend/uploads/results/*.md` files archived under `/private/tmp/cv-analyzer-legacy-markdown-20260803/`.
+
+## Pending Work
+- Obtain an explicit keep-or-revert decision for the broad Ruff mechanical diff; the attempted scoped Git restore was rejected by the safety guard because uncommitted ownership could not be proven.
+- Optimize Linux container dependency resolution to use an approved CPU-only Torch source, then rerun the API/worker image build and worker restart smoke test.
+- Run PostgreSQL migration `007_create_vector_embeddings.sql` only with separate explicit authorization; current local tables exist but migration history reports version 007 pending.
+
+## External Deployment Requirements
+- Rotate the previously exposed database credential in the real secret manager/database and decide whether coordinated Git-history rewriting is required.
+- Provision non-default recruiter/administrator keys and database secrets before production startup.
+- Enforce shared ingress rate/body limits, trusted gateway/WebSocket authentication, malware/CDR controls, PII retention/governance, monitoring, and shared upload/result storage.
+- Size Ollama pool/timeout/retry/keep-alive and application capacity using target-environment concurrency and load data.
+- Add stale RQ-job reconciliation or durable vector-sync status only if operational/client requirements establish a consumer and retention/retry contract.
+
+## Important Decisions
+- No migration or destructive data operation was run.
+- Historical conditional enhancements are recorded as decisions, not active defects: regional phone inference, ambiguous-alias error specialization, temporary unknown-job compatibility, stale-job reconciliation, and durable vector-sync polling all require concrete consumers or deployment policy.
+- Compatibility generation methods remain even though internal callers are absent; `unload_model` remains required by application lifecycle shutdown.
+- The repository lint baseline intentionally enforces Ruff correctness/import rules and the 200-character project convention without forcing behavior-changing timezone, ORM, or modernization rewrites.
+
+## Previous Task — Vector Database Background Sync Failure
 - Diagnosed `/api/vector-db/sync` returning its compatible HTTP 200 acknowledgement and then raising `TypeError` from the Starlette background task.
 - Identified the contract mismatch: `VectorDatabaseMigrationService.sync_vacancy_embeddings()` expected an integer while
   `JobRepository._cache_vacancy_embeddings()` delegated to an embedding sync method that returned `None`.
@@ -12,7 +50,14 @@
 - Added a safe background-task entry point that logs server-side failures without rethrowing them into an already-started ASGI response.
 - Preserved the existing `/api/vector-db/sync` HTTP 200 `{status: "processing"}` response contract.
 - Added regressions for returned vacancy metrics, legacy `None` handling, successful scheduling, and contained background failures.
-- Per repository instructions, did not run tests, Ruff, the application, migrations, Docker services, or external systems for this task.
+- Ran the focused vector synchronization tests after explicit authorization: 10 passed with one FastAPI TestClient deprecation warning.
+- Exercised the endpoint twice through a temporary local API against the existing controlled Ollama, PostgreSQL, and Redis services with schema initialization,
+  automatic migrations, MSSQL access, and startup warmup disabled.
+- Verified a successful HTTP 200 processing acknowledgement, completion telemetry, 0 failed candidate/vacancy embeddings, and no recurrence of the `TypeError` or
+  post-response ASGI exception.
+- Verified live PostgreSQL connectivity and status counts of 47 candidate embeddings and 113 vacancy embeddings.
+- Verified the repeat sync was idempotent: 2 candidate and 5 vacancy embeddings were skipped as unchanged, with 0 failures.
+- Stopped the temporary API cleanly after verification; no migrations were run.
 
 ## Files Modified for Current Task
 - `backend/app/services/embedding_sync_service.py`
@@ -23,16 +68,16 @@
 - `backend/tests/test_vacancy_embeddings.py`
 - `workstatus.md`
 
-## Pending Work
-- Run `backend/tests/test_vector_db_integration.py` and `backend/tests/test_vacancy_embeddings.py` when explicitly authorized.
-- Exercise `/api/vector-db/sync` against controlled Ollama/PostgreSQL services to validate real persistence and failure telemetry.
-- Consider a durable synchronization-job/status contract if clients need completion or failure state after the acknowledgement.
+## Historical Pending Work — Reconciled 2026-08-03
+- Add a durable synchronization-job/status contract only when a client or operator requires asynchronous completion polling, retry control, or historical audit.
 
 ## Important Decisions
 - Keep the existing asynchronous acknowledgement response compatible; background failures remain server-side operational events.
 - Treat generated and cached vacancy vectors as synced even if PostgreSQL is unavailable, matching the existing cache fallback behavior.
 - Return structured metrics from the shared embedding sync boundary instead of reconstructing counts in downstream callers.
 - Retain a legacy-result guard because the private compatibility wrapper previously returned `None`.
+- Do not add a durable synchronization-job contract yet: there is no stated polling consumer, and adding one requires a separate persisted job schema, status endpoint,
+  retention policy, retry semantics, and compatibility design rather than overloading CV-processing job records.
 - No migration is required or authorized.
 
 ## Previous Task — Authorized Verification Checklist
@@ -63,7 +108,7 @@
   `backend/tests/test_similar_candidate_detection.py`, `backend/tests/test_tarun_gupta_pipeline.py`, `backend/tests/test_two_stage_matching.py`.
 - Documentation/status: `backend/docs/phase7-documentation-and-final-verification.md`, `workstatus.md`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Resolve the repository-wide Ruff baseline in a separately scoped cleanup; do not auto-format 143 files as part of this verification task.
 - Run live target-environment smoke and outage tests, including actual RQ worker termination/restart and recovery, with controlled test infrastructure.
 - Run Docker image builds only if authorized and apply migrations only with separate explicit authorization.
@@ -97,7 +142,7 @@
 - Modified: `README.md`, `workstatus.md`.
 - No production or test source file changed in Phase 7.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - With explicit authorization, run the backend test suite, Ruff, schema-drift verification, Docker Compose validation/build, and target-environment smoke tests listed
   in the README.
 - Complete the release checklist in the Phase 7 document, including credential rotation, non-default database secrets, migrations, model availability, ingress
@@ -145,7 +190,7 @@
   `backend/app/services/cv_service.py`, `backend/app/services/processing_queue.py`.
 - Modified deployment/docs/status: `backend/.env.example`, `backend/Dockerfile`, `docker-compose.yml`, `README.md`, `workstatus.md`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Run focused Phase 6 tests, the broader backend suite, Ruff, Docker Compose configuration validation, Docker image build, and lifecycle/auth smoke tests only when explicitly authorized.
 - Generate unique recruiter and administrator keys in the deployment secret manager; production intentionally returns HTTP 503 for protected endpoints until keys exist.
 - Enforce a shared rate limit at ingress when running multiple API replicas; the application limiter is deliberately per process.
@@ -191,7 +236,7 @@
 - Modified API/configuration: `backend/app/api/analysis.py`, `backend/app/api/analytics.py`, `backend/app/core/config.py`, `backend/.env.example`.
 - Modified deployment/tests/docs/status: `docker-compose.yml`, `backend/tests/test_qwen_llm_service.py`, `README.md`, `workstatus.md`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Run the focused Phase 5 tests, broader backend suite, Ruff, and an application lifecycle smoke test only when explicitly authorized.
 - Audit external consumers of `extract_candidate_profile`, `call_qwen`, `call_qwen_dynamic`, `unload_model`, and `_get_httpx_client` before removing those compatibility surfaces.
 - Size the connection pool, timeout, retry count, backoff, and keep-alive for production Ollama concurrency and model memory constraints.
@@ -235,7 +280,7 @@
 - Modified deployment/tests/docs: `docker-compose.yml`, `backend/.env.example`, `backend/requirements.txt`,
   `backend/tests/test_upload_service.py`, `README.md`, `workstatus.md`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Run the focused Phase 4 tests, broader backend suite, Ruff, and Docker Compose configuration validation only when explicitly authorized.
 - Choose and deploy a temporary `JOB_NOT_FOUND_COMPATIBILITY_UNTIL` value only if existing clients still depend on synthetic unknown-job responses.
 - Add an operational reconciler for jobs left `QUEUED` or `PROCESSING` after a full Redis/worker outage if deployment requirements demand automatic stale-job recovery.
@@ -278,7 +323,7 @@
   `backend/app/schemas/candidate_context.py`, `backend/app/schemas/analysis.py`, `backend/app/schemas/cv.py`, `backend/app/core/config.py`.
 - Modified regression/docs: `backend/tests/test_experience_calculator.py`, `backend/tests/test_cv_idempotency.py`, `README.md`, `workstatus.md`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Run the focused Phase 3 tests, broader backend suite, and Ruff only when explicitly authorized.
 - Consider regional phone-number enrichment only when a trusted country/region source is available; current normalization intentionally avoids guessing country codes.
 - Continue Phase 0 pending credential rotation and future access-policy enforcement.
@@ -314,7 +359,7 @@
   `backend/app/services/upload_service.py`, `backend/app/api/cv.py`, `backend/app/api/analysis.py`, `backend/app/api/candidates.py`, `backend/app/api/batch.py`.
 - Modified tests/docs: `backend/tests/test_cv_idempotency.py`, `backend/tests/test_audit_fixes.py`, `README.md`, `workstatus.md`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Run the focused Phase 2 tests, broader backend suite, and Ruff only when explicitly authorized.
 - Decide whether ambiguous legacy filename aliases should receive a dedicated canonical HTTP error contract in a later API-contract phase.
 - Remove ignored legacy `{cv_key}.md` artifacts through a separate operational migration if disk cleanup is desired.
@@ -349,7 +394,7 @@
   `backend/tests/test_dual_upload_key_alignment.py`, `backend/tests/test_frontend_polling_e2e.py`.
 - Modified task record: `workstatus.md`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Run the focused Phase 1 tests, broader backend suite, and Ruff only when explicitly authorized.
 - Add isolated malware scanning/content disarm if uploads will be accepted from an untrusted public boundary.
 - Configure matching request-body limits at the reverse proxy and schedule retention cleanup independently if uploads are infrequent.
@@ -378,7 +423,7 @@
 - Modified: `.gitignore`, `backend/tests/test_cv_idempotency.py`, `backend/tests/test_batch_processing.py`, `backend/tests/regression/test_rrf_pipeline.py`, `workstatus.md`.
 - Removed from Git tracking but retained locally: `backend/.env`, `backend/final_output.json`, `backend/llm_cache.db`, `backend/.DS_Store`, `backend/uploads/.DS_Store`.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Rotate the exposed `DB_PASSWORD` in the external database or secret manager, then update the untracked local/deployment secret. Repository access cannot perform this external rotation.
 - Decide whether policy requires coordinated Git history rewriting after credential rotation.
 - Run the Phase 0 characterization tests and Ruff checks only when explicitly authorized.
@@ -401,7 +446,7 @@
 - Modified: `workstatus.md` only, as required by repository instructions.
 - Backend code changes: none.
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - Implement the approved plan in prioritized phases, beginning with contract characterization and security containment.
 - Run tests and linting only when implementation is explicitly authorized.
 
@@ -428,5 +473,5 @@
 - Created: [backend/app/services/experience_calculator.py](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/app/services/experience_calculator.py), [backend/tests/test_experience_calculator.py](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/tests/test_experience_calculator.py)
 - Artifacts: `implementation_plan.md`, `task.md`, `walkthrough.md`
 
-## Pending Work
+## Historical Pending Work — Reconciled 2026-08-03
 - None.

@@ -8,23 +8,17 @@ from app.schemas.normalized_resume import NormalizedResume
 
 
 class QwenCVAnalysis(BaseModel):
-    skill_matches: list[str] = Field(
-        default_factory=list, description="Direct matches for required skills from CV"
-    )
-    inferred_skills: list[str] = Field(
-        default_factory=list, description="Skills inferred from CV content or synonyms"
-    )
-    missing_critical: list[str] = Field(
-        default_factory=list, description="Crucial requirements missing"
-    )
-    semantic_reason: str = Field(
-        ..., description="Explanation of why this candidate fits or lacks fit"
-    )
+    skill_matches: list[str] = Field(default_factory=list, description="Direct matches for required skills from CV")
+    inferred_skills: list[str] = Field(default_factory=list, description="Skills inferred from CV content or synonyms")
+    missing_critical: list[str] = Field(default_factory=list, description="Crucial requirements missing")
+    semantic_reason: str = Field(..., description="Explanation of why this candidate fits or lacks fit")
+
 
 class DynamicMatchedVacancy(BaseModel):
     vacancy_id: int
     semantic_reason: str
     inferred_skills: list[str] = Field(default_factory=list)
+
 
 class DynamicMappingResponse(BaseModel):
     matched_vacancies: list[DynamicMatchedVacancy] = Field(default_factory=list)
@@ -34,7 +28,10 @@ class ClassifiedRequirementItem(BaseModel):
     requirement_id: str = Field(..., description="Unique identifier for requirement item")
     description: str = Field(..., description="Description of requirement")
     tier: str = Field(default="MANDATORY", description="Tier: MANDATORY, PREFERRED, or OPTIONAL")
-    status: str = Field(default="SATISFIED", description="Status: SATISFIED, PARTIALLY_SATISFIED, or FAILED")
+    status: str = Field(
+        default="SATISFIED",
+        description="Status: SATISFIED, PARTIALLY_SATISFIED, or FAILED",
+    )
     failure_reason: str | None = Field(default=None, description="Explanation if requirement failed")
 
 
@@ -111,14 +108,9 @@ class PipelineStageMetrics(BaseModel):
     average_cv_processing_ms: float = 0.0
 
 
-
 class EnrichedJobMatchResult(JobMatchResult):
-    llm_reason: str = Field(
-        default="", description="Qwen's semantic explanation of the fit"
-    )
-    inferred_skills: list[str] = Field(
-        default_factory=list, description="Additional skills inferred by Qwen"
-    )
+    llm_reason: str = Field(default="", description="Qwen's semantic explanation of the fit")
+    inferred_skills: list[str] = Field(default_factory=list, description="Additional skills inferred by Qwen")
 
 
 class EnrichedCandidateAnalysis(BaseModel):
@@ -132,23 +124,14 @@ class EnrichedCandidateAnalysis(BaseModel):
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
     full_name: str | None = Field(default=None, description="Extracted candidate full name")
     candidate_name: str | None = Field(default=None, description="Extracted candidate name")
-    primary_department: str = Field(
-        ..., description="Top recommended department for candidate"
-    )
-    recommended_department: str = Field(
-        default="", description="Recommended department derived from candidate profile"
-    )
-    professional_domain: str = Field(
-        default="", description="Candidate's specialized professional domain"
-    )
-    strengths: list[str] = Field(
-        default_factory=list, description="Key strengths identified from CV"
-    )
-    suitable_job_roles: list[str] = Field(
-        default_factory=list, description="Suitable job roles for candidate"
-    )
+    primary_department: str = Field(..., description="Top recommended department for candidate")
+    recommended_department: str = Field(default="", description="Recommended department derived from candidate profile")
+    professional_domain: str = Field(default="", description="Candidate's specialized professional domain")
+    strengths: list[str] = Field(default_factory=list, description="Key strengths identified from CV")
+    suitable_job_roles: list[str] = Field(default_factory=list, description="Suitable job roles for candidate")
     has_genuine_match: bool = Field(
-        default=False, description="True if a genuine match with an active vacancy exists"
+        default=False,
+        description="True if a genuine match with an active vacancy exists",
     )
     active_vacancy_summary: str = Field(
         default="No suitable active vacancy found.",
@@ -158,12 +141,8 @@ class EnrichedCandidateAnalysis(BaseModel):
         default="",
         description="Independent AI analysis of candidate profile, strengths, department, and suitable roles",
     )
-    best_match: EnrichedJobMatchResult = Field(
-        ..., description="Top matching job opening"
-    )
-    suitable_openings: list[EnrichedJobMatchResult] = Field(
-        ..., description="All evaluated job openings ranked by match score"
-    )
+    best_match: EnrichedJobMatchResult = Field(..., description="Top matching job opening")
+    suitable_openings: list[EnrichedJobMatchResult] = Field(..., description="All evaluated job openings ranked by match score")
     rejection_policy_note: str = Field(
         default="Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
         description="Policy enforcement note regarding LOW score candidate retention",
@@ -179,11 +158,19 @@ class EnrichedCandidateAnalysis(BaseModel):
 
 
 class HRReviewRequest(BaseModel):
-    scan_id: str = Field(..., min_length=1, max_length=200, description="The ID of the scan/analysis result")
-    job_id: str = Field(..., min_length=1, max_length=200, description="The ID of the job being reviewed against")
-    corrected_score: float | None = Field(
-        None, description="HR's corrected score if any"
+    scan_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="The ID of the scan/analysis result",
     )
+    job_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="The ID of the job being reviewed against",
+    )
+    corrected_score: float | None = Field(None, description="HR's corrected score if any")
     corrected_classification: str | None = Field(None, max_length=50, description="HR's corrected classification if any")
     feedback_notes: str = Field(
         ...,

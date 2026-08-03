@@ -16,7 +16,7 @@ from app.core.tasks import sync_all_vacancies
 
 def main():
     start_time = time.time()
-    
+
     print("1. Adding content_hash column if it does not exist...")
     if pg_engine is not None:
         with pg_engine.connect() as conn:
@@ -34,7 +34,7 @@ def main():
     print("3. Waiting for RQ worker to finish jobs...")
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
-    q = Queue('default', connection=conn)
+    q = Queue("default", connection=conn)
 
     while True:
         job_count = len(q)
@@ -45,7 +45,7 @@ def main():
                 break
         print(f"Waiting... {job_count} jobs remaining in queue.")
         time.sleep(5)
-        
+
     print("Queue is empty. Verifying count...")
 
     with pg_engine.connect() as conn:
@@ -55,6 +55,7 @@ def main():
     duration = end_time - start_time
     print(f"Gate: SELECT COUNT(*) FROM vacancy_embeddings = {result}")
     print(f"Backfill Runtime: {duration:.2f} seconds")
+
 
 if __name__ == "__main__":
     main()

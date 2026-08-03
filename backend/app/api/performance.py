@@ -9,7 +9,10 @@ router = APIRouter(prefix="/performance", tags=["Enterprise Performance & Observ
 
 
 class CacheInvalidateRequest(BaseModel):
-    pattern: str = Field("*", description="Cache key pattern or domain tag to invalidate (e.g., 'vacancies', 'embeddings', '*')")
+    pattern: str = Field(
+        "*",
+        description="Cache key pattern or domain tag to invalidate (e.g., 'vacancies', 'embeddings', '*')",
+    )
 
 
 class CacheInvalidateResponse(BaseModel):

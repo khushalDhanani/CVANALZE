@@ -13,15 +13,17 @@ warnings.filterwarnings("ignore", category=UserWarning, module="multiprocessing.
 
 if __name__ == "__main__":
     from app.core.database import init_db
+
     init_db()
 
     # Warm cache synchronously before the batch scan (CLI mode)
     try:
         from app.services.cache_warmer import warm_all
+
         warm_all()
     except Exception as exc:
         print(f"[WARMUP] CLI cache warmup skipped: {exc}")
-    
+
     print("🚀 Starting Resource-Optimized Batch CV Scanner for 'uploads/' directory...")
     print(
         f"⚙️ Settings: Batch Size={settings.BATCH_SIZE} | "

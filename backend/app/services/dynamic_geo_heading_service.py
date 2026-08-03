@@ -1,5 +1,6 @@
 # backend/app/services/dynamic_geo_heading_service.py
 import logging
+
 from app.core.database import SessionLocal
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading

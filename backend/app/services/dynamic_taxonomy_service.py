@@ -1,8 +1,7 @@
 # backend/app/services/dynamic_taxonomy_service.py
-import hashlib
 import logging
-from typing import Any
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.core.database import SessionLocal, pg_SessionLocal
@@ -11,7 +10,6 @@ from app.models.pg import DomainEmbedding
 from app.models.taxonomy import (
     DesignationMaster,
     DesignationSynonym,
-    DomainMaster,
     FamilyCompatibility,
     JobFamilyMaster,
 )
@@ -122,10 +120,14 @@ class DynamicTaxonomyService:
                     src = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name == candidate_family_name).first()
                     tgt = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name == vacancy_family_name).first()
                     if src and tgt:
-                        compat = session.query(FamilyCompatibility).filter(
-                            FamilyCompatibility.source_family_id == src.family_id,
-                            FamilyCompatibility.target_family_id == tgt.family_id,
-                        ).first()
+                        compat = (
+                            session.query(FamilyCompatibility)
+                            .filter(
+                                FamilyCompatibility.source_family_id == src.family_id,
+                                FamilyCompatibility.target_family_id == tgt.family_id,
+                            )
+                            .first()
+                        )
                         if compat:
                             return compat.is_allowed, compat.compatibility_score
             except Exception as exc:
@@ -155,7 +157,11 @@ class DynamicTaxonomyService:
                         for kw in c.keywords:
                             kw_clean = kw.strip().lower()
                             if kw_clean and len(kw_clean) > 1:
-                                cls._in_memory_synonyms[kw_clean] = (desig_name, r.family, r.domain)
+                                cls._in_memory_synonyms[kw_clean] = (
+                                    desig_name,
+                                    r.family,
+                                    r.domain,
+                                )
             for r in taxonomy.candidate_rules:
                 desig_name = r.name.replace("_", " ").title()
                 fam_name = r.families[0] if r.families else taxonomy.default_family
@@ -164,7 +170,11 @@ class DynamicTaxonomyService:
                         for kw in c.keywords:
                             kw_clean = kw.strip().lower()
                             if kw_clean and len(kw_clean) > 1:
-                                cls._in_memory_synonyms[kw_clean] = (desig_name, fam_name, r.domain)
+                                cls._in_memory_synonyms[kw_clean] = (
+                                    desig_name,
+                                    fam_name,
+                                    r.domain,
+                                )
         except Exception as exc:
             logger.warning(f"[DYNAMIC_TAXONOMY] Failed to seed default in-memory synonyms: {exc}")
 
@@ -197,7 +207,11 @@ class DynamicTaxonomyService:
 
         terms_to_register = [clean_desig] + (synonyms or [])
         for t in terms_to_register:
-            cls._in_memory_synonyms[t.strip().lower()] = (clean_desig, family_name, dom_name)
+            cls._in_memory_synonyms[t.strip().lower()] = (
+                clean_desig,
+                family_name,
+                dom_name,
+            )
 
         if SessionLocal is not None:
             try:
@@ -217,24 +231,44 @@ class DynamicTaxonomyService:
                             session.flush()
 
                         # Add canonical synonym
-                        canon = session.query(DesignationSynonym).filter(
-                            DesignationSynonym.designation_id == desig.designation_id,
-                            DesignationSynonym.synonym_text == clean_desig,
-                        ).first()
+                        canon = (
+                            session.query(DesignationSynonym)
+                            .filter(
+                                DesignationSynonym.designation_id == desig.designation_id,
+                                DesignationSynonym.synonym_text == clean_desig,
+                            )
+                            .first()
+                        )
                         if not canon:
-                            session.add(DesignationSynonym(designation_id=desig.designation_id, synonym_text=clean_desig, is_canonical=True))
+                            session.add(
+                                DesignationSynonym(
+                                    designation_id=desig.designation_id,
+                                    synonym_text=clean_desig,
+                                    is_canonical=True,
+                                )
+                            )
 
                         # Add user-provided synonyms
                         if synonyms:
                             for syn in synonyms:
                                 syn_clean = syn.strip()
                                 if syn_clean:
-                                    syn_obj = session.query(DesignationSynonym).filter(
-                                        DesignationSynonym.designation_id == desig.designation_id,
-                                        DesignationSynonym.synonym_text == syn_clean,
-                                    ).first()
+                                    syn_obj = (
+                                        session.query(DesignationSynonym)
+                                        .filter(
+                                            DesignationSynonym.designation_id == desig.designation_id,
+                                            DesignationSynonym.synonym_text == syn_clean,
+                                        )
+                                        .first()
+                                    )
                                     if not syn_obj:
-                                        session.add(DesignationSynonym(designation_id=desig.designation_id, synonym_text=syn_clean, is_canonical=False))
+                                        session.add(
+                                            DesignationSynonym(
+                                                designation_id=desig.designation_id,
+                                                synonym_text=syn_clean,
+                                                is_canonical=False,
+                                            )
+                                        )
 
                         session.commit()
             except Exception as exc:
@@ -310,7 +344,10 @@ class DynamicTaxonomyService:
 
             with pg_SessionLocal() as pg_session:
                 stmt = (
-                    select(DomainEmbedding.term, DomainEmbedding.embedding.cosine_distance(query_vector).label("distance"))
+                    select(
+                        DomainEmbedding.term,
+                        DomainEmbedding.embedding.cosine_distance(query_vector).label("distance"),
+                    )
                     .where(DomainEmbedding.category == "job_titles")
                     .order_by("distance")
                     .limit(1)

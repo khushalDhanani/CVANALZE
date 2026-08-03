@@ -185,18 +185,9 @@ class DocumentConversionService:
         if not clean_text or (len(clean_text) < 20 and "<!-- image -->" in raw_text):
             raise ValueError(f"No readable text or content could be extracted from CV document '{filename}'.")
 
-        page_count = (
-            len(docling_document.pages)
-            if docling_document and getattr(docling_document, "pages", None)
-            else 1
-        )
+        page_count = len(docling_document.pages) if docling_document and getattr(docling_document, "pages", None) else 1
         is_scanned = pdf_type == "SCANNED_PDF" or (
-            extension == "pdf"
-            and (
-                "<!-- image -->" in raw_text
-                or (ocr_applied and native_char_count < 50)
-                or bool(docling_document and getattr(docling_document, "pictures", None))
-            )
+            extension == "pdf" and ("<!-- image -->" in raw_text or (ocr_applied and native_char_count < 50) or bool(docling_document and getattr(docling_document, "pictures", None)))
         )
         metrics = {
             "pdf_type": pdf_type,
@@ -286,11 +277,7 @@ class DocumentConversionService:
                 recovered.append(text)
             elif text and item.get("content_layer") == "furniture" and text not in raw_text:
                 previous_text = next(
-                    (
-                        texts[previous].get("text", "").strip()
-                        for previous in range(index - 1, -1, -1)
-                        if texts[previous].get("text", "").strip() in raw_text
-                    ),
+                    (texts[previous].get("text", "").strip() for previous in range(index - 1, -1, -1) if texts[previous].get("text", "").strip() in raw_text),
                     "",
                 )
                 if previous_text:

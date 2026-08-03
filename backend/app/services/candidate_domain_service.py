@@ -77,7 +77,10 @@ class CandidateDomainService:
                         projects_list.append(str(proj))
 
         combined_text = " ".join(
-            filter(None, combined_parts + sorted(skills_set) + education_list + projects_list + roles_list)
+            filter(
+                None,
+                combined_parts + sorted(skills_set) + education_list + projects_list + roles_list,
+            )
         ).lower()
 
         repo = domain_repository or department_domain_repository
@@ -190,7 +193,7 @@ class CandidateDomainService:
 
         # 1. Match using the dynamic taxonomy classifier
         _, compatible_families = TaxonomyClassifier.classify_candidate(cv_text=cv_text, resume_json=resume_json)
-        
+
         # Add taxonomy families as base roles, giving them a high initial score
         for family in compatible_families:
             if family not in seen_roles and family != RuleConfigManager.get_taxonomy_rules().default_family:
@@ -258,7 +261,7 @@ class CandidateDomainService:
         if not strengths:
             fallback_defaults = RuleConfigManager.get_match_rules().fallback_defaults
             current_domain = prof_domain or fallback_defaults.professional_domain
-            
+
             if current_domain != fallback_defaults.professional_domain:
                 strengths.append(f"Professional background in {current_domain}")
             else:
@@ -307,12 +310,7 @@ class CandidateDomainService:
             header = re.sub(r"\s+", " ", line.lstrip("# ").strip())
             normalized_header = header.lower()
             compact_header = re.sub(r"\s+", "", normalized_header)
-            if (
-                not header
-                or normalized_header in section_denylist
-                or compact_header in compact_denylist
-                or any(term in normalized_header for term in substring_denylist)
-            ):
+            if not header or normalized_header in section_denylist or compact_header in compact_denylist or any(term in normalized_header for term in substring_denylist):
                 continue
             headers.append(header)
 
@@ -365,21 +363,13 @@ class CandidateDomainService:
         domain_words = set(re.findall(r"\w+", domain_text))
 
         repo = domain_repository or department_domain_repository
-        inferred_domains = [
-            matcher.domain.department_name
-            for matcher in repo.get_domain_matchers()
-            if matcher.shares_keyword_with(domain_words)
-        ]
+        inferred_domains = [matcher.domain.department_name for matcher in repo.get_domain_matchers() if matcher.shares_keyword_with(domain_words)]
         return " ".join([domain_text, *inferred_domains]).strip()
 
     @classmethod
     def extract_department_domain_terms(cls, department: str) -> list[str]:
         department_without_names = re.sub(r"\([^)]*\)", " ", department)
-        denylist = {
-            term.lower().strip()
-            for term in RuleConfigManager.get_match_rules().domain_department_denylist
-            if term
-        }
+        denylist = {term.lower().strip() for term in RuleConfigManager.get_match_rules().domain_department_denylist if term}
         terms = []
         for token in re.split(r"[\s/&()\-,]+", department_without_names):
             term = token.strip().lower()

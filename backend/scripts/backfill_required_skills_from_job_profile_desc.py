@@ -99,12 +99,7 @@ def fit_to_column(value: str, max_length: int | None) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Backfill RecruitVacancyRequest.RequestedAdditionalKnowledge from "
-            "OrgJobProfileMst.JobProfileDesc for rows where the skills field is NULL or blank."
-        )
-    )
+    parser = argparse.ArgumentParser(description=("Backfill RecruitVacancyRequest.RequestedAdditionalKnowledge from OrgJobProfileMst.JobProfileDesc for rows where the skills field is NULL or blank."))
     parser.add_argument("--apply", action="store_true", help="Apply the update. Defaults to dry-run.")
     args = parser.parse_args()
 
@@ -168,10 +163,7 @@ def main() -> None:
         print(f"candidate_rows={len(rows)}")
         print(f"rows_with_extracted_required_skills={len(updates)}")
         for sample in updates[:10]:
-            print(
-                f"sample vacancy_id={sample['vacancy_id']} title={sample['job_title']!r} "
-                f"required_skills={sample['required_skills']!r}"
-            )
+            print(f"sample vacancy_id={sample['vacancy_id']} title={sample['job_title']!r} required_skills={sample['required_skills']!r}")
 
         if not args.apply:
             print("dry_run=true")

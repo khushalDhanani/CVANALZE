@@ -81,9 +81,7 @@ class DepartmentDomainRepository:
                 self._reload_locked()
             return list(self._domains or [])
 
-    def get_domain_by_department(
-        self, department_id: int | None
-    ) -> DepartmentDomain | None:
+    def get_domain_by_department(self, department_id: int | None) -> DepartmentDomain | None:
         if department_id is None:
             return None
         target = str(department_id)
@@ -110,9 +108,7 @@ class DepartmentDomainRepository:
             source = "seed"
         self._domains = domains
         self._matchers = self._build_matchers(domains)
-        logger.info(
-            f"[DEPARTMENT_DOMAIN] Loaded {len(domains)} active domain(s) from {source}."
-        )
+        logger.info(f"[DEPARTMENT_DOMAIN] Loaded {len(domains)} active domain(s) from {source}.")
 
     def _create_session(self) -> Session | None:
         if self._db_factory is not None:
@@ -153,9 +149,7 @@ class DepartmentDomainRepository:
             return [
                 DepartmentDomain(
                     id=int(row.Id),
-                    department_id=(
-                        int(row.DepartmentId) if row.DepartmentId is not None else None
-                    ),
+                    department_id=(int(row.DepartmentId) if row.DepartmentId is not None else None),
                     department_name=(dept_name or row.DomainName) if dept_name else row.DomainName,
                     domain_name=row.DomainName,
                     keywords=json.loads(row.Keywords) if row.Keywords else [],

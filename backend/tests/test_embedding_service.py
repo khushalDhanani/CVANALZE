@@ -18,7 +18,10 @@ def reset_cache_and_metrics():
 def test_embedding_metrics_and_caching():
     mock_vector = [0.1, 0.2, 0.3, 0.4]
 
-    with patch("app.services.embedding_service.EmbeddingService._call_ollama_embed", return_value=mock_vector) as mock_call:
+    with patch(
+        "app.services.embedding_service.EmbeddingService._call_ollama_embed",
+        return_value=mock_vector,
+    ) as mock_call:
         # Initial request: Cache MISS
         emb1 = EmbeddingService.generate_embedding("John Doe CV text", identifier="cv_101")
         assert emb1 == mock_vector
@@ -54,7 +57,10 @@ def test_embedding_metrics_and_caching():
 
 
 def test_embedding_non_blocking_on_failure():
-    with patch("app.services.embedding_service.EmbeddingService._call_ollama_embed", side_effect=RuntimeError("Ollama service down")):
+    with patch(
+        "app.services.embedding_service.EmbeddingService._call_ollama_embed",
+        side_effect=RuntimeError("Ollama service down"),
+    ):
         emb = EmbeddingService.generate_embedding("CV text on server down", identifier="cv_error_1")
         assert emb is None  # Does not raise, returns None gracefully
 
@@ -72,7 +78,10 @@ def test_embedding_version_tracking():
             return mock_vector_v1
         return mock_vector_v2
 
-    with patch("app.services.embedding_service.EmbeddingService._call_ollama_embed", side_effect=mock_embed):
+    with patch(
+        "app.services.embedding_service.EmbeddingService._call_ollama_embed",
+        side_effect=mock_embed,
+    ):
         emb_v1 = EmbeddingService.generate_embedding("Same text", model_version="model-v1")
         emb_v2 = EmbeddingService.generate_embedding("Same text", model_version="model-v2")
 
@@ -89,21 +98,36 @@ async def test_single_embedding_in_cv_pipeline():
     from app.services.match_service import MatchService
 
     mock_emb = [0.5, 0.5, 0.5]
-    openings = [{"id": "job1", "title": "Developer", "department": "IT", "required_skills": ["Python"]}]
+    openings = [
+        {
+            "id": "job1",
+            "title": "Developer",
+            "department": "IT",
+            "required_skills": ["Python"],
+        }
+    ]
 
-    with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb) as mock_gen:
-        with patch("app.repositories.job.JobRepository.get_all_jobs", return_value=openings):
-            analysis = await MatchService.analyze_single_cv(
-                cv_text="Python developer with 5 years experience in web APIs",
-                cv_embedding=mock_emb,
-            )
-            assert analysis is not None
-            # VacancyPreFilter reused passed cv_embedding without calling generate_embedding again
-            assert mock_gen.call_count == 0
+    with (
+        patch(
+            "app.services.embedding_service.EmbeddingService.generate_embedding",
+            return_value=mock_emb,
+        ) as mock_gen,
+        patch("app.repositories.job.JobRepository.get_all_jobs", return_value=openings),
+    ):
+        analysis = await MatchService.analyze_single_cv(
+            cv_text="Python developer with 5 years experience in web APIs",
+            cv_embedding=mock_emb,
+        )
+        assert analysis is not None
+        # VacancyPreFilter reused passed cv_embedding without calling generate_embedding again
+        assert mock_gen.call_count == 0
 
 
 def test_reset_metrics():
-    with patch("app.services.embedding_service.EmbeddingService._call_ollama_embed", return_value=[0.1]):
+    with patch(
+        "app.services.embedding_service.EmbeddingService._call_ollama_embed",
+        return_value=[0.1],
+    ):
         EmbeddingService.generate_embedding("Sample text")
         assert EmbeddingService.get_metrics()["total_requests"] == 1
 

@@ -50,17 +50,23 @@ class JobEvaluationContext:
 
         raw_words = set(re.findall(r"\w+", title_lower))
         config_noise = RuleConfigManager.get_term_matching_assets().get("noise_words", set())
-        default_noise = {"senior", "junior", "lead", "head", "manager", "developer", "engineer", "specialist"}
+        default_noise = {
+            "senior",
+            "junior",
+            "lead",
+            "head",
+            "manager",
+            "developer",
+            "engineer",
+            "specialist",
+        }
         noise = config_noise.union(default_noise)
         title_words = raw_words - noise
 
         department = str(job.get("department_name") or job.get("department") or "")
         department_lower = department.strip().lower()
         dept_terms = CandidateDomainService.extract_department_domain_terms(department)
-        dept_term_patterns = [
-            re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE)
-            for t in dept_terms
-        ]
+        dept_term_patterns = [re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in dept_terms]
 
         required_skills = list(job.get("required_skills") or [])
         preferred_keywords = list(job.get("preferred_keywords") or [])
@@ -82,14 +88,8 @@ class JobEvaluationContext:
 
         # 2. Pre-compute Guard Flags
         compiled_guard = RuleConfigManager.get_compiled_cross_domain_guard()
-        is_non_it_job = any(
-            p.search(title) or p.search(department)
-            for p in compiled_guard["non_it_job_patterns"]
-        )
-        has_software_req = any(
-            any(p.search(str(s)) for p in compiled_guard["software_requirement_patterns"])
-            for s in required_skills
-        )
+        is_non_it_job = any(p.search(title) or p.search(department) for p in compiled_guard["non_it_job_patterns"])
+        has_software_req = any(any(p.search(str(s)) for p in compiled_guard["software_requirement_patterns"]) for s in required_skills)
 
         return cls(
             job_id=job_id,

@@ -47,7 +47,10 @@ async def test_tarun_gupta_flutter_retrieval_and_ranking_with_external_systems_m
 
     with (
         patch.object(EmbeddingService, "generate_embedding", return_value=mock_embedding),
-        patch("app.services.match_service.OllamaLLMService.run_optimized_match", return_value=None),
+        patch(
+            "app.services.match_service.OllamaLLMService.run_optimized_match",
+            return_value=None,
+        ),
     ):
         cv_embedding = get_embedding(TARUN_GUPTA_CV_TEXT)
         shortlist = VacancyPreFilter.filter_vacancies(

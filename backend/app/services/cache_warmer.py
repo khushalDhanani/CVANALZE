@@ -72,10 +72,7 @@ def warm_departments() -> list[dict[str, Any]]:
     try:
         stmt = select(OrgDepartmentMst).where(OrgDepartmentMst.DeptIsActive == True)
         rows = db.execute(stmt).scalars().all()
-        depts = [
-            {"id": r.DeptID, "name": r.DeptName, "company_id": r.CompID}
-            for r in rows
-        ]
+        depts = [{"id": r.DeptID, "name": r.DeptName, "company_id": r.CompID} for r in rows]
         master_data_cache_manager.set("departments", depts)
         logger.info(f"[WARM] Departments cached: {len(depts)}")
         return depts
@@ -93,10 +90,7 @@ def warm_companies() -> list[dict[str, Any]]:
     try:
         stmt = select(OrgCompanyMst).where(OrgCompanyMst.CompIsActive == True)
         rows = db.execute(stmt).scalars().all()
-        companies = [
-            {"id": r.CompID, "name": r.CompName, "business_group_id": r.BusinessGrpID}
-            for r in rows
-        ]
+        companies = [{"id": r.CompID, "name": r.CompName, "business_group_id": r.BusinessGrpID} for r in rows]
         master_data_cache_manager.set("companies", companies)
         logger.info(f"[WARM] Companies cached: {len(companies)}")
         return companies
@@ -112,13 +106,8 @@ def warm_skills() -> list[dict[str, Any]]:
     if db is None:
         return []
     try:
-        result = db.execute(
-            text("SELECT SkillID, SkillTypeID, SkillName, SkillDesc FROM RecruitSkillMst WHERE SkillIsActive = 1")
-        )
-        skills = [
-            {"id": row[0], "type_id": row[1], "name": row[2], "description": row[3]}
-            for row in result.fetchall()
-        ]
+        result = db.execute(text("SELECT SkillID, SkillTypeID, SkillName, SkillDesc FROM RecruitSkillMst WHERE SkillIsActive = 1"))
+        skills = [{"id": row[0], "type_id": row[1], "name": row[2], "description": row[3]} for row in result.fetchall()]
         master_data_cache_manager.set("skills", skills)
         logger.info(f"[WARM] Skills cached: {len(skills)}")
         return skills
@@ -135,6 +124,7 @@ def warm_department_domains() -> int:
         return 0
     try:
         from app.repositories.department_domain import department_domain_repository
+
         department_domain_repository.refresh_cache()
         count = len(department_domain_repository.get_all_domains())
         logger.info(f"[WARM] Department domains refreshed: {count} domains cached.")

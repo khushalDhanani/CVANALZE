@@ -35,3 +35,18 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 
+[tool.ruff]
+line-length = 200
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+ignore = [
+    "E712",  # SQLAlchemy boolean column expressions require equality operators.
+    "E731",  # Compact callables in repository test doubles remain readable as lambdas.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]  # Executable scripts add the backend root before importing app modules.
+"start_worker.py" = ["E402"]  # Worker entry point configures process paths before app imports.
+"tests/regression/*.py" = ["E402"]  # Standalone regression runners bootstrap the backend path.

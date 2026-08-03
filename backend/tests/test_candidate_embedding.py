@@ -10,14 +10,12 @@ from app.services.embedding_service import get_candidate_embedding
 
 
 @pytest.mark.asyncio
-async def test_candidate_side_embedding_end_to_end_with_external_systems_mocked(tmp_path):
+async def test_candidate_side_embedding_end_to_end_with_external_systems_mocked(
+    tmp_path,
+):
     filename = "john_doe_flutter_dev.pdf"
     content = b"mock-pdf-content"
-    markdown = (
-        "John Doe\nSenior Flutter Developer\n"
-        "Experience: 5 years in Flutter, Dart, iOS, Android, and REST APIs.\n"
-        "Education: Bachelor of Science in Computer Science."
-    )
+    markdown = "John Doe\nSenior Flutter Developer\nExperience: 5 years in Flutter, Dart, iOS, Android, and REST APIs.\nEducation: Bachelor of Science in Computer Science."
     expected_cv_key = get_stable_cv_key(filename, candidate_id=9901, cv_id=4401)
     expected_embedding = [0.1] * 768
     match_analysis = MagicMock()
@@ -35,10 +33,22 @@ async def test_candidate_side_embedding_end_to_end_with_external_systems_mocked(
             "app.services.cv_service.MarkdownGenerator.generate_with_timeout",
             return_value=MarkdownResult(markdown, page_count=1, is_scanned=False, ocr_applied=False),
         ),
-        patch("app.services.cv_service.EmbeddingService.generate_embedding", return_value=expected_embedding),
-        patch("app.services.embedding_service.save_candidate_embedding", side_effect=cache_embedding) as save_mock,
-        patch("app.services.match_service.MatchService.analyze_single_cv", return_value=match_analysis),
-        patch("app.services.similar_candidate_service.SimilarCandidateService.detect_similar_candidates", return_value=[]),
+        patch(
+            "app.services.cv_service.EmbeddingService.generate_embedding",
+            return_value=expected_embedding,
+        ),
+        patch(
+            "app.services.embedding_service.save_candidate_embedding",
+            side_effect=cache_embedding,
+        ) as save_mock,
+        patch(
+            "app.services.match_service.MatchService.analyze_single_cv",
+            return_value=match_analysis,
+        ),
+        patch(
+            "app.services.similar_candidate_service.SimilarCandidateService.detect_similar_candidates",
+            return_value=[],
+        ),
     ):
         result = await process_cv_file(
             filename=filename,

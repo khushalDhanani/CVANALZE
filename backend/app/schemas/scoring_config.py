@@ -62,25 +62,19 @@ class ScoringConfig:
         return cls(
             penalty_per_item=float(
                 ConfigRepository.get_setting(
-                    "MANDATORY_FAILURE_PENALTY_PER_ITEM", settings.MANDATORY_FAILURE_PENALTY_PER_ITEM
+                    "MANDATORY_FAILURE_PENALTY_PER_ITEM",
+                    settings.MANDATORY_FAILURE_PENALTY_PER_ITEM,
                 )
             ),
             max_score_on_failure=float(
                 ConfigRepository.get_setting(
-                    "MAX_SCORE_ON_MANDATORY_FAILURE", settings.MAX_SCORE_ON_MANDATORY_FAILURE
+                    "MAX_SCORE_ON_MANDATORY_FAILURE",
+                    settings.MAX_SCORE_ON_MANDATORY_FAILURE,
                 )
             ),
-            llm_semantic_weight=float(
-                ConfigRepository.get_setting("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT)
-            ),
-            max_llm_boost=float(
-                ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST)
-            ),
-            match_high_threshold=float(
-                ConfigRepository.get_setting("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD)
-            ),
-            match_medium_threshold=float(
-                ConfigRepository.get_setting("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD)
-            ),
+            llm_semantic_weight=float(ConfigRepository.get_setting("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT)),
+            max_llm_boost=float(ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST)),
+            match_high_threshold=float(ConfigRepository.get_setting("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD)),
+            match_medium_threshold=float(ConfigRepository.get_setting("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD)),
             component_weights=weights,
         )

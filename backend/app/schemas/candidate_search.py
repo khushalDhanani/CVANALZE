@@ -17,9 +17,7 @@ class CandidateSearchRequest(BaseModel):
     education: str | None = Field(None, description="Filter by education background")
     status: str | None = Field(None, description="Filter candidate status")
     limit: int = Field(50, ge=1, le=200, description="Maximum number of candidate results to return")
-    min_similarity: float | None = Field(
-        None, ge=0.0, le=1.0, description="Minimum vector similarity threshold"
-    )
+    min_similarity: float | None = Field(None, ge=0.0, le=1.0, description="Minimum vector similarity threshold")
 
 
 class CandidateSearchResultItem(BaseModel):
@@ -43,7 +41,8 @@ class CandidateSearchResultItem(BaseModel):
     ocr_applied: bool = Field(False, description="Whether OCR was applied")
     primary_department: str | None = Field(None, description="Primary matching department")
     similarity_score: float | None = Field(
-        None, description="Semantic vector similarity score (0.0 to 1.0) when query is supplied"
+        None,
+        description="Semantic vector similarity score (0.0 to 1.0) when query is supplied",
     )
     search_mode: str = Field("keyword", description="Search execution mode: 'semantic' or 'keyword'")
     best_match: dict[str, Any] | None = Field(None, description="Best job match evaluation summary")
@@ -53,6 +52,4 @@ class CandidateSearchResponse(BaseModel):
     total_found: int = Field(..., description="Total candidate results matching search and filters")
     search_mode: str = Field(..., description="Search mode used: 'semantic' or 'keyword'")
     query: str | None = Field(None, description="Natural language search query applied")
-    candidates: list[CandidateSearchResultItem] = Field(
-        default_factory=list, description="List of ranked candidate search items"
-    )
+    candidates: list[CandidateSearchResultItem] = Field(default_factory=list, description="List of ranked candidate search items")

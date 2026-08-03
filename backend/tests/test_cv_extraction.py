@@ -200,7 +200,10 @@ Experienced IT Executive and Systems Administrator.
     assert contact["name"] == "John Doe"
     assert contact["full_name"] == "John Doe"
     assert contact["name_confidence"] >= 0.85
-    assert contact["extraction_source"] in ["header_email_validated", "header_contact_section"]
+    assert contact["extraction_source"] in [
+        "header_email_validated",
+        "header_contact_section",
+    ]
 
 
 def test_deterministic_name_extraction_email_fallback():

@@ -37,7 +37,10 @@ def test_candidate_recommendations_all_domains():
         "quality_metrics": {"experience_years": 5.5},
         "match_analysis": {
             "primary_department": "Engineering",
-            "strengths": ["Strong Python FastAPI expertise", "Database design with PostgreSQL"],
+            "strengths": [
+                "Strong Python FastAPI expertise",
+                "Database design with PostgreSQL",
+            ],
             "best_match": {
                 "job_title": "Senior Python Developer",
                 "department": "Engineering",
@@ -83,8 +86,13 @@ def test_candidate_recommendations_all_domains():
         },
     ]
 
-    with patch("app.repositories.result.ResultRepository.read_result_by_filename", return_value=mock_result), \
-         patch("app.repositories.job.JobRepository.get_all_jobs", return_value=mock_jobs):
+    with (
+        patch(
+            "app.repositories.result.ResultRepository.read_result_by_filename",
+            return_value=mock_result,
+        ),
+        patch("app.repositories.job.JobRepository.get_all_jobs", return_value=mock_jobs),
+    ):
         recs = RecommendationService.get_candidate_recommendations("rec_cand_1")
 
         assert recs["candidate_id"] == "rec_cand_1"
@@ -105,7 +113,10 @@ def test_candidate_recommendations_empty_state():
     """
     Verifies clean empty state response when candidate analysis has no data or is processing.
     """
-    with patch("app.repositories.result.ResultRepository.read_result_by_filename", return_value=None):
+    with patch(
+        "app.repositories.result.ResultRepository.read_result_by_filename",
+        return_value=None,
+    ):
         recs = RecommendationService.get_candidate_recommendations("non_existent_cand")
 
         assert recs["candidate_id"] == "non_existent_cand"
@@ -156,4 +167,3 @@ def test_recommendations_api_endpoints():
     resp_pools = client.get("/api/recommendations/talent-pools")
     assert resp_pools.status_code == 200
     assert "talent_pools" in resp_pools.json()
-

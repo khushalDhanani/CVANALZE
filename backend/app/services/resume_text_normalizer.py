@@ -16,7 +16,10 @@ class ResumeTextNormalizer:
         cleaned_lines = [cls._collapse_spaced_letters(line).rstrip() for line in text.splitlines()]
         text = "\n".join(cleaned_lines)
 
-        for pattern, replacement in RuleConfigManager.get_compiled_heading_normalizations():
+        for (
+            pattern,
+            replacement,
+        ) in RuleConfigManager.get_compiled_heading_normalizations():
             text = pattern.sub(replacement, text)
 
         deduplicated_lines: list[str] = []
@@ -56,4 +59,3 @@ class ResumeTextNormalizer:
 
 
 TextSanitizer = ResumeTextNormalizer
-

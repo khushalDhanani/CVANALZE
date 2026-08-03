@@ -60,33 +60,37 @@ class CandidateAnalysisContext:
             exp_years = candidate_experience
 
         if optimized_profile:
-            profile_parts.extend([
-                *optimized_profile.core_skills,
-                *optimized_profile.inferred_skills,
-                *optimized_profile.professional_domains,
-                optimized_profile.current_role or "",
-                *optimized_profile.education_domains,
-                *optimized_profile.certifications,
-            ])
+            profile_parts.extend(
+                [
+                    *optimized_profile.core_skills,
+                    *optimized_profile.inferred_skills,
+                    *optimized_profile.professional_domains,
+                    optimized_profile.current_role or "",
+                    *optimized_profile.education_domains,
+                    *optimized_profile.certifications,
+                ]
+            )
             current_role = optimized_profile.current_role
-            
+
             if exp_years is None and optimized_profile.relevant_experience_years is not None:
                 try:
                     exp_years = float(optimized_profile.relevant_experience_years)
                 except (ValueError, TypeError):
                     pass
-            
+
         elif dynamic_profile:
-            profile_parts.extend([
-                *dynamic_profile.core_skills,
-                *dynamic_profile.professional_domains,
-                dynamic_profile.current_domain or "",
-                dynamic_profile.current_role or "",
-                *dynamic_profile.previous_roles,
-                *dynamic_profile.education_domains,
-            ])
+            profile_parts.extend(
+                [
+                    *dynamic_profile.core_skills,
+                    *dynamic_profile.professional_domains,
+                    dynamic_profile.current_domain or "",
+                    dynamic_profile.current_role or "",
+                    *dynamic_profile.previous_roles,
+                    *dynamic_profile.education_domains,
+                ]
+            )
             current_role = dynamic_profile.current_role
-            
+
             if exp_years is None and dynamic_profile.relevant_experience_years is not None:
                 try:
                     exp_years = float(dynamic_profile.relevant_experience_years)
@@ -97,7 +101,11 @@ class CandidateAnalysisContext:
             current_role = normalized_resume.employment[0].job_title.normalized_value
 
         if not current_role:
-            m = re.search(r"(?:current\s*role|position|title)\s*:\s*([^\n]+)", cv_text, re.IGNORECASE)
+            m = re.search(
+                r"(?:current\s*role|position|title)\s*:\s*([^\n]+)",
+                cv_text,
+                re.IGNORECASE,
+            )
             if m:
                 current_role = m.group(1).strip()
             else:
@@ -113,7 +121,7 @@ class CandidateAnalysisContext:
         # 2. Taxonomy Classification (cached)
         cand_tax_domain, cand_families_list = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
         cand_families = list(cand_families_list)
-        
+
         # Override with LLM classification if available
         if optimized_profile and optimized_profile.professional_domains:
             cand_tax_domain = optimized_profile.professional_domains[0]
@@ -123,7 +131,7 @@ class CandidateAnalysisContext:
             for r in taxonomy.candidate_rules:
                 if r.domain == cand_tax_domain:
                     llm_families.extend(r.families)
-            
+
             seen = set()
             mapped_families = [f for f in llm_families if not (f in seen or seen.add(f))]
             if mapped_families:
@@ -143,7 +151,7 @@ class CandidateAnalysisContext:
         )
         if optimized_profile and optimized_profile.professional_domains:
             cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
-        
+
         cand_domain = cand_domain_profile.get("professional_domain", "")
 
         # 4. Domain Candidate Text Construction
@@ -158,11 +166,7 @@ class CandidateAnalysisContext:
         # 5. Software Candidate Guard Flag
         compiled_guard = RuleConfigManager.get_compiled_cross_domain_guard()
         sw_patterns = compiled_guard["software_candidate_patterns"]
-        is_software_cand = (
-            "Information Technology" in cand_domain
-            or "Software" in cand_domain
-            or any(p.search(norm_text) for p in sw_patterns)
-        )
+        is_software_cand = "Information Technology" in cand_domain or "Software" in cand_domain or any(p.search(norm_text) for p in sw_patterns)
 
         return cls(
             cv_text=cv_text,
@@ -240,7 +244,5 @@ class CandidateAnalysisContext:
         )
         guard = RuleConfigManager.get_compiled_cross_domain_guard()
         self.is_software_cand = (
-            "Information Technology" in self.cand_domain
-            or "Software" in self.cand_domain
-            or any(pattern.search(self.norm_text) for pattern in guard["software_candidate_patterns"])
+            "Information Technology" in self.cand_domain or "Software" in self.cand_domain or any(pattern.search(self.norm_text) for pattern in guard["software_candidate_patterns"])
         )

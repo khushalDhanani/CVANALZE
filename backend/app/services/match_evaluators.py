@@ -129,13 +129,10 @@ class RequirementEvaluator:
         job_ctx = job if isinstance(job, JobEvaluationContext) else JobEvaluationContext.create(job)
         if extract_term_matches_fn is None:
             from app.services.scoring_engine import ScoringEngine
+
             extract_term_matches_fn = ScoringEngine._extract_term_matches
 
-        typed_config = (
-            scoring_config
-            if isinstance(scoring_config, ScoringConfig)
-            else ScoringConfig.load(scoring_config if isinstance(scoring_config, dict) else None)
-        )
+        typed_config = scoring_config if isinstance(scoring_config, ScoringConfig) else ScoringConfig.load(scoring_config if isinstance(scoring_config, dict) else None)
         penalty = penalty_per_item if penalty_per_item is not None else typed_config.penalty_per_item
 
         results = RequirementEvaluationResults()
@@ -167,7 +164,13 @@ class RequirementEvaluator:
                 cv_ev = f"CV contains skill: '{skill}'"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
-                    cls._create_requirement(req_id, f"Skill: {skill}", RequirementTier.MANDATORY, RequirementStatus.SATISFIED, ev)
+                    cls._create_requirement(
+                        req_id,
+                        f"Skill: {skill}",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.SATISFIED,
+                        ev,
+                    )
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Skill ({skill})")
@@ -177,13 +180,16 @@ class RequirementEvaluator:
                 reason = f"Candidate CV lacks documented skill '{skill}'."
                 results.mandatory_reqs.append(
                     cls._create_requirement(
-                        req_id, f"Skill: {skill}", RequirementTier.MANDATORY, RequirementStatus.FAILED, ev, failure_reason=reason
+                        req_id,
+                        f"Skill: {skill}",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.FAILED,
+                        ev,
+                        failure_reason=reason,
                     )
                 )
                 results.evidence_map[req_id] = ev
-                results.mandatory_failures.append(
-                    cls._create_failure(req_id, f"Mandatory Skill: {skill}", reason, penalty)
-                )
+                results.mandatory_failures.append(cls._create_failure(req_id, f"Mandatory Skill: {skill}", reason, penalty))
                 results.missing_criteria.append(f"Mandatory Skill ({skill})")
 
         # 2. Preferred Keywords
@@ -198,7 +204,13 @@ class RequirementEvaluator:
                 cv_ev = f"CV contains preferred keyword: '{kw}'"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.preferred_reqs.append(
-                    cls._create_requirement(req_id, f"Preferred Keyword: {kw}", RequirementTier.PREFERRED, RequirementStatus.SATISFIED, ev)
+                    cls._create_requirement(
+                        req_id,
+                        f"Preferred Keyword: {kw}",
+                        RequirementTier.PREFERRED,
+                        RequirementStatus.SATISFIED,
+                        ev,
+                    )
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Preferred Keyword ({kw})")
@@ -211,7 +223,13 @@ class RequirementEvaluator:
                 cv_ev = f"Candidate experience {context.candidate_experience} years meets minimum requirement ({min_exp} years)"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
-                    cls._create_requirement(req_id, f"Min Experience: {min_exp} years", RequirementTier.MANDATORY, RequirementStatus.SATISFIED, ev)
+                    cls._create_requirement(
+                        req_id,
+                        f"Min Experience: {min_exp} years",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.SATISFIED,
+                        ev,
+                    )
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Min Experience ({min_exp} years)")
@@ -222,13 +240,16 @@ class RequirementEvaluator:
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
                     cls._create_requirement(
-                        req_id, f"Min Experience: {min_exp} years", RequirementTier.MANDATORY, RequirementStatus.FAILED, ev, failure_reason=reason
+                        req_id,
+                        f"Min Experience: {min_exp} years",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.FAILED,
+                        ev,
+                        failure_reason=reason,
                     )
                 )
                 results.evidence_map[req_id] = ev
-                results.mandatory_failures.append(
-                    cls._create_failure(req_id, f"Min Experience: {min_exp} years", reason, penalty)
-                )
+                results.mandatory_failures.append(cls._create_failure(req_id, f"Min Experience: {min_exp} years", reason, penalty))
                 results.missing_criteria.append(f"Min Experience ({min_exp} years)")
 
         # 4. Mandatory Education
@@ -241,7 +262,13 @@ class RequirementEvaluator:
                 cv_ev = f"CV satisfies education requirement: '{education_req}'"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
-                    cls._create_requirement(req_id, f"Education: {education_req}", RequirementTier.MANDATORY, RequirementStatus.SATISFIED, ev)
+                    cls._create_requirement(
+                        req_id,
+                        f"Education: {education_req}",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.SATISFIED,
+                        ev,
+                    )
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Education ({education_req})")
@@ -251,13 +278,16 @@ class RequirementEvaluator:
                 reason = f"Candidate CV lacks documented education requirement '{education_req}'."
                 results.mandatory_reqs.append(
                     cls._create_requirement(
-                        req_id, f"Education: {education_req}", RequirementTier.MANDATORY, RequirementStatus.FAILED, ev, failure_reason=reason
+                        req_id,
+                        f"Education: {education_req}",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.FAILED,
+                        ev,
+                        failure_reason=reason,
                     )
                 )
                 results.evidence_map[req_id] = ev
-                results.mandatory_failures.append(
-                    cls._create_failure(req_id, f"Mandatory Education: {education_req}", reason, penalty)
-                )
+                results.mandatory_failures.append(cls._create_failure(req_id, f"Mandatory Education: {education_req}", reason, penalty))
                 results.missing_criteria.append(f"Mandatory Education ({education_req})")
 
         # 5. Mandatory Certification
@@ -270,7 +300,13 @@ class RequirementEvaluator:
                 cv_ev = f"CV satisfies certification requirement: '{certification_req}'"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
-                    cls._create_requirement(req_id, f"Certification: {certification_req}", RequirementTier.MANDATORY, RequirementStatus.SATISFIED, ev)
+                    cls._create_requirement(
+                        req_id,
+                        f"Certification: {certification_req}",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.SATISFIED,
+                        ev,
+                    )
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Certification ({certification_req})")
@@ -280,12 +316,22 @@ class RequirementEvaluator:
                 reason = f"Candidate CV lacks required certification '{certification_req}'."
                 results.mandatory_reqs.append(
                     cls._create_requirement(
-                        req_id, f"Certification: {certification_req}", RequirementTier.MANDATORY, RequirementStatus.FAILED, ev, failure_reason=reason
+                        req_id,
+                        f"Certification: {certification_req}",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.FAILED,
+                        ev,
+                        failure_reason=reason,
                     )
                 )
                 results.evidence_map[req_id] = ev
                 results.mandatory_failures.append(
-                    cls._create_failure(req_id, f"Mandatory Certification: {certification_req}", reason, penalty)
+                    cls._create_failure(
+                        req_id,
+                        f"Mandatory Certification: {certification_req}",
+                        reason,
+                        penalty,
+                    )
                 )
                 results.missing_criteria.append(f"Mandatory Certification ({certification_req})")
 
@@ -298,13 +344,16 @@ class RequirementEvaluator:
             reason = f"Candidate CTC requirement ({context.candidate_ctc}) exceeds maximum budget ({max_ctc})."
             results.mandatory_reqs.append(
                 cls._create_requirement(
-                    req_id, f"Max CTC: {max_ctc}", RequirementTier.MANDATORY, RequirementStatus.FAILED, ev, failure_reason=reason
+                    req_id,
+                    f"Max CTC: {max_ctc}",
+                    RequirementTier.MANDATORY,
+                    RequirementStatus.FAILED,
+                    ev,
+                    failure_reason=reason,
                 )
             )
             results.evidence_map[req_id] = ev
-            results.mandatory_failures.append(
-                cls._create_failure(req_id, f"Max CTC Budget: {max_ctc}", reason, penalty)
-            )
+            results.mandatory_failures.append(cls._create_failure(req_id, f"Max CTC Budget: {max_ctc}", reason, penalty))
             results.missing_criteria.append(f"Max CTC Budget ({max_ctc})")
 
         # 7. Preferred Upper Experience Limit
@@ -315,7 +364,13 @@ class RequirementEvaluator:
                 cv_ev = f"Candidate experience {context.candidate_experience} years is within preferred upper bound ({max_exp} years)"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.preferred_reqs.append(
-                    cls._create_requirement(req_id, f"Max Experience: {max_exp} years", RequirementTier.PREFERRED, RequirementStatus.SATISFIED, ev)
+                    cls._create_requirement(
+                        req_id,
+                        f"Max Experience: {max_exp} years",
+                        RequirementTier.PREFERRED,
+                        RequirementStatus.SATISFIED,
+                        ev,
+                    )
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Max Experience ({max_exp} years)")
@@ -391,13 +446,10 @@ class ComponentScoreEvaluator:
         job_ctx = job if isinstance(job, JobEvaluationContext) else JobEvaluationContext.create(job)
         if extract_term_matches_fn is None:
             from app.services.scoring_engine import ScoringEngine
+
             extract_term_matches_fn = ScoringEngine._extract_term_matches
 
-        typed_config = (
-            scoring_config
-            if isinstance(scoring_config, ScoringConfig)
-            else ScoringConfig.load(scoring_config if isinstance(scoring_config, dict) else None)
-        )
+        typed_config = scoring_config if isinstance(scoring_config, ScoringConfig) else ScoringConfig.load(scoring_config if isinstance(scoring_config, dict) else None)
 
         penalty = penalty_per_item if penalty_per_item is not None else typed_config.penalty_per_item
         max_score_cap = max_score_on_failure if max_score_on_failure is not None else typed_config.max_score_on_failure
@@ -465,11 +517,7 @@ class ComponentScoreEvaluator:
         if job_department:
             domain_score = params.domain_default_match_score
             if job_ctx.dept_term_patterns:
-                matched_dept_terms = [
-                    p.pattern
-                    for p in job_ctx.dept_term_patterns
-                    if p.search(context.domain_candidate_text)
-                ]
+                matched_dept_terms = [p.pattern for p in job_ctx.dept_term_patterns if p.search(context.domain_candidate_text)]
                 if matched_dept_terms:
                     domain_score = 100.0
 
@@ -522,16 +570,10 @@ class ComponentScoreEvaluator:
             total_penalty = len(req_results.mandatory_failures) * penalty
             final_score = round(max(0.0, min(raw_score - total_penalty, max_score_cap)), 1)
             hr_review_required = True
-            reason_str = "Mandatory requirement failure(s): " + "; ".join(
-                f"{f.description} ({f.reason})" for f in req_results.mandatory_failures
-            )
+            reason_str = "Mandatory requirement failure(s): " + "; ".join(f"{f.description} ({f.reason})" for f in req_results.mandatory_failures)
         else:
             final_score = round(min(100.0, max(0.0, raw_score)), 1)
-            if final_score >= 100.0 and (
-                (skills_score is not None and skills_score < 100.0)
-                or len(req_results.missing_criteria) > 0
-                or (domain_score is not None and domain_score < 100.0)
-            ):
+            if final_score >= 100.0 and ((skills_score is not None and skills_score < 100.0) or len(req_results.missing_criteria) > 0 or (domain_score is not None and domain_score < 100.0)):
                 final_score = params.false_positive_score_cap
             hr_review_required = final_score < high_threshold
             reason_str = f"All mandatory requirements satisfied. Overall match score is {final_score}%."
@@ -568,13 +610,8 @@ class CrossDomainGuardEvaluator:
         **kwargs: Any,
     ) -> CrossDomainGuardResults:
         job_ctx = job if isinstance(job, JobEvaluationContext) else JobEvaluationContext.create(job)
-        job_title = job_ctx.title
-        job_department = job_ctx.department
-
-        compiled_guard = RuleConfigManager.get_compiled_cross_domain_guard()
         guard_params = RuleConfigManager.get_match_rules().cross_domain_guard
 
-        is_non_it_job = job_ctx.is_non_it_job
         has_software_req = job_ctx.has_software_req
 
         vac_tax_domain, vac_family = job_ctx.vac_tax_domain, job_ctx.vac_family
@@ -615,16 +652,11 @@ class CrossDomainGuardEvaluator:
                     )
                 )
 
-        is_domain_capped = domain_mismatch or any(
-            f.requirement_id == "req_domain_mismatch" for f in mandatory_failures
-        ) or bool(additional_failures)
+        is_domain_capped = domain_mismatch or any(f.requirement_id == "req_domain_mismatch" for f in mandatory_failures) or bool(additional_failures)
 
         domain_capped_reason = None
         if is_domain_capped:
-            domain_capped_reason = (
-                f"Strict domain mismatch penalty applied. Candidate domain ({context.cand_tax_domain}) "
-                f"conflicts with vacancy domain ({vac_tax_domain})."
-            )
+            domain_capped_reason = f"Strict domain mismatch penalty applied. Candidate domain ({context.cand_tax_domain}) conflicts with vacancy domain ({vac_tax_domain})."
 
         return CrossDomainGuardResults(
             final_score=final_score,
@@ -667,11 +699,7 @@ class RecommendationEvaluator:
 
         cov = component_coverage if component_coverage is not None else (coverage if coverage is not None else 1.0)
         missing = missing_criteria if missing_criteria is not None else []
-        typed_config = (
-            scoring_config
-            if isinstance(scoring_config, ScoringConfig)
-            else ScoringConfig.load(scoring_config if isinstance(scoring_config, dict) else None)
-        )
+        typed_config = scoring_config if isinstance(scoring_config, ScoringConfig) else ScoringConfig.load(scoring_config if isinstance(scoring_config, dict) else None)
         high_thresh = match_high_threshold if match_high_threshold is not None else typed_config.match_high_threshold
         med_thresh = match_medium_threshold if match_medium_threshold is not None else typed_config.match_medium_threshold
 

@@ -1,6 +1,4 @@
 # backend/scripts/seed_taxonomy_from_json.py
-import hashlib
-import json
 import logging
 import sys
 from pathlib import Path
@@ -8,8 +6,7 @@ from pathlib import Path
 # Add backend directory to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy.orm import Session
-from app.core.database import SessionLocal, engine, pg_SessionLocal, init_db
+from app.core.database import SessionLocal, init_db
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.taxonomy import (
     DesignationMaster,
@@ -17,7 +14,6 @@ from app.models.taxonomy import (
     DomainMaster,
     FamilyCompatibility,
     JobFamilyMaster,
-    SkillMaster,
 )
 from app.services.domain_embedding_service import DomainEmbeddingService
 
@@ -49,7 +45,11 @@ def seed_taxonomy_and_vectors():
             if db:
                 dom = db.query(DomainMaster).filter(DomainMaster.domain_name == domain_name).first()
                 if not dom:
-                    dom = DomainMaster(domain_code=code, domain_name=domain_name, description=f"Canonical Domain: {domain_name}")
+                    dom = DomainMaster(
+                        domain_code=code,
+                        domain_name=domain_name,
+                        description=f"Canonical Domain: {domain_name}",
+                    )
                     db.add(dom)
                     db.flush()
                 domain_map[domain_name] = dom
@@ -62,7 +62,11 @@ def seed_taxonomy_and_vectors():
             code = default_dom_name.upper().replace(" & ", "_").replace(" ", "_")
             dom = db.query(DomainMaster).filter(DomainMaster.domain_name == default_dom_name).first()
             if not dom:
-                dom = DomainMaster(domain_code=code, domain_name=default_dom_name, description="Default Fallback Domain")
+                dom = DomainMaster(
+                    domain_code=code,
+                    domain_name=default_dom_name,
+                    description="Default Fallback Domain",
+                )
                 db.add(dom)
                 db.flush()
             domain_map[default_dom_name] = dom
@@ -91,7 +95,12 @@ def seed_taxonomy_and_vectors():
                 code = fam_name.upper().replace(" & ", "_").replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")
                 fam = db.query(JobFamilyMaster).filter(JobFamilyMaster.family_name == fam_name).first()
                 if not fam:
-                    fam = JobFamilyMaster(domain_id=dom_obj.domain_id, family_code=code, family_name=fam_name, description=f"Canonical Family: {fam_name}")
+                    fam = JobFamilyMaster(
+                        domain_id=dom_obj.domain_id,
+                        family_code=code,
+                        family_name=fam_name,
+                        description=f"Canonical Family: {fam_name}",
+                    )
                     db.add(fam)
                     db.flush()
                 family_map[fam_name] = fam
@@ -123,7 +132,10 @@ def seed_taxonomy_and_vectors():
                         synonyms.extend(cond.keywords)
                 if desig_name in raw_designations:
                     existing_fam, existing_syns = raw_designations[desig_name]
-                    raw_designations[desig_name] = (existing_fam, list(set(existing_syns + synonyms)))
+                    raw_designations[desig_name] = (
+                        existing_fam,
+                        list(set(existing_syns + synonyms)),
+                    )
                 else:
                     raw_designations[desig_name] = (fam_name, list(set(synonyms)))
 
@@ -133,20 +145,50 @@ def seed_taxonomy_and_vectors():
                 code = desig_name.upper().replace(" ", "_")
                 desig = db.query(DesignationMaster).filter(DesignationMaster.designation_name == desig_name).first()
                 if not desig:
-                    desig = DesignationMaster(family_id=fam_obj.family_id, designation_code=code, designation_name=desig_name)
+                    desig = DesignationMaster(
+                        family_id=fam_obj.family_id,
+                        designation_code=code,
+                        designation_name=desig_name,
+                    )
                     db.add(desig)
                     db.flush()
-                
+
                 # Add canonical synonym
-                canon_syn = db.query(DesignationSynonym).filter(DesignationSynonym.designation_id == desig.designation_id, DesignationSynonym.synonym_text == desig_name).first()
+                canon_syn = (
+                    db.query(DesignationSynonym)
+                    .filter(
+                        DesignationSynonym.designation_id == desig.designation_id,
+                        DesignationSynonym.synonym_text == desig_name,
+                    )
+                    .first()
+                )
                 if not canon_syn:
-                    db.add(DesignationSynonym(designation_id=desig.designation_id, synonym_text=desig_name, is_canonical=True))
-                
+                    db.add(
+                        DesignationSynonym(
+                            designation_id=desig.designation_id,
+                            synonym_text=desig_name,
+                            is_canonical=True,
+                        )
+                    )
+
                 for syn in synonyms:
                     if syn and len(syn) > 1:
-                        syn_obj = db.query(DesignationSynonym).filter(DesignationSynonym.designation_id == desig.designation_id, DesignationSynonym.synonym_text == syn).first()
+                        syn_obj = (
+                            db.query(DesignationSynonym)
+                            .filter(
+                                DesignationSynonym.designation_id == desig.designation_id,
+                                DesignationSynonym.synonym_text == syn,
+                            )
+                            .first()
+                        )
                         if not syn_obj:
-                            db.add(DesignationSynonym(designation_id=desig.designation_id, synonym_text=syn, is_canonical=False))
+                            db.add(
+                                DesignationSynonym(
+                                    designation_id=desig.designation_id,
+                                    synonym_text=syn,
+                                    is_canonical=False,
+                                )
+                            )
 
             designations_to_vectorize.append((desig_name, "job_titles"))
             for syn in synonyms:
@@ -156,7 +198,10 @@ def seed_taxonomy_and_vectors():
         # 4. Seed Family Compatibilities
         logger.info("Seeding Family Compatibility Matrix...")
         if db:
-            for source_fam_name, target_fams in taxonomy_rules.compatibility_map.items():
+            for (
+                source_fam_name,
+                target_fams,
+            ) in taxonomy_rules.compatibility_map.items():
                 src_fam = family_map.get(source_fam_name)
                 if not src_fam:
                     continue
@@ -164,17 +209,23 @@ def seed_taxonomy_and_vectors():
                     tgt_fam = family_map.get(tgt_fam_name)
                     if not tgt_fam:
                         continue
-                    compat = db.query(FamilyCompatibility).filter(
-                        FamilyCompatibility.source_family_id == src_fam.family_id,
-                        FamilyCompatibility.target_family_id == tgt_fam.family_id
-                    ).first()
+                    compat = (
+                        db.query(FamilyCompatibility)
+                        .filter(
+                            FamilyCompatibility.source_family_id == src_fam.family_id,
+                            FamilyCompatibility.target_family_id == tgt_fam.family_id,
+                        )
+                        .first()
+                    )
                     if not compat:
-                        db.add(FamilyCompatibility(
-                            source_family_id=src_fam.family_id,
-                            target_family_id=tgt_fam.family_id,
-                            compatibility_score=1.0,
-                            is_allowed=True
-                        ))
+                        db.add(
+                            FamilyCompatibility(
+                                source_family_id=src_fam.family_id,
+                                target_family_id=tgt_fam.family_id,
+                                compatibility_score=1.0,
+                                is_allowed=True,
+                            )
+                        )
 
         if db:
             db.commit()

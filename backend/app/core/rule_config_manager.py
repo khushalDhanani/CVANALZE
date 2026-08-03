@@ -78,10 +78,16 @@ class CrossDomainGuard(BaseModel):
 
 
 class RecommendationTexts(BaseModel):
-    low_coverage: str = Field("Low Confidence Match — Requires HR verification (Vacancy is underspecified).", min_length=1)
+    low_coverage: str = Field(
+        "Low Confidence Match — Requires HR verification (Vacancy is underspecified).",
+        min_length=1,
+    )
     high_match: str = Field("Strong candidate — proceed to interview.", min_length=1)
     medium_match: str = Field("Potential match — HR review recommended.", min_length=1)
-    low_match: str = Field("Significant requirements missing — Manual HR review required (never auto-rejected).", min_length=1)
+    low_match: str = Field(
+        "Significant requirements missing — Manual HR review required (never auto-rejected).",
+        min_length=1,
+    )
 
 
 class ScoringParameters(BaseModel):
@@ -205,22 +211,14 @@ class UnifiedRuleConfig(BaseModel):
             min_acc = name_cfg.downstream_gates.min_acceptance_confidence
             email_fb = name_cfg.confidence_scoring.get("email_username_fallback", 0.0)
             if min_acc <= email_fb:
-                raise ValueError(
-                    "[SAFETY_GATE_VIOLATION] min_acceptance_confidence must be strictly greater than email_username_fallback"
-                )
+                raise ValueError("[SAFETY_GATE_VIOLATION] min_acceptance_confidence must be strictly greater than email_username_fallback")
 
         for field_name, cfg in self.fields.items():
-            if cfg.tier_thresholds.override_reason is None and (
-                cfg.tier_thresholds.high_min != 0.80 or cfg.tier_thresholds.medium_min != 0.50
-            ):
-                raise ValueError(
-                    f"[SAFETY_GATE_VIOLATION] Field '{field_name}' tier threshold modified but override_reason is missing"
-                )
+            if cfg.tier_thresholds.override_reason is None and (cfg.tier_thresholds.high_min != 0.80 or cfg.tier_thresholds.medium_min != 0.50):
+                raise ValueError(f"[SAFETY_GATE_VIOLATION] Field '{field_name}' tier threshold modified but override_reason is missing")
 
             if cfg.downstream_gates.min_acceptance_confidence < cfg.tier_thresholds.medium_min:
-                raise ValueError(
-                    f"[SAFETY_GATE_VIOLATION] Field '{field_name}' min_acceptance_confidence cannot be lower than medium_min threshold"
-                )
+                raise ValueError(f"[SAFETY_GATE_VIOLATION] Field '{field_name}' min_acceptance_confidence cannot be lower than medium_min threshold")
 
         loc = self.fields.get("location")
         if loc:
@@ -274,9 +272,7 @@ class UnifiedRuleConfig(BaseModel):
         density = resume_quality.density_scores
         for i in range(len(density) - 1):
             if density[i].min_words_per_page <= density[i + 1].min_words_per_page:
-                raise ValueError(
-                    "[SAFETY_GATE_VIOLATION] Resume quality density_scores must be ordered by descending min_words_per_page"
-                )
+                raise ValueError("[SAFETY_GATE_VIOLATION] Resume quality density_scores must be ordered by descending min_words_per_page")
 
         domain_embedding = self.scoring.domain_embedding
         if not domain_embedding.categories:
@@ -351,17 +347,19 @@ class RuleConfigManager:
             cls._config_mtime = path_mtime
             cls._config_hash = path_hash
             cls._load_counter += 1
-            cls._metrics = MappingProxyType({
-                "config_version": candidate_config.version,
-                "config_load_count": cls._load_counter,
-                "config_load_time_ms": total_load_time_ms,
-                "cache_build_time_ms": cache_build_time_ms,
-                "compiled_pattern_count": compiled_pattern_count,
-                "configuration_size_bytes": config_size_bytes,
-                "last_loaded_timestamp": datetime.now(UTC).isoformat(),
-                "last_modified_timestamp": str(path_mtime) if path_mtime else None,
-                "file_hash": path_hash,
-            })
+            cls._metrics = MappingProxyType(
+                {
+                    "config_version": candidate_config.version,
+                    "config_load_count": cls._load_counter,
+                    "config_load_time_ms": total_load_time_ms,
+                    "cache_build_time_ms": cache_build_time_ms,
+                    "compiled_pattern_count": compiled_pattern_count,
+                    "configuration_size_bytes": config_size_bytes,
+                    "last_loaded_timestamp": datetime.now(UTC).isoformat(),
+                    "last_modified_timestamp": str(path_mtime) if path_mtime else None,
+                    "file_hash": path_hash,
+                }
+            )
 
         logger.info(
             f"[RULE_CONFIG] Successfully loaded and activated rule_config "
@@ -371,35 +369,30 @@ class RuleConfigManager:
         return cls._active_config
 
     @classmethod
-    def _build_and_validate_all_caches(
-        cls, config: UnifiedRuleConfig
-    ) -> tuple[MappingProxyType, int]:
+    def _build_and_validate_all_caches(cls, config: UnifiedRuleConfig) -> tuple[MappingProxyType, int]:
         """Pre-compiles and warms ALL regexes and immutable asset dictionaries at startup."""
         pattern_count = 0
 
         # A. Term Matching
         tm = config.scoring.match.term_matching
-        term_matching_assets = MappingProxyType({
-            "stop_phrases": frozenset(p.lower().strip() for p in tm.stop_phrases if p),
-            "noise_words": frozenset(w.lower().strip() for w in tm.noise_words if w),
-            "aliases": MappingProxyType({
-                k.lower().strip(): [a.lower().strip() for a in v if a]
-                for k, v in tm.aliases.items()
-                if k and k.strip()
-            }),
-        })
+        term_matching_assets = MappingProxyType(
+            {
+                "stop_phrases": frozenset(p.lower().strip() for p in tm.stop_phrases if p),
+                "noise_words": frozenset(w.lower().strip() for w in tm.noise_words if w),
+                "aliases": MappingProxyType({k.lower().strip(): [a.lower().strip() for a in v if a] for k, v in tm.aliases.items() if k and k.strip()}),
+            }
+        )
 
         # B. Cross Domain Guard Sets
         guard = config.scoring.match.cross_domain_guard
-        cross_domain_assets = MappingProxyType({
-            "software_candidate_keywords": frozenset(k.lower().strip() for k in guard.software_candidate_keywords if k),
-            "non_it_job_keywords": frozenset(k.lower().strip() for k in guard.non_it_job_keywords if k),
-            "software_requirement_keywords": frozenset(k.lower().strip() for k in guard.software_requirement_keywords if k),
-            "domain_guard_terms": MappingProxyType({
-                domain.lower().strip(): frozenset(k.lower().strip() for k in keywords if k)
-                for domain, keywords in guard.domain_guard_terms.items()
-            }),
-        })
+        cross_domain_assets = MappingProxyType(
+            {
+                "software_candidate_keywords": frozenset(k.lower().strip() for k in guard.software_candidate_keywords if k),
+                "non_it_job_keywords": frozenset(k.lower().strip() for k in guard.non_it_job_keywords if k),
+                "software_requirement_keywords": frozenset(k.lower().strip() for k in guard.software_requirement_keywords if k),
+                "domain_guard_terms": MappingProxyType({domain.lower().strip(): frozenset(k.lower().strip() for k in keywords if k) for domain, keywords in guard.domain_guard_terms.items()}),
+            }
+        )
 
         # C. Resume Quality Section Patterns & Heading Normalizations
         rq = config.scoring.resume_quality
@@ -413,49 +406,37 @@ class RuleConfigManager:
             heading_normalizations.append((re.compile(h.pattern, re.IGNORECASE), h.replacement))
             pattern_count += 1
 
-        compiled_rq = MappingProxyType({
-            "section_patterns": MappingProxyType(section_patterns),
-            "heading_normalization": tuple(heading_normalizations),
-        })
+        compiled_rq = MappingProxyType(
+            {
+                "section_patterns": MappingProxyType(section_patterns),
+                "heading_normalization": tuple(heading_normalizations),
+            }
+        )
 
         # D. Compiled Cross Domain Guard Regexes
-        soft_cand_p = tuple(
-            re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE)
-            for k in guard.software_candidate_keywords
-            if k and k.strip()
-        )
+        soft_cand_p = tuple(re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE) for k in guard.software_candidate_keywords if k and k.strip())
         pattern_count += len(soft_cand_p)
 
-        non_it_p = tuple(
-            re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE)
-            for k in guard.non_it_job_keywords
-            if k and k.strip()
-        )
+        non_it_p = tuple(re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE) for k in guard.non_it_job_keywords if k and k.strip())
         pattern_count += len(non_it_p)
 
-        soft_req_p = tuple(
-            re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE)
-            for k in guard.software_requirement_keywords
-            if k and k.strip()
-        )
+        soft_req_p = tuple(re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE) for k in guard.software_requirement_keywords if k and k.strip())
         pattern_count += len(soft_req_p)
 
         domain_guard_map = {}
         for domain, keywords in guard.domain_guard_terms.items():
-            compiled_terms = tuple(
-                re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE)
-                for k in keywords
-                if k and k.strip()
-            )
+            compiled_terms = tuple(re.compile(r"\b" + re.escape(k.lower().strip()) + r"\b", re.IGNORECASE) for k in keywords if k and k.strip())
             domain_guard_map[domain.lower().strip()] = compiled_terms
             pattern_count += len(compiled_terms)
 
-        compiled_cross_domain_guard = MappingProxyType({
-            "software_candidate_patterns": soft_cand_p,
-            "non_it_job_patterns": non_it_p,
-            "software_requirement_patterns": soft_req_p,
-            "domain_guard_term_patterns": MappingProxyType(domain_guard_map),
-        })
+        compiled_cross_domain_guard = MappingProxyType(
+            {
+                "software_candidate_patterns": soft_cand_p,
+                "non_it_job_patterns": non_it_p,
+                "software_requirement_patterns": soft_req_p,
+                "domain_guard_term_patterns": MappingProxyType(domain_guard_map),
+            }
+        )
 
         # Cache Validation Gate
         if pattern_count == 0:
@@ -465,15 +446,17 @@ class RuleConfigManager:
         if not soft_cand_p:
             raise ValueError("[CACHE_VALIDATION_FAILURE] Software candidate patterns are empty")
 
-        cache_dict = MappingProxyType({
-            "config": config,
-            "term_matching": term_matching_assets,
-            "cross_domain_guard": cross_domain_assets,
-            "compiled": compiled_rq,
-            "compiled_cross_domain_guard": compiled_cross_domain_guard,
-            "recommendations": config.scoring.match.recommendations,
-            "scoring_parameters": config.scoring.match.scoring_parameters,
-        })
+        cache_dict = MappingProxyType(
+            {
+                "config": config,
+                "term_matching": term_matching_assets,
+                "cross_domain_guard": cross_domain_assets,
+                "compiled": compiled_rq,
+                "compiled_cross_domain_guard": compiled_cross_domain_guard,
+                "recommendations": config.scoring.match.recommendations,
+                "scoring_parameters": config.scoring.match.scoring_parameters,
+            }
+        )
         return cache_dict, pattern_count
 
     @classmethod
@@ -595,7 +578,9 @@ class RuleConfigManager:
         return cls._get_cache()["compiled"]["section_patterns"]
 
     @classmethod
-    def get_compiled_heading_normalizations(cls) -> tuple[tuple[Pattern[str], str], ...]:
+    def get_compiled_heading_normalizations(
+        cls,
+    ) -> tuple[tuple[Pattern[str], str], ...]:
         return cls._get_cache()["compiled"]["heading_normalization"]
 
     @classmethod
@@ -657,9 +642,7 @@ class RuleConfigManager:
         scoring = candidate_config.scoring
 
         # Smoke Test 4: Cross-Domain Guard Software Candidate Detection
-        software_keywords = {
-            k.lower().strip() for k in scoring.match.cross_domain_guard.software_candidate_keywords if k
-        }
+        software_keywords = {k.lower().strip() for k in scoring.match.cross_domain_guard.software_candidate_keywords if k}
         norm_text = "worked as a flutter developer"
         if not any(k in norm_text for k in software_keywords):
             raise ValueError("[SMOKE_TEST_FAILURE] Failed to detect software candidate via cross_domain_guard keywords")
@@ -670,10 +653,7 @@ class RuleConfigManager:
             raise ValueError("[SMOKE_TEST_FAILURE] prefilter stop_words missing expected entries")
 
         # Smoke Test 6: Resume Quality Section Detection & Heading Normalization
-        section_patterns = {
-            name: re.compile(pattern, re.IGNORECASE)
-            for name, pattern in scoring.resume_quality.section_patterns.items()
-        }
+        section_patterns = {name: re.compile(pattern, re.IGNORECASE) for name, pattern in scoring.resume_quality.section_patterns.items()}
         sample_resume = "## WORK EXPERIENCE\nPython developer"
         if not section_patterns["experience"].search(sample_resume.lower()):
             raise ValueError("[SMOKE_TEST_FAILURE] Failed to detect experience section via resume_quality patterns")
@@ -695,8 +675,7 @@ class RuleConfigManager:
         )
         if software_rule is not None and not any(
             all(
-                (c.keywords and (not c.negate) and any(k in scopes.get(c.scope, "") for k in c.keywords))
-                or (c.negate and not any(k in scopes.get(c.scope, "") for k in c.keywords))
+                (c.keywords and (not c.negate) and any(k in scopes.get(c.scope, "") for k in c.keywords)) or (c.negate and not any(k in scopes.get(c.scope, "") for k in c.keywords))
                 for c in branch.conditions
             )
             for branch in software_rule.branches

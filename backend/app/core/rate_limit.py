@@ -58,7 +58,10 @@ class RateLimitMiddleware:
         self.limiter = InMemoryRateLimiter()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if not settings.RATE_LIMIT_ENABLED or scope["type"] not in ("http", "websocket"):
+        if not settings.RATE_LIMIT_ENABLED or scope["type"] not in (
+            "http",
+            "websocket",
+        ):
             await self.app(scope, receive, send)
             return
         if scope.get("method") == "OPTIONS" or scope.get("path") in ("/", "/health"):
@@ -72,7 +75,13 @@ class RateLimitMiddleware:
         )
         if not decision.allowed:
             if scope["type"] == "websocket":
-                await send({"type": "websocket.close", "code": 4429, "reason": "Rate limit exceeded."})
+                await send(
+                    {
+                        "type": "websocket.close",
+                        "code": 4429,
+                        "reason": "Rate limit exceeded.",
+                    }
+                )
                 return
             response = error_response(
                 scope,

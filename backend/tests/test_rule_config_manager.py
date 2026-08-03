@@ -48,7 +48,10 @@ def test_rule_config_manager_enforces_email_fallback_safety_invariant():
     # Set min_acceptance_confidence to 0.30 (equal to email_username_fallback)
     candidate_dict["fields"]["name"]["downstream_gates"]["min_acceptance_confidence"] = 0.30
 
-    with pytest.raises(ValueError, match=r"SAFETY_GATE_VIOLATION.*must be strictly greater than email_username_fallback"):
+    with pytest.raises(
+        ValueError,
+        match=r"SAFETY_GATE_VIOLATION.*must be strictly greater than email_username_fallback",
+    ):
         RuleConfigManager.load_config(candidate_dict)
 
     # Restore default config
@@ -64,7 +67,10 @@ def test_rule_config_manager_enforces_medium_min_decoupling_invariant():
     candidate_dict["fields"]["location"]["downstream_gates"]["min_acceptance_confidence"] = 0.50
     candidate_dict["fields"]["location"]["tier_thresholds"]["override_reason"] = "Higher medium threshold"
 
-    with pytest.raises(ValueError, match=r"SAFETY_GATE_VIOLATION.*cannot be lower than medium_min threshold"):
+    with pytest.raises(
+        ValueError,
+        match=r"SAFETY_GATE_VIOLATION.*cannot be lower than medium_min threshold",
+    ):
         RuleConfigManager.load_config(candidate_dict)
 
     # Restore default config
@@ -117,7 +123,13 @@ def test_scoring_accessors_expose_data_driven_rules():
     assert any(rule.name == "finance_administration" for rule in taxonomy.candidate_rules)
 
     resume_quality = RuleConfigManager.get_resume_quality_rules()
-    assert set(resume_quality.core_sections) == {"contact", "summary", "experience", "education", "skills"}
+    assert set(resume_quality.core_sections) == {
+        "contact",
+        "summary",
+        "experience",
+        "education",
+        "skills",
+    }
     assert resume_quality.density_scores[0].min_words_per_page == 150
     assert len(resume_quality.section_patterns) == 7
     assert len(resume_quality.heading_normalization) == 5
@@ -131,7 +143,13 @@ def test_term_matching_assets_are_cached_and_normalized():
     assets = RuleConfigManager.get_term_matching_assets()
     assert assets["stop_phrases"] == {"e.g", "eg", "e.g.", "etc", "etc.", "i.e", "i.e."}
     assert "the" in assets["noise_words"]
-    assert assets["aliases"]["restful apis"] == ["api", "apis", "rest", "restful", "http"]
+    assert assets["aliases"]["restful apis"] == [
+        "api",
+        "apis",
+        "rest",
+        "restful",
+        "http",
+    ]
     assert RuleConfigManager.get_term_matching_assets() is assets
 
 
@@ -139,7 +157,13 @@ def test_cross_domain_guard_assets_are_normalized():
     assets = RuleConfigManager.get_cross_domain_guard_assets()
     assert "full stack developer" in assets["software_candidate_keywords"]
     assert "human resources" in assets["non_it_job_keywords"]
-    assert assets["domain_guard_terms"]["finance"] == {"finance", "account", "audit", "tax", "ledger"}
+    assert assets["domain_guard_terms"]["finance"] == {
+        "finance",
+        "account",
+        "audit",
+        "tax",
+        "ledger",
+    }
 
 
 def test_compiled_regex_cache_normalizes_headings_and_detects_sections():
@@ -217,4 +241,3 @@ def test_rule_config_manager_metrics_and_reload():
 
     reloaded = RuleConfigManager.reload_if_changed()
     assert reloaded is False
-

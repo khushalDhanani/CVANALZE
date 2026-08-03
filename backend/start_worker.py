@@ -15,10 +15,11 @@ def main():
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
 
-    listen = ['default']
+    listen = ["default"]
     queues = [Queue(name, connection=conn) for name in listen]
     worker = Worker(queues, connection=conn)
     worker.work()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

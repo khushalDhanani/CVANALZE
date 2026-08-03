@@ -11,7 +11,7 @@ def test_scoring_engine_high_match():
     analysis = ScoringEngine.analyze_cv(cv_text)
 
     # Since we are matching against real DB vacancies, we just assert that it finds a match
-    # and the logic doesn't crash. 
+    # and the logic doesn't crash.
     assert analysis.primary_department is not None
     assert analysis.best_match is not None
     assert analysis.best_match.score >= 0.0
@@ -52,9 +52,7 @@ def test_api_cv_match_endpoint(monkeypatch):
     client = TestClient(app)
     response = client.post(
         "/api/cv/match",
-        json={
-            "cv_text": "Skills: Python, FastAPI, SQL, REST API, Node.js, Express.js, MongoDB, Git"
-        },
+        json={"cv_text": "Skills: Python, FastAPI, SQL, REST API, Node.js, Express.js, MongoDB, Git"},
     )
 
     assert response.status_code == 200
@@ -100,4 +98,3 @@ def test_evaluate_job_match_with_custom_scoring_config():
         scoring_config=custom_config,
     )
     assert result.overall_score >= 0.0
-

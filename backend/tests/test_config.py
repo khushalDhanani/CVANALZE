@@ -21,8 +21,16 @@ def test_dynamic_config_api():
 
     app.dependency_overrides[get_db] = lambda: None
     try:
-        with patch("app.api.config.ConfigRepository.get_setting", side_effect=fake_get_setting), \
-             patch("app.api.config.ConfigRepository.update_setting", side_effect=fake_update_setting):
+        with (
+            patch(
+                "app.api.config.ConfigRepository.get_setting",
+                side_effect=fake_get_setting,
+            ),
+            patch(
+                "app.api.config.ConfigRepository.update_setting",
+                side_effect=fake_update_setting,
+            ),
+        ):
             # 1. GET config
             resp = client.get("/api/config/match")
             assert resp.status_code == 200

@@ -103,8 +103,16 @@ def test_legacy_filename_key_resolves_one_canonical_result(monkeypatch):
 
 def test_ambiguous_legacy_filename_key_does_not_choose_a_candidate(monkeypatch):
     results = [
-        {"id": "cv_candidate_1", "legacy_cv_keys": ["cv_resume"], "status": "COMPLETED"},
-        {"id": "cv_candidate_2", "legacy_cv_keys": ["cv_resume"], "status": "COMPLETED"},
+        {
+            "id": "cv_candidate_1",
+            "legacy_cv_keys": ["cv_resume"],
+            "status": "COMPLETED",
+        },
+        {
+            "id": "cv_candidate_2",
+            "legacy_cv_keys": ["cv_resume"],
+            "status": "COMPLETED",
+        },
     ]
     monkeypatch.setattr(ResultRepository, "read_result_by_filename", lambda _: None)
     monkeypatch.setattr(ResultRepository, "find_results_by_scan_id", lambda _: [])
@@ -200,7 +208,10 @@ async def test_match_service_hashes_raw_text_when_hash_is_missing(monkeypatch):
 
     cached_result = MatchService._empty_analysis().model_dump()
     monkeypatch.setattr(CacheKey, "for_match_result", staticmethod(capture_match_key))
-    monkeypatch.setattr("app.services.match_service.match_result_cache_manager.get", lambda _: cached_result)
+    monkeypatch.setattr(
+        "app.services.match_service.match_result_cache_manager.get",
+        lambda _: cached_result,
+    )
 
     raw_text = "Candidate text with Python experience."
     await MatchService.analyze_single_cv(
@@ -211,6 +222,4 @@ async def test_match_service_hashes_raw_text_when_hash_is_missing(monkeypatch):
     assert captured_components["document_hash"] == hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
     assert captured_components["model_version"] == settings.OLLAMA_MODEL
     assert captured_components["matching_version"] == settings.MATCHING_VERSION
-    assert captured_components["extraction_version"] == (
-        f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
-    )
+    assert captured_components["extraction_version"] == (f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}")

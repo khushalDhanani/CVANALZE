@@ -46,10 +46,14 @@ class DynamicScoringAndPrefilterService:
                     db_words = session.query(StopWord.word).filter(StopWord.is_active == True).all()
                     stop_words.update(w[0].strip().lower() for w in db_words if w[0])
 
-                    prof = session.query(ScoringProfileMaster).filter(
-                        ScoringProfileMaster.is_default == True,
-                        ScoringProfileMaster.is_active == True,
-                    ).first()
+                    prof = (
+                        session.query(ScoringProfileMaster)
+                        .filter(
+                            ScoringProfileMaster.is_default == True,
+                            ScoringProfileMaster.is_active == True,
+                        )
+                        .first()
+                    )
                     if prof:
                         cls._default_profile_cache = {
                             "lexical_weights": json.loads(prof.lexical_weights_json) if prof.lexical_weights_json else {},
@@ -82,10 +86,14 @@ class DynamicScoringAndPrefilterService:
         if SessionLocal is not None:
             try:
                 with SessionLocal() as session:
-                    prof = session.query(ScoringProfileMaster).filter(
-                        ScoringProfileMaster.profile_code == profile_code.upper(),
-                        ScoringProfileMaster.is_active == True,
-                    ).first()
+                    prof = (
+                        session.query(ScoringProfileMaster)
+                        .filter(
+                            ScoringProfileMaster.profile_code == profile_code.upper(),
+                            ScoringProfileMaster.is_active == True,
+                        )
+                        .first()
+                    )
                     if prof:
                         return {
                             "profile_code": prof.profile_code,

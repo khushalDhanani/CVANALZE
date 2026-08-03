@@ -122,9 +122,7 @@ def test_extract_candidate_domain_profile_maps_to_real_departments(monkeypatch):
     profile = ScoringEngine.extract_candidate_domain_profile(software_cv)
     assert any(term in profile["recommended_department"] for term in ["IT & Software Services", "Software", "CIS"])
     assert any(term in profile["professional_domain"] for term in ["IT & Software Services", "Information Technology", "Software"])
-    assert any(
-        "Developer" in role or "Engineer" in role for role in profile["suitable_job_roles"]
-    )
+    assert any("Developer" in role or "Engineer" in role for role in profile["suitable_job_roles"])
 
     finance_cv = """
     Financial Analyst | CA Inter
@@ -150,32 +148,36 @@ def test_extract_candidate_domain_profile_generic_fallback(monkeypatch):
     profile = ScoringEngine.extract_candidate_domain_profile("completely unrelated text about hobbies")
     assert profile["recommended_department"] == "General Engineering & Operations"
     assert profile["professional_domain"] == "General Operations"
-    assert profile["suitable_job_roles"] == ["Operations Associate", "General Specialist"]
+    assert profile["suitable_job_roles"] == [
+        "Operations Associate",
+        "General Specialist",
+    ]
 
 
 def test_new_department_works_without_code_change(monkeypatch):
-    loader = lambda path: json.loads(
-        path.read_text(encoding="utf-8")
-    )["domains"] + [
-        {
-            "department_name": "Data & Analytics",
-            "domain_name": "Data Science & Analytics",
-            "keywords": [
-                "machine learning",
-                "data science",
-                "tensorflow",
-                "pandas",
-                "deep learning",
-                "nlp",
-                "big data",
-                "statistics",
-                "data mining",
-            ],
-            "default_roles": ["Data Scientist", "ML Engineer", "Data Analyst"],
-            "priority": 9,
-            "is_active": True,
-        }
-    ]
+    loader = lambda path: (
+        json.loads(path.read_text(encoding="utf-8"))["domains"]
+        + [
+            {
+                "department_name": "Data & Analytics",
+                "domain_name": "Data Science & Analytics",
+                "keywords": [
+                    "machine learning",
+                    "data science",
+                    "tensorflow",
+                    "pandas",
+                    "deep learning",
+                    "nlp",
+                    "big data",
+                    "statistics",
+                    "data mining",
+                ],
+                "default_roles": ["Data Scientist", "ML Engineer", "Data Analyst"],
+                "priority": 9,
+                "is_active": True,
+            }
+        ]
+    )
     repo = _seed_repo(seed_loader=loader)
     assert len(repo.get_all_domains()) == 9
     monkeypatch.setattr(ScoringEngine, "domain_repository", repo)
@@ -194,11 +196,7 @@ def test_build_domain_candidate_text_infers_departments(monkeypatch):
     repo = _seed_repo()
     monkeypatch.setattr(ScoringEngine, "domain_repository", repo)
 
-    domain_text = ScoringEngine._build_domain_candidate_text(
-        "## Senior Flutter Developer\n"
-        "### Skills\n"
-        "Flutter, Dart, REST APIs"
-    )
+    domain_text = ScoringEngine._build_domain_candidate_text("## Senior Flutter Developer\n### Skills\nFlutter, Dart, REST APIs")
     assert "CIS Team" in domain_text
 
 
@@ -212,7 +210,7 @@ def test_thread_safety_smoke():
                 assert len(repo.get_all_domains()) == 8
                 assert len(repo.get_domain_matchers()) == 8
                 assert repo.get_domain_by_department(99999) is None
-        except Exception as exc:  # noqa: BLE001 - collected for thread-safety assertion
+        except Exception as exc:
             errors.append(exc)
 
     with ThreadPoolExecutor(max_workers=8) as pool:

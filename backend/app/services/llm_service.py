@@ -174,10 +174,7 @@ class OllamaLLMService:
                     profiler.metrics.token_count = cached_entry.token_count
                 return cached
             except (ValidationError, TypeError, ValueError) as exc:
-                logger.warning(
-                    f"[OLLAMA] operation={operation} model='{model}' cache=INVALID "
-                    f"error={type(exc).__name__}"
-                )
+                logger.warning(f"[OLLAMA] operation={operation} model='{model}' cache=INVALID error={type(exc).__name__}")
         else:
             logger.info(f"[OLLAMA] operation={operation} model='{model}' cache=MISS")
 
@@ -216,18 +213,11 @@ class OllamaLLMService:
                 parser=parse,
             )
         except OllamaError as exc:
-            logger.error(
-                f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK "
-                f"error={type(exc).__name__}"
-            )
+            logger.error(f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK error={type(exc).__name__}")
             return None
 
         generation = transport_result.value
-        inference_ms = (
-            round(generation.envelope.eval_duration / 1_000_000.0, 2)
-            if generation.envelope.eval_duration
-            else transport_result.duration_ms
-        )
+        inference_ms = round(generation.envelope.eval_duration / 1_000_000.0, 2) if generation.envelope.eval_duration else transport_result.duration_ms
         if profiler:
             profiler.metrics.ollama_request_ms = transport_result.duration_ms
             profiler.metrics.model_inference_ms = inference_ms
@@ -260,10 +250,7 @@ class OllamaLLMService:
             OllamaTransport.unload(model)
             return True
         except OllamaError as exc:
-            logger.warning(
-                f"[OLLAMA] operation=unload model='{model}' status=FALLBACK "
-                f"error={type(exc).__name__}"
-            )
+            logger.warning(f"[OLLAMA] operation=unload model='{model}' status=FALLBACK error={type(exc).__name__}")
             return False
 
     @staticmethod

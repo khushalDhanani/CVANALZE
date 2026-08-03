@@ -15,30 +15,48 @@ from app.services.scoring_engine import ScoringEngine
 def generate_synthetic_vacancies(count: int) -> list[dict[str, Any]]:
     """Generates realistic synthetic vacancy dataset across 8 departments."""
     departments = [
-        ("CIS Team", "Software Engineer", ["Python", "FastAPI", "Docker", "PostgreSQL"]),
+        (
+            "CIS Team",
+            "Software Engineer",
+            ["Python", "FastAPI", "Docker", "PostgreSQL"],
+        ),
         ("CIS Team", "DevOps Engineer", ["Kubernetes", "Docker", "Terraform", "CI/CD"]),
         ("Finance Team", "Accountant", ["Tally", "GST", "Excel", "Auditing"]),
-        ("HR & IR Team", "HR Manager", ["Recruitment", "Payroll", "Employee Relations"]),
-        ("Maintenance Team - 1 (Ramesh Maurya)", "Mechanical Technician", ["HVAC", "Pumps", "Boilers", "Maintenance"]),
+        (
+            "HR & IR Team",
+            "HR Manager",
+            ["Recruitment", "Payroll", "Employee Relations"],
+        ),
+        (
+            "Maintenance Team - 1 (Ramesh Maurya)",
+            "Mechanical Technician",
+            ["HVAC", "Pumps", "Boilers", "Maintenance"],
+        ),
         ("Sales Team", "Sales Executive", ["CRM", "B2B Sales", "Lead Generation"]),
         ("EHS Team", "Safety Officer", ["Safety Audit", "ISO 14001", "OSHA"]),
-        ("Procurement Team", "Purchase Executive", ["Vendor Management", "SAP", "Negotiation"]),
+        (
+            "Procurement Team",
+            "Purchase Executive",
+            ["Vendor Management", "SAP", "Negotiation"],
+        ),
     ]
 
     vacancies: list[dict[str, Any]] = []
     for i in range(count):
         dept_name, title, skills = departments[i % len(departments)]
-        vacancies.append({
-            "id": f"vac_{i+1:05d}",
-            "vacancy_id": i + 1,
-            "title": f"{title} #{i+1}",
-            "department_name": dept_name,
-            "required_skills": skills,
-            "preferred_keywords": ["Teamwork", "Problem Solving"],
-            "min_experience_years": float((i % 5) + 1),
-            "max_experience_years": float((i % 5) + 6),
-            "max_ctc": float(500000 + (i * 100)),
-        })
+        vacancies.append(
+            {
+                "id": f"vac_{i + 1:05d}",
+                "vacancy_id": i + 1,
+                "title": f"{title} #{i + 1}",
+                "department_name": dept_name,
+                "required_skills": skills,
+                "preferred_keywords": ["Teamwork", "Problem Solving"],
+                "min_experience_years": float((i % 5) + 1),
+                "max_experience_years": float((i % 5) + 6),
+                "max_ctc": float(500000 + (i * 100)),
+            }
+        )
     return vacancies
 
 
@@ -78,10 +96,7 @@ def test_scale_benchmark_throughput_and_memory(vacancy_count: int):
 
     # 4. Stage-0 Taxonomy Retrieval Filtering
     t0 = time.perf_counter()
-    filtered_job_contexts = [
-        j for j in job_contexts
-        if TaxonomyClassifier.are_families_compatible(cand_context.cand_families, j.vac_family)
-    ]
+    filtered_job_contexts = [j for j in job_contexts if TaxonomyClassifier.are_families_compatible(cand_context.cand_families, j.vac_family)]
     t_stage0_ms = (time.perf_counter() - t0) * 1000.0
     pruned_count = vacancy_count - len(filtered_job_contexts)
     prune_ratio_pct = round((pruned_count / vacancy_count) * 100.0, 1)
@@ -103,12 +118,12 @@ def test_scale_benchmark_throughput_and_memory(vacancy_count: int):
     print(f"SCALE BENCHMARK RESULTS (N = {vacancy_count} Vacancies)")
     print("==================================================")
     print(f"Dataset Gen Time       : {t_gen_ms:.2f} ms")
-    print(f"Vacancy Context Time   : {t_vac_ctx_ms:.2f} ms ({t_vac_ctx_ms/vacancy_count:.3f} ms/vac)")
+    print(f"Vacancy Context Time   : {t_vac_ctx_ms:.2f} ms ({t_vac_ctx_ms / vacancy_count:.3f} ms/vac)")
     print(f"Candidate Context Time : {t_cand_ctx_ms:.2f} ms")
     print(f"Stage-0 Prefilter Time : {t_stage0_ms:.2f} ms")
     print(f"Taxonomy Pruning Ratio : {pruned_count}/{vacancy_count} ({prune_ratio_pct}% pruned)")
     print(f"Post-Filter Vacancies  : {len(filtered_job_contexts)}")
-    print(f"Scoring Engine Time    : {t_scoring_ms:.2f} ms ({t_scoring_ms/max(1, len(filtered_job_contexts)):.3f} ms/vac scored)")
+    print(f"Scoring Engine Time    : {t_scoring_ms:.2f} ms ({t_scoring_ms / max(1, len(filtered_job_contexts)):.3f} ms/vac scored)")
     print(f"Scoring Throughput     : {throughput_eval_per_sec} evaluations/sec")
     print(f"Memory Footprint Delta : {mem_after - mem_before:.2f} MB (Peak RSS: {mem_after} MB)")
     print(f"Best Match Found       : {analysis.best_match.job_title} (Score: {analysis.best_match.score}%)")

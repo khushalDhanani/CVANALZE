@@ -183,7 +183,10 @@ class UploadService:
         try:
             document = fitz.open(stream=content, filetype="pdf")
             if document.needs_pass:
-                raise UploadValidationError("Password-protected PDFs are not supported.", code="encrypted_document")
+                raise UploadValidationError(
+                    "Password-protected PDFs are not supported.",
+                    code="encrypted_document",
+                )
             if document.page_count < 1:
                 raise UploadValidationError("The PDF contains no pages.", code="invalid_document_structure")
             if document.page_count > settings.MAX_PDF_PAGES:
@@ -335,7 +338,13 @@ class UploadService:
     @classmethod
     def _storage_filename(cls, storage_key: str, content_hash: str, extension: str) -> str:
         safe_key = re.sub(r"[^A-Za-z0-9_-]+", "_", storage_key).strip("._-") or "cv"
-        key_limit = max(1, min(settings.UPLOAD_FILENAME_MAX_CHARS, 253 - len(content_hash) - len(extension)))
+        key_limit = max(
+            1,
+            min(
+                settings.UPLOAD_FILENAME_MAX_CHARS,
+                253 - len(content_hash) - len(extension),
+            ),
+        )
         safe_key = safe_key[:key_limit].rstrip("._-") or "cv"
         return f"{safe_key}_{content_hash}.{extension}"
 

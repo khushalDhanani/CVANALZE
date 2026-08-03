@@ -47,8 +47,14 @@ def _install_client(monkeypatch, *side_effects) -> MagicMock:
 
 
 def _disable_cache(monkeypatch) -> None:
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: None)
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.save_cached_entry", lambda key, entry: None)
+    monkeypatch.setattr(
+        "app.repositories.llm_cache.LLMCacheRepository.get_cached_entry",
+        lambda key: None,
+    )
+    monkeypatch.setattr(
+        "app.repositories.llm_cache.LLMCacheRepository.save_cached_entry",
+        lambda key, entry: None,
+    )
 
 
 def test_transport_reuses_one_pooled_client(monkeypatch):
@@ -83,7 +89,10 @@ def test_generation_cache_hit_skips_transport(monkeypatch):
         model=settings.OLLAMA_MODEL,
         prompt_version="phase5",
     )
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: cached)
+    monkeypatch.setattr(
+        "app.repositories.llm_cache.LLMCacheRepository.get_cached_entry",
+        lambda key: cached,
+    )
     execute = MagicMock(side_effect=AssertionError("transport must not run on cache hit"))
     monkeypatch.setattr(OllamaTransport, "execute", execute)
 

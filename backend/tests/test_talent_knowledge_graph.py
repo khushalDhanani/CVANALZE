@@ -36,17 +36,34 @@ def test_candidate_360_graph_generation():
         "quality_metrics": {"experience_years": 5.0},
         "match_analysis": {
             "primary_department": "Engineering",
-            "suitable_openings": [{"vacancy_id": 101, "job_title": "Python Engineer", "score": 92.5, "classification": "HIGH"}],
+            "suitable_openings": [
+                {
+                    "vacancy_id": 101,
+                    "job_title": "Python Engineer",
+                    "score": 92.5,
+                    "classification": "HIGH",
+                }
+            ],
         },
         "resume_json": {
             "contact_info": {"name": "Alex Mercer", "email": "alex@example.com"},
             "skills": ["Python", "FastAPI", "PostgreSQL"],
             "work_experience": [{"company": "Tech Corp", "role": "Senior Developer"}],
         },
-        "similar_candidates": [{"cv_key": "cand_other", "full_name": "Other Candidate", "similarity_score": 0.89, "is_duplicate_flag": False}],
+        "similar_candidates": [
+            {
+                "cv_key": "cand_other",
+                "full_name": "Other Candidate",
+                "similarity_score": 0.89,
+                "is_duplicate_flag": False,
+            }
+        ],
     }
 
-    with patch("app.repositories.result.ResultRepository.read_result_by_filename", return_value=mock_result):
+    with patch(
+        "app.repositories.result.ResultRepository.read_result_by_filename",
+        return_value=mock_result,
+    ):
         graph = TalentKnowledgeGraphService.get_candidate_360_graph("cand_graph_1")
 
         assert graph["candidate_id"] == "cand_graph_1"

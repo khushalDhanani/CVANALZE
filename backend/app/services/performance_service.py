@@ -124,9 +124,7 @@ class EnterprisePerformanceService:
         return cleared_count
 
     @classmethod
-    async def generate_embeddings_batch_async(
-        cls, texts: list[str], max_concurrent: int = 5, max_retries: int = 3
-    ) -> list[list[float] | None]:
+    async def generate_embeddings_batch_async(cls, texts: list[str], max_concurrent: int = 5, max_retries: int = 3) -> list[list[float] | None]:
         """
         Asynchronous concurrent batch embedding generation with exponential backoff retries.
         """
@@ -153,9 +151,7 @@ class EnterprisePerformanceService:
                         start_t = time.perf_counter()
                         # Execute in threadpool so event loop is non-blocking
                         loop = asyncio.get_running_loop()
-                        emb = await loop.run_in_executor(
-                            None, EmbeddingService.generate_embedding, text
-                        )
+                        emb = await loop.run_in_executor(None, EmbeddingService.generate_embedding, text)
                         dur_ms = (time.perf_counter() - start_t) * 1000.0
 
                         if emb:

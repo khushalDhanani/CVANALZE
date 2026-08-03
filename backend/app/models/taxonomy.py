@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+
 from sqlalchemy import (
     Boolean,
     Column,
@@ -33,7 +34,11 @@ class JobFamilyMaster(Base):
     __table_args__ = {"schema": "cvai"}
 
     family_id = Column(Integer, primary_key=True, autoincrement=True)
-    domain_id = Column(Integer, ForeignKey("cvai.domains.domain_id", ondelete="CASCADE"), nullable=False)
+    domain_id = Column(
+        Integer,
+        ForeignKey("cvai.domains.domain_id", ondelete="CASCADE"),
+        nullable=False,
+    )
     family_code = Column(String(50), nullable=False, unique=True)
     family_name = Column(String(255), nullable=False)
     description = Column(String(500), nullable=True)
@@ -50,7 +55,11 @@ class DesignationMaster(Base):
     __table_args__ = {"schema": "cvai"}
 
     designation_id = Column(Integer, primary_key=True, autoincrement=True)
-    family_id = Column(Integer, ForeignKey("cvai.job_families.family_id", ondelete="CASCADE"), nullable=False)
+    family_id = Column(
+        Integer,
+        ForeignKey("cvai.job_families.family_id", ondelete="CASCADE"),
+        nullable=False,
+    )
     designation_code = Column(String(100), nullable=False, unique=True)
     designation_name = Column(String(255), nullable=False)
     seniority_level = Column(String(50), nullable=True)
@@ -69,7 +78,11 @@ class DesignationSynonym(Base):
     __table_args__ = {"schema": "cvai"}
 
     synonym_id = Column(Integer, primary_key=True, autoincrement=True)
-    designation_id = Column(Integer, ForeignKey("cvai.designations.designation_id", ondelete="CASCADE"), nullable=False)
+    designation_id = Column(
+        Integer,
+        ForeignKey("cvai.designations.designation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
     synonym_text = Column(String(255), nullable=False, index=True)
     is_canonical = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
@@ -93,8 +106,16 @@ class DesignationSkill(Base):
     __tablename__ = "designation_skills"
     __table_args__ = {"schema": "cvai"}
 
-    designation_id = Column(Integer, ForeignKey("cvai.designations.designation_id", ondelete="CASCADE"), primary_key=True)
-    skill_id = Column(Integer, ForeignKey("cvai.skills.skill_id", ondelete="CASCADE"), primary_key=True)
+    designation_id = Column(
+        Integer,
+        ForeignKey("cvai.designations.designation_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    skill_id = Column(
+        Integer,
+        ForeignKey("cvai.skills.skill_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
     is_mandatory = Column(Boolean, default=False)
     importance_weight = Column(Float, default=1.0)
 

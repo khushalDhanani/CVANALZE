@@ -39,6 +39,7 @@ def _get_local_cv_lock(cv_key: str) -> asyncio.Lock:
 @asynccontextmanager
 async def get_cv_lock(cv_key: str):
     from app.core.cache import _REDIS_CLIENT
+
     redis_lock = None
     if _REDIS_CLIENT:
         try:
@@ -70,7 +71,6 @@ def get_stable_cv_key(
 ) -> str:
     """Return the canonical ID-based key, falling back to the legacy filename key."""
     return resolve_cv_identity(filename, candidate_id, cv_id).canonical_key
-
 
 
 async def process_cv_file(
@@ -110,17 +110,11 @@ async def process_cv_file(
                 existing_schema_version = existing_data.get("schema_version")
 
                 hash_matches = existing_hash == cv_hash
-                parser_matches = (
-                    existing_parser_version == settings.EXTRACTION_PARSER_VERSION
-                )
-                schema_matches = (
-                    existing_schema_version == settings.EXTRACTION_SCHEMA_VERSION
-                )
+                parser_matches = existing_parser_version == settings.EXTRACTION_PARSER_VERSION
+                schema_matches = existing_schema_version == settings.EXTRACTION_SCHEMA_VERSION
 
                 if hash_matches and parser_matches and schema_matches:
-                    logger.info(
-                        f"[CACHE_HIT] Reusing existing JSON for '{cv_key}' ({result_filename})."
-                    )
+                    logger.info(f"[CACHE_HIT] Reusing existing JSON for '{cv_key}' ({result_filename}).")
                     existing_data["status"] = "COMPLETED"
                     existing_data["original_status"] = "CACHE_HIT"
                     existing_data["progress"] = 100
@@ -129,26 +123,36 @@ async def process_cv_file(
                     existing_data["storage_filename"] = storage_filename or existing_data.get("storage_filename")
                     existing_data["identity"] = identity_metadata
                     existing_data["legacy_cv_keys"] = legacy_cv_keys
-                    
+
                     # 1. Disk/Cache Persistence Parity
-                    saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, existing_data)
+                    saved_path = await asyncio.to_thread(
+                        ResultRepository.atomic_save_result,
+                        result_filename,
+                        existing_data,
+                    )
                     existing_data["result_file_path"] = str(saved_path)
-                    
+
                     # 2. Vector DB Synchronization Parity
                     from app.services.embedding_service import (
                         get_candidate_embedding,
                         save_candidate_embedding,
                     )
+
                     cand_emb = await asyncio.to_thread(get_candidate_embedding, cv_key)
                     if cand_emb is None:
                         logger.info(f"[CACHE_HIT] Missing vector embedding for '{cv_key}'. Syncing to pgvector...")
                         markdown_text = str(existing_data.get("markdown") or existing_data.get("text") or "")
                         if markdown_text:
-                            new_emb = await asyncio.to_thread(EmbeddingService.generate_embedding, markdown_text, model_version=None, identifier=cv_key)
+                            new_emb = await asyncio.to_thread(
+                                EmbeddingService.generate_embedding,
+                                markdown_text,
+                                model_version=None,
+                                identifier=cv_key,
+                            )
                             if new_emb:
                                 await asyncio.to_thread(save_candidate_embedding, cv_key, new_emb, cv_hash)
                                 logger.info(f"[CACHE_HIT] Successfully synchronized embedding for '{cv_key}'.")
-                    
+
                     # 3. Raw-upload cleanup parity. Ollama lifecycle is controlled by keep-alive policy.
                     await asyncio.to_thread(
                         UploadService.cleanup_after_processing,
@@ -158,15 +162,11 @@ async def process_cv_file(
                     return existing_data
 
                 if not hash_matches:
-                    logger.info(
-                        f"[CV_CHANGED] CV source content changed for '{cv_key}'. Reprocessing..."
-                    )
+                    logger.info(f"[CV_CHANGED] CV source content changed for '{cv_key}'. Reprocessing...")
                     if existing_hash:
                         CacheInvalidator.invalidate_cv(existing_hash)
                 else:
-                    logger.info(
-                        f"[SCHEMA_CHANGED] Parser or schema version changed for '{cv_key}'. Reprocessing..."
-                    )
+                    logger.info(f"[SCHEMA_CHANGED] Parser or schema version changed for '{cv_key}'. Reprocessing...")
             elif existing_data and force_reprocess:
                 logger.info(f"[REPROCESSED] Force reprocessing requested for '{cv_key}'.")
             else:
@@ -174,7 +174,7 @@ async def process_cv_file(
 
             current_stage = "validation"
             t_stage_start = asyncio.get_event_loop().time()
-            
+
             # Helper to save interim status
             async def _save_interim_status(progress: int, stage: str):
                 interim_data = {
@@ -192,7 +192,11 @@ async def process_cv_file(
                     "legacy_cv_keys": legacy_cv_keys,
                 }
                 try:
-                    await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, interim_data)
+                    await asyncio.to_thread(
+                        ResultRepository.atomic_save_result,
+                        result_filename,
+                        interim_data,
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to save interim status for '{cv_key}': {e}")
 
@@ -235,7 +239,7 @@ async def process_cv_file(
             markdown_text = extraction.markdown
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
             stage_durations_ms["docling_parsing_ms"] = docling_duration_ms
-            
+
             current_stage = "extraction"
             await _save_interim_status(45, current_stage)
 
@@ -247,15 +251,14 @@ async def process_cv_file(
                 parser_used=extraction.parser_used,
                 ocr_applied=extraction.ocr_applied,
             )
-            resume_json = ResumeJsonExtractor.extract(
-                markdown_text, quality_metrics, filename=filename
-            )
+            resume_json = ResumeJsonExtractor.extract(markdown_text, quality_metrics, filename=filename)
             normalized_resume = NormalizedResume.model_validate(resume_json["normalized"])
-            
+
             from app.services.experience_calculator import ExperienceCalculator
+
             calculated_exp = ExperienceCalculator.calculate_total_experience(resume_json, markdown_text)
             quality_metrics["experience_years"] = calculated_exp
-            
+
             stage_durations_ms["resume_extraction_ms"] = round((asyncio.get_event_loop().time() - t_ext_start) * 1000.0, 2)
 
             from app.services.embedding_service import save_candidate_embedding
@@ -311,6 +314,7 @@ async def process_cv_file(
             raw_fct = contact_info.get("field_confidence_tiers") or {}
 
             from app.core.rule_config_manager import RuleConfigManager
+
             name_tier = contact_info.get("name_confidence_level") or contact_info.get("name_confidence_tier") or raw_fct.get("name") or RuleConfigManager.get_confidence_tier("name", name_confidence)
             loc_tier = contact_info.get("location_confidence_tier") or raw_fct.get("location") or RuleConfigManager.get_confidence_tier("location", raw_fc.get("location"))
             title_tier = contact_info.get("job_title_confidence_tier") or raw_fct.get("job_title") or RuleConfigManager.get_confidence_tier("job_title", raw_fc.get("job_title"))
@@ -330,11 +334,7 @@ async def process_cv_file(
             await _save_interim_status(90, current_stage)
 
             now_iso = datetime.now(UTC).isoformat()
-            created_at = (
-                existing_data.get("created_at")
-                if existing_data and existing_data.get("created_at")
-                else now_iso
-            )
+            created_at = existing_data.get("created_at") if existing_data and existing_data.get("created_at") else now_iso
             updated_at = now_iso
 
             status = "REPROCESSED" if existing_data else "NEW_CV"
@@ -430,13 +430,13 @@ async def process_cv_file(
         except Exception as exc:
             logger.exception(f"CV processing failed for '{cv_key}' at stage '{current_stage}': {exc}")
             now_iso = datetime.now(UTC).isoformat()
-            
+
             stage_to_step = {
                 "parsing": "Docling Parsing",
                 "extraction": "Resume Extraction",
                 "ai_analysis": "AI Analysis",
                 "matching": "Job Matching",
-                "complete": "Finalizing"
+                "complete": "Finalizing",
             }
             failed_step = stage_to_step.get(current_stage, current_stage)
 
@@ -488,23 +488,24 @@ async def process_cv_file(
 def process_cv_task_sync(file_path: str) -> dict[str, Any]:
     import asyncio
     import json
+
     path = Path(file_path)
     filename = path.name
     content = path.read_bytes()
-    
+
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
-    
+
     try:
         # Run the existing async processor inside a synchronous event loop for RQ
         result = asyncio.run(process_cv_file(filename=filename, content=content))
-        
+
         payload = {
             "filename": filename,
             "status": result.get("status", "OK"),
             "best_match": result.get("match_analysis", {}).get("best_match", {}) if result.get("match_analysis") else {},
             "llm_skipped": result.get("match_analysis", {}).get("llm_skipped", False) if result.get("match_analysis") else False,
-            "result_file_path": result.get("result_file_path")
+            "result_file_path": result.get("result_file_path"),
         }
         conn.publish("cv_processing_progress", json.dumps(payload))
         return result
@@ -551,7 +552,7 @@ async def scan_uploads_directory(
     import json
 
     import redis.asyncio as aioredis
-    
+
     async_redis = aioredis.from_url(redis_url, decode_responses=True)
     pubsub = async_redis.pubsub()
     await pubsub.subscribe("cv_processing_progress")
@@ -559,25 +560,25 @@ async def scan_uploads_directory(
     jobs = []
     for file_obj in files:
         job = q.enqueue(
-            process_cv_task_sync, 
-            str(file_obj.absolute()), 
+            process_cv_task_sync,
+            str(file_obj.absolute()),
             job_timeout=settings.EXTRACTION_TIMEOUT_SECONDS,
-            result_ttl=600
+            result_ttl=600,
         )
         jobs.append((file_obj, job))
 
     print(f"📦 Enqueued {len(jobs)} file(s). Waiting for RQ workers to process...")
-    
+
     try:
         processed_count = 0
         completed_ids = set()
-        
+
         while processed_count < len(jobs):
             message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
             if message:
                 payload = json.loads(message["data"])
                 filename = payload.get("filename")
-                
+
                 # Check if we already processed this (to prevent double counting if fallback also caught it)
                 if filename not in completed_ids:
                     completed_ids.add(filename)
@@ -586,7 +587,7 @@ async def scan_uploads_directory(
                     best = payload.get("best_match", {})
                     llm_skipped = payload.get("llm_skipped", False)
                     fast_track_msg = " [⚡️Fast Track] " if llm_skipped else " "
-                    
+
                     if status != "FAILED":
                         results.append(payload)
                         score = best.get("score", 0)
@@ -612,7 +613,7 @@ async def scan_uploads_directory(
                             print(f"   [{processed_count}/{len(files)}] ❌ Error: {file_obj.name} failed silently in RQ. {error_msg}")
                     except Exception:
                         pass
-                        
+
             await asyncio.sleep(0.1)
     finally:
         try:
@@ -631,7 +632,6 @@ async def scan_uploads_directory(
                 await async_redis.aclose()
         except Exception:
             pass
-
 
     print()
     return results

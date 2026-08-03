@@ -11,9 +11,13 @@ def test_mandatory_failure_reduces_score_and_requires_hr_review():
         "id": "job_1",
         "title": "Senior Python Developer",
         "department": "Engineering",
-        "required_skills": ["Python", "Docker", "Kubernetes"],  # Docker and Kubernetes are missing
+        "required_skills": [
+            "Python",
+            "Docker",
+            "Kubernetes",
+        ],  # Docker and Kubernetes are missing
         "preferred_keywords": ["Git", "CI/CD"],
-        "min_experience_years": 5.0
+        "min_experience_years": 5.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=10.0)
@@ -24,7 +28,7 @@ def test_mandatory_failure_reduces_score_and_requires_hr_review():
     assert result.score <= 65.0  # Capped at max score on mandatory failure
     assert result.score < 100.0
     assert "Mandatory requirement failure(s)" in result.reason
-    
+
     # Dual evidence verification
     assert "req_skill_docker" in result.evidence
     ev = result.evidence["req_skill_docker"]
@@ -43,8 +47,12 @@ def test_false_100_percent_prevention():
         "title": "Frontend Engineer",
         "department": "Engineering",
         "required_skills": ["React", "JavaScript"],
-        "preferred_keywords": ["TypeScript", "GraphQL", "Tailwind"],  # Missing preferred keywords
-        "min_experience_years": 2.0
+        "preferred_keywords": [
+            "TypeScript",
+            "GraphQL",
+            "Tailwind",
+        ],  # Missing preferred keywords
+        "min_experience_years": 2.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=4.0)
@@ -66,7 +74,7 @@ def test_candidate_matching_all_explicit_requirements_scores_high():
         "department": "Engineering",
         "required_skills": ["React", "JavaScript"],
         "preferred_keywords": ["TypeScript", "GraphQL"],
-        "min_experience_years": 5.0
+        "min_experience_years": 5.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=6.0)
@@ -90,7 +98,7 @@ def test_unspecified_education_does_not_reduce_score():
         "department": "Engineering",
         "required_skills": ["Python", "FastAPI"],
         "preferred_keywords": ["PostgreSQL"],
-        "min_experience_years": 2.0
+        "min_experience_years": 2.0,
         # Notice: NO education requirement in job dict
     }
 
@@ -115,7 +123,7 @@ def test_dynamic_career_transition_detection():
         "department": "Product",
         "required_skills": ["Product Strategy", "Roadmapping", "Java"],
         "preferred_keywords": ["Agile", "User Research"],
-        "min_experience_years": 5.0
+        "min_experience_years": 5.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=8.0)
@@ -140,7 +148,7 @@ def test_dual_evidence_tracing():
         "department": "Healthcare",
         "required_skills": ["Patient Care", "ICU"],
         "preferred_keywords": ["CPR"],
-        "min_experience_years": 3.0
+        "min_experience_years": 3.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=5.0)
@@ -163,7 +171,7 @@ def test_cross_industry_generalization():
         "department": "Finance",
         "required_skills": ["Financial Modeling", "Valuation", "SQL"],
         "preferred_keywords": ["Forecasting"],
-        "min_experience_years": 3.0
+        "min_experience_years": 3.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=4.0)

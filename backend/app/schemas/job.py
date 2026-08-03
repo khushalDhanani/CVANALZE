@@ -5,12 +5,8 @@ class JobOpening(BaseModel):
     id: str = Field(..., description="Unique job opening ID")
     title: str = Field(..., description="Job position title")
     department: str = Field(..., description="Department hosting this role")
-    required_skills: list[str] = Field(
-        default_factory=list, description="List of required skills"
-    )
-    preferred_keywords: list[str] = Field(
-        default_factory=list, description="List of preferred keywords"
-    )
+    required_skills: list[str] = Field(default_factory=list, description="List of required skills")
+    preferred_keywords: list[str] = Field(default_factory=list, description="List of preferred keywords")
     min_experience_years: float | None = Field(None, description="Minimum experience required")
     max_experience_years: float | None = Field(None, description="Maximum experience required")
     min_ctc: float | None = Field(None, description="Minimum CTC required")
@@ -18,7 +14,7 @@ class JobOpening(BaseModel):
     preferred_gender: str | None = Field(None, description="Preferred gender for the role")
     company_name: str | None = Field(None, description="Company name")
     location_name: str | None = Field(None, description="Location name")
-    
+
     # Detailed Semantic Requirement Fields
     job_description: str | None = Field(None, description="Detailed job description")
     responsibilities: str | None = Field(None, description="Key responsibilities and duties")
@@ -36,4 +32,3 @@ class JobOpening(BaseModel):
     # Taxonomy Metadata
     domain: str | None = Field(None, description="Taxonomy Domain")
     job_family: str | None = Field(None, description="Taxonomy Job Family")
-

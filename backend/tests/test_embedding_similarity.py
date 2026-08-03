@@ -13,7 +13,11 @@ def test_embedding_similarity_comparison():
         text2: [0.9, 0.1] + [0.0] * 766,
         text3: [0.0, 1.0] + [0.0] * 766,
     }
-    with patch.object(EmbeddingService, "generate_embedding", side_effect=lambda text, **_: vectors[text]):
+    with patch.object(
+        EmbeddingService,
+        "generate_embedding",
+        side_effect=lambda text, **_: vectors[text],
+    ):
         emb1 = get_embedding(text1)
         emb2 = get_embedding(text2)
         emb3 = get_embedding(text3)
@@ -29,10 +33,7 @@ def test_embedding_similarity_comparison():
     print(f"Similarity ('{text1}' vs '{text2}'): {sim_flutter_mobile:.6f}")
     print(f"Similarity ('{text1}' vs '{text3}'): {sim_flutter_plant:.6f}")
 
-    assert sim_flutter_mobile > sim_flutter_plant, (
-        f"Expected Flutter vs Mobile ({sim_flutter_mobile:.4f}) to be strictly higher than "
-        f"Flutter vs Plant Maintenance ({sim_flutter_plant:.4f})"
-    )
+    assert sim_flutter_mobile > sim_flutter_plant, f"Expected Flutter vs Mobile ({sim_flutter_mobile:.4f}) to be strictly higher than Flutter vs Plant Maintenance ({sim_flutter_plant:.4f})"
 
 
 if __name__ == "__main__":

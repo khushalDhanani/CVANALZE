@@ -1,5 +1,7 @@
 # backend/tests/test_dynamic_scoring_prefilter_service.py
-from app.services.dynamic_scoring_prefilter_service import DynamicScoringAndPrefilterService
+from app.services.dynamic_scoring_prefilter_service import (
+    DynamicScoringAndPrefilterService,
+)
 
 
 def test_get_stop_words():

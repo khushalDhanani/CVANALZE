@@ -15,16 +15,8 @@ async def get_match_config(db: Session = Depends(get_db)):
     """Retrieve the current matching engine configuration weights and thresholds."""
     try:
         return MatchEngineConfigResponse(
-            MATCH_HIGH_THRESHOLD=float(
-                ConfigRepository.get_setting(
-                    "MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD, db
-                )
-            ),
-            MATCH_MEDIUM_THRESHOLD=float(
-                ConfigRepository.get_setting(
-                    "MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD, db
-                )
-            ),
+            MATCH_HIGH_THRESHOLD=float(ConfigRepository.get_setting("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD, db)),
+            MATCH_MEDIUM_THRESHOLD=float(ConfigRepository.get_setting("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD, db)),
             MANDATORY_FAILURE_PENALTY_PER_ITEM=float(
                 ConfigRepository.get_setting(
                     "MANDATORY_FAILURE_PENALTY_PER_ITEM",
@@ -39,19 +31,15 @@ async def get_match_config(db: Session = Depends(get_db)):
                     db,
                 )
             ),
-            LLM_SEMANTIC_WEIGHT=float(
-                ConfigRepository.get_setting(
-                    "LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT, db
-                )
-            ),
-            MAX_LLM_BOOST=float(
-                ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST, db)
-            ),
-            LLM_SKIP_MARGIN_THRESHOLD=float(
-                ConfigRepository.get_setting("LLM_SKIP_MARGIN_THRESHOLD", settings.LLM_SKIP_MARGIN_THRESHOLD, db)
-            ),
+            LLM_SEMANTIC_WEIGHT=float(ConfigRepository.get_setting("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT, db)),
+            MAX_LLM_BOOST=float(ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST, db)),
+            LLM_SKIP_MARGIN_THRESHOLD=float(ConfigRepository.get_setting("LLM_SKIP_MARGIN_THRESHOLD", settings.LLM_SKIP_MARGIN_THRESHOLD, db)),
             LLM_SKIP_COVERAGE_THRESHOLD=float(
-                ConfigRepository.get_setting("LLM_SKIP_COVERAGE_THRESHOLD", settings.LLM_SKIP_COVERAGE_THRESHOLD, db)
+                ConfigRepository.get_setting(
+                    "LLM_SKIP_COVERAGE_THRESHOLD",
+                    settings.LLM_SKIP_COVERAGE_THRESHOLD,
+                    db,
+                )
             ),
             MATCH_COMPONENT_WEIGHTS=ConfigRepository.get_setting(
                 "MATCH_COMPONENT_WEIGHTS",
@@ -74,9 +62,7 @@ async def get_match_config(db: Session = Depends(get_db)):
 
 
 @router.put("/match", response_model=MatchEngineConfigResponse)
-async def update_match_config(
-    payload: MatchEngineConfigUpdate, db: Session = Depends(get_db)
-):
+async def update_match_config(payload: MatchEngineConfigUpdate, db: Session = Depends(get_db)):
     """Update the matching engine configuration. Values are merged with existing settings."""
     try:
         update_data = payload.model_dump(exclude_unset=True)

@@ -9,7 +9,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.logging import logger
 from app.schemas.contracts import CanonicalError, ErrorCode, ErrorResponse
 
-
 _STATUS_CODES: dict[int, ErrorCode] = {
     400: ErrorCode.VALIDATION_ERROR,
     401: ErrorCode.UNAUTHORIZED,
@@ -89,15 +88,10 @@ async def _http_exception_handler(request: Request, exc: StarletteHTTPException)
         request_id, correlation_id = request_identifiers(request.scope)
         cause = exc.__cause__ or exc
         logger.error(
-            f"[HTTP_ERROR] request_id={request_id} correlation_id={correlation_id} "
-            f"method={request.method} path={request.url.path} status={status_code}",
+            f"[HTTP_ERROR] request_id={request_id} correlation_id={correlation_id} method={request.method} path={request.url.path} status={status_code}",
             exc_info=(type(cause), cause, cause.__traceback__),
         )
-        message = (
-            "A required service is temporarily unavailable."
-            if status_code == 503
-            else "An internal error occurred."
-        )
+        message = "A required service is temporarily unavailable." if status_code == 503 else "An internal error occurred."
     else:
         message = _http_exception_message(exc.detail)
     return error_response(
@@ -132,10 +126,7 @@ async def _validation_exception_handler(request: Request, exc: RequestValidation
 
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     request_id, correlation_id = request_identifiers(request.scope)
-    logger.exception(
-        f"[REQUEST_ERROR] request_id={request_id} correlation_id={correlation_id} "
-        f"method={request.method} path={request.url.path} error={type(exc).__name__}"
-    )
+    logger.exception(f"[REQUEST_ERROR] request_id={request_id} correlation_id={correlation_id} method={request.method} path={request.url.path} error={type(exc).__name__}")
     return error_response(
         request.scope,
         status_code=500,

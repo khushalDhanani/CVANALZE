@@ -2,6 +2,7 @@ import json
 
 PROMPT_VERSION = "1.0"
 
+
 def build_profile_extraction_prompt(cv_text: str) -> str:
     """
     Builds a strict JSON-only prompt for Qwen to extract a DynamicCandidateProfile

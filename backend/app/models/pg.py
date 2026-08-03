@@ -66,5 +66,3 @@ class DomainEmbedding(pg_Base):
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
-
-

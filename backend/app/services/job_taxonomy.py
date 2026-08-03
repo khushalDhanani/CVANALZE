@@ -178,10 +178,7 @@ class JobTaxonomy:
 
     @classproperty
     def COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
-        return {
-            family: set(compatible)
-            for family, compatible in RuleConfigManager.get_taxonomy_rules().compatibility_map.items()
-        }
+        return {family: set(compatible) for family, compatible in RuleConfigManager.get_taxonomy_rules().compatibility_map.items()}
 
     @classproperty
     def REVERSE_COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
@@ -254,11 +251,7 @@ class TaxonomyMetrics:
     @classmethod
     def get_metrics(cls) -> dict[str, Any]:
         with cls._lock:
-            avg_ms = (
-                round(cls.classification_time_total_ms / cls.taxonomy_hits, 4)
-                if cls.taxonomy_hits > 0
-                else 0.0
-            )
+            avg_ms = round(cls.classification_time_total_ms / cls.taxonomy_hits, 4) if cls.taxonomy_hits > 0 else 0.0
             return {
                 "taxonomy_hits": cls.taxonomy_hits,
                 "taxonomy_cache_hits": cls.taxonomy_cache_hits,
@@ -337,7 +330,11 @@ class TaxonomyClassifier:
         Classifies vacancy into (domain, family, rule_name, branch_idx, matched_keywords).
         Thread-safe under CPython GIL atomic LRU cache operations.
         """
-        scopes = {"title": title_lower, "dept": dept_lower, "full_text": normalized_job_text}
+        scopes = {
+            "title": title_lower,
+            "dept": dept_lower,
+            "full_text": normalized_job_text,
+        }
         scope_tokens = {
             "title": set(re.findall(r"\w+", title_lower)),
             "dept": set(re.findall(r"\w+", dept_lower)),
@@ -354,7 +351,9 @@ class TaxonomyClassifier:
 
     @staticmethod
     @functools.lru_cache(maxsize=512)
-    def classify_candidate_by_full_text(candidate_full_text: str) -> tuple[str, tuple[str, ...]]:
+    def classify_candidate_by_full_text(
+        candidate_full_text: str,
+    ) -> tuple[str, tuple[str, ...]]:
         """
         Classifies candidate full text into (domain, families_tuple).
         Cached via functools.lru_cache(maxsize=512). Thread-safe under CPython GIL.
@@ -397,9 +396,7 @@ class TaxonomyClassifier:
 
         # 2. Fallback to static rule classification
         cache_info_before = cls._classify_vacancy_cached.cache_info()
-        domain, family, rule_name, branch_idx, kws = cls._classify_vacancy_cached(
-            dto.normalized_job_text, dto.title_lower, dto.department_lower
-        )
+        domain, family, rule_name, branch_idx, kws = cls._classify_vacancy_cached(dto.normalized_job_text, dto.title_lower, dto.department_lower)
         cache_info_after = cls._classify_vacancy_cached.cache_info()
         cache_hit = cache_info_after.hits > cache_info_before.hits
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -407,10 +404,7 @@ class TaxonomyClassifier:
         TaxonomyMetrics.record_hit(cache_hit, elapsed_ms)
 
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                f"[TAXONOMY_VACANCY] Title='{dto.title}' -> Domain='{domain}', Family='{family}' | "
-                f"Rule='{rule_name}', Branch={branch_idx}, Keywords={kws}, CacheHit={cache_hit}"
-            )
+            logger.debug(f"[TAXONOMY_VACANCY] Title='{dto.title}' -> Domain='{domain}', Family='{family}' | Rule='{rule_name}', Branch={branch_idx}, Keywords={kws}, CacheHit={cache_hit}")
 
         return TaxonomyClassification(
             domain=domain,
@@ -456,9 +450,7 @@ class TaxonomyClassifier:
 
         # 2. Fallback to static rule classification
         cache_info_before = cls.classify_candidate_by_full_text.cache_info()
-        domain, families_tuple = cls.classify_candidate_by_full_text(
-            dto.normalized_full_text
-        )
+        domain, families_tuple = cls.classify_candidate_by_full_text(dto.normalized_full_text)
         cache_info_after = cls.classify_candidate_by_full_text.cache_info()
         cache_hit = cache_info_after.hits > cache_info_before.hits
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -466,9 +458,7 @@ class TaxonomyClassifier:
         TaxonomyMetrics.record_hit(cache_hit, elapsed_ms)
 
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                f"[TAXONOMY_CANDIDATE] Domain='{domain}', Families={families_tuple} | CacheHit={cache_hit}"
-            )
+            logger.debug(f"[TAXONOMY_CANDIDATE] Domain='{domain}', Families={families_tuple} | CacheHit={cache_hit}")
 
         return TaxonomyClassification(
             domain=domain,

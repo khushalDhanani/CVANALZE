@@ -2,7 +2,6 @@ import hashlib
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -112,7 +111,7 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
 
     entry = LLMCacheEntry(
         prompt="test prompt",
-        raw_response='{}',
+        raw_response="{}",
         structured_data=sample_response.model_dump(),
         reasoning="",
         processing_time_ms=500.0,
@@ -191,25 +190,27 @@ def test_redis_result_repository_caching():
     """Test that ResultRepository uses Redis when configured."""
     mock_redis = MagicMock()
     mock_redis = MagicMock()
-    with patch("app.core.cache._REDIS_CLIENT", mock_redis), \
-         patch("app.repositories.result._REDIS_CLIENT", mock_redis):
+    with (
+        patch("app.core.cache._REDIS_CLIENT", mock_redis),
+        patch("app.repositories.result._REDIS_CLIENT", mock_redis),
+    ):
         mock_data = {"extracted": "content", "pages": 1}
-        
+
         # 1. Test atomic_save_result
         res = ResultRepository.atomic_save_result("test_result.json", mock_data)
-        
+
         # Should return the redis URI string
         assert isinstance(res, str)
         assert res.startswith("redis://")
-        
+
         # Redis commands should be executed (setex with TTL, not set+expire)
         mock_redis.setex.assert_called_once()
-        
+
         # 2. Test read_result using the redis path
         mock_redis.get.return_value = json.dumps(mock_data)
         read_data = ResultRepository.read_result(res)
         assert read_data == mock_data
-        
+
         # 3. Test read_result_by_filename
         mock_redis.get.reset_mock()
         mock_redis.get.return_value = json.dumps(mock_data)
@@ -232,7 +233,7 @@ def test_redis_llm_repository_caching():
         # 1. Test save_result using version-aware cache key
         LLMCacheRepository.save_result(cache_key, mock_data)
         mock_redis.setex.assert_called_once()
-        
+
         # 2. Test get_cached_result using same key
         mock_redis.get.return_value = json.dumps(mock_data)
         read_data = LLMCacheRepository.get_cached_result(cache_key)
@@ -241,8 +242,9 @@ def test_redis_llm_repository_caching():
 
 def test_cv_upload_background_task_returns_processing_status(tmp_path, monkeypatch):
     """Test that /cv/upload endpoint immediately returns a processing status, preventing 504 timeouts."""
-    import fitz
     from unittest.mock import patch
+
+    import fitz
 
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")
     monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path / "results")
@@ -251,30 +253,29 @@ def test_cv_upload_background_task_returns_processing_status(tmp_path, monkeypat
     page.insert_text((50, 50), "John Doe\nSoftware Engineer with Python and FastAPI experience.")
     pdf_content = doc.tobytes()
     doc.close()
-    
+
     with patch("app.api.cv.background_process_cv"):
         response = client.post(
             "/api/cv/upload",
-            files={"file": ("test_background.pdf", pdf_content, "application/pdf")}
+            files={"file": ("test_background.pdf", pdf_content, "application/pdf")},
         )
-    
+
     # We should get a 200 OK immediately, instead of waiting for Docling/LLM
     assert response.status_code == 200, response.text
     data = response.json()
-    
+
     # Assert background task response format
     assert data["status"] == "processing"
     assert "cv_key" in data
     assert "message" in data
-    
+
     cv_key = data["cv_key"]
-    
+
     # Assert the status endpoint is functional
     status_response = client.get(f"/api/cv/status/{cv_key}")
     assert status_response.status_code == 200
     status_data = status_response.json()
     assert status_data["status"] in ("processing", "COMPLETED", "REPROCESSED")
-
 
 
 def test_vacancy_cache_compute_hash():
@@ -400,8 +401,13 @@ def test_embedding_cache_roundtrip():
     mock_response.json.return_value = {"embeddings": [[0.1, 0.2, 0.3]]}
     mock_response.raise_for_status.return_value = None
 
-    with patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True), \
-         patch("app.services.embedding_service.EmbeddingService._call_ollama_embed", return_value=[0.1, 0.2, 0.3]):
+    with (
+        patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True),
+        patch(
+            "app.services.embedding_service.EmbeddingService._call_ollama_embed",
+            return_value=[0.1, 0.2, 0.3],
+        ),
+    ):
         emb = EmbeddingService.generate_embedding("test text", "test-model")
         assert emb == [0.1, 0.2, 0.3]
 
@@ -425,8 +431,13 @@ def test_embedding_cache_different_model_version():
         call_count += 1
         return [float(call_count), 0.0, 0.0]
 
-    with patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True), \
-         patch("app.services.embedding_service.EmbeddingService._call_ollama_embed", side_effect=mock_embed):
+    with (
+        patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True),
+        patch(
+            "app.services.embedding_service.EmbeddingService._call_ollama_embed",
+            side_effect=mock_embed,
+        ),
+    ):
         emb_v1 = EmbeddingService.generate_embedding("same content", "model-v1")
         emb_v2 = EmbeddingService.generate_embedding("same content", "model-v2")
         assert emb_v1 != emb_v2, "Different model versions must produce different embeddings"
@@ -440,9 +451,15 @@ def test_embedding_cache_content_change():
 
     embedding_cache_manager.clear()
 
-    with patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True), \
-         patch("app.services.embedding_service.EmbeddingService._call_ollama_embed") as mock_call:
-        mock_call.side_effect = lambda model, text: [hash(text) % 1000 / 1000.0, 0.0, 0.0]
+    with (
+        patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True),
+        patch("app.services.embedding_service.EmbeddingService._call_ollama_embed") as mock_call,
+    ):
+        mock_call.side_effect = lambda model, text: [
+            hash(text) % 1000 / 1000.0,
+            0.0,
+            0.0,
+        ]
 
         emb_a = EmbeddingService.generate_embedding("content A", "test-model")
         emb_b = EmbeddingService.generate_embedding("content B", "test-model")
@@ -484,8 +501,10 @@ def test_embedding_cache_different_content_same_model():
 
     embedding_cache_manager.clear()
 
-    with patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True), \
-         patch("app.services.embedding_service.EmbeddingService._call_ollama_embed") as mock_call:
+    with (
+        patch("app.services.embedding_service.settings.EMBEDDING_ENABLED", True),
+        patch("app.services.embedding_service.EmbeddingService._call_ollama_embed") as mock_call,
+    ):
         mock_call.side_effect = lambda model, text: [hash(text) % 1000 / 1000.0]
 
         emb_1 = EmbeddingService.generate_embedding("unique text one", "same-model")
@@ -502,42 +521,72 @@ def test_match_result_cache_key_includes_version_components():
     from app.core.cache import CacheKey
 
     key_a = CacheKey.for_match_result(
-        document_hash="abc", candidate_id="1",
-        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
-        model_version="model1", extraction_version="extract1", matching_version="m1",
+        document_hash="abc",
+        candidate_id="1",
+        vacancy_version="v1",
+        vacancy_ids=["10"],
+        prompt_version="p1",
+        model_version="model1",
+        extraction_version="extract1",
+        matching_version="m1",
     ).to_key()
     key_b = CacheKey.for_match_result(
-        document_hash="abc", candidate_id="1",
-        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
-        model_version="model1", extraction_version="extract1", matching_version="m1",
+        document_hash="abc",
+        candidate_id="1",
+        vacancy_version="v1",
+        vacancy_ids=["10"],
+        prompt_version="p1",
+        model_version="model1",
+        extraction_version="extract1",
+        matching_version="m1",
     ).to_key()
     assert key_a == key_b, "Same components must produce same key"
 
     key_c = CacheKey.for_match_result(
-        document_hash="abc", candidate_id="1",
-        vacancy_version="v2", vacancy_ids=["10"], prompt_version="p1",
-        model_version="model1", extraction_version="extract1", matching_version="m1",
+        document_hash="abc",
+        candidate_id="1",
+        vacancy_version="v2",
+        vacancy_ids=["10"],
+        prompt_version="p1",
+        model_version="model1",
+        extraction_version="extract1",
+        matching_version="m1",
     ).to_key()
     assert key_a != key_c, "Different vacancy version must produce different key"
 
     key_d = CacheKey.for_match_result(
-        document_hash="abc", candidate_id="1",
-        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p2",
-        model_version="model1", extraction_version="extract1", matching_version="m1",
+        document_hash="abc",
+        candidate_id="1",
+        vacancy_version="v1",
+        vacancy_ids=["10"],
+        prompt_version="p2",
+        model_version="model1",
+        extraction_version="extract1",
+        matching_version="m1",
     ).to_key()
     assert key_a != key_d, "Different prompt version must produce different key"
 
     key_e = CacheKey.for_match_result(
-        document_hash="abc", candidate_id="1",
-        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
-        model_version="model1", extraction_version="extract1", matching_version="m2",
+        document_hash="abc",
+        candidate_id="1",
+        vacancy_version="v1",
+        vacancy_ids=["10"],
+        prompt_version="p1",
+        model_version="model1",
+        extraction_version="extract1",
+        matching_version="m2",
     ).to_key()
     assert key_a != key_e, "Different matching version must produce different key"
 
     key_f = CacheKey.for_match_result(
-        document_hash="xyz", candidate_id="1",
-        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
-        model_version="model1", extraction_version="extract1", matching_version="m1",
+        document_hash="xyz",
+        candidate_id="1",
+        vacancy_version="v1",
+        vacancy_ids=["10"],
+        prompt_version="p1",
+        model_version="model1",
+        extraction_version="extract1",
+        matching_version="m1",
     ).to_key()
     assert key_a != key_f, "Different document hash must produce different key"
 
@@ -640,18 +689,23 @@ def test_match_result_cache_invalidated_by_version_change():
     match_result_cache_manager.clear()
 
     key_v1 = CacheKey.for_match_result(
-        document_hash="abc", candidate_id="1",
-        vacancy_version="v1", prompt_version="p1", matching_version="m1",
+        document_hash="abc",
+        candidate_id="1",
+        vacancy_version="v1",
+        prompt_version="p1",
+        matching_version="m1",
     ).to_key()
     key_v2 = CacheKey.for_match_result(
-        document_hash="abc", candidate_id="1",
-        vacancy_version="v2", prompt_version="p1", matching_version="m1",
+        document_hash="abc",
+        candidate_id="1",
+        vacancy_version="v2",
+        prompt_version="p1",
+        matching_version="m1",
     ).to_key()
 
     match_result_cache_manager.set(key_v1, {"primary_department": "Engineering"})
     assert match_result_cache_manager.get(key_v1) is not None
-    assert match_result_cache_manager.get(key_v2) is None, \
-        "Different vacancy version must produce cache miss"
+    assert match_result_cache_manager.get(key_v2) is None, "Different vacancy version must produce cache miss"
 
 
 def test_cache_invalidator_cv():
@@ -983,9 +1037,11 @@ def test_background_warmup_fails_gracefully():
 def test_cli_warmup_does_not_raise():
     """Test that the CLI warmup path handles missing DB gracefully."""
     from app.core.cache import master_data_cache_manager
+
     master_data_cache_manager.clear()
     with patch("app.services.cache_warmer.SessionLocal", None):
         from app.services.cache_warmer import warm_all
+
         counts = warm_all()
         assert counts["vacancies"] == 0
         assert counts["job_profiles"] == 0
@@ -998,9 +1054,9 @@ def test_cli_warmup_does_not_raise():
 def test_docx_upload_full_pipeline(tmp_path, monkeypatch):
     """Test that uploading a .docx file completes all pipeline stages cleanly."""
     from io import BytesIO
+    from unittest.mock import patch
 
     import docx
-    from unittest.mock import patch
 
     from app.services.document_parser import MarkdownGenerator
 
@@ -1028,7 +1084,13 @@ def test_docx_upload_full_pipeline(tmp_path, monkeypatch):
     with patch("app.api.cv.background_process_cv"):
         response = client.post(
             "/api/cv/upload",
-            files={"file": ("jane_smith_resume.docx", docx_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+            files={
+                "file": (
+                    "jane_smith_resume.docx",
+                    docx_bytes,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
         )
     assert response.status_code == 200
     data = response.json()
@@ -1054,7 +1116,10 @@ def test_result_repository_resolve_result_with_prefix_variation(tmp_path, monkey
 
     monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
     res_file = tmp_path / "cv_13347_Yagnik_Resume.json"
-    res_file.write_text('{"id": "cv_13347_Yagnik_Resume", "status": "COMPLETED", "progress": 100, "stage": "complete", "match_analysis": {}}', encoding="utf-8")
+    res_file.write_text(
+        '{"id": "cv_13347_Yagnik_Resume", "status": "COMPLETED", "progress": 100, "stage": "complete", "match_analysis": {}}',
+        encoding="utf-8",
+    )
 
     r1 = ResultRepository.resolve_result("cv_13347_Yagnik_Resume")
     assert r1 is not None

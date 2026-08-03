@@ -25,7 +25,6 @@ from app.core.request_context import RequestContextMiddleware
 from app.core.security import AccessControlMiddleware
 from app.schemas.contracts import ErrorResponse
 
-
 _ERROR_RESPONSES = {
     400: {"model": ErrorResponse, "description": "Invalid request"},
     401: {"model": ErrorResponse, "description": "Authentication required"},
@@ -58,7 +57,13 @@ app.add_middleware(
     allow_origins=settings.TRUSTED_ORIGINS,
     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID", "X-Correlation-ID"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-API-Key",
+        "X-Request-ID",
+        "X-Correlation-ID",
+    ],
     expose_headers=[
         "X-Request-ID",
         "X-Correlation-ID",

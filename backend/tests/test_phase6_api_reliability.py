@@ -85,9 +85,7 @@ def test_unhandled_exception_returns_stable_envelope_without_trace(monkeypatch):
 
     @test_app.get("/boom")
     async def boom():
-        raise RuntimeError(
-            "private stack detail /Users/operator/cv-analyzer secret-token raw.person@example.com"
-        )
+        raise RuntimeError("private stack detail /Users/operator/cv-analyzer secret-token raw.person@example.com")
 
     test_app.add_middleware(RequestContextMiddleware)
     client = TestClient(test_app, raise_server_exceptions=False)

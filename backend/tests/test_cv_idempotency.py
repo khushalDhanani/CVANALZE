@@ -15,6 +15,7 @@ def clear_caches():
         doc_cache_manager,
         embedding_cache_manager,
     )
+
     cv_result_cache_manager.clear()
     doc_cache_manager.clear()
     embedding_cache_manager.clear()
@@ -40,10 +41,10 @@ def mock_parser_and_engine(monkeypatch):
         }
     }
     match_mock = AsyncMock(return_value=match_analysis_mock)
-    from app.services.match_service import MatchService
     from app.services import embedding_service
     from app.services.embedding_service import EmbeddingService
     from app.services.llm_service import OllamaLLMService
+    from app.services.match_service import MatchService
 
     monkeypatch.setattr(MatchService, "analyze_single_cv", match_mock)
     monkeypatch.setattr(EmbeddingService, "generate_embedding", MagicMock(return_value=None))

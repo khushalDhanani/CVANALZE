@@ -4,7 +4,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.domain_embedding_service import DomainEmbeddingService
-from app.services.dynamic_taxonomy_service import DynamicTaxonomyService, DynamicTaxonomyResult
+from app.services.dynamic_taxonomy_service import (
+    DynamicTaxonomyResult,
+    DynamicTaxonomyService,
+)
 
 router = APIRouter(prefix="/domain-knowledge", tags=["Domain Knowledge"])
 
@@ -27,7 +30,11 @@ class DomainEquivalentResponse(BaseModel):
 
 class AddDesignationRequest(BaseModel):
     designation_name: str = Field(..., min_length=1, description="Name of designation (e.g. 'Prompt Engineer')")
-    family_name: str = Field(..., min_length=1, description="Parent Job Family Name (e.g. 'Software Engineering & Development')")
+    family_name: str = Field(
+        ...,
+        min_length=1,
+        description="Parent Job Family Name (e.g. 'Software Engineering & Development')",
+    )
     synonyms: list[str] = Field(default_factory=list, description="List of aliases/synonyms")
     seniority_level: str = Field("Standard", description="Seniority level (e.g. Executive, Senior, Lead)")
 
@@ -47,7 +54,9 @@ def list_domain_categories() -> list[str]:
 
 
 @router.post("/equivalents", response_model=DomainEquivalentResponse)
-def get_semantic_equivalents(request: DomainEquivalentRequest) -> DomainEquivalentResponse:
+def get_semantic_equivalents(
+    request: DomainEquivalentRequest,
+) -> DomainEquivalentResponse:
     """
     Resolve semantically equivalent domain terms for a given term and category.
     """
@@ -84,7 +93,10 @@ def add_new_designation(request: AddDesignationRequest) -> dict[str, Any]:
         seniority_level=request.seniority_level,
     )
     if not success:
-        raise HTTPException(status_code=400, detail=f"Failed to add designation '{request.designation_name}'. Ensure parent family exists.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to add designation '{request.designation_name}'. Ensure parent family exists.",
+        )
     return {
         "status": "success",
         "message": f"Successfully added designation '{request.designation_name}' and generated vector embeddings.",

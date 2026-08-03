@@ -15,9 +15,15 @@ class CVProcessingResponse(BaseModel):
     progress: int | None = Field(default=None, description="Progress percentage (0-100)")
     stage: str | None = Field(default=None, description="Current processing stage")
     failed_step: str | None = Field(default=None, description="Step where the pipeline failed")
-    error_details: str | None = Field(default=None, description="Reserved compatibility field; technical traces are never returned")
+    error_details: str | None = Field(
+        default=None,
+        description="Reserved compatibility field; technical traces are never returned",
+    )
     job_id: str | None = Field(default=None, description="Content-addressed background processing job ID")
-    job_state: str | None = Field(default=None, description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, or FAILED state")
+    job_state: str | None = Field(
+        default=None,
+        description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, or FAILED state",
+    )
     execution_mode: str | None = Field(default=None, description="RQ or explicit development fallback execution mode")
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
 
@@ -28,28 +34,18 @@ class CVUploadResponse(BaseModel):
     parsed_at: str | None = Field(None, description="ISO timestamp of parsing (alias for scanned_at)")
     filename: str = Field(..., description="Uploaded CV filename")
     content_type: str | None = Field(None, description="MIME content type")
-    characters: int = Field(
-        ..., description="Total character count of extracted Markdown text"
-    )
+    characters: int = Field(..., description="Total character count of extracted Markdown text")
     page_count: int = Field(..., description="Total number of pages in the document")
     is_scanned: bool = Field(
         ...,
         description="Indicates whether the document was detected as scanned/image-heavy",
     )
-    ocr_applied: bool = Field(
-        ..., description="Indicates whether local OCR was executed"
-    )
+    ocr_applied: bool = Field(..., description="Indicates whether local OCR was executed")
     text: str = Field(..., description="Clean extracted Markdown text content")
     markdown: str = Field(..., description="Clean extracted Markdown text content")
-    structured_doc: dict[str, Any] | None = Field(
-        default=None, description="Docling structured document JSON model"
-    )
-    match_analysis: CandidateMatchAnalysis = Field(
-        ..., description="Job matching analysis, scores, and candidate classifications"
-    )
-    result_file_path: str | None = Field(
-        None, description="Path to saved JSON extraction result file"
-    )
+    structured_doc: dict[str, Any] | None = Field(default=None, description="Docling structured document JSON model")
+    match_analysis: CandidateMatchAnalysis = Field(..., description="Job matching analysis, scores, and candidate classifications")
+    result_file_path: str | None = Field(None, description="Path to saved JSON extraction result file")
     candidate_id: str | None = Field(None, description="Candidate or User ID")
     cv_id: str | None = Field(None, description="Unique CV ID")
     cv_hash: str | None = Field(None, description="SHA-256 hash of CV source content")
@@ -61,17 +57,15 @@ class CVUploadResponse(BaseModel):
         None,
         description="Processing status: CACHE_HIT, NEW_CV, CV_CHANGED, SCHEMA_CHANGED, REPROCESSED",
     )
-    dynamic_profile: DynamicCandidateProfile | None = Field(
-        None, description="Dynamically extracted candidate profile from LLM analysis."
-    )
+    dynamic_profile: DynamicCandidateProfile | None = Field(None, description="Dynamically extracted candidate profile from LLM analysis.")
     quality_metrics: dict[str, Any] | None = Field(
-        None, description="Extraction quality metrics (pages, words, completeness score, sections detected)"
+        None,
+        description="Extraction quality metrics (pages, words, completeness score, sections detected)",
     )
-    resume_json: dict[str, Any] | None = Field(
-        None, description="Normalized structured Resume JSON parsed from extracted text"
-    )
+    resume_json: dict[str, Any] | None = Field(None, description="Normalized structured Resume JSON parsed from extracted text")
     normalized_resume: NormalizedResume | None = Field(
-        None, description="Typed additive resume normalization with raw values, confidence, and evidence"
+        None,
+        description="Typed additive resume normalization with raw values, confidence, and evidence",
     )
     full_name: str | None = Field(None, description="Extracted candidate full name")
     candidate_name: str | None = Field(None, description="Extracted candidate name")
@@ -92,8 +86,6 @@ class CVUploadResponse(BaseModel):
     job_state: str | None = Field(default=None, description="Canonical background processing state")
     execution_mode: str | None = Field(default=None, description="Background execution mode")
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
-
-
 
 
 class CVMatchRequest(BaseModel):

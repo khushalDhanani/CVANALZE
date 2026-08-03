@@ -32,7 +32,6 @@ def get_embedding(text: str, model_name: str | None = None) -> list[float]:
     raise RuntimeError(f"Failed to generate embedding for model '{model}'. Check Ollama service availability.")
 
 
-
 class EmbeddingService:
     """
     Generates text embeddings via the shared Ollama transport with Redis L2 + File L3 caching.
@@ -48,7 +47,7 @@ class EmbeddingService:
     _cache_misses: int = 0
     _last_processing_time_ms: float = 0.0
     _total_processing_time_ms: float = 0.0
-    
+
     # Store timestamp of when a model failed to prevent log flooding
     _failed_models_cache: dict[str, float] = {}
 
@@ -122,9 +121,7 @@ class EmbeddingService:
         if cached is not None:
             with cls._metrics_lock:
                 cls._cache_hits += 1
-            logger.info(
-                f"[EMBEDDING] Cache HIT for model='{model}' hash='{content_hash[:12]}...' (0.0ms)"
-            )
+            logger.info(f"[EMBEDDING] Cache HIT for model='{model}' hash='{content_hash[:12]}...' (0.0ms)")
             return cached
 
         with cls._metrics_lock:
@@ -143,20 +140,14 @@ class EmbeddingService:
                 embedding_cache_manager.set(primary_cache_key, embedding)
                 if id_cache_key and id_cache_key != primary_cache_key:
                     embedding_cache_manager.set(id_cache_key, embedding)
-                logger.info(
-                    f"[EMBEDDING] Generated embedding via Ollama model='{model}' hash='{content_hash[:12]}...' in {duration_ms:.1f}ms (cache miss)"
-                )
+                logger.info(f"[EMBEDDING] Generated embedding via Ollama model='{model}' hash='{content_hash[:12]}...' in {duration_ms:.1f}ms (cache miss)")
                 return embedding
             else:
-                logger.warning(
-                    f"[EMBEDDING] Ollama returned empty embedding for model='{model}' in {duration_ms:.1f}ms"
-                )
+                logger.warning(f"[EMBEDDING] Ollama returned empty embedding for model='{model}' in {duration_ms:.1f}ms")
                 return None
         except Exception as exc:
             duration_ms = (time.perf_counter() - t0) * 1000.0
-            logger.warning(
-                f"[EMBEDDING] Non-fatal embedding generation failure for model='{model}': {exc} ({duration_ms:.1f}ms)"
-            )
+            logger.warning(f"[EMBEDDING] Non-fatal embedding generation failure for model='{model}': {exc} ({duration_ms:.1f}ms)")
             return None
 
     @classmethod
@@ -222,9 +213,7 @@ class EmbeddingService:
             return None
 
     @classmethod
-    def _call_ollama_batch_embed(
-        cls, model: str, texts: list[str]
-    ) -> list[list[float]] | None:
+    def _call_ollama_batch_embed(cls, model: str, texts: list[str]) -> list[list[float]] | None:
         if cls._is_model_throttled(model):
             return None
 
@@ -244,10 +233,7 @@ class EmbeddingService:
                 logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
                 break
             except OllamaError as exc:
-                logger.warning(
-                    f"[EMBEDDING] Ollama batch embed failed at offset {i} for model '{model}': "
-                    f"{type(exc).__name__}; retrying the batch as individual inputs"
-                )
+                logger.warning(f"[EMBEDDING] Ollama batch embed failed at offset {i} for model '{model}': {type(exc).__name__}; retrying the batch as individual inputs")
                 for text in batch:
                     single = cls._call_ollama_embed(model, text)
                     all_embeddings.append(single if single else [])
@@ -471,4 +457,3 @@ def get_vacancy_embedding(vacancy_id: int) -> tuple[list[float] | None, str | No
     if cached is not None:
         return cached, None
     return None, None
-

@@ -68,7 +68,4 @@ class PipelineProfiler:
             f"Comp:{m.evaluator_component_ms}, Guard:{m.evaluator_cross_domain_ms}, Rec:{m.evaluator_recommendation_ms}) | "
             f"LLM={llm_time_ms} | Total={m.total_execution_ms}"
         )
-        logger.info(
-            f"[TELEMETRY] Vacancies: Raw={m.vacancies_before_filtering} -> Filtered={m.vacancies_after_filtering} | "
-            f"Cache: {cache_str} | Total Time={m.total_execution_ms}ms"
-        )
+        logger.info(f"[TELEMETRY] Vacancies: Raw={m.vacancies_before_filtering} -> Filtered={m.vacancies_after_filtering} | Cache: {cache_str} | Total Time={m.total_execution_ms}ms")

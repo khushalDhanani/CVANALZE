@@ -24,7 +24,6 @@ from app.services.vacancy_prefilter import VacancyPreFilter
 
 
 class MatchService:
-
     @staticmethod
     async def analyze_single_cv(
         cv_text: str,
@@ -50,10 +49,7 @@ class MatchService:
 
         cv_stripped = cv_text.strip()
         if "<!-- image -->" in cv_stripped and len(cv_stripped) < 50:
-            raise ValueError(
-                "CV document is a scanned image with no extractable text. "
-                "OCR could not extract any meaningful content."
-            )
+            raise ValueError("CV document is a scanned image with no extractable text. OCR could not extract any meaningful content.")
 
         document_hash = (document_hash or "").strip() or hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
         candidate_id = str(candidate_id).strip() if candidate_id else ""
@@ -69,21 +65,16 @@ class MatchService:
                     resume_json = {}
             if normalized_resume is None:
                 normalized_payload = resume_json.get("normalized") if resume_json else None
-                normalized_resume = (
-                    NormalizedResume.model_validate(normalized_payload)
-                    if normalized_payload
-                    else ResumeNormalizer.normalize(resume_json or {}, cv_text)
-                )
+                normalized_resume = NormalizedResume.model_validate(normalized_payload) if normalized_payload else ResumeNormalizer.normalize(resume_json or {}, cv_text)
 
         if deterministic_experience is None:
             deterministic_experience = normalized_resume.experience.deterministic_years
 
         from fastapi.concurrency import run_in_threadpool
+
         # 3. Vacancy retrieval
         with profiler.time_stage("vacancy_retrieval"):
-            openings = (
-                job_openings if job_openings is not None else await run_in_threadpool(JobRepository.get_all_jobs)
-            )
+            openings = job_openings if job_openings is not None else await run_in_threadpool(JobRepository.get_all_jobs)
 
         if not openings:
             logger.warning("MatchService.analyze_single_cv: No job openings available for matching.")
@@ -93,11 +84,7 @@ class MatchService:
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
-        vacancy_ids = sorted(
-            str(job.get("vacancy_id") or job.get("id") or "")
-            for job in openings
-            if job.get("vacancy_id") is not None or job.get("id") is not None
-        )
+        vacancy_ids = sorted(str(job.get("vacancy_id") or job.get("id") or "") for job in openings if job.get("vacancy_id") is not None or job.get("id") is not None)
         vacancy_version = JobRepository.compute_matching_vacancy_version(openings)
 
         # 4. Match Result Cache Check (instant repeat searches)
@@ -152,7 +139,6 @@ class MatchService:
         filtered_vacancies = [job.raw_job for job in filtered_job_contexts]
         profiler.metrics.vacancies_after_filtering = len(filtered_job_contexts)
 
-
         # Fetch configuration thresholds once for all jobs to avoid redundant lookups
         def _safe_float_config(key: str, default: float) -> float:
             val = ConfigRepository.get_setting(key, default)
@@ -163,8 +149,14 @@ class MatchService:
                 return default
 
         scoring_config = {
-            "MANDATORY_FAILURE_PENALTY_PER_ITEM": _safe_float_config("MANDATORY_FAILURE_PENALTY_PER_ITEM", settings.MANDATORY_FAILURE_PENALTY_PER_ITEM),
-            "MAX_SCORE_ON_MANDATORY_FAILURE": _safe_float_config("MAX_SCORE_ON_MANDATORY_FAILURE", settings.MAX_SCORE_ON_MANDATORY_FAILURE),
+            "MANDATORY_FAILURE_PENALTY_PER_ITEM": _safe_float_config(
+                "MANDATORY_FAILURE_PENALTY_PER_ITEM",
+                settings.MANDATORY_FAILURE_PENALTY_PER_ITEM,
+            ),
+            "MAX_SCORE_ON_MANDATORY_FAILURE": _safe_float_config(
+                "MAX_SCORE_ON_MANDATORY_FAILURE",
+                settings.MAX_SCORE_ON_MANDATORY_FAILURE,
+            ),
             "LLM_SEMANTIC_WEIGHT": _safe_float_config("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT),
             "MAX_LLM_BOOST": _safe_float_config("MAX_LLM_BOOST", settings.MAX_LLM_BOOST),
             "MATCH_HIGH_THRESHOLD": _safe_float_config("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD),
@@ -188,7 +180,7 @@ class MatchService:
                     pre_llm_matches.append(pre_llm_match)
                 except Exception as e:
                     logger.error(f"Error in rule-based matching for job {job_context.job_id}: {e}")
-                
+
             pre_llm_matches.sort(key=lambda m: m.score, reverse=True)
             if pre_llm_matches:
                 top_score = pre_llm_matches[0].score
@@ -205,9 +197,7 @@ class MatchService:
         if not llm_skipped:
             # 4. Prompt Construction & Token Count
             with profiler.time_stage("prompt_construction"):
-                prompt, token_est, char_count = build_optimized_match_prompt(
-                    cv_text, filtered_vacancies
-                )
+                prompt, token_est, char_count = build_optimized_match_prompt(cv_text, filtered_vacancies)
                 profiler.metrics.token_count = token_est
                 profiler.metrics.context_char_count = char_count
 
@@ -245,7 +235,6 @@ class MatchService:
         # 6. Deterministic Scoring & Ranking in Python
         evaluated_matches = []
         with profiler.time_stage("scoring"):
-            
             if optimized_profile:
                 logger.info(f"LLM Extracted Experience: {optimized_profile.relevant_experience_years}, LLM Domain: {optimized_profile.professional_domain}")
 
@@ -314,7 +303,6 @@ class MatchService:
                 except Exception as e:
                     logger.error(f"Error in LLM-enriched matching for job {job.get('id') or job.get('vacancy_id')}: {e}")
 
-
             evaluated_matches.sort(key=lambda m: m.score, reverse=True)
 
             if evaluated_matches:
@@ -323,16 +311,16 @@ class MatchService:
                     if i == 0:
                         m.ranking_reason = f"Ranked #1 with highest verified score of {m.score}%."
                     else:
-                        m.ranking_reason = f"Ranked #{i+1} due to lower score ({m.score}% vs top {evaluated_matches[0].score}%)."
-                    
+                        m.ranking_reason = f"Ranked #{i + 1} due to lower score ({m.score}% vs top {evaluated_matches[0].score}%)."
+
                     evidence_snippet = "; ".join(f"{ev.cv_evidence}" for ev in m.evidence.values())
                     if len(evidence_snippet) > 150:
                         evidence_snippet = evidence_snippet[:147] + "..."
                     if not evidence_snippet:
                         evidence_snippet = "None"
-                    
+
                     fails_snippet = "; ".join(f"{f.description}" for f in m.mandatory_failures) if m.mandatory_failures else "None"
-                    
+
                     logger.debug(
                         f"[VACANCY] ID: {m.vacancy_id} | Title: {m.job_title} | "
                         f"Overall Score: {m.score}% (Coverage: {int(m.coverage * 100)}%) | "
@@ -352,19 +340,13 @@ class MatchService:
         has_genuine_match = False
         if evaluated_matches and evaluated_matches[0].score >= settings.MATCH_MEDIUM_THRESHOLD:
             top_m = evaluated_matches[0]
-            has_domain_mismatch = any(
-                f.requirement_id == "req_domain_mismatch" for f in top_m.mandatory_failures
-            )
+            has_domain_mismatch = any(f.requirement_id == "req_domain_mismatch" for f in top_m.mandatory_failures)
             if not has_domain_mismatch:
                 has_genuine_match = True
 
         if has_genuine_match and evaluated_matches:
             top_m = evaluated_matches[0]
-            skills_str = (
-                ", ".join(top_m.matched_skills[:4])
-                if top_m.matched_skills
-                else "core qualification requirements"
-            )
+            skills_str = ", ".join(top_m.matched_skills[:4]) if top_m.matched_skills else "core qualification requirements"
             active_vacancy_summary = (
                 f"Genuine Match Found: Candidate is a strong match for '{top_m.job_title}' "
                 f"in the {top_m.department_name or top_m.department} department "
@@ -374,7 +356,6 @@ class MatchService:
         else:
             active_vacancy_summary = f"No suitable active vacancy found matching candidate domain/taxonomy profile (Primary Domain: {professional_domain}). Manual HR review recommended."
             best_match = evaluated_matches[0] if evaluated_matches else MatchService._empty_job_match()
-
 
         roles_str = ", ".join(suitable_roles) if suitable_roles else "General Roles"
         strengths_str = "; ".join(strengths) if strengths else "Solid technical and professional baseline."
@@ -390,10 +371,7 @@ class MatchService:
                 f"• Suitable Job Roles: {roles_str}"
             )
 
-        logger.info(
-            f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}', "
-            f"has_genuine_match={has_genuine_match}"
-        )
+        logger.info(f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}', has_genuine_match={has_genuine_match}")
 
         result = EnrichedCandidateAnalysis(
             primary_department=recommended_dept,
@@ -458,9 +436,7 @@ class MatchService:
         cv_text: str = "",
         normalized_resume: NormalizedResume | None = None,
     ) -> EnrichedCandidateAnalysis:
-        cand_profile = (
-            ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
-        )
+        cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
         rec_dept = cand_profile.get("recommended_department", "General")
         prof_domain = cand_profile.get("professional_domain", "General Operations")
         strengths = cand_profile.get("strengths", ["General technical background"])
@@ -497,22 +473,14 @@ class MatchService:
 
         cv_hash = data.get("cv_hash", "")
         cand_id = data.get("candidate_id", "")
-        stored_normalized_resume = (
-            NormalizedResume.model_validate(data["normalized_resume"])
-            if data.get("normalized_resume")
-            else None
-        )
+        stored_normalized_resume = NormalizedResume.model_validate(data["normalized_resume"]) if data.get("normalized_resume") else None
         enriched_analysis = await MatchService.analyze_single_cv(
             cv_text,
             document_hash=cv_hash,
             candidate_id=cand_id,
             resume_json=data.get("resume_json"),
             normalized_resume=stored_normalized_resume,
-            deterministic_experience=(
-                stored_normalized_resume.experience.deterministic_years
-                if stored_normalized_resume
-                else ((data.get("quality_metrics") or {}).get("experience_years") or None)
-            ),
+            deterministic_experience=(stored_normalized_resume.experience.deterministic_years if stored_normalized_resume else ((data.get("quality_metrics") or {}).get("experience_years") or None)),
         )
 
         # Merge back into data

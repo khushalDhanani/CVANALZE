@@ -12,6 +12,7 @@ T = TypeVar("T", bound=BaseModel)
 @dataclass
 class LLMCacheEntry:
     """Full LLM inference cache entry with all metadata preserved."""
+
     prompt: str
     raw_response: str
     structured_data: dict[str, Any]
@@ -92,9 +93,7 @@ class LLMCacheRepository:
         ).to_key()
 
     @classmethod
-    def get_cached_object(
-        cls, hash_key: str, model_class: type[T]
-    ) -> T | None:
+    def get_cached_object(cls, hash_key: str, model_class: type[T]) -> T | None:
         entry = cls.get_cached_entry(hash_key)
         if entry is not None:
             try:
@@ -105,9 +104,7 @@ class LLMCacheRepository:
         return None
 
     @classmethod
-    def save_cached_object(
-        cls, hash_key: str, object_to_cache: BaseModel | dict[str, Any]
-    ) -> None:
+    def save_cached_object(cls, hash_key: str, object_to_cache: BaseModel | dict[str, Any]) -> None:
         if isinstance(object_to_cache, BaseModel):
             data = object_to_cache.model_dump()
         elif isinstance(object_to_cache, dict):
@@ -142,9 +139,7 @@ class LLMCacheRepository:
         llm_cache_manager.set(hash_key, entry.to_dict())
 
     @classmethod
-    def get_cached_result(
-        cls, cache_key: str
-    ) -> Any | None:
+    def get_cached_result(cls, cache_key: str) -> Any | None:
         return llm_cache_manager.get(cache_key)
 
     @classmethod

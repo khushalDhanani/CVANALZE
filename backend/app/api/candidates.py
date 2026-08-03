@@ -25,8 +25,12 @@ def search_candidates_post(request: CandidateSearchRequest) -> CandidateSearchRe
         return CandidateSearchService.search_candidates(request)
     except Exception as exc:
         from app.core.logging import logger
+
         logger.exception(f"Candidate search failed: {exc}")
-        raise HTTPException(status_code=500, detail="An internal error occurred during candidate search.") from exc
+        raise HTTPException(
+            status_code=500,
+            detail="An internal error occurred during candidate search.",
+        ) from exc
 
 
 @router.get("", response_model=list[dict[str, Any]])
@@ -65,8 +69,12 @@ def list_candidates(
         return [item.model_dump() for item in res.candidates]
     except Exception as exc:
         from app.core.logging import logger
+
         logger.exception(f"Candidate listing failed: {exc}")
-        raise HTTPException(status_code=500, detail="An internal error occurred while listing candidates.") from exc
+        raise HTTPException(
+            status_code=500,
+            detail="An internal error occurred while listing candidates.",
+        ) from exc
 
 
 @router.get("/{candidate_id}", response_model=dict[str, Any])
@@ -83,6 +91,7 @@ def get_candidate_detail(candidate_id: str):
     if "similar_candidates" not in result or result.get("similar_candidates") is None:
         from app.services.embedding_service import get_candidate_embedding
         from app.services.similar_candidate_service import SimilarCandidateService
+
         stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
         cand_emb = get_candidate_embedding(stem)
         if cand_emb:
@@ -118,7 +127,6 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
 
     cv_key = str(existing_result.get("id") or existing_result.get("scan_id") or requested_key)
     result_filename = f"{cv_key}.json"
-
 
     # Prevent duplicate concurrent reprocessing jobs
     if existing_result.get("status") == "processing":

@@ -1,5 +1,5 @@
-import hashlib
 import functools
+import hashlib
 import re
 import time
 from dataclasses import dataclass, field
@@ -7,10 +7,12 @@ from typing import Any
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
+from app.core.rule_config_manager import PrefilterRules
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
-from app.services.dynamic_scoring_prefilter_service import DynamicScoringAndPrefilterService
+from app.services.dynamic_scoring_prefilter_service import (
+    DynamicScoringAndPrefilterService,
+)
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
 from app.services.job_taxonomy import JobTaxonomy, TaxonomyClassifier
 
@@ -47,9 +49,7 @@ class CandidateSearchContext:
             cv_embedding = get_candidate_embedding(cv_hash)
             if cv_embedding is None:
                 try:
-                    cv_embedding = EmbeddingService.generate_embedding(
-                        cv_text[:8000], settings.EMBEDDING_MODEL
-                    )
+                    cv_embedding = EmbeddingService.generate_embedding(cv_text[:8000], settings.EMBEDDING_MODEL)
                 except (RuntimeError, ValueError, AttributeError, KeyError) as e:
                     logger.warning(f"[PREFILTER] CV embedding generation failed: {e}")
                     cv_embedding = None
@@ -59,9 +59,7 @@ class CandidateSearchContext:
             cand_families = list(analysis_context.cand_families)
             candidate_experience = analysis_context.candidate_experience
         else:
-            cand_domain, cand_families = TaxonomyClassifier.classify_candidate(
-                cv_text, resume_json=resume_json
-            )
+            cand_domain, cand_families = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
 
         return cls(
             cv_text=cv_text,
@@ -80,9 +78,7 @@ class PgVectorQueryCache:
 
     @staticmethod
     @functools.lru_cache(maxsize=128)
-    def query_pgvector_cached(
-        embedding_tuple: tuple[float, ...], top_limit: int = 200
-    ) -> tuple[tuple[str, int, float], ...]:
+    def query_pgvector_cached(embedding_tuple: tuple[float, ...], top_limit: int = 200) -> tuple[tuple[str, int, float], ...]:
         """
         Queries pgvector ONCE for candidate embedding, returning tuple of (vacancy_id, rank, distance).
         Thread-safe under CPython GIL atomic LRU cache operations.
@@ -98,11 +94,7 @@ class PgVectorQueryCache:
                 embedding_list = list(embedding_tuple)
                 with pg_SessionLocal() as session:
                     dist_col = VacancyEmbedding.embedding.cosine_distance(embedding_list)
-                    stmt = (
-                        select(VacancyEmbedding.vacancy_id, dist_col)
-                        .order_by(dist_col)
-                        .limit(top_limit)
-                    )
+                    stmt = select(VacancyEmbedding.vacancy_id, dist_col).order_by(dist_col).limit(top_limit)
                     rows = session.execute(stmt).all()
                     for rank, (vid, dist) in enumerate(rows, 1):
                         results_list.append((str(vid), rank, float(dist or 0.0)))
@@ -163,9 +155,7 @@ class VacancyPreFilter:
         """
         if not candidate_embedding:
             return []
-        cached_results = PgVectorQueryCache.query_pgvector_cached(
-            tuple(candidate_embedding), top_limit=max(top_n, 200)
-        )
+        cached_results = PgVectorQueryCache.query_pgvector_cached(tuple(candidate_embedding), top_limit=max(top_n, 200))
         return [vid for vid, rank, dist in cached_results[:top_n]]
 
     @classmethod
@@ -177,9 +167,7 @@ class VacancyPreFilter:
         """
         if not candidate_embedding:
             return {}
-        cached_results = PgVectorQueryCache.query_pgvector_cached(
-            tuple(candidate_embedding), top_limit=max(top_k, 200)
-        )
+        cached_results = PgVectorQueryCache.query_pgvector_cached(tuple(candidate_embedding), top_limit=max(top_k, 200))
         return {vid: rank for vid, rank, dist in cached_results[:top_k]}
 
     @classmethod
@@ -201,10 +189,7 @@ class VacancyPreFilter:
         limit = top_k or settings.PREFILTER_TOP_K
 
         # Convert openings to JobEvaluationContexts once if needed
-        job_contexts: list[JobEvaluationContext] = [
-            j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j)
-            for j in openings
-        ]
+        job_contexts: list[JobEvaluationContext] = [j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j) for j in openings]
 
         # Fast exit if total openings <= limit
         if len(job_contexts) <= limit:
@@ -228,11 +213,7 @@ class VacancyPreFilter:
         t0 = time.perf_counter()
         stage0_jobs = job_contexts
         if cand_ctx.cand_families and cand_ctx.cand_families != [JobTaxonomy.FAMILY_OTHER]:
-            compatible_jobs = [
-                j for j in job_contexts
-                if TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family)
-                or j.vac_tax_domain == cand_ctx.cand_domain
-            ]
+            compatible_jobs = [j for j in job_contexts if TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) or j.vac_tax_domain == cand_ctx.cand_domain]
             if compatible_jobs:
                 stage0_jobs = compatible_jobs
 
@@ -244,10 +225,7 @@ class VacancyPreFilter:
 
         # Adaptive Retrieval Guard: Skip Stage 1 & 2 if Stage 0 count <= limit
         if len(stage0_jobs) <= limit:
-            logger.info(
-                f"[PREFILTER_ADAPTIVE] Stage 0 compatible openings ({len(stage0_jobs)}) <= limit ({limit}). "
-                f"Skipping Stage 1 & 2 retrieval."
-            )
+            logger.info(f"[PREFILTER_ADAPTIVE] Stage 0 compatible openings ({len(stage0_jobs)}) <= limit ({limit}). Skipping Stage 1 & 2 retrieval.")
             res_jobs = []
             for j in stage0_jobs:
                 job_dict = dict(j.raw_job) if isinstance(j.raw_job, dict) and j.raw_job else dict(j.__dict__)
@@ -264,9 +242,7 @@ class VacancyPreFilter:
 
         if cand_ctx.cv_embedding and settings.EMBEDDING_ENABLED:
             top_n = getattr(settings, "SEMANTIC_RETRIEVAL_TOP_N", 50)
-            vector_results_tuple = PgVectorQueryCache.query_pgvector_cached(
-                tuple(cand_ctx.cv_embedding), top_limit=max(top_n, 200)
-            )
+            vector_results_tuple = PgVectorQueryCache.query_pgvector_cached(tuple(cand_ctx.cv_embedding), top_limit=max(top_n, 200))
 
             if vector_results_tuple:
                 top_n_vids = {vid for vid, rank, dist in vector_results_tuple[:top_n]}
@@ -275,10 +251,7 @@ class VacancyPreFilter:
                     stage1_jobs = semantic_candidates
 
         t_stage1_ms = round((time.perf_counter() - t1) * 1000.0, 2)
-        logger.info(
-            f"[PREFILTER_STAGE_1] Semantic Retrieval selected {len(stage1_jobs)} candidate vacancies out of "
-            f"{len(stage0_jobs)} Stage 0 openings in {t_stage1_ms} ms."
-        )
+        logger.info(f"[PREFILTER_STAGE_1] Semantic Retrieval selected {len(stage1_jobs)} candidate vacancies out of {len(stage0_jobs)} Stage 0 openings in {t_stage1_ms} ms.")
 
         # STAGE 2: Deterministic VacancyPreFilter (Fast Token-Set Lexical + RRF fusion)
         t2 = time.perf_counter()
@@ -329,9 +302,7 @@ class VacancyPreFilter:
             if cand_ctx.candidate_experience is not None:
                 min_e = job.min_experience_years
                 max_e = job.max_experience_years
-                if (min_e is None or cand_ctx.candidate_experience >= min_e) and (
-                    max_e is None or cand_ctx.candidate_experience <= max_e
-                ):
+                if (min_e is None or cand_ctx.candidate_experience >= min_e) and (max_e is None or cand_ctx.candidate_experience <= max_e):
                     score += prefilter_rules.lexical_weights.experience_suitability
 
             lexical_scored.append((score, job))

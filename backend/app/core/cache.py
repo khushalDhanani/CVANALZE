@@ -18,9 +18,8 @@ _REDIS_CLIENT: Any = None
 if settings.REDIS_URL:
     try:
         import redis as redis_module
-        _REDIS_CLIENT = redis_module.Redis.from_url(
-            settings.REDIS_URL, decode_responses=True
-        )
+
+        _REDIS_CLIENT = redis_module.Redis.from_url(settings.REDIS_URL, decode_responses=True)
         _REDIS_CLIENT.ping()
     except Exception:
         _REDIS_CLIENT = None
@@ -34,6 +33,7 @@ class CacheKey:
     automatic uniqueness and that keys change when any contributing
     component changes. Never uses raw prompt text as input.
     """
+
     components: dict[str, str] = field(default_factory=dict)
 
     def to_key(self) -> str:
@@ -145,32 +145,25 @@ class CacheKey:
 
 class CacheProvider(ABC):
     @abstractmethod
-    def get(self, key: str) -> Any | None:
-        ...
+    def get(self, key: str) -> Any | None: ...
 
     @abstractmethod
-    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
-        ...
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None: ...
 
     @abstractmethod
-    def delete(self, key: str) -> None:
-        ...
+    def delete(self, key: str) -> None: ...
 
     @abstractmethod
-    def delete_by_pattern(self, pattern: str) -> int:
-        ...
+    def delete_by_pattern(self, pattern: str) -> int: ...
 
     @abstractmethod
-    def exists(self, key: str) -> bool:
-        ...
+    def exists(self, key: str) -> bool: ...
 
     @abstractmethod
-    def ttl(self, key: str) -> int | None:
-        ...
+    def ttl(self, key: str) -> int | None: ...
 
     @abstractmethod
-    def clear(self) -> None:
-        ...
+    def clear(self) -> None: ...
 
 
 class MemoryCache(CacheProvider):
@@ -358,7 +351,7 @@ class FileCache(CacheProvider):
     def _sanitize_key(self, key: str) -> str:
         clean_key = key.split(":", 1)[1] if ":" in key else key
         if self._key_prefix and clean_key.startswith(self._key_prefix):
-            clean_key = clean_key[len(self._key_prefix):]
+            clean_key = clean_key[len(self._key_prefix) :]
         if clean_key.endswith(".json"):
             return clean_key
         return f"{clean_key}.json"
@@ -481,9 +474,7 @@ class CacheManager:
         """
         if self._persist_to_all_providers:
             return self._providers
-        has_active_redis = any(
-            isinstance(p, RedisCache) and p.available for p in self._providers
-        )
+        has_active_redis = any(isinstance(p, RedisCache) and p.available for p in self._providers)
         if has_active_redis:
             return [p for p in self._providers if not isinstance(p, FileCache)]
         return self._providers

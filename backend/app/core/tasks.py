@@ -52,6 +52,7 @@ def embed_vacancy(vacancy_id: int | str, job_dict: dict[str, Any] | None = None)
     vid_int = int(vacancy_id)
     if job_dict is None:
         from app.repositories.job import JobRepository
+
         job_dict = JobRepository.get_job_by_id(str(vid_int))
 
     if not job_dict:
@@ -135,4 +136,3 @@ def sync_all_vacancies() -> str:
                 embed_vacancy(int(vid), job_dict=job)
                 count += 1
         return f"Synchronously processed {count} vacancies for embedding sync."
-

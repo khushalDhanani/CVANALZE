@@ -78,9 +78,23 @@ class ProcessingJobRepository:
     @staticmethod
     def _assert_transition(current: JobState, target: JobState) -> None:
         allowed = {
-            JobState.QUEUED: {JobState.QUEUED, JobState.PROCESSING, JobState.RETRYING, JobState.FAILED},
-            JobState.PROCESSING: {JobState.PROCESSING, JobState.RETRYING, JobState.COMPLETED, JobState.FAILED},
-            JobState.RETRYING: {JobState.RETRYING, JobState.PROCESSING, JobState.FAILED},
+            JobState.QUEUED: {
+                JobState.QUEUED,
+                JobState.PROCESSING,
+                JobState.RETRYING,
+                JobState.FAILED,
+            },
+            JobState.PROCESSING: {
+                JobState.PROCESSING,
+                JobState.RETRYING,
+                JobState.COMPLETED,
+                JobState.FAILED,
+            },
+            JobState.RETRYING: {
+                JobState.RETRYING,
+                JobState.PROCESSING,
+                JobState.FAILED,
+            },
             JobState.COMPLETED: {JobState.COMPLETED, JobState.QUEUED},
             JobState.FAILED: {JobState.FAILED, JobState.QUEUED},
             JobState.UNKNOWN: {JobState.QUEUED, JobState.FAILED},

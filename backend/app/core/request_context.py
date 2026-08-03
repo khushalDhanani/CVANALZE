@@ -10,7 +10,6 @@ from app.core.error_handlers import error_response
 from app.core.logging import logger
 from app.schemas.contracts import ErrorCode
 
-
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
@@ -34,10 +33,7 @@ class RequestContextMiddleware:
         started = time.perf_counter()
 
         if scope["type"] == "http" and _json_content_length(headers) > settings.MAX_JSON_REQUEST_SIZE_BYTES:
-            logger.warning(
-                f"[REQUEST] request_id={request_id} correlation_id={correlation_id} "
-                f"method={scope.get('method')} path={scope.get('path')} status=413"
-            )
+            logger.warning(f"[REQUEST] request_id={request_id} correlation_id={correlation_id} method={scope.get('method')} path={scope.get('path')} status=413")
             response = error_response(
                 scope,
                 status_code=413,
@@ -66,10 +62,7 @@ class RequestContextMiddleware:
         except Exception as exc:
             if scope["type"] != "http" or response_started:
                 raise
-            logger.exception(
-                f"[REQUEST_ERROR] request_id={request_id} correlation_id={correlation_id} "
-                f"method={scope.get('method')} path={scope.get('path')} error={type(exc).__name__}"
-            )
+            logger.exception(f"[REQUEST_ERROR] request_id={request_id} correlation_id={correlation_id} method={scope.get('method')} path={scope.get('path')} error={type(exc).__name__}")
             response = error_response(
                 scope,
                 status_code=500,
@@ -82,8 +75,7 @@ class RequestContextMiddleware:
             if scope["type"] == "http":
                 duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
                 logger.info(
-                    f"[REQUEST] request_id={request_id} correlation_id={correlation_id} "
-                    f"method={scope.get('method')} path={scope.get('path')} status={status_code or 500} duration_ms={duration_ms}"
+                    f"[REQUEST] request_id={request_id} correlation_id={correlation_id} method={scope.get('method')} path={scope.get('path')} status={status_code or 500} duration_ms={duration_ms}"
                 )
 
 

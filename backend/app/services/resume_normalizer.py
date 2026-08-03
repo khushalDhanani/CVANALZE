@@ -51,11 +51,7 @@ class ResumeNormalizer:
         skills_data = resume_json.get("skills") or {}
         raw_skills = skills_data.get("all_skills") or [] if isinstance(skills_data, dict) else skills_data
         deterministic_intervals = ExperienceCalculator.extract_intervals(resume_json)
-        deterministic_years = (
-            ExperienceCalculator.calculate_total_experience(resume_json, cv_text)
-            if deterministic_intervals
-            else None
-        )
+        deterministic_years = ExperienceCalculator.calculate_total_experience(resume_json, cv_text) if deterministic_intervals else None
         stated_years = ExperienceCalculator._extract_explicit_experience(cv_text)
 
         return NormalizedResume(
@@ -140,8 +136,16 @@ class ResumeNormalizer:
         if not isinstance(item, dict):
             raw_value = cls._as_string(item)
             return NormalizedEducation(
-                degree=cls._string_field(raw_value, cls._canonical_degree(raw_value), 0.5 if raw_value else 0.0),
-                domain=cls._string_field(raw_value, cls._education_domain(raw_value), 0.5 if raw_value else 0.0),
+                degree=cls._string_field(
+                    raw_value,
+                    cls._canonical_degree(raw_value),
+                    0.5 if raw_value else 0.0,
+                ),
+                domain=cls._string_field(
+                    raw_value,
+                    cls._education_domain(raw_value),
+                    0.5 if raw_value else 0.0,
+                ),
                 evidence=[raw_value] if raw_value else [],
             )
         degree_raw = cls._as_string(item.get("degree"))
@@ -155,7 +159,11 @@ class ResumeNormalizer:
         return NormalizedEducation(
             degree=cls._string_field(degree_raw, degree, 0.9 if degree_raw else 0.0),
             domain=cls._string_field(degree_raw, domain, 0.8 if domain else 0.0),
-            institution=cls._string_field(institution_raw, cls._clean_whitespace(institution_raw), 0.9 if institution_raw else 0.0),
+            institution=cls._string_field(
+                institution_raw,
+                cls._clean_whitespace(institution_raw),
+                0.9 if institution_raw else 0.0,
+            ),
             interval=cls._normalize_interval(dates_raw) if dates_raw else None,
             grade=cls._string_field(grade_raw, cls._clean_whitespace(grade_raw), 0.9) if grade_raw else None,
             evidence=evidence,
@@ -174,7 +182,11 @@ class ResumeNormalizer:
         evidence = [value for value in (title_raw, company_raw, dates_raw, description) if value] + responsibilities
         return NormalizedEmployment(
             job_title=cls._string_field(title_raw, cls._clean_whitespace(title_raw), 0.9 if title_raw else 0.0),
-            company=cls._string_field(company_raw, cls._clean_whitespace(company_raw), 0.9 if company_raw else 0.0),
+            company=cls._string_field(
+                company_raw,
+                cls._clean_whitespace(company_raw),
+                0.9 if company_raw else 0.0,
+            ),
             interval=cls._normalize_interval(dates_raw),
             responsibilities=responsibilities,
             evidence=evidence,
@@ -250,9 +262,15 @@ class ResumeNormalizer:
         if not value:
             return None
         domains = (
-            (r"computer science|software|information technology|\bIT\b", "Computer Science & IT"),
+            (
+                r"computer science|software|information technology|\bIT\b",
+                "Computer Science & IT",
+            ),
             (r"mechanical", "Mechanical Engineering"),
-            (r"electrical|electronics|communication", "Electrical & Electronics Engineering"),
+            (
+                r"electrical|electronics|communication",
+                "Electrical & Electronics Engineering",
+            ),
             (r"civil", "Civil Engineering"),
             (r"business|management|finance|account", "Business & Finance"),
         )

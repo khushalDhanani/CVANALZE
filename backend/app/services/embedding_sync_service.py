@@ -81,9 +81,5 @@ class EmbeddingSyncService:
 
         metrics["skipped"] = metrics["total"] - len(uncached)
 
-        logger.info(
-            f"[EMBEDDING_SYNC] Processed {len(job_dicts)} vacancies: "
-            f"{metrics['synced']} newly embedded, {metrics['skipped']} cached/unchanged, "
-            f"{metrics['failed']} failed."
-        )
+        logger.info(f"[EMBEDDING_SYNC] Processed {len(job_dicts)} vacancies: {metrics['synced']} newly embedded, {metrics['skipped']} cached/unchanged, {metrics['failed']} failed.")
         return metrics

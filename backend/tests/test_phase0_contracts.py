@@ -41,47 +41,97 @@ def test_every_application_route_has_an_access_policy():
 
 
 def test_openapi_path_and_method_snapshot_matches_access_policy():
-    expected = {
-        (policy.method, policy.path)
-        for policy in ENDPOINT_POLICIES
-        if policy.method != "WEBSOCKET"
-    }
-    actual = {
-        (method.upper(), path)
-        for path, path_item in app.openapi()["paths"].items()
-        for method in path_item
-        if method.lower() in {"get", "post", "put", "patch", "delete"}
-    }
+    expected = {(policy.method, policy.path) for policy in ENDPOINT_POLICIES if policy.method != "WEBSOCKET"}
+    actual = {(method.upper(), path) for path, path_item in app.openapi()["paths"].items() for method in path_item if method.lower() in {"get", "post", "put", "patch", "delete"}}
 
     assert actual == expected
 
 
 def test_success_response_field_snapshots_are_stable():
     assert set(CVProcessingResponse.model_fields) == {
-        "message", "cv_key", "status", "progress", "stage", "failed_step",
-        "error_details", "job_id", "job_state", "execution_mode", "retry_count",
+        "message",
+        "cv_key",
+        "status",
+        "progress",
+        "stage",
+        "failed_step",
+        "error_details",
+        "job_id",
+        "job_state",
+        "execution_mode",
+        "retry_count",
     }
     assert set(EnrichedCandidateAnalysis.model_fields) == {
-        "status", "progress", "stage", "is_complete", "job_id", "job_state",
-        "execution_mode", "retry_count", "full_name", "candidate_name",
-        "primary_department", "recommended_department", "professional_domain",
-        "strengths", "suitable_job_roles", "has_genuine_match",
-        "active_vacancy_summary", "ai_career_summary", "best_match",
-        "suitable_openings", "rejection_policy_note", "llm_skipped",
+        "status",
+        "progress",
+        "stage",
+        "is_complete",
+        "job_id",
+        "job_state",
+        "execution_mode",
+        "retry_count",
+        "full_name",
+        "candidate_name",
+        "primary_department",
+        "recommended_department",
+        "professional_domain",
+        "strengths",
+        "suitable_job_roles",
+        "has_genuine_match",
+        "active_vacancy_summary",
+        "ai_career_summary",
+        "best_match",
+        "suitable_openings",
+        "rejection_policy_note",
+        "llm_skipped",
         "normalized_resume",
     }
     assert set(CVUploadResponse.model_fields) == {
-        "id", "scan_id", "parsed_at", "filename", "content_type", "characters",
-        "page_count", "is_scanned", "ocr_applied", "text", "markdown",
-        "structured_doc", "match_analysis", "result_file_path", "candidate_id",
-        "cv_id", "cv_hash", "parser_version", "schema_version", "created_at",
-        "updated_at", "status", "dynamic_profile", "quality_metrics", "resume_json",
-        "normalized_resume", "full_name", "candidate_name", "email", "phone",
-        "location", "job_title", "company_name", "name_confidence",
-        "name_confidence_tier", "location_confidence_tier",
-        "job_title_confidence_tier", "company_name_confidence_tier",
-        "field_confidence", "field_confidence_tiers", "name_extraction_source",
-        "job_id", "job_state", "execution_mode", "retry_count",
+        "id",
+        "scan_id",
+        "parsed_at",
+        "filename",
+        "content_type",
+        "characters",
+        "page_count",
+        "is_scanned",
+        "ocr_applied",
+        "text",
+        "markdown",
+        "structured_doc",
+        "match_analysis",
+        "result_file_path",
+        "candidate_id",
+        "cv_id",
+        "cv_hash",
+        "parser_version",
+        "schema_version",
+        "created_at",
+        "updated_at",
+        "status",
+        "dynamic_profile",
+        "quality_metrics",
+        "resume_json",
+        "normalized_resume",
+        "full_name",
+        "candidate_name",
+        "email",
+        "phone",
+        "location",
+        "job_title",
+        "company_name",
+        "name_confidence",
+        "name_confidence_tier",
+        "location_confidence_tier",
+        "job_title_confidence_tier",
+        "company_name_confidence_tier",
+        "field_confidence",
+        "field_confidence_tiers",
+        "name_extraction_source",
+        "job_id",
+        "job_state",
+        "execution_mode",
+        "retry_count",
     }
 
 

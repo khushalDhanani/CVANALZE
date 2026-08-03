@@ -126,9 +126,6 @@ class SimilarCandidateService:
         top_similar = similar_candidates[:max_matches]
 
         if top_similar:
-            logger.info(
-                f"[SIMILAR_CANDIDATES] Detected {len(top_similar)} similar candidate profile(s) for '{cv_key}' "
-                f"(Top similarity: {top_similar[0]['similarity_score']}, Threshold: {thresh})."
-            )
+            logger.info(f"[SIMILAR_CANDIDATES] Detected {len(top_similar)} similar candidate profile(s) for '{cv_key}' (Top similarity: {top_similar[0]['similarity_score']}, Threshold: {thresh}).")
 
         return top_similar

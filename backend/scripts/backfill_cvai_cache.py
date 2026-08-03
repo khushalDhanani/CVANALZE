@@ -17,6 +17,7 @@ logger = logging.getLogger("backfill_cvai_cache")
 
 UPLOADS_RESULTS_DIR = os.path.join(backend_dir, "uploads", "results")
 
+
 def backfill():
     if not SessionLocal:
         logger.error("Database connection not configured.")
@@ -98,7 +99,7 @@ def backfill():
         for filename in json_files:
             file_path = os.path.join(UPLOADS_RESULTS_DIR, filename)
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     data = json.load(f)
 
                 def parse_date(date_str):
@@ -112,7 +113,7 @@ def backfill():
                 parsed_at = parse_date(data.get("parsed_at"))
                 created_at = parse_date(data.get("created_at"))
                 updated_at = parse_date(data.get("updated_at"))
-                tenant_id = data.get("tenant_id") # Nullable
+                tenant_id = data.get("tenant_id")  # Nullable
 
                 cv_doc_params = {
                     "id": data.get("cv_id") or data.get("id") or filename.replace(".json", ""),
@@ -133,12 +134,12 @@ def backfill():
                     "markdown": data.get("markdown"),
                     "structured_doc": json.dumps(data.get("structured_doc")) if data.get("structured_doc") else None,
                     "quality_metrics": json.dumps(data.get("quality_metrics")) if data.get("quality_metrics") else None,
-                    "stage_metrics": json.dumps(data.get("stage_metrics")) if data.get("stage_metrics") else None
+                    "stage_metrics": json.dumps(data.get("stage_metrics")) if data.get("stage_metrics") else None,
                 }
 
                 # Extract profile data (which contains skills, experience, etc.)
                 dyn_profile = data.get("dynamic_profile") or data.get("resume_json") or {}
-                
+
                 candidate_id = data.get("candidate_id") or f"cand_{cv_doc_params['id']}"
                 candidate_params = {
                     "id": candidate_id,
@@ -150,7 +151,7 @@ def backfill():
                     "raw_profile_json": json.dumps(dyn_profile) if dyn_profile else None,
                     "schema_version": cv_doc_params["schema_version"],
                     "created_at": created_at,
-                    "updated_at": updated_at
+                    "updated_at": updated_at,
                 }
 
                 db.execute(upsert_cv_sql, cv_doc_params)
@@ -160,7 +161,7 @@ def backfill():
                 match_analysis = data.get("match_analysis")
                 if match_analysis:
                     match_id = match_analysis.get("id") or f"match_{candidate_id}"
-                    
+
                     match_params = {
                         "id": match_id,
                         "tenant_id": tenant_id,
@@ -173,23 +174,24 @@ def backfill():
                         "overall_score": float(match_analysis.get("overall_score", 0.0)),
                         "component_scores_json": json.dumps(match_analysis.get("component_scores")) if match_analysis.get("component_scores") else None,
                         "created_at": created_at,
-                        "updated_at": updated_at
+                        "updated_at": updated_at,
                     }
                     db.execute(upsert_match_sql, match_params)
 
                 processed_count += 1
-            
+
             except Exception as e:
                 logger.error(f"Error processing file {filename}: {e}", exc_info=True)
 
-        db.commit() 
+        db.commit()
         logger.info(f"Successfully backfilled {processed_count} files.")
-    
+
     except Exception as e:
         db.rollback()
         logger.error(f"Database error during backfill: {e}", exc_info=True)
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     backfill()

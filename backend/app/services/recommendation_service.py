@@ -57,13 +57,7 @@ class RecommendationService:
 
         resume_json = r.get("resume_json") or {}
         contact_info = resume_json.get("contact_info") or {}
-        extracted_name = (
-            contact_info.get("name")
-            or contact_info.get("full_name")
-            or r.get("full_name")
-            or r.get("candidate_name")
-            or cv_key
-        )
+        extracted_name = contact_info.get("name") or contact_info.get("full_name") or r.get("full_name") or r.get("candidate_name") or cv_key
         all_jobs = JobRepository.get_all_jobs()
         # Dynamically derive fallback department from the most common department among active jobs
         fallback_dept = "Unspecified"
@@ -76,17 +70,9 @@ class RecommendationService:
             if dept_counts:
                 fallback_dept = max(dept_counts, key=dept_counts.get)
 
-        primary_dept = (
-            match_analysis.get("primary_department")
-            or match_analysis.get("recommended_department")
-            or best_match.get("department")
-            or fallback_dept
-        ).title()
-        
-        prof_domain = (
-            match_analysis.get("professional_domain")
-            or fallback_dept
-        )
+        primary_dept = (match_analysis.get("primary_department") or match_analysis.get("recommended_department") or best_match.get("department") or fallback_dept).title()
+
+        prof_domain = match_analysis.get("professional_domain") or fallback_dept
 
         # 1. Extract candidate skills (structured skills + fallback to work experience extraction)
         raw_cand_skills = resume_json.get("skills") or best_match.get("matched_skills") or []
@@ -133,44 +119,44 @@ class RecommendationService:
         # 2. Best Vacancies for Candidate (Deterministic Scoring Engine authority)
         suitable_openings = match_analysis.get("suitable_openings") or []
         best_vacancies = []
-        for vac in suitable_openings[:settings.MAX_RECOMMENDED_VACANCIES]:
+        for vac in suitable_openings[: settings.MAX_RECOMMENDED_VACANCIES]:
             if isinstance(vac, dict):
-                best_vacancies.append({
-                    "vacancy_id": vac.get("vacancy_id") or vac.get("id") or vac.get("job_id"),
-                    "job_title": vac.get("job_title"),
-                    "department": vac.get("department") or vac.get("department_name"),
-                    "score": vac.get("score") or vac.get("overall_score") or 0.0,
-                    "classification": vac.get("classification"),
-                    "recommendation": vac.get("recommendation"),
-                    "reason": vac.get("ranking_reason") or vac.get("reason"),
-                })
+                best_vacancies.append(
+                    {
+                        "vacancy_id": vac.get("vacancy_id") or vac.get("id") or vac.get("job_id"),
+                        "job_title": vac.get("job_title"),
+                        "department": vac.get("department") or vac.get("department_name"),
+                        "score": vac.get("score") or vac.get("overall_score") or 0.0,
+                        "classification": vac.get("classification"),
+                        "recommendation": vac.get("recommendation"),
+                        "reason": vac.get("ranking_reason") or vac.get("reason"),
+                    }
+                )
 
         overall_confidence = float(best_match.get("overall_score") or best_match.get("score") or (best_vacancies[0]["score"] if best_vacancies else 0.0))
 
         # 3. Semantically Related Skills Recommendations (via DomainEmbeddingService with no live Ollama generation)
         related_skills_set = set()
         for skill in candidate_skills[:5]:
-            eqs = DomainEmbeddingService.find_semantic_equivalents(
-                term=skill, category="skills", limit=3, allow_live_generation=False
-            )
+            eqs = DomainEmbeddingService.find_semantic_equivalents(term=skill, category="skills", limit=3, allow_live_generation=False)
             for eq in eqs:
                 eq_term = eq["term"].title()
                 if eq_term.lower() not in cand_skills_lower_set:
                     related_skills_set.add(eq_term)
 
-        related_skills = list(related_skills_set)[:settings.MAX_RELATED_SKILLS]
+        related_skills = list(related_skills_set)[: settings.MAX_RELATED_SKILLS]
 
         # 4. Missing Qualifications & Skill Gap Insights (Aggregated across suitable openings)
         missing_quals = []
         seen_gaps = set()
 
         openings_to_check = suitable_openings if suitable_openings else ([best_match] if best_match else [])
-        for vac in openings_to_check[:settings.MAX_MISSING_QUALS]:
+        for vac in openings_to_check[: settings.MAX_MISSING_QUALS]:
             if not isinstance(vac, dict):
                 continue
             job_title = vac.get("job_title") or "Target Vacancy"
             vac_score = vac.get("score") or vac.get("overall_score") or 0.0
-            
+
             missing_skills = vac.get("missing_skills") or []
             missing_criteria = vac.get("missing_criteria") or []
             mandatory_fails = vac.get("mandatory_fails") or []
@@ -178,41 +164,48 @@ class RecommendationService:
             for ms in missing_skills[:4]:
                 if isinstance(ms, str) and ms.strip() and ms.lower() not in seen_gaps:
                     seen_gaps.add(ms.lower())
-                    missing_quals.append({
-                        "requirement": f"Missing Skill: {ms.title()}",
-                        "impact": f"Critical requirement to increase match score on {job_title} ({vac_score}% match)",
-                        "type": "Skill",
-                        "actionable_suggestion": f"Acquire practical experience with {ms.title()} to qualify for {job_title}.",
-                    })
+                    missing_quals.append(
+                        {
+                            "requirement": f"Missing Skill: {ms.title()}",
+                            "impact": f"Critical requirement to increase match score on {job_title} ({vac_score}% match)",
+                            "type": "Skill",
+                            "actionable_suggestion": f"Acquire practical experience with {ms.title()} to qualify for {job_title}.",
+                        }
+                    )
 
             for mf in mandatory_fails[:2]:
                 req_name = mf.get("requirement") if isinstance(mf, dict) else str(mf)
                 if req_name and req_name.lower() not in seen_gaps:
                     seen_gaps.add(req_name.lower())
-                    missing_quals.append({
-                        "requirement": f"Mandatory Constraint: {req_name}",
-                        "impact": f"High severity penalty on suitability for {job_title}",
-                        "type": "Mandatory Requirement",
-                        "actionable_suggestion": f"Verify eligibility regarding {req_name}.",
-                    })
+                    missing_quals.append(
+                        {
+                            "requirement": f"Mandatory Constraint: {req_name}",
+                            "impact": f"High severity penalty on suitability for {job_title}",
+                            "type": "Mandatory Requirement",
+                            "actionable_suggestion": f"Verify eligibility regarding {req_name}.",
+                        }
+                    )
 
             for mc in missing_criteria[:2]:
                 if isinstance(mc, str) and mc.strip() and mc.lower() not in seen_gaps:
                     seen_gaps.add(mc.lower())
-                    missing_quals.append({
-                        "requirement": mc,
-                        "impact": f"Improves candidate score alignment for {job_title}",
-                        "type": "Criterion",
-                        "actionable_suggestion": f"Address {mc} to strengthen profile alignment.",
-                    })
+                    missing_quals.append(
+                        {
+                            "requirement": mc,
+                            "impact": f"Improves candidate score alignment for {job_title}",
+                            "type": "Criterion",
+                            "actionable_suggestion": f"Address {mc} to strengthen profile alignment.",
+                        }
+                    )
 
         # 5. Dynamic Recommended Certifications (Domain-aware + evidence-based from active vacancies)
         recommended_certs = []
         domain_jobs = [
-            j for j in all_jobs
-            if isinstance(j, dict) and (
-                primary_dept.lower() in str(j.get("department") or j.get("department_name") or "").lower()
-                or str(j.get("department") or j.get("department_name") or "").lower() in primary_dept.lower()
+            j
+            for j in all_jobs
+            if isinstance(j, dict)
+            and (
+                primary_dept.lower() in str(j.get("department") or j.get("department_name") or "").lower() or str(j.get("department") or j.get("department_name") or "").lower() in primary_dept.lower()
             )
         ]
         if not domain_jobs:
@@ -220,24 +213,30 @@ class RecommendationService:
 
         # Resolve domain-aware certification keywords dynamically from domain jobs
         import re
-        cert_pattern = re.compile(r'\b([A-Z][a-zA-Z0-9-]*\s+(?:Certification|Certified|License))\b', re.IGNORECASE)
+
+        cert_pattern = re.compile(
+            r"\b([A-Z][a-zA-Z0-9-]*\s+(?:Certification|Certified|License))\b",
+            re.IGNORECASE,
+        )
         found_job_certs = set()
 
         for j in domain_jobs:
-            req_text = " ".join([
-                str(j.get("QualificationReq") or ""),
-                str(j.get("JobDescription") or ""),
-                str(j.get("MandatorySkillsReq") or ""),
-                str(j.get("PreferredKeywords") or ""),
-                str(j.get("title") or j.get("JobTitle") or ""),
-            ])
+            req_text = " ".join(
+                [
+                    str(j.get("QualificationReq") or ""),
+                    str(j.get("JobDescription") or ""),
+                    str(j.get("MandatorySkillsReq") or ""),
+                    str(j.get("PreferredKeywords") or ""),
+                    str(j.get("title") or j.get("JobTitle") or ""),
+                ]
+            )
             matches = cert_pattern.findall(req_text)
             for m in matches:
                 kw = m.strip().title()
                 if not any(kw.lower() in ec.lower() for ec in existing_certs_lower):
                     found_job_certs.add(kw)
 
-        recommended_certs = sorted(found_job_certs)[:settings.MAX_RECOMMENDED_CERTS]
+        recommended_certs = sorted(found_job_certs)[: settings.MAX_RECOMMENDED_CERTS]
 
         # 6. Hiring-focused Metrics
         if overall_confidence >= 85:
@@ -249,7 +248,11 @@ class RecommendationService:
         else:
             hiring_rec = "Needs Further Review"
 
-        role_dept_fit = f"Strong alignment for {primary_dept} roles based on {prof_domain} experience." if overall_confidence >= 70 else f"Marginal fit for {primary_dept}; requires validation of {prof_domain} transferability."
+        role_dept_fit = (
+            f"Strong alignment for {primary_dept} roles based on {prof_domain} experience."
+            if overall_confidence >= 70
+            else f"Marginal fit for {primary_dept}; requires validation of {prof_domain} transferability."
+        )
 
         # Generate Interview Focus Areas
         interview_focus_areas = []
@@ -264,7 +267,7 @@ class RecommendationService:
         for qual in missing_quals:
             if "Mandatory" in qual.get("requirement", "") or "Critical" in qual.get("impact", ""):
                 risk_flags.append(qual.get("requirement"))
-        
+
         exp_years = (r.get("quality_metrics") or {}).get("experience_years") or 0.0
         exp_tier = "Junior"
         for tier, threshold in sorted(settings.EXPERIENCE_BANDS.items(), key=lambda x: x[1], reverse=True):
@@ -300,13 +303,15 @@ class RecommendationService:
             vac_title = vac.get("title") or vac.get("JobTitle") or "Target Role"
             vac_dept = vac.get("department") or vac.get("department_name") or primary_dept
             if vac_title.lower() != best_title and not any(ct["target_role"].lower() == vac_title.lower() for ct in career_transitions):
-                career_transitions.append({
-                    "target_role": vac_title,
-                    "target_department": vac_dept,
-                    "feasibility_score": round(max(40.0, overall_confidence - 10.0), 1),
-                    "transition_path": f"Transition from {prof_domain} to {vac_title} by building {vac_dept} experience.",
-                    "skill_bridge": candidate_skills[:2] if candidate_skills else ["Domain Knowledge"],
-                })
+                career_transitions.append(
+                    {
+                        "target_role": vac_title,
+                        "target_department": vac_dept,
+                        "feasibility_score": round(max(40.0, overall_confidence - 10.0), 1),
+                        "transition_path": f"Transition from {prof_domain} to {vac_title} by building {vac_dept} experience.",
+                        "skill_bridge": candidate_skills[:2] if candidate_skills else ["Domain Knowledge"],
+                    }
+                )
             if len(career_transitions) >= 3:
                 break
 
@@ -318,7 +323,7 @@ class RecommendationService:
             next_steps.append("Schedule introductory call to clarify experience gaps.")
         else:
             next_steps.append("Keep in talent pool for future junior roles.")
-        
+
         for qual in missing_quals[:1]:
             if qual.get("actionable_suggestion"):
                 next_steps.append(qual["actionable_suggestion"])
@@ -446,22 +451,26 @@ class RecommendationService:
             contact_info = (r.get("resume_json") or {}).get("contact_info") or {}
             cname = contact_info.get("name") or contact_info.get("full_name") or cv_key
 
-            top_candidate_matches.append({
-                "candidate_id": cv_key,
-                "full_name": cname,
-                "match_score": score,
-                "classification": s.get("classification"),
-                "recommendation": s.get("recommendation"),
-            })
+            top_candidate_matches.append(
+                {
+                    "candidate_id": cv_key,
+                    "full_name": cname,
+                    "match_score": score,
+                    "classification": s.get("classification"),
+                    "recommendation": s.get("recommendation"),
+                }
+            )
 
         # Skill Gap Insights
         skill_gap_insights = []
         for req in req_skills[:3]:
-            skill_gap_insights.append({
-                "skill": req.title(),
-                "market_rarity": "Medium Demand",
-                "recommendation": f"Include {req.title()} in interview technical evaluation.",
-            })
+            skill_gap_insights.append(
+                {
+                    "skill": req.title(),
+                    "market_rarity": "Medium Demand",
+                    "recommendation": f"Include {req.title()} in interview technical evaluation.",
+                }
+            )
 
         return {
             "vacancy_id": vid_str,
@@ -483,9 +492,7 @@ class RecommendationService:
             if not r or not isinstance(r, dict):
                 continue
             cv_key = str(r.get("id") or r.get("filename") or "")
-            dept = str(
-                (r.get("match_analysis") or {}).get("primary_department") or "Unspecified"
-            ).title()
+            dept = str((r.get("match_analysis") or {}).get("primary_department") or "Unspecified").title()
             pool_name = f"{dept} Talent Pool"
 
             contact_info = (r.get("resume_json") or {}).get("contact_info") or {}
@@ -502,20 +509,24 @@ class RecommendationService:
             else:
                 cand_skills = []
 
-            pools[pool_name].append({
-                "candidate_id": cv_key,
-                "full_name": cname,
-                "skills": cand_skills[:3],
-                "experience_years": (r.get("quality_metrics") or {}).get("experience_years"),
-            })
+            pools[pool_name].append(
+                {
+                    "candidate_id": cv_key,
+                    "full_name": cname,
+                    "skills": cand_skills[:3],
+                    "experience_years": (r.get("quality_metrics") or {}).get("experience_years"),
+                }
+            )
 
         summary = []
         for name, cands in pools.items():
-            summary.append({
-                "pool_name": name,
-                "candidate_count": len(cands),
-                "sample_candidates": cands[:3],
-            })
+            summary.append(
+                {
+                    "pool_name": name,
+                    "candidate_count": len(cands),
+                    "sample_candidates": cands[:3],
+                }
+            )
 
         return {
             "total_pools": len(summary),

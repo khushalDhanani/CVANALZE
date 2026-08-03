@@ -8,10 +8,10 @@ from app.services.document_parser import MarkdownGenerator
 def test_invalid_docx_structure_validation_error():
     """Verify that fake or corrupted .docx files fail signature validation."""
     fake_docx_content = b"This is plain text pretending to be a docx file."
-    
+
     with pytest.raises(ValueError) as exc_info:
         MarkdownGenerator.generate("corrupted_resume.docx", fake_docx_content)
-    
+
     assert "Invalid DOCX signature" in str(exc_info.value)
 
 

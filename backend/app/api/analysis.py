@@ -33,6 +33,7 @@ async def check_llm_health():
         return {"status": "disabled", "message": "LLM matching is disabled in config."}
 
     from app.services.llm_service import OllamaLLMService
+
     try:
         model_names = OllamaLLMService.get_available_models()
         is_healthy = bool(model_names) or OllamaLLMService.check_health()
@@ -40,16 +41,13 @@ async def check_llm_health():
             return {
                 "status": "online",
                 "model_configured": settings.OLLAMA_MODEL,
-                "model_available": any(
-                    settings.OLLAMA_MODEL in name for name in model_names
-                ),
+                "model_available": any(settings.OLLAMA_MODEL in name for name in model_names),
                 "available_models": model_names,
             }
         return {"status": "offline", "error": "Ollama server unreachable"}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning(f"Ollama health check failed: {type(exc).__name__}")
         return {"status": "offline", "error": "Ollama server unreachable"}
-
 
 
 @router.post("/analyze", response_model=EnrichedCandidateAnalysis)
@@ -62,9 +60,7 @@ async def analyze_cv_text(payload: CVMatchRequest):
         return await MatchService.analyze_single_cv(payload.cv_text)
     except Exception as exc:
         logger.exception(f"Failed to analyze CV text: {exc}")
-        raise HTTPException(
-            status_code=500, detail="An internal error occurred during CV analysis."
-        ) from exc
+        raise HTTPException(status_code=500, detail="An internal error occurred during CV analysis.") from exc
 
 
 def background_upload_and_analyze(job_id: str) -> None:
@@ -74,7 +70,7 @@ def background_upload_and_analyze(job_id: str) -> None:
 @router.post("/upload", response_model=CVProcessingResponse)
 async def upload_and_analyze(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)  # noqa: B008
+    file: UploadFile = File(...),
 ):
     """Upload CV, parse with Docling, and perform LLM-enriched semantic matching in background."""
     try:
@@ -119,7 +115,8 @@ async def upload_and_analyze(
     except Exception as exc:
         logger.exception(f"Failed to process CV upload: {exc}")
         raise HTTPException(
-            status_code=500, detail="An internal error occurred while processing the CV."
+            status_code=500,
+            detail="An internal error occurred while processing the CV.",
         ) from exc
 
 
@@ -146,11 +143,7 @@ async def get_match_status(cv_key: str):
                 retry_count=job.attempt if job else None,
             )
 
-        is_completed = (
-            result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED")
-            or result.get("progress") == 100
-            or result.get("is_complete") is True
-        )
+        is_completed = result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED") or result.get("progress") == 100 or result.get("is_complete") is True
 
         match_analysis = result.get("match_analysis")
         if match_analysis:
@@ -217,14 +210,10 @@ async def reanalyze_scan(scan_id: str):
     matching_files = ResultRepository.find_results_by_scan_id(scan_id)
 
     # Filter out already enriched files
-    original_files = [
-        f for f in matching_files if not str(f).endswith("_enriched.json")
-    ]
+    original_files = [f for f in matching_files if not str(f).endswith("_enriched.json")]
 
     if not original_files:
-        raise HTTPException(
-            status_code=404, detail=f"No original result found for scan_id: {scan_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"No original result found for scan_id: {scan_id}")
 
     file_path = original_files[0]
 
@@ -232,9 +221,7 @@ async def reanalyze_scan(scan_id: str):
         return await MatchService.analyze_from_result_file(file_path)
     except Exception as exc:
         logger.exception(f"Failed to reanalyze CV: {exc}")
-        raise HTTPException(
-            status_code=500, detail="An internal error occurred during reanalysis."
-        ) from exc
+        raise HTTPException(status_code=500, detail="An internal error occurred during reanalysis.") from exc
 
 
 @router.post("/hr-review")
@@ -243,9 +230,7 @@ async def submit_hr_review(payload: HRReviewRequest):
     matching_files = ResultRepository.find_results_by_scan_id(payload.scan_id)
 
     if not matching_files:
-        raise HTTPException(
-            status_code=404, detail=f"No result found for scan_id: {payload.scan_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"No result found for scan_id: {payload.scan_id}")
 
     # Prefer enriched result if available
     enriched_files = [f for f in matching_files if str(f).endswith("_enriched.json")]
@@ -257,18 +242,12 @@ async def submit_hr_review(payload: HRReviewRequest):
         cv_text = data.get("markdown", "")
 
         # Get original analysis
-        match_analysis = data.get("enriched_match_analysis") or data.get(
-            "match_analysis"
-        )
+        match_analysis = data.get("enriched_match_analysis") or data.get("match_analysis")
         if not match_analysis:
-            raise HTTPException(
-                status_code=400, detail="Result file lacks match_analysis."
-            )
+            raise HTTPException(status_code=400, detail="Result file lacks match_analysis.")
 
         suitable_openings = match_analysis.get("suitable_openings", [])
-        job_eval = next(
-            (j for j in suitable_openings if j.get("job_id") == payload.job_id), None
-        )
+        job_eval = next((j for j in suitable_openings if j.get("job_id") == payload.job_id), None)
 
         if not job_eval:
             raise HTTPException(
@@ -277,6 +256,7 @@ async def submit_hr_review(payload: HRReviewRequest):
             )
 
         from fastapi.concurrency import run_in_threadpool
+
         # Get Job Requirements
         job_req = await run_in_threadpool(JobRepository.get_job_by_id, payload.job_id) or {}
 
@@ -308,7 +288,8 @@ async def submit_hr_review(payload: HRReviewRequest):
     except Exception as exc:
         logger.exception(f"Failed to save HR review: {exc}")
         raise HTTPException(
-            status_code=500, detail="An internal error occurred while saving the HR review."
+            status_code=500,
+            detail="An internal error occurred while saving the HR review.",
         ) from exc
 
 

@@ -66,10 +66,7 @@ def resolve_cv_identity(
     legacy_key = get_legacy_cv_key(filename)
 
     if clean_candidate_id and clean_cv_id:
-        canonical_key = (
-            f"cv_candidate_{_safe_component(clean_candidate_id)}_"
-            f"document_{_safe_component(clean_cv_id)}"
-        )
+        canonical_key = f"cv_candidate_{_safe_component(clean_candidate_id)}_document_{_safe_component(clean_cv_id)}"
         strategy = "candidate_and_cv_ids"
     elif clean_cv_id:
         canonical_key = f"cv_document_{_safe_component(clean_cv_id)}"
