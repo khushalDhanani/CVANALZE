@@ -1,9 +1,45 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T14:40:08+05:30
+2026-08-03T14:50:58+05:30
 
-## Current Task — Phase 6 API and Operational Reliability
+## Current Task — Phase 7 Documentation and Final Verification
+- Replaced the stale minimal README with the implemented Phase 0–6 architecture, actual `backend/` layout, supported-format matrix, request and processing flow,
+  access model, canonical job states, stable error envelope, and compatibility behavior.
+- Documented every operator-facing setting from `backend/.env.example`, grouped across runtime/access, databases/Redis/RQ, secure uploads, and Ollama/embeddings.
+- Added local API and RQ worker startup, explicit PostgreSQL/MSSQL migration commands, Docker Compose production startup order, shared-volume requirements,
+  health/OpenAPI locations, and an authorization-gated final verification command set.
+- Added a cumulative implementation change map and explicit preserved-surface versus intentional-containment compatibility summary.
+- Documented residual limitations for OCR quality, encrypted documents, uncommon layouts, LLM nondeterminism, Ollama availability, malware scanning, rate limiting,
+  authorization granularity, PII lifecycle, shared storage, and stale-job recovery.
+- Added `backend/docs/phase7-documentation-and-final-verification.md` with the final changed-area map, compatibility assessment, environment/deployment reconciliation,
+  residual risk register, verification status, and release checklist.
+- Reconciled documentation claims statically against configuration, Compose, Dockerfile, access policy, job/error contracts, upload validation, lifespan, and phase records.
+- Confirmed every active environment-template variable is documented, every relative README link resolves, changed Markdown respects the practical line-length rule,
+  and tracked-file diff whitespace checks pass.
+- Per repository instructions, did not run the application, tests, Ruff, builds, dependency restore, migrations, Docker services, or external services.
+
+## Files Created / Modified for Current Task
+- Created: `backend/docs/phase7-documentation-and-final-verification.md`.
+- Modified: `README.md`, `workstatus.md`.
+- No production or test source file changed in Phase 7.
+
+## Pending Work
+- With explicit authorization, run the backend test suite, Ruff, schema-drift verification, Docker Compose validation/build, and target-environment smoke tests listed
+  in the README.
+- Complete the release checklist in the Phase 7 document, including credential rotation, non-default database secrets, migrations, model availability, ingress
+  containment, malware scanning, PII governance, monitoring, shared storage, and stale-job recovery.
+- Revalidate downstream clients against the intentional containment changes: PDF/DOCX-only uploads, collision rejection, production authorization, safe body limits,
+  sanitized polling failures, and default unknown-job HTTP 404.
+
+## Important Decisions
+- Phase 7 is documentation-only; it does not alter API, processing, storage, cache, authorization, or deployment behavior.
+- Current source/configuration and the Phase 0–6 records are authoritative where the codebase knowledge graph or old README is stale.
+- The root README is the primary operator/developer entry point; detailed rationale and historical compatibility remain in the phase documents and `workstatus.md`.
+- Runtime verification is explicitly pending because repository policy prohibits tests, lint, builds, migrations, and service startup without user authorization.
+- Compatibility documentation distinguishes additive preserved surfaces from intentional security/correctness changes instead of describing all changes as transparent.
+
+## Previous Task — Phase 6 API and Operational Reliability
 - Added centralized request context with safe caller-provided/generated request and correlation IDs, response headers, structured request logging, and JSON size prechecks.
 - Activated the Phase 0 access policy through API-key authentication and hierarchical recruiter/administrator authorization for HTTP and WebSocket routes.
 - Made production/staging fail closed even if the local-development authentication toggle is disabled; public `/` and `/health` remain available.
