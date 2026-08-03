@@ -47,7 +47,8 @@ async def check_llm_health():
             }
         return {"status": "offline", "error": "Ollama server unreachable"}
     except Exception as exc:  # noqa: BLE001
-        return {"status": "offline", "error": str(exc)}
+        logger.warning(f"Ollama health check failed: {type(exc).__name__}")
+        return {"status": "offline", "error": "Ollama server unreachable"}
 
 
 
@@ -138,7 +139,7 @@ async def get_match_status(cv_key: str):
                 progress=100,
                 stage=result.get("stage"),
                 failed_step=result.get("failed_step"),
-                error_details=result.get("error_details"),
+                error_details=None,
                 job_id=job.job_id if job else None,
                 job_state=job.state.value if job else "FAILED",
                 execution_mode=job.execution_mode.value if job else None,

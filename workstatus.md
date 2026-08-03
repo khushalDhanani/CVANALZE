@@ -1,9 +1,61 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T13:28:46+05:30
+2026-08-03T14:40:08+05:30
 
-## Current Task — Phase 5 Standardize Ollama
+## Current Task — Phase 6 API and Operational Reliability
+- Added centralized request context with safe caller-provided/generated request and correlation IDs, response headers, structured request logging, and JSON size prechecks.
+- Activated the Phase 0 access policy through API-key authentication and hierarchical recruiter/administrator authorization for HTTP and WebSocket routes.
+- Made production/staging fail closed even if the local-development authentication toggle is disabled; public `/` and `/health` remain available.
+- Added a stable canonical error envelope for HTTP, validation, authorization, rate-limit, oversized-body, framework 404, and unexpected failures while retaining legacy `detail`.
+- Kept exception traces in server logs with request/correlation context and removed traceback persistence/exposure from both polling aliases and background job adapters.
+- Added raw CV text and HR feedback length limits plus safe validation details that never echo submitted values.
+- Added a bounded, thread-safe per-process sliding-window rate limiter with HTTP 429, `Retry-After`, and rate-limit headers.
+- Replaced wildcard CORS defaults with explicit trusted origins, enumerated methods/headers, disabled credentials by default, and ignored configured wildcard values.
+- Replaced startup/shutdown event decorators and import-time schema mutation with one FastAPI lifespan owner for local initialization, dependency checks, warmup, and Ollama cleanup.
+- Prevented production/staging startup initialization and automatic migrations regardless of flags; production migration execution is now an explicit release operation.
+- Added explicit PostgreSQL pgvector/embedding-table and MSSQL system-configuration migrations for schema previously supplied by startup `create_all()`.
+- Aligned Compose on `PG_DB_URL`, one shared API/worker/migration environment, configurable queue name, explicit migration service, health/readiness checks, and Linux host Ollama routing.
+- Pinned the backend image to Python 3.12 Bookworm and added Microsoft ODBC Driver 18 plus PDF/OCR runtime libraries.
+- Added focused Phase 6 regressions for concrete policy resolution, authentication/roles, production fail-closed behavior, request IDs, safe 500/404/validation errors,
+  JSON/field limits, rate limiting, polling traceback scrubbing, trusted CORS configuration, and production schema containment.
+- Added `backend/docs/phase6-api-operational-reliability.md` and linked it from the README.
+- Audited the Ollama lifecycle path and continued using the centralized `OllamaLLMService`; no request transport, retry, timeout, payload, model, or cache logic changed.
+- Per repository instructions, did not run the application, tests, linting, builds, dependency restore, migrations, Docker services, or external services.
+
+## Files Created / Modified for Current Task
+- Created reliability core: `backend/app/core/request_context.py`, `backend/app/core/security.py`, `backend/app/core/rate_limit.py`,
+  `backend/app/core/error_handlers.py`, `backend/app/core/lifecycle.py`.
+- Created migrations: `backend/scripts/migrations/postgres/007_create_vector_embeddings.sql`,
+  `backend/scripts/migrations/postgres/007_create_vector_embeddings_down.sql`, `backend/scripts/migrations/mssql/007_create_system_config.sql`,
+  `backend/scripts/migrations/mssql/007_create_system_config_down.sql`.
+- Created tests/docs: `backend/tests/test_phase6_api_reliability.py`, `backend/docs/phase6-api-operational-reliability.md`.
+- Modified core/contracts: `backend/app/core/config.py`, `backend/app/core/access_policy.py`, `backend/app/core/database.py`,
+  `backend/app/schemas/contracts.py`, `backend/app/schemas/cv.py`, `backend/app/schemas/analysis.py`.
+- Modified app/processing: `backend/app/main.py`, `backend/app/api/analysis.py`, `backend/app/api/cv.py`, `backend/app/api/batch.py`,
+  `backend/app/services/cv_service.py`, `backend/app/services/processing_queue.py`.
+- Modified deployment/docs/status: `backend/.env.example`, `backend/Dockerfile`, `docker-compose.yml`, `README.md`, `workstatus.md`.
+
+## Pending Work
+- Run focused Phase 6 tests, the broader backend suite, Ruff, Docker Compose configuration validation, Docker image build, and lifecycle/auth smoke tests only when explicitly authorized.
+- Generate unique recruiter and administrator keys in the deployment secret manager; production intentionally returns HTTP 503 for protected endpoints until keys exist.
+- Enforce a shared rate limit at ingress when running multiple API replicas; the application limiter is deliberately per process.
+- Provide browser/WebSocket authentication through a trusted same-origin gateway or session-capable proxy rather than exposing API keys in frontend code or query strings.
+- Replace the Compose development-default PostgreSQL password and complete the Phase 0 external credential rotation before production deployment.
+
+## Important Decisions
+- The Phase 0 access-policy table is the single authorization source; uncharacterized `/api/*` routes fail closed as administrator-only.
+- Administrator keys inherit recruiter permissions. Keys are accepted through Bearer authorization or `X-API-Key`, compared in constant time, and never logged.
+- Development auth can be disabled for backward-compatible local tests; production/staging auth cannot be disabled through configuration.
+- Canonical error responses include additive legacy `detail`; successful response bodies and compatibility aliases remain unchanged.
+- Validation responses contain only field location/type/message and never the rejected CV or feedback value.
+- `error_details` remains in polling schemas only as a compatibility field and is always returned as `null`.
+- Health/root remain public; Docker uses the fast root endpoint for liveness while `/health` retains dependency status reporting.
+- Local schema initialization remains available through lifespan. Production schema changes require the migration runner and are never triggered by application import/startup.
+- Application rate limits use the socket peer address and never trust forwarded headers; proxied or replicated deployments need an authoritative gateway limit.
+- CORS wildcard values are ignored rather than accepted, and credentialed cross-origin requests are opt-in.
+
+## Previous Task — Phase 5 Standardize Ollama
 - Added `OllamaTransport` as the only Ollama HTTP boundary for generation, embeddings, tags, and explicit unload operations.
 - Added one process-level pooled `httpx.Client` with configurable connection and keep-alive limits.
 - Centralized generation, embedding, and unload payload construction; Ollama response envelopes; structured JSON extraction; Pydantic validation error mapping;

@@ -16,155 +16,81 @@ from app.api.recommendations import router as recommendations_router
 from app.api.talent_graph import router as talent_graph_router
 from app.api.vector_db import router as vector_db_router
 from app.core.config import settings
-from app.core.database import engine, init_db, run_auto_migrations
+from app.core.database import engine, pg_engine
+from app.core.error_handlers import register_exception_handlers
+from app.core.lifecycle import application_lifespan
 from app.core.logging import logger
+from app.core.rate_limit import RateLimitMiddleware
+from app.core.request_context import RequestContextMiddleware
+from app.core.security import AccessControlMiddleware
+from app.schemas.contracts import ErrorResponse
 
-# Initialize database tables & auto-run pending schema migrations
-init_db()
-run_auto_migrations()
+
+_ERROR_RESPONSES = {
+    400: {"model": ErrorResponse, "description": "Invalid request"},
+    401: {"model": ErrorResponse, "description": "Authentication required"},
+    403: {"model": ErrorResponse, "description": "Insufficient permissions"},
+    404: {"model": ErrorResponse, "description": "Resource not found"},
+    409: {"model": ErrorResponse, "description": "Resource conflict"},
+    413: {"model": ErrorResponse, "description": "Request body too large"},
+    415: {"model": ErrorResponse, "description": "Unsupported media or file type"},
+    422: {"model": ErrorResponse, "description": "Request validation failed"},
+    429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
+    500: {"model": ErrorResponse, "description": "Internal error"},
+    503: {"model": ErrorResponse, "description": "Required dependency unavailable"},
+}
+
 
 app = FastAPI(
     title="CV Analyzer API",
     version=settings.VERSION,
+    lifespan=application_lifespan,
+    responses=_ERROR_RESPONSES,
 )
+register_exception_handlers(app)
 
+# Middleware is applied in reverse registration order. Request IDs wrap every response,
+# CORS wraps authentication/rate-limit failures, and authorization remains closest to routes.
+app.add_middleware(AccessControlMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.TRUSTED_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID", "X-Correlation-ID"],
+    expose_headers=[
+        "X-Request-ID",
+        "X-Correlation-ID",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+        "Retry-After",
+    ],
 )
+app.add_middleware(RequestContextMiddleware)
 
-app.include_router(
+for router in (
     cv_router,
-    prefix="/api",
-)
-app.include_router(
     match_router,
-    prefix="/api",
-)
-app.include_router(
     jobs_router,
-    prefix="/api",
-)
-app.include_router(
     master_data_router,
-    prefix="/api",
-)
-app.include_router(
     batch_router,
-    prefix="/api",
-)
-app.include_router(
     config_router,
-    prefix="/api",
-)
-app.include_router(
-    candidates_router,
-    prefix="/api",
-)
-app.include_router(
-    candidates_router,
-    prefix="/api/v1",
-)
-app.include_router(
     analytics_router,
-    prefix="/api",
-)
-app.include_router(
     vector_db_router,
-    prefix="/api",
-)
-app.include_router(
     domain_knowledge_router,
-    prefix="/api",
-)
-app.include_router(
     talent_graph_router,
-    prefix="/api",
-)
-app.include_router(
     recommendations_router,
-    prefix="/api",
-)
-app.include_router(
     performance_router,
-    prefix="/api",
-)
-
-
-def _run_background_warmup() -> None:
-    """Run cache warmup synchronously (called in a daemon thread at startup)."""
-    try:
-        from app.services.cache_warmer import warm_all
-        warm_all()
-    except Exception as exc:
-        logger.warning(f"[WARMUP] Background warmup failed: {exc}")
-
-
-@app.on_event("startup")
-async def start_background_warmup():
-    """Verify active Redis connection and warm the cache in a background thread."""
-    from app.core.cache import _REDIS_CLIENT
-    if _REDIS_CLIENT:
-        try:
-            _REDIS_CLIENT.ping()
-            logger.info("[STARTUP] Active Redis instance verified successfully.")
-        except Exception as exc:
-            logger.warning(
-                f"[STARTUP] Redis ping failed ({exc}). "
-                "Operating with L1 Memory & File Caching fallback."
-            )
-    else:
-        logger.warning(
-            "[STARTUP] Redis is not active or unreachable. "
-            "Operating with L1 Memory & File Caching fallback."
-        )
-
-    if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
-        try:
-            from app.services.llm_service import OllamaLLMService
-            models = OllamaLLMService.get_available_models()
-            if models:
-                configured_models = []
-                if settings.LLM_ENABLED:
-                    configured_models.append(("generation", settings.OLLAMA_MODEL))
-                if settings.EMBEDDING_ENABLED:
-                    configured_models.append(("embedding", settings.EMBEDDING_MODEL))
-                for purpose, model in configured_models:
-                    if not any(model in available for available in models):
-                        logger.error(
-                            f"[STARTUP CRITICAL] Configured {purpose} model '{model}' is MISSING in Ollama! "
-                            f"Run: ollama pull {model}"
-                        )
-                    else:
-                        logger.info(f"[STARTUP] Ollama {purpose} model '{model}' verified successfully.")
-            else:
-                logger.warning("[STARTUP] Ollama server returned no models or is unreachable. LLM operations may fail.")
-        except Exception as exc:
-            logger.warning(f"[STARTUP] Could not verify Ollama status: {exc}")
-
-    import threading
-    thread = threading.Thread(target=_run_background_warmup, daemon=True)
-    thread.start()
-    logger.info("[WARMUP] Background cache warmup thread started.")
-
-
-@app.on_event("shutdown")
-def close_ollama_lifecycle() -> None:
-    """Apply the configured process-level model lifecycle and close the shared pool."""
-    from app.services.llm_service import OllamaLLMService
-
-    try:
-        if settings.LLM_ENABLED and settings.OLLAMA_UNLOAD_ON_SHUTDOWN:
-            OllamaLLMService.unload_model()
-    finally:
-        OllamaLLMService.close_transport()
+):
+    app.include_router(router, prefix="/api")
+app.include_router(candidates_router, prefix="/api")
+app.include_router(candidates_router, prefix="/api/v1")
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     return {
         "message": "Welcome to CV Analyzer API",
         "docs": "/docs",
@@ -173,31 +99,13 @@ async def root():
 
 
 @app.get("/health")
-async def health():
-    db_status = "disabled"
-    if engine is not None:
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            db_status = "online"
-        except Exception as exc:
-            logger.error(f"Database health check failed: {exc}")
-            db_status = "offline"
-            
-    pg_status = "disabled"
-    from app.core.database import pg_engine
-    if pg_engine is not None:
-        try:
-            with pg_engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            pg_status = "online"
-        except Exception as exc:
-            logger.error(f"PG Database health check failed: {exc}")
-            pg_status = "offline"
-
+async def health() -> dict[str, str]:
+    db_status = _database_health(engine, "MSSQL")
+    pg_status = _database_health(pg_engine, "PostgreSQL")
     ollama_status = "disabled"
     if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         from app.services.llm_service import OllamaLLMService
+
         ollama_status = "online" if OllamaLLMService.check_health() else "offline"
 
     return {
@@ -207,3 +115,15 @@ async def health():
         "pg_database": pg_status,
         "ollama_llm": ollama_status,
     }
+
+
+def _database_health(database_engine, label: str) -> str:
+    if database_engine is None:
+        return "disabled"
+    try:
+        with database_engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return "online"
+    except Exception as exc:
+        logger.error(f"{label} health check failed: {type(exc).__name__}")
+        return "offline"

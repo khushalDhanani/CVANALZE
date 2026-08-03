@@ -425,11 +425,8 @@ async def process_cv_file(
             logger.warning(f"Rejected colliding CV identity '{cv_key}' without altering its existing result.")
             raise
         except Exception as exc:
-            import traceback
-            error_details = traceback.format_exc()
             logger.exception(f"CV processing failed for '{cv_key}' at stage '{current_stage}': {exc}")
             now_iso = datetime.now(UTC).isoformat()
-            err_msg = str(exc)
             
             stage_to_step = {
                 "parsing": "Docling Parsing",
@@ -458,11 +455,11 @@ async def process_cv_file(
                 "status": "FAILED",
                 "progress": 100,
                 "is_complete": False,
-                "error": err_msg,
-                "message": f"CV processing failed at {failed_step}: {err_msg}",
+                "error": "CV processing failed.",
+                "message": f"CV processing failed at {failed_step}.",
                 "stage": current_stage,
                 "failed_step": failed_step,
-                "error_details": error_details,
+                "error_details": None,
                 "characters": 0,
                 "page_count": 0,
                 "is_scanned": False,
@@ -508,11 +505,12 @@ def process_cv_task_sync(file_path: str) -> dict[str, Any]:
         }
         conn.publish("cv_processing_progress", json.dumps(payload))
         return result
-    except Exception as e:
+    except Exception as exc:
+        logger.exception(f"Synchronous CV task failed for '{filename}': {type(exc).__name__}")
         payload = {
             "filename": filename,
             "status": "FAILED",
-            "error": str(e)
+            "error": "CV processing failed.",
         }
         try:
             conn.publish("cv_processing_progress", json.dumps(payload))

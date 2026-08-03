@@ -9,8 +9,21 @@ class Settings(BaseSettings):
     
     PROJECT_NAME: str = "CV Analyzer"
     VERSION: str = "0.1.0"
-    ALLOWED_ORIGINS: list[str] = ["*"]
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:8081"]
+    CORS_ALLOW_CREDENTIALS: bool = False
     APP_ENVIRONMENT: str = "development"
+    AUTH_ENABLED: bool = False
+    RECRUITER_API_KEYS: list[str] = []
+    ADMINISTRATOR_API_KEYS: list[str] = []
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_REQUESTS: int = 300
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+    RATE_LIMIT_MAX_BUCKETS: int = 10000
+    MAX_JSON_REQUEST_SIZE_BYTES: int = 1024 * 1024
+    MAX_CV_TEXT_LENGTH_CHARS: int = 500_000
+    MAX_HR_FEEDBACK_LENGTH_CHARS: int = 10_000
+    INITIALIZE_DATABASE_ON_STARTUP: bool = True
+    STARTUP_CACHE_WARMUP_ENABLED: bool = True
     REDIS_URL: str | None = "redis://localhost:6379/0"
     RQ_QUEUE_NAME: str = "cv-processing"
     RQ_JOB_TIMEOUT_SECONDS: int = 900
@@ -133,7 +146,23 @@ class Settings(BaseSettings):
     PG_DB_URL: str = "postgresql://postgres:postgres@localhost:5432/cv_analyzer"
 
     # Migration Configuration
-    AUTO_MIGRATE: bool = True
+    AUTO_MIGRATE: bool = False
+
+    @property
+    def IS_PRODUCTION(self) -> bool:
+        return self.APP_ENVIRONMENT.strip().lower() in {"production", "prod", "staging"}
+
+    @property
+    def AUTH_REQUIRED(self) -> bool:
+        return self.AUTH_ENABLED or self.IS_PRODUCTION
+
+    @property
+    def TRUSTED_ORIGINS(self) -> list[str]:
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.ALLOWED_ORIGINS
+            if origin.strip() and origin.strip() != "*"
+        ]
 
     @property
     def DB_URL(self) -> str:

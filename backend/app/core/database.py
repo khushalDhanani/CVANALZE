@@ -84,13 +84,16 @@ def init_db():
 
 def run_auto_migrations():
     """
-    Executes pending database migrations automatically at startup if AUTO_MIGRATE is enabled.
+    Executes pending database migrations in explicitly enabled non-production environments.
     """
     if not settings.AUTO_MIGRATE:
         return
 
     import logging
     logger = logging.getLogger(__name__)
+    if settings.IS_PRODUCTION:
+        logger.warning("[AUTO_MIGRATE] Ignored in production; use scripts/run_migrations.py explicitly.")
+        return
 
     try:
         from scripts.run_migrations import run_migrations
@@ -110,4 +113,3 @@ def run_auto_migrations():
                 logger.warning(f"[AUTO_MIGRATE] PostgreSQL auto-migration warning: {exc}")
     except Exception as exc:
         logger.warning(f"[AUTO_MIGRATE] Could not execute auto-migrations: {exc}")
-

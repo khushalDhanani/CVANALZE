@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.logging import logger
 from app.models.recruit import RecruitCandidateMst
 from app.services.match_service import MatchService
 from app.services.vacancy_service import VacancyService
@@ -107,9 +108,9 @@ async def websocket_progress_endpoint(websocket: WebSocket):
             # This small sleep allows checking if client disconnected
             await asyncio.sleep(0.1)
     except WebSocketDisconnect:
-        print("Client disconnected from /ws/progress")
-    except Exception as e:
-        print(f"WebSocket Error: {e}")
+        logger.info("Client disconnected from /api/batch/ws/progress")
+    except Exception as exc:
+        logger.exception(f"WebSocket progress stream failed: {type(exc).__name__}")
     finally:
         await pubsub.unsubscribe("cv_processing_progress")
         await pubsub.close()

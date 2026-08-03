@@ -1,54 +1,74 @@
+x-backend-environment: &backend-environment
+  APP_ENVIRONMENT: production
+  AUTH_ENABLED: "true"
+  RECRUITER_API_KEYS: '${RECRUITER_API_KEYS:-[]}'
+  ADMINISTRATOR_API_KEYS: '${ADMINISTRATOR_API_KEYS:-[]}'
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS: '${RATE_LIMIT_REQUESTS:-120}'
+  RATE_LIMIT_WINDOW_SECONDS: '${RATE_LIMIT_WINDOW_SECONDS:-60}'
+  RATE_LIMIT_MAX_BUCKETS: '${RATE_LIMIT_MAX_BUCKETS:-10000}'
+  MAX_JSON_REQUEST_SIZE_BYTES: '${MAX_JSON_REQUEST_SIZE_BYTES:-1048576}'
+  MAX_CV_TEXT_LENGTH_CHARS: '${MAX_CV_TEXT_LENGTH_CHARS:-500000}'
+  MAX_HR_FEEDBACK_LENGTH_CHARS: '${MAX_HR_FEEDBACK_LENGTH_CHARS:-10000}'
+  ALLOWED_ORIGINS: '${ALLOWED_ORIGINS:-["http://localhost:8081"]}'
+  CORS_ALLOW_CREDENTIALS: '${CORS_ALLOW_CREDENTIALS:-false}'
+  INITIALIZE_DATABASE_ON_STARTUP: "false"
+  STARTUP_CACHE_WARMUP_ENABLED: '${STARTUP_CACHE_WARMUP_ENABLED:-true}'
+  AUTO_MIGRATE: "false"
+  PG_DB_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
+  REDIS_URL: 'redis://redis:6379/0'
+  RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
+  RQ_JOB_TIMEOUT_SECONDS: '${RQ_JOB_TIMEOUT_SECONDS:-900}'
+  RQ_RESULT_TTL_SECONDS: '${RQ_RESULT_TTL_SECONDS:-604800}'
+  RQ_MAX_RETRIES: '${RQ_MAX_RETRIES:-2}'
+  RQ_RETRY_INTERVAL_SECONDS: '${RQ_RETRY_INTERVAL_SECONDS:-30}'
+  PROCESSING_JOB_TTL_SECONDS: '${PROCESSING_JOB_TTL_SECONDS:-604800}'
+  PROCESSING_JOB_LOCK_TIMEOUT_SECONDS: '${PROCESSING_JOB_LOCK_TIMEOUT_SECONDS:-1200}'
+  RQ_DEVELOPMENT_FALLBACK_ENABLED: "false"
+  LLM_ENABLED: '${LLM_ENABLED:-true}'
+  EMBEDDING_ENABLED: '${EMBEDDING_ENABLED:-true}'
+  OLLAMA_BASE_URL: '${OLLAMA_BASE_URL:-http://host.docker.internal:11434}'
+  OLLAMA_MODEL: '${OLLAMA_MODEL:-qwen3:4b}'
+  EMBEDDING_MODEL: '${EMBEDDING_MODEL:-nomic-embed-text}'
+  OLLAMA_REQUEST_TIMEOUT: '${OLLAMA_REQUEST_TIMEOUT:-90}'
+  OLLAMA_MAX_RETRIES: '${OLLAMA_MAX_RETRIES:-1}'
+  OLLAMA_RETRY_BACKOFF_SECONDS: '${OLLAMA_RETRY_BACKOFF_SECONDS:-0.5}'
+  OLLAMA_KEEP_ALIVE: '${OLLAMA_KEEP_ALIVE:-30m}'
+  OLLAMA_UNLOAD_ON_SHUTDOWN: '${OLLAMA_UNLOAD_ON_SHUTDOWN:-false}'
+  OLLAMA_MAX_CONNECTIONS: '${OLLAMA_MAX_CONNECTIONS:-20}'
+  OLLAMA_MAX_KEEPALIVE_CONNECTIONS: '${OLLAMA_MAX_KEEPALIVE_CONNECTIONS:-10}'
+
 services:
   api:
     build: ./backend
     container_name: cv_analyzer_api
     ports:
       - "8000:8000"
-    environment:
-      - LLM_ENABLED=true
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_MODEL=qwen3:4b
-      - OLLAMA_REQUEST_TIMEOUT=${OLLAMA_REQUEST_TIMEOUT:-90}
-      - OLLAMA_MAX_RETRIES=${OLLAMA_MAX_RETRIES:-1}
-      - OLLAMA_RETRY_BACKOFF_SECONDS=${OLLAMA_RETRY_BACKOFF_SECONDS:-0.5}
-      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
-      - OLLAMA_UNLOAD_ON_SHUTDOWN=${OLLAMA_UNLOAD_ON_SHUTDOWN:-false}
-      - OLLAMA_MAX_CONNECTIONS=${OLLAMA_MAX_CONNECTIONS:-20}
-      - OLLAMA_MAX_KEEPALIVE_CONNECTIONS=${OLLAMA_MAX_KEEPALIVE_CONNECTIONS:-10}
-      - DB_URL=postgresql://postgres:postgres@pgvector:5432/cv_analyzer
-      - REDIS_URL=redis://redis:6379/0
-      - APP_ENVIRONMENT=production
-      - RQ_DEVELOPMENT_FALLBACK_ENABLED=false
-      - RQ_QUEUE_NAME=cv-processing
+    environment: *backend-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend/uploads:/app/uploads
     restart: unless-stopped
     depends_on:
       pgvector:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   worker:
     build: ./backend
     container_name: cv_analyzer_worker
-    command: ["uv", "run", "rq", "worker", "--url", "redis://redis:6379/0", "cv-processing"]
-    environment:
-      - LLM_ENABLED=true
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_MODEL=qwen3:4b
-      - OLLAMA_REQUEST_TIMEOUT=${OLLAMA_REQUEST_TIMEOUT:-90}
-      - OLLAMA_MAX_RETRIES=${OLLAMA_MAX_RETRIES:-1}
-      - OLLAMA_RETRY_BACKOFF_SECONDS=${OLLAMA_RETRY_BACKOFF_SECONDS:-0.5}
-      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
-      - OLLAMA_UNLOAD_ON_SHUTDOWN=${OLLAMA_UNLOAD_ON_SHUTDOWN:-false}
-      - OLLAMA_MAX_CONNECTIONS=${OLLAMA_MAX_CONNECTIONS:-20}
-      - OLLAMA_MAX_KEEPALIVE_CONNECTIONS=${OLLAMA_MAX_KEEPALIVE_CONNECTIONS:-10}
-      - DB_URL=postgresql://postgres:postgres@pgvector:5432/cv_analyzer
-      - REDIS_URL=redis://redis:6379/0
-      - APP_ENVIRONMENT=production
-      - RQ_DEVELOPMENT_FALLBACK_ENABLED=false
-      - RQ_QUEUE_NAME=cv-processing
+    command: ["uv", "run", "rq", "worker", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
+    environment: *backend-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend/uploads:/app/uploads
     restart: unless-stopped
@@ -56,26 +76,42 @@ services:
       redis:
         condition: service_healthy
       pgvector:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "uv run rq info --url redis://redis:6379/0 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "uv run rq info --url $$REDIS_URL >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
 
+  migrate-postgres:
+    build: ./backend
+    profiles: ["tools"]
+    command: ["uv", "run", "python", "scripts/run_migrations.py", "--dialect", "postgres"]
+    environment: *backend-environment
+    depends_on:
+      pgvector:
+        condition: service_healthy
+    restart: "no"
+
   pgvector:
     image: pgvector/pgvector:pg16
     container_name: cv_analyzer_pgvector
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=cv_analyzer
+      POSTGRES_USER: '${POSTGRES_USER:-postgres}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-postgres}'
+      POSTGRES_DB: '${POSTGRES_DB:-cv_analyzer}'
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
     image: redis:7-alpine

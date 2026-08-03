@@ -42,6 +42,7 @@ class ErrorCode(str, Enum):
     UNSUPPORTED_FILE = "UNSUPPORTED_FILE"
     DEPENDENCY_UNAVAILABLE = "DEPENDENCY_UNAVAILABLE"
     PROCESSING_FAILED = "PROCESSING_FAILED"
+    RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -81,12 +82,14 @@ class CanonicalError(BaseModel):
     code: ErrorCode
     message: str
     request_id: str | None = None
+    correlation_id: str | None = None
     retryable: bool = False
     details: dict[str, Any] = Field(default_factory=dict)
 
 
 class ErrorResponse(BaseModel):
     error: CanonicalError
+    detail: str | None = None
 
     def to_legacy_detail(self) -> dict[str, str]:
         return {"detail": self.error.message}

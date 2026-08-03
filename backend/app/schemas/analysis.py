@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.core.config import settings
 from app.schemas.match import JobMatchResult
 from app.schemas.normalized_resume import NormalizedResume
 
@@ -178,16 +179,16 @@ class EnrichedCandidateAnalysis(BaseModel):
 
 
 class HRReviewRequest(BaseModel):
-    scan_id: str = Field(..., description="The ID of the scan/analysis result")
-    job_id: str = Field(..., description="The ID of the job being reviewed against")
+    scan_id: str = Field(..., min_length=1, max_length=200, description="The ID of the scan/analysis result")
+    job_id: str = Field(..., min_length=1, max_length=200, description="The ID of the job being reviewed against")
     corrected_score: float | None = Field(
         None, description="HR's corrected score if any"
     )
-    corrected_classification: str | None = Field(
-        None, description="HR's corrected classification if any"
-    )
+    corrected_classification: str | None = Field(None, max_length=50, description="HR's corrected classification if any")
     feedback_notes: str = Field(
         ...,
+        min_length=1,
+        max_length=settings.MAX_HR_FEEDBACK_LENGTH_CHARS,
         description="HR notes on why the score/classification was changed or approved",
     )
 

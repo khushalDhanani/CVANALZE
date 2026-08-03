@@ -159,7 +159,7 @@ class ProcessingQueueService:
             "progress": record.progress,
             "stage": record.stage,
             "failed_step": record.stage if record.state == JobState.FAILED else None,
-            "error_details": record.error.message if record.error else None,
+            "error_details": None,
             "job_id": record.job_id,
             "job_state": record.state.value,
             "execution_mode": record.execution_mode.value,
@@ -315,12 +315,13 @@ def process_cv_job(job_id: str) -> dict[str, Any]:
             )
             return result
         except Exception as exc:
+            logger.exception(f"Processing job '{job_id}' failed on attempt {attempt}: {type(exc).__name__}")
             current = ProcessingJobRepository.get(job_id) or record
             will_retry = attempt < current.max_attempts
             state = JobState.RETRYING if will_retry else JobState.FAILED
             error = CanonicalError(
                 code=ErrorCode.PROCESSING_FAILED,
-                message=str(exc) or "CV processing failed.",
+                message="CV processing failed during background execution.",
                 retryable=will_retry,
             )
             ProcessingJobRepository.transition(

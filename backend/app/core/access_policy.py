@@ -94,3 +94,26 @@ def get_access_tier(method: str, path: str) -> AccessTier | None:
         if policy.method == normalized_method and policy.path == path:
             return policy.access
     return None
+
+
+def resolve_access_tier(method: str, request_path: str) -> AccessTier | None:
+    """Resolve a concrete request path against the characterized route templates."""
+    normalized_method = method.strip().upper()
+    request_segments = _path_segments(request_path)
+    for policy in ENDPOINT_POLICIES:
+        if policy.method != normalized_method:
+            continue
+        policy_segments = _path_segments(policy.path)
+        if len(policy_segments) != len(request_segments):
+            continue
+        segments_match = all(
+            (expected.startswith("{") and expected.endswith("}")) or expected == actual
+            for expected, actual in zip(policy_segments, request_segments)
+        )
+        if segments_match:
+            return policy.access
+    return None
+
+
+def _path_segments(path: str) -> tuple[str, ...]:
+    return tuple(segment for segment in path.strip().split("/") if segment)

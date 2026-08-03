@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.core.config import settings
 from app.schemas.match import CandidateMatchAnalysis
 from app.schemas.normalized_resume import NormalizedResume
 from app.schemas.profile import DynamicCandidateProfile
@@ -14,7 +15,7 @@ class CVProcessingResponse(BaseModel):
     progress: int | None = Field(default=None, description="Progress percentage (0-100)")
     stage: str | None = Field(default=None, description="Current processing stage")
     failed_step: str | None = Field(default=None, description="Step where the pipeline failed")
-    error_details: str | None = Field(default=None, description="Detailed stack trace or technical error info")
+    error_details: str | None = Field(default=None, description="Reserved compatibility field; technical traces are never returned")
     job_id: str | None = Field(default=None, description="Content-addressed background processing job ID")
     job_state: str | None = Field(default=None, description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, or FAILED state")
     execution_mode: str | None = Field(default=None, description="RQ or explicit development fallback execution mode")
@@ -97,5 +98,8 @@ class CVUploadResponse(BaseModel):
 
 class CVMatchRequest(BaseModel):
     cv_text: str = Field(
-        ..., description="Extracted Markdown or plain text of candidate CV"
+        ...,
+        min_length=1,
+        max_length=settings.MAX_CV_TEXT_LENGTH_CHARS,
+        description="Extracted Markdown or plain text of candidate CV",
     )
