@@ -9,6 +9,7 @@ from app.repositories.department_domain import (
 from app.schemas.analysis import OptimizedCandidateProfile, OptimizedVacancyMatch
 from app.schemas.domain import DepartmentDomain
 from app.schemas.profile import DynamicCandidateProfile
+from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.job_taxonomy import TaxonomyClassifier
 
 
@@ -80,22 +81,35 @@ class CandidateDomainService:
         ).lower()
 
         repo = domain_repository or department_domain_repository
-        dept_scores: list[tuple[int, DepartmentDomain]] = []
-        for matcher in repo.get_domain_matchers():
-            kw_matches = matcher.keyword_match_count(combined_text)
-            if kw_matches > 0:
-                dept_scores.append((kw_matches, matcher.domain))
 
-        if dept_scores:
-            best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
-            recommended_dept = best_domain.department_name
-            prof_domain = best_domain.domain_name
-            suitable_roles = best_domain.default_roles
+        # 1. Dynamic Vector & MSSQL taxonomy resolution
+        role_input = " ".join(roles_list) if roles_list else combined_text
+        dyn_res = DynamicTaxonomyService.resolve_candidate_role_and_domain(
+            role_or_summary=role_input,
+            skills=sorted(skills_set),
+        )
+
+        if dyn_res.match_source != "legacy_fallback":
+            recommended_dept = f"{dyn_res.domain_name} Department"
+            prof_domain = dyn_res.domain_name
+            suitable_roles = [dyn_res.family_name] if dyn_res.family_name else []
         else:
-            fallback_defaults = RuleConfigManager.get_match_rules().fallback_defaults
-            recommended_dept = fallback_defaults.recommended_department
-            prof_domain = fallback_defaults.professional_domain
-            suitable_roles = list(fallback_defaults.suitable_roles)
+            dept_scores: list[tuple[int, DepartmentDomain]] = []
+            for matcher in repo.get_domain_matchers():
+                kw_matches = matcher.keyword_match_count(combined_text)
+                if kw_matches > 0:
+                    dept_scores.append((kw_matches, matcher.domain))
+
+            if dept_scores:
+                best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+                recommended_dept = best_domain.department_name
+                prof_domain = best_domain.domain_name
+                suitable_roles = best_domain.default_roles
+            else:
+                fallback_defaults = RuleConfigManager.get_match_rules().fallback_defaults
+                recommended_dept = fallback_defaults.recommended_department
+                prof_domain = fallback_defaults.professional_domain
+                suitable_roles = list(fallback_defaults.suitable_roles)
 
         # Build custom roles from structured profile roles first
         custom_roles = []

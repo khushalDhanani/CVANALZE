@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.core.rule_config_manager import RuleConfigManager
+from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 
 logger = logging.getLogger("cv_analyzer")
 
@@ -358,8 +359,8 @@ class TaxonomyClassifier:
         Classifies candidate full text into (domain, families_tuple).
         Cached via functools.lru_cache(maxsize=512). Thread-safe under CPython GIL.
         """
-        scopes = {"candidate_full_text": candidate_full_text}
-        scope_tokens = {"candidate_full_text": set(re.findall(r"\w+", candidate_full_text))}
+        scopes = {"full_text": candidate_full_text}
+        scope_tokens = {"full_text": set(re.findall(r"\w+", candidate_full_text))}
         taxonomy = RuleConfigManager.get_taxonomy_rules()
 
         for rule in taxonomy.candidate_rules:
@@ -371,9 +372,30 @@ class TaxonomyClassifier:
 
     @classmethod
     def classify_vacancy_dto(cls, dto: VacancyDTO) -> TaxonomyClassification:
-        """Strongly-typed classification of VacancyDTO returning TaxonomyClassification."""
+        """Strongly-typed classification of VacancyDTO returning TaxonomyClassification via DynamicTaxonomyService."""
         t0 = time.perf_counter()
 
+        # 1. Try Dynamic Vector & MSSQL taxonomy resolution first
+        dyn_res = DynamicTaxonomyService.resolve_vacancy_domain_and_family(
+            title=dto.title,
+            department=dto.department,
+            description=dto.description,
+            required_skills=dto.required_skills,
+        )
+
+        if dyn_res.match_source != "legacy_fallback":
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
+            return TaxonomyClassification(
+                domain=dyn_res.domain_name,
+                job_family=dyn_res.family_name,
+                compatible_families=tuple(JobTaxonomy.REVERSE_COMPATIBILITY_MAP.get(dyn_res.family_name, {dyn_res.family_name})),
+                matched_rule=f"dynamic:{dyn_res.match_source}",
+                matched_branch=0,
+                matched_keywords=(dyn_res.matched_term,) if dyn_res.matched_term else (),
+            )
+
+        # 2. Fallback to static rule classification
         cache_info_before = cls._classify_vacancy_cached.cache_info()
         domain, family, rule_name, branch_idx, kws = cls._classify_vacancy_cached(
             dto.normalized_job_text, dto.title_lower, dto.department_lower
@@ -412,9 +434,27 @@ class TaxonomyClassifier:
 
     @classmethod
     def classify_candidate_dto(cls, dto: CandidateResumeDTO) -> TaxonomyClassification:
-        """Strongly-typed classification of CandidateResumeDTO returning TaxonomyClassification."""
+        """Strongly-typed classification of CandidateResumeDTO returning TaxonomyClassification via DynamicTaxonomyService."""
         t0 = time.perf_counter()
 
+        # 1. Try Dynamic Vector & MSSQL taxonomy resolution first
+        role_text = " ".join(dto.experience_titles) if dto.experience_titles else dto.summary
+        dyn_res = DynamicTaxonomyService.resolve_candidate_role_and_domain(
+            role_or_summary=role_text or dto.normalized_full_text,
+            skills=dto.skills,
+        )
+
+        if dyn_res.match_source != "legacy_fallback":
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
+            return TaxonomyClassification(
+                domain=dyn_res.domain_name,
+                job_family=dyn_res.family_name,
+                compatible_families=(dyn_res.family_name,),
+                matched_rule=f"dynamic:{dyn_res.match_source}",
+            )
+
+        # 2. Fallback to static rule classification
         cache_info_before = cls.classify_candidate_by_full_text.cache_info()
         domain, families_tuple = cls.classify_candidate_by_full_text(
             dto.normalized_full_text
@@ -450,15 +490,14 @@ class TaxonomyClassifier:
     @classmethod
     def are_families_compatible(cls, candidate_families: list[str], job_family: str) -> bool:
         """
-        Returns True if candidate_families contains or is compatible with job_family.
+        Returns True if candidate_families contains or is compatible with job_family via DynamicTaxonomyService or legacy config map.
         Preserves 100% backward compatibility.
         """
-        compatibility_map = JobTaxonomy.COMPATIBILITY_MAP
         for cand_fam in candidate_families:
             if cand_fam == job_family:
                 return True
-            compatible_set = compatibility_map.get(cand_fam, set())
-            if job_family in compatible_set:
+            is_compat, score = DynamicTaxonomyService.check_family_compatibility(cand_fam, job_family)
+            if is_compat and score > 0.4:
                 return True
         return False
 

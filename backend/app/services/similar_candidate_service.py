@@ -60,11 +60,21 @@ class SimilarCandidateService:
         max_matches = limit if limit is not None else settings.SIMILAR_CANDIDATE_MAX_MATCHES
 
         vector_scores = cls._vector_search_pg(cv_key, cv_embedding, limit=max_matches * 3)
-        all_results = ResultRepository.list_all_results()
+
+        # Optimize: If pgvector returned matches, only resolve results for those keys rather than reading all disk files
+        if vector_scores:
+            target_keys = list(vector_scores.keys())
+            candidate_records = []
+            for k in target_keys:
+                rec = ResultRepository.resolve_result(k)
+                if rec and isinstance(rec, dict):
+                    candidate_records.append(rec)
+        else:
+            candidate_records = ResultRepository.list_all_results()
 
         similar_candidates: list[dict[str, Any]] = []
 
-        for r in all_results:
+        for r in candidate_records:
             if not r or not isinstance(r, dict):
                 continue
 

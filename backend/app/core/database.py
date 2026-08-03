@@ -80,3 +80,34 @@ def init_db():
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning(f"Could not initialize PG tables: {exc}")
+
+
+def run_auto_migrations():
+    """
+    Executes pending database migrations automatically at startup if AUTO_MIGRATE is enabled.
+    """
+    if not settings.AUTO_MIGRATE:
+        return
+
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        from scripts.run_migrations import run_migrations
+
+        if settings.DB_NAME and settings.DB_URL:
+            try:
+                logger.info("[AUTO_MIGRATE] Checking pending MSSQL schema migrations...")
+                run_migrations("mssql", settings.DB_URL, dry_run=False)
+            except Exception as exc:
+                logger.warning(f"[AUTO_MIGRATE] MSSQL auto-migration warning: {exc}")
+
+        if settings.PG_DB_URL:
+            try:
+                logger.info("[AUTO_MIGRATE] Checking pending PostgreSQL schema migrations...")
+                run_migrations("postgres", settings.PG_DB_URL, dry_run=False)
+            except Exception as exc:
+                logger.warning(f"[AUTO_MIGRATE] PostgreSQL auto-migration warning: {exc}")
+    except Exception as exc:
+        logger.warning(f"[AUTO_MIGRATE] Could not execute auto-migrations: {exc}")
+

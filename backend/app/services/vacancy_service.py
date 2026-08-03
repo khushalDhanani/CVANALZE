@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -75,11 +77,19 @@ class VacancyService:
         if dept_id is None and vacancy.job_profile:
             dept_id = vacancy.job_profile.DeptID
 
-        # Convert Decimals to float
-        min_exp = float(vacancy.RequestedExperienceRangeFrom) if vacancy.RequestedExperienceRangeFrom is not None else None
-        max_exp = float(vacancy.RequestedExperienceRangeTo) if vacancy.RequestedExperienceRangeTo is not None else None
-        min_ctc = float(vacancy.RequestedCTCRangeFrom) if vacancy.RequestedCTCRangeFrom is not None else None
-        max_ctc = float(vacancy.RequestedCTCRangeTo) if vacancy.RequestedCTCRangeTo is not None else None
+        # Convert Decimals to float safely
+        def _safe_float_db(val: Any) -> float | None:
+            if val is None:
+                return None
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
+        min_exp = _safe_float_db(vacancy.RequestedExperienceRangeFrom)
+        max_exp = _safe_float_db(vacancy.RequestedExperienceRangeTo)
+        min_ctc = _safe_float_db(vacancy.RequestedCTCRangeFrom)
+        max_ctc = _safe_float_db(vacancy.RequestedCTCRangeTo)
         
         # Config Validation Warning
         if not skills and min_exp is None and not vacancy.job_profile:

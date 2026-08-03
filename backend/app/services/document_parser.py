@@ -12,6 +12,7 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
+from app.services.dynamic_geo_heading_service import DynamicGeoAndHeadingService
 
 
 class MarkdownResult:
@@ -207,15 +208,15 @@ class classproperty:
 class ResumeJsonExtractor:
     @classproperty
     def JOB_TITLE_KEYWORDS(cls) -> set[str]:
-        return RuleConfigManager.get_upper_keywords("name", "job_title_denylist")
+        return DynamicGeoAndHeadingService.get_name_denylist()
 
     @classproperty
     def RESUME_HEADER_KEYWORDS(cls) -> set[str]:
-        return RuleConfigManager.get_upper_keywords("name", "header_denylist")
+        return DynamicGeoAndHeadingService.get_name_denylist()
 
     @classproperty
     def KNOWN_GAZETTEER(cls) -> set[str]:
-        return RuleConfigManager.get_keywords("location", "gazetteer")
+        return DynamicGeoAndHeadingService.get_gazetteer_cities()
 
     @classproperty
     def LOCATION_BLACKLIST_KEYWORDS(cls) -> set[str]:
@@ -231,7 +232,7 @@ class ResumeJsonExtractor:
 
     @classproperty
     def GENERIC_SECTION_HEADERS(cls) -> set[str]:
-        return RuleConfigManager.get_keywords("company_name", "generic_section_headers")
+        return DynamicGeoAndHeadingService.get_section_headings()
 
     @classmethod
     def extract_candidate_name(

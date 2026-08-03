@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
 from app.schemas.job_context import JobEvaluationContext
+from app.services.dynamic_scoring_prefilter_service import DynamicScoringAndPrefilterService
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
 from app.services.job_taxonomy import JobTaxonomy, TaxonomyClassifier
 
@@ -200,8 +201,8 @@ class VacancyPreFilter:
         if len(job_contexts) <= limit:
             return [j.raw_job if isinstance(j.raw_job, dict) and j.raw_job else j.__dict__ for j in job_contexts]
 
-        # Load prefilter configuration rules ONCE
-        prefilter_rules: PrefilterRules = RuleConfigManager.get_prefilter_rules()
+        # Load prefilter configuration rules ONCE (dynamic MSSQL stop_words & weights)
+        prefilter_rules: PrefilterRules = DynamicScoringAndPrefilterService.get_prefilter_rules()
 
         # Batch candidate preparation
         cand_ctx = CandidateSearchContext.create(
@@ -235,7 +236,13 @@ class VacancyPreFilter:
                 f"[PREFILTER_ADAPTIVE] Stage 0 compatible openings ({len(stage0_jobs)}) <= limit ({limit}). "
                 f"Skipping Stage 1 & 2 retrieval."
             )
-            return [j.raw_job if isinstance(j.raw_job, dict) and j.raw_job else j.__dict__ for j in stage0_jobs]
+            res_jobs = []
+            for j in stage0_jobs:
+                job_dict = dict(j.raw_job) if isinstance(j.raw_job, dict) and j.raw_job else dict(j.__dict__)
+                job_dict["_prefilter_score"] = 100.0
+                job_dict["_rrf_details"] = {"rrf_score": 1.0, "stage0_compatible": True}
+                res_jobs.append(job_dict)
+            return res_jobs
 
         # STAGE 1: Semantic Vector Retrieval (Single pgvector Query Reuse)
         t1 = time.perf_counter()

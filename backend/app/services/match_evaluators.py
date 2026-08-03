@@ -15,6 +15,7 @@ from app.schemas.match import (
     RequirementTier,
 )
 from app.schemas.scoring_config import ScoringConfig
+from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.job_taxonomy import TaxonomyClassifier
 
 
@@ -217,8 +218,8 @@ class RequirementEvaluator:
             else:
                 exp_val = context.candidate_experience if context.candidate_experience is not None else 0.0
                 cv_ev = f"Candidate experience {exp_val} years is below minimum required ({min_exp} years)"
-                ev = cls._create_evidence(cv_ev, vac_ev)
                 reason = f"Candidate experience ({exp_val} yrs) is less than required minimum ({min_exp} yrs)."
+                ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
                     cls._create_requirement(
                         req_id, f"Min Experience: {min_exp} years", RequirementTier.MANDATORY, RequirementStatus.FAILED, ev, failure_reason=reason
@@ -432,7 +433,10 @@ class ComponentScoreEvaluator:
         if min_exp is not None or max_exp is not None:
             experience_score = 100.0
             if min_exp is not None and context.candidate_experience is not None and context.candidate_experience < min_exp:
-                experience_score = (context.candidate_experience / min_exp) * params.below_min_exp_multiplier
+                if min_exp > 0:
+                    experience_score = (context.candidate_experience / min_exp) * params.below_min_exp_multiplier
+                else:
+                    experience_score = 0.0
             if max_exp is not None and context.candidate_experience is not None and context.candidate_experience > max_exp:
                 experience_score -= params.overqualification_penalty
             experience_score = max(0.0, min(100.0, experience_score))
@@ -505,7 +509,8 @@ class ComponentScoreEvaluator:
                 active_weights += weight
 
         raw_score = (weighted_sum / active_weights) if active_weights > 0 else 0.0
-        component_coverage = active_weights / sum(weights.values())
+        total_weights_sum = sum(weights.values())
+        component_coverage = (active_weights / total_weights_sum) if total_weights_sum > 0 else 0.0
 
         llm_boost = 0.0
         if llm_match and llm_match.semantic_fit_score:
@@ -576,20 +581,12 @@ class CrossDomainGuardEvaluator:
         is_tax_compat = TaxonomyClassifier.are_families_compatible(context.cand_families, vac_family)
 
         domain_mismatch = False
-        if not is_tax_compat and not has_software_req or context.is_software_cand and is_non_it_job and not has_software_req:
+        if not is_tax_compat and not has_software_req:
             domain_mismatch = True
-        elif context.cand_domain and job_department:
-            job_dept_clean = job_department.lower()
-            job_title_lower = job_title.lower()
-            term_patterns_map = compiled_guard["domain_guard_term_patterns"]
-            for cand_domain_term, guard_patterns in term_patterns_map.items():
-                if cand_domain_term in context.cand_domain.lower():
-                    if not any(
-                        p.search(job_dept_clean) or p.search(job_title_lower)
-                        for p in guard_patterns
-                    ):
-                        domain_mismatch = True
-                    break
+        elif context.cand_primary_family and vac_family:
+            is_compat, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
+            if not is_compat or score < 0.4:
+                domain_mismatch = True
 
         final_score = initial_score
         domain_score = initial_domain_score

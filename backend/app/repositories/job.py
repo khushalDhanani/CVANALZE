@@ -308,3 +308,9 @@ class JobRepository:
     def get_metrics(cls) -> dict[str, Any]:
         """Exposes telemetry diagnostics and metrics for JobRepository operations."""
         return RepositoryMetrics.get_metrics()
+
+    @classmethod
+    def _cache_vacancy_embeddings(cls, jobs: list[dict[str, Any]]) -> None:
+        """Compatibility wrapper for batch caching vacancy embeddings."""
+        from app.services.embedding_sync_service import EmbeddingSyncService
+        return EmbeddingSyncService.sync_vacancy_embeddings(jobs)

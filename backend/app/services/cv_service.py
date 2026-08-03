@@ -20,18 +20,46 @@ from app.services.document_parser import (
 )
 from app.services.embedding_service import EmbeddingService
 
+from contextlib import asynccontextmanager
+
 _cv_locks: dict[str, asyncio.Lock] = {}
 _MAX_CV_LOCKS = 1000
 
 
-def _get_cv_lock(cv_key: str) -> asyncio.Lock:
+def _get_local_cv_lock(cv_key: str) -> asyncio.Lock:
     if cv_key not in _cv_locks:
         if len(_cv_locks) >= _MAX_CV_LOCKS:
-            # Simple LRU/first-key eviction for inactive locks
             first_key = next(iter(_cv_locks))
             _cv_locks.pop(first_key, None)
         _cv_locks[cv_key] = asyncio.Lock()
     return _cv_locks[cv_key]
+
+
+@asynccontextmanager
+async def get_cv_lock(cv_key: str):
+    from app.core.cache import _REDIS_CLIENT
+    redis_lock = None
+    if _REDIS_CLIENT:
+        try:
+            lock_key = f"lock:cv:{cv_key}"
+            redis_lock = _REDIS_CLIENT.lock(lock_key, timeout=120, blocking_timeout=10)
+            acquired = redis_lock.acquire(blocking=True)
+            if not acquired:
+                redis_lock = None
+        except Exception as err:
+            logger.warning(f"Redis distributed lock acquire failed ({err}), using local lock fallback.")
+            redis_lock = None
+
+    local_lock = _get_local_cv_lock(cv_key)
+    async with local_lock:
+        try:
+            yield
+        finally:
+            if redis_lock:
+                try:
+                    redis_lock.release()
+                except Exception as rel_err:
+                    logger.warning(f"Redis lock release warning for '{cv_key}': {rel_err}")
 
 
 def get_stable_cv_key(
@@ -66,9 +94,7 @@ async def process_cv_file(
     result_filename = f"{cv_key}.json"
     result_path = settings.RESULTS_DIR / result_filename
 
-    lock = _get_cv_lock(cv_key)
-
-    async with lock:
+    async with get_cv_lock(cv_key):
         current_stage = "initialization"
         t_pipeline_start = asyncio.get_event_loop().time()
         stage_durations_ms: dict[str, float] = {}

@@ -18,17 +18,20 @@ class Settings(BaseSettings):
     # Match Engine Configuration
     MATCH_HIGH_THRESHOLD: float = 70.0
     MATCH_MEDIUM_THRESHOLD: float = 40.0
-    SKILL_WEIGHT: float = 0.60
-    KEYWORD_WEIGHT: float = 0.40
-
-    # Two-Stage Match Engine Configuration
-    MANDATORY_WEIGHT: float = 0.50
-    PREFERRED_WEIGHT: float = 0.35
-    OPTIONAL_WEIGHT: float = 0.15
     LLM_SEMANTIC_WEIGHT: float = 0.10
     MANDATORY_FAILURE_PENALTY_PER_ITEM: float = 20.0
     MAX_SCORE_ON_MANDATORY_FAILURE: float = 65.0
-    REQUIRE_FULL_EVIDENCE_FOR_100: bool = True
+
+    MATCH_COMPONENT_WEIGHTS: dict[str, float] = {
+        "role": 0.15,
+        "skills": 0.25,
+        "experience": 0.15,
+        "education": 0.10,
+        "domain": 0.15,
+        "technology": 0.10,
+        "certification": 0.05,
+        "responsibilities": 0.05,
+    }
 
     # Resource Optimization & Batch Processing Configuration
     BATCH_SIZE: int = 2
@@ -49,7 +52,7 @@ class Settings(BaseSettings):
     LLM_BOOST_WEIGHT: float = 0.10
     MAX_LLM_BOOST: float = 10.0
     PREFILTER_TOP_K: int = 5
-    OPTIMIZED_PROMPT_VERSION: str = "3.0"
+    OPTIMIZED_PROMPT_VERSION: str = "3.5"
     MAX_CONCURRENT_LLM_WORKERS: int = 2
     
     # LLM Bypass Configuration
@@ -90,6 +93,9 @@ class Settings(BaseSettings):
     
     # Database Configuration (Postgres)
     PG_DB_URL: str = "postgresql://postgres:postgres@localhost:5432/cv_analyzer"
+
+    # Migration Configuration
+    AUTO_MIGRATE: bool = True
 
     @property
     def DB_URL(self) -> str:

@@ -188,7 +188,7 @@ async def reanalyze_scan(scan_id: str):
 
     # Filter out already enriched files
     original_files = [
-        f for f in matching_files if not f.name.endswith("_enriched.json")
+        f for f in matching_files if not str(f).endswith("_enriched.json")
     ]
 
     if not original_files:
@@ -218,7 +218,7 @@ async def submit_hr_review(payload: HRReviewRequest):
         )
 
     # Prefer enriched result if available
-    enriched_files = [f for f in matching_files if f.name.endswith("_enriched.json")]
+    enriched_files = [f for f in matching_files if str(f).endswith("_enriched.json")]
     file_path = enriched_files[0] if enriched_files else matching_files[0]
 
     try:

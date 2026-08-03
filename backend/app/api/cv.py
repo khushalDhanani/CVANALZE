@@ -3,6 +3,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 from app.core.config import settings
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
+from app.schemas.analysis import EnrichedCandidateAnalysis
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse, CVUploadResponse
 from app.schemas.match import CandidateMatchAnalysis
 from app.services.cv_service import get_stable_cv_key, process_cv_file
@@ -90,7 +91,7 @@ async def upload_cv(
         ) from exc
 
 
-@router.post("/match", response_model=CandidateMatchAnalysis)
+@router.post("/match", response_model=EnrichedCandidateAnalysis | CandidateMatchAnalysis)
 async def match_cv_text(payload: CVMatchRequest):
     if not payload.cv_text or not payload.cv_text.strip():
         raise HTTPException(
@@ -99,7 +100,8 @@ async def match_cv_text(payload: CVMatchRequest):
         )
 
     try:
-        return ScoringEngine.analyze_cv(payload.cv_text)
+        from app.services.match_service import MatchService
+        return await MatchService.analyze_single_cv(payload.cv_text)
     except Exception as exc:
         logger.exception(f"Failed to analyze CV text: {exc}")
         raise HTTPException(

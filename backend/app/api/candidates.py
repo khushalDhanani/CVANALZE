@@ -34,6 +34,11 @@ def list_candidates(
     department: str | None = Query(None, description="Filter by department name"),
     min_experience: float | None = Query(None, description="Minimum total experience years"),
     max_experience: float | None = Query(None, description="Maximum total experience years"),
+    location: str | None = Query(None, description="Filter by location name"),
+    skills: list[str] | None = Query(None, description="List of required skills"),
+    education: str | None = Query(None, description="Filter by education background"),
+    status: str | None = Query(None, description="Filter candidate status"),
+    min_similarity: float | None = Query(None, ge=0.0, le=1.0, description="Minimum vector similarity threshold"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """
@@ -47,6 +52,11 @@ def list_candidates(
             department=department,
             min_experience=min_experience,
             max_experience=max_experience,
+            location=location,
+            skills=skills,
+            education=education,
+            status=status,
+            min_similarity=min_similarity,
             limit=limit,
         )
         res = CandidateSearchService.search_candidates(req)

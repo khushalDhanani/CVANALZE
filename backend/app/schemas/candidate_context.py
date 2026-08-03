@@ -63,7 +63,11 @@ class CandidateAnalysisContext:
             ])
             current_role = optimized_profile.current_role
             if exp_years is None and optimized_profile.relevant_experience_years is not None:
-                exp_years = optimized_profile.relevant_experience_years
+                try:
+                    exp_years = float(optimized_profile.relevant_experience_years)
+                except (ValueError, TypeError):
+                    pass
+            
         elif dynamic_profile:
             profile_parts.extend([
                 *dynamic_profile.core_skills,
@@ -75,7 +79,10 @@ class CandidateAnalysisContext:
             ])
             current_role = dynamic_profile.current_role
             if exp_years is None and dynamic_profile.relevant_experience_years is not None:
-                exp_years = dynamic_profile.relevant_experience_years
+                try:
+                    exp_years = float(dynamic_profile.relevant_experience_years)
+                except (ValueError, TypeError):
+                    pass
 
         if not current_role:
             m = re.search(r"(?:current\s*role|position|title)\s*:\s*([^\n]+)", cv_text, re.IGNORECASE)
@@ -92,7 +99,26 @@ class CandidateAnalysisContext:
         norm_text = re.sub(r"\s+", " ", norm_text).strip()
 
         # 2. Taxonomy Classification (cached)
-        cand_tax_domain, cand_families = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
+        cand_tax_domain, cand_families_list = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
+        cand_families = list(cand_families_list)
+        
+        # Override with LLM classification if available
+        if optimized_profile and optimized_profile.professional_domains:
+            cand_tax_domain = optimized_profile.professional_domains[0]
+            # Map canonical domain back to compatible families using taxonomy rules
+            llm_families = []
+            taxonomy = RuleConfigManager.get_taxonomy_rules()
+            for r in taxonomy.candidate_rules:
+                if r.domain == cand_tax_domain:
+                    llm_families.extend(r.families)
+            
+            seen = set()
+            mapped_families = [f for f in llm_families if not (f in seen or seen.add(f))]
+            if mapped_families:
+                cand_families = mapped_families
+            else:
+                cand_families = [cand_tax_domain]
+
         cand_primary_family = cand_families[0] if cand_families else None
 
         # 3. Candidate Domain Profile Extraction
@@ -102,6 +128,9 @@ class CandidateAnalysisContext:
             optimized_profile=optimized_profile,
             domain_repository=domain_repository,
         )
+        if optimized_profile and optimized_profile.professional_domains:
+            cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
+        
         cand_domain = cand_domain_profile.get("professional_domain", "")
 
         # 4. Domain Candidate Text Construction

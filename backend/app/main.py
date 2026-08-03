@@ -17,11 +17,12 @@ from app.api.recommendations import router as recommendations_router
 from app.api.talent_graph import router as talent_graph_router
 from app.api.vector_db import router as vector_db_router
 from app.core.config import settings
-from app.core.database import engine, init_db
+from app.core.database import engine, init_db, run_auto_migrations
 from app.core.logging import logger
 
-# Initialize database tables if missing
+# Initialize database tables & auto-run pending schema migrations
 init_db()
+run_auto_migrations()
 
 app = FastAPI(
     title="CV Analyzer API",

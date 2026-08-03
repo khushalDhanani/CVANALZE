@@ -57,6 +57,10 @@ def build_optimized_match_prompt(
         "candidate_vacancies": compact_vacancies,
     }
 
+    from app.core.rule_config_manager import RuleConfigManager
+    canonical_domains = RuleConfigManager.get_taxonomy_rules().canonical_domains
+    domain_list_str = ", ".join(f'"{d}"' for d in canonical_domains)
+
     input_json = json.dumps(structured_input, separators=(",", ":"), ensure_ascii=False)
 
     prompt = f"""/think
@@ -71,6 +75,8 @@ EVIDENCE-BASED REASONING RULES:
 6. If there is a mismatch (department, domain, education, role, technology, skills), explicitly report it.
 7. Never increase semantic_fit_score based on assumptions — score only on verified evidence.
 8. If there is no genuine match with any active vacancy, set active_vacancy_summary to "No suitable active vacancy found.".
+9. IMPORTANT (EXPERIENCE): Calculate `relevant_experience_years` strictly by summing the total duration of the chronological work history. E.g., "2014 to 2015" (1 yr) + "2023 to present" (~3 yrs) = 4.0 years. Do NOT default to 0.0 if dates are present.
+10. IMPORTANT (DOMAIN): `professional_domain` MUST be strictly selected from this list: [{domain_list_str}]. Do NOT invent domains like "Information Technology" for Plant Operators, Technicians, or blue-collar roles. Select "Plant Operations & Maintenance" or "General Operations" instead.
 
 INSTRUCTIONS:
 Return ONLY valid JSON matching the exact schema below without markdown wrapper, thinking tokens, or extra commentary.

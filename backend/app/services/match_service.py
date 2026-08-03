@@ -107,13 +107,21 @@ class MatchService:
 
 
         # Fetch configuration thresholds once for all jobs to avoid redundant lookups
+        def _safe_float_config(key: str, default: float) -> float:
+            val = ConfigRepository.get_setting(key, default)
+            try:
+                return float(val) if val is not None else default
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid config value for {key}: {val}. Using default {default}.")
+                return default
+
         scoring_config = {
-            "MANDATORY_FAILURE_PENALTY_PER_ITEM": float(ConfigRepository.get_setting("MANDATORY_FAILURE_PENALTY_PER_ITEM", settings.MANDATORY_FAILURE_PENALTY_PER_ITEM)),
-            "MAX_SCORE_ON_MANDATORY_FAILURE": float(ConfigRepository.get_setting("MAX_SCORE_ON_MANDATORY_FAILURE", settings.MAX_SCORE_ON_MANDATORY_FAILURE)),
-            "LLM_SEMANTIC_WEIGHT": float(ConfigRepository.get_setting("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT)),
-            "MAX_LLM_BOOST": float(ConfigRepository.get_setting("MAX_LLM_BOOST", settings.MAX_LLM_BOOST)),
-            "MATCH_HIGH_THRESHOLD": float(ConfigRepository.get_setting("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD)),
-            "MATCH_MEDIUM_THRESHOLD": float(ConfigRepository.get_setting("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD)),
+            "MANDATORY_FAILURE_PENALTY_PER_ITEM": _safe_float_config("MANDATORY_FAILURE_PENALTY_PER_ITEM", settings.MANDATORY_FAILURE_PENALTY_PER_ITEM),
+            "MAX_SCORE_ON_MANDATORY_FAILURE": _safe_float_config("MAX_SCORE_ON_MANDATORY_FAILURE", settings.MAX_SCORE_ON_MANDATORY_FAILURE),
+            "LLM_SEMANTIC_WEIGHT": _safe_float_config("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT),
+            "MAX_LLM_BOOST": _safe_float_config("MAX_LLM_BOOST", settings.MAX_LLM_BOOST),
+            "MATCH_HIGH_THRESHOLD": _safe_float_config("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD),
+            "MATCH_MEDIUM_THRESHOLD": _safe_float_config("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD),
             "MATCH_COMPONENT_WEIGHTS": ConfigRepository.get_setting("MATCH_COMPONENT_WEIGHTS", None),
         }
 
@@ -122,16 +130,19 @@ class MatchService:
         if filtered_vacancies:
             pre_llm_matches = []
             for job in filtered_vacancies:
-                pre_llm_match = ScoringEngine.evaluate_job_match(
-                    cv_text=cv_text,
-                    job=job,
-                    candidate_experience=candidate_experience,
-                    candidate_ctc=candidate_ctc,
-                    optimized_profile=None,
-                    llm_match=None,
-                    scoring_config=scoring_config,
-                )
-                pre_llm_matches.append(pre_llm_match)
+                try:
+                    pre_llm_match = ScoringEngine.evaluate_job_match(
+                        cv_text=cv_text,
+                        job=job,
+                        candidate_experience=candidate_experience,
+                        candidate_ctc=candidate_ctc,
+                        optimized_profile=None,
+                        llm_match=None,
+                        scoring_config=scoring_config,
+                    )
+                    pre_llm_matches.append(pre_llm_match)
+                except Exception as e:
+                    logger.error(f"Error in rule-based matching for job {job.get('id') or job.get('vacancy_id')}: {e}")
                 
             pre_llm_matches.sort(key=lambda m: m.score, reverse=True)
             top_score = pre_llm_matches[0].score
@@ -183,68 +194,85 @@ class MatchService:
         # 6. Deterministic Scoring & Ranking in Python
         evaluated_matches = []
         with profiler.time_stage("scoring"):
+            
+            # Prefer LLM experience extraction if it's more comprehensive or regex failed
+            if optimized_profile:
+                logger.info(f"LLM Extracted Experience: {optimized_profile.relevant_experience_years}, LLM Domain: {optimized_profile.professional_domain}")
+            
+            if optimized_profile and optimized_profile.relevant_experience_years is not None:
+                try:
+                    llm_exp = float(optimized_profile.relevant_experience_years)
+                    curr_exp = float(candidate_experience) if candidate_experience is not None else 0.0
+                    if llm_exp > curr_exp or curr_exp == 0.0:
+                        candidate_experience = llm_exp
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Failed to parse LLM experience: {e}")
+
             for job in filtered_vacancies:
-                vac_id_str = str(job.get("vacancy_id") or job.get("id"))
-                llm_match = llm_matches_map.get(vac_id_str)
+                try:
+                    vac_id_str = str(job.get("vacancy_id") or job.get("id"))
+                    llm_match = llm_matches_map.get(vac_id_str)
 
-                job_match = ScoringEngine.evaluate_job_match(
-                    cv_text=cv_text,
-                    job=job,
-                    candidate_experience=candidate_experience,
-                    candidate_ctc=candidate_ctc,
-                    optimized_profile=optimized_profile,
-                    llm_match=llm_match,
-                    scoring_config=scoring_config,
-                )
+                    job_match = ScoringEngine.evaluate_job_match(
+                        cv_text=cv_text,
+                        job=job,
+                        candidate_experience=candidate_experience,
+                        candidate_ctc=candidate_ctc,
+                        optimized_profile=optimized_profile,
+                        llm_match=llm_match,
+                        scoring_config=scoring_config,
+                    )
 
-                # Wrap into EnrichedJobMatchResult
-                llm_reason = llm_match.semantic_reason if llm_match else ""
-                inferred_skills = llm_match.inferred_skills if llm_match else (optimized_profile.inferred_skills if optimized_profile else [])
+                    # Wrap into EnrichedJobMatchResult
+                    llm_reason = llm_match.semantic_reason if llm_match else ""
+                    inferred_skills = llm_match.inferred_skills if llm_match else (optimized_profile.inferred_skills if optimized_profile else [])
 
-                enriched_match = EnrichedJobMatchResult(
-                    job_id=job_match.job_id,
-                    job_title=job_match.job_title,
-                    department=job_match.department,
-                    vacancy_id=job_match.vacancy_id,
-                    job_profile_id=job_match.job_profile_id,
-                    company_id=job_match.company_id,
-                    department_id=job_match.department_id,
-                    department_name=job_match.department_name,
-                    location_id=job_match.location_id,
-                    score=job_match.score,
-                    overall_score=job_match.overall_score,
-                    role_score=job_match.role_score,
-                    skills_score=job_match.skills_score,
-                    experience_score=job_match.experience_score,
-                    education_score=job_match.education_score,
-                    domain_score=job_match.domain_score,
-                    technology_score=job_match.technology_score,
-                    certification_score=job_match.certification_score,
-                    responsibilities_score=job_match.responsibilities_score,
-                    coverage=job_match.coverage,
-                    ranking_reason=job_match.ranking_reason,
-                    classification=job_match.classification,
-                    recommendation=job_match.recommendation,
-                    matched_skills=job_match.matched_skills,
-                    missing_skills=job_match.missing_skills,
-                    matched_keywords=job_match.matched_keywords,
-                    missing_keywords=job_match.missing_keywords,
-                    mandatory_requirements=job_match.mandatory_requirements,
-                    preferred_requirements=job_match.preferred_requirements,
-                    optional_requirements=job_match.optional_requirements,
-                    matched_criteria=job_match.matched_criteria,
-                    missing_criteria=job_match.missing_criteria,
-                    evidence=job_match.evidence,
-                    mandatory_failures=job_match.mandatory_failures,
-                    confidence=job_match.confidence,
-                    hr_review_required=job_match.hr_review_required,
-                    reason=job_match.reason or llm_reason,
-                    career_transition_detected=job_match.career_transition_detected,
-                    career_transition_note=job_match.career_transition_note,
-                    llm_reason=llm_reason,
-                    inferred_skills=inferred_skills,
-                )
-                evaluated_matches.append(enriched_match)
+                    enriched_match = EnrichedJobMatchResult(
+                        job_id=job_match.job_id,
+                        job_title=job_match.job_title,
+                        department=job_match.department,
+                        vacancy_id=job_match.vacancy_id,
+                        job_profile_id=job_match.job_profile_id,
+                        company_id=job_match.company_id,
+                        department_id=job_match.department_id,
+                        department_name=job_match.department_name,
+                        location_id=job_match.location_id,
+                        score=job_match.score,
+                        overall_score=job_match.overall_score,
+                        role_score=job_match.role_score,
+                        skills_score=job_match.skills_score,
+                        experience_score=job_match.experience_score,
+                        education_score=job_match.education_score,
+                        domain_score=job_match.domain_score,
+                        technology_score=job_match.technology_score,
+                        certification_score=job_match.certification_score,
+                        responsibilities_score=job_match.responsibilities_score,
+                        coverage=job_match.coverage,
+                        ranking_reason=job_match.ranking_reason,
+                        classification=job_match.classification,
+                        recommendation=job_match.recommendation,
+                        matched_skills=job_match.matched_skills,
+                        missing_skills=job_match.missing_skills,
+                        matched_keywords=job_match.matched_keywords,
+                        missing_keywords=job_match.missing_keywords,
+                        mandatory_requirements=job_match.mandatory_requirements,
+                        preferred_requirements=job_match.preferred_requirements,
+                        optional_requirements=job_match.optional_requirements,
+                        matched_criteria=job_match.matched_criteria,
+                        missing_criteria=job_match.missing_criteria,
+                        evidence=job_match.evidence,
+                        mandatory_failures=job_match.mandatory_failures,
+                        confidence=job_match.confidence,
+                        hr_review_required=job_match.hr_review_required,
+                        reason=job_match.reason or llm_reason,
+                        career_transition_detected=job_match.career_transition_detected,
+                        career_transition_note=job_match.career_transition_note,
+                        llm_reason=llm_reason,
+                        inferred_skills=inferred_skills,
+                    )
+                    evaluated_matches.append(enriched_match)
+                except Exception as e:
+                    logger.error(f"Error in LLM-enriched matching for job {job.get('id') or job.get('vacancy_id')}: {e}")
 
 
             evaluated_matches.sort(key=lambda m: m.score, reverse=True)
