@@ -1,4 +1,4 @@
--- Migration: 002_create_department_domain_master.sql
+-- Migration: 005_create_department_domain_master.sql
 -- Description: Creates the DepartmentDomainMaster table, the DB-driven source of
 --              truth for candidate department/domain detection. Replaces the legacy
 --              hardcoded DEPARTMENT_DOMAIN_MAP in ScoringEngine so new departments
@@ -43,8 +43,6 @@ GO
 
 -- Seed rows: resolve DepartmentId from OrgDepartmentMst by real department name.
 -- Each domain links to the active department it recommends candidates to.
--- Healthcare has no corresponding real department in the org (chemical plant),
--- so it is seeded with NULL DepartmentId (linked later when a department exists).
 IF NOT EXISTS (SELECT 1 FROM dbo.DepartmentDomainMaster)
 BEGIN
     INSERT INTO dbo.DepartmentDomainMaster (DepartmentId, DomainName, Keywords, DefaultRoles, Priority, IsActive)
