@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.job import JobRepository
+from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.repositories.training import TrainingRepository
 from app.schemas.analysis import (
@@ -15,8 +16,12 @@ from app.schemas.analysis import (
     TrainingExample,
 )
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse
-from app.services.cv_service import process_cv_file
 from app.services.match_service import MatchService
+from app.services.processing_queue import (
+    ProcessingQueueService,
+    ProcessingQueueUnavailableError,
+    run_processing_job_fallback,
+)
 from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/match", tags=["Matching"])
@@ -62,27 +67,13 @@ async def analyze_cv_text(payload: CVMatchRequest):
         ) from exc
 
 
-async def background_upload_and_analyze(
-    filename: str,
-    content: bytes,
-    content_type: str | None,
-    storage_filename: str | None = None,
-):
-    try:
-        await process_cv_file(
-            filename=filename,
-            content=content,
-            content_type=content_type,
-            storage_filename=storage_filename,
-        )
-    except Exception as exc:
-        UploadService.cleanup_after_processing(storage_filename, succeeded=False)
-        logger.exception(f"Background match processing failed: {exc}")
+def background_upload_and_analyze(job_id: str) -> None:
+    run_processing_job_fallback(job_id)
 
 
 @router.post("/upload", response_model=CVProcessingResponse)
 async def upload_and_analyze(
-    background_tasks: BackgroundTasks, 
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...)  # noqa: B008
 ):
     """Upload CV, parse with Docling, and perform LLM-enriched semantic matching in background."""
@@ -93,29 +84,38 @@ async def upload_and_analyze(
         accepted = await UploadService.accept_and_persist(file, storage_key=cv_key)
         try:
             ResultRepository.assert_identity_available(identity, accepted.content_hash)
-            background_tasks.add_task(
-                background_upload_and_analyze,
+            submission = ProcessingQueueService.submit_upload(
+                cv_key=cv_key,
+                content_hash=accepted.content_hash,
                 filename=accepted.safe_filename,
-                content=accepted.content,
                 content_type=accepted.detected_content_type,
                 storage_filename=accepted.storage_filename,
             )
+            if submission.schedule_development_fallback:
+                background_tasks.add_task(background_upload_and_analyze, submission.record.job_id)
         except Exception:
             if not accepted.was_already_stored:
                 UploadService.remove_stored_upload(accepted.storage_filename)
             raise
 
         return CVProcessingResponse(
-            message="10% - Upload and match processing started in the background...",
+            message=submission.record.message,
             cv_key=cv_key,
             status="processing",
-            progress=10
+            progress=submission.record.progress,
+            stage=submission.record.stage,
+            job_id=submission.record.job_id,
+            job_state=submission.record.state.value,
+            execution_mode=submission.record.execution_mode.value,
+            retry_count=submission.record.attempt,
         )
 
     except CVIdentityCollisionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except UploadValidationError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except ProcessingQueueUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception(f"Failed to process CV upload: {exc}")
         raise HTTPException(
@@ -127,8 +127,11 @@ async def upload_and_analyze(
 async def get_match_status(cv_key: str):
     """Get the status or result of an enriched background match job."""
     result = ResultRepository.resolve_result(cv_key)
+    job = ProcessingJobRepository.get_by_cv_key(cv_key)
     if result:
         if result.get("status") == "FAILED":
+            if job and job.state.value in ("QUEUED", "PROCESSING", "RETRYING"):
+                return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
             return CVProcessingResponse(
                 message=result.get("message") or result.get("error") or "CV processing failed.",
                 cv_key=cv_key,
@@ -137,6 +140,10 @@ async def get_match_status(cv_key: str):
                 stage=result.get("stage"),
                 failed_step=result.get("failed_step"),
                 error_details=result.get("error_details"),
+                job_id=job.job_id if job else None,
+                job_state=job.state.value if job else "FAILED",
+                execution_mode=job.execution_mode.value if job else None,
+                retry_count=job.attempt if job else None,
             )
 
         is_completed = (
@@ -153,6 +160,13 @@ async def get_match_status(cv_key: str):
             match_analysis["progress"] = result.get("progress", 100)
             match_analysis["stage"] = result.get("stage", "complete")
             match_analysis["is_complete"] = result.get("is_complete", True)
+            if job:
+                match_analysis.update(
+                    job_id=job.job_id,
+                    job_state=job.state.value,
+                    execution_mode=job.execution_mode.value,
+                    retry_count=job.attempt,
+                )
             try:
                 return EnrichedCandidateAnalysis.model_validate(match_analysis)
             except Exception:
@@ -165,6 +179,10 @@ async def get_match_status(cv_key: str):
                 status="COMPLETED",
                 progress=100,
                 stage="complete",
+                job_id=job.job_id if job else None,
+                job_state=job.state.value if job else "COMPLETED",
+                execution_mode=job.execution_mode.value if job else None,
+                retry_count=job.attempt if job else None,
             )
 
         return CVProcessingResponse(
@@ -172,16 +190,25 @@ async def get_match_status(cv_key: str):
             cv_key=cv_key,
             status=result.get("status", "processing"),
             progress=result.get("progress", 50),
-            stage=result.get("stage")
+            stage=result.get("stage"),
+            job_id=job.job_id if job else None,
+            job_state=job.state.value if job else "PROCESSING",
+            execution_mode=job.execution_mode.value if job else None,
+            retry_count=job.attempt if job else None,
         )
 
-    return CVProcessingResponse(
-        message="Uploading and parsing CV...",
-        cv_key=cv_key,
-        status="processing",
-        progress=25,
-        stage="parsing"
-    )
+    if job:
+        return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
+    if ProcessingQueueService.unknown_job_compatibility_active():
+        return CVProcessingResponse(
+            message="Uploading and parsing CV...",
+            cv_key=cv_key,
+            status="processing",
+            progress=25,
+            stage="parsing",
+            job_state="UNKNOWN",
+        )
+    raise HTTPException(status_code=404, detail=f"CV processing job '{cv_key}' was not found.")
 
 
 @router.post("/reanalyze/{scan_id}")

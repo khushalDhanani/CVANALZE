@@ -167,6 +167,7 @@ def test_both_upload_routes_return_413_and_write_nothing(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_reprocess_missing_raw_returns_409_without_deleting_result(monkeypatch, tmp_path):
     from app.api.candidates import reprocess_candidate
+    from app.core.cache import CacheInvalidator, cv_result_cache_manager
     from app.repositories.result import ResultRepository
 
     uploads_dir = tmp_path / "uploads"
@@ -179,14 +180,22 @@ async def test_reprocess_missing_raw_returns_409_without_deleting_result(monkeyp
         "id": "cv_resume",
         "scan_id": "cv_resume",
         "filename": "resume.pdf",
+        "cv_hash": "source-hash",
         "status": "COMPLETED",
     }
     monkeypatch.setattr(settings, "UPLOADS_DIR", uploads_dir)
     monkeypatch.setattr(settings, "RESULTS_DIR", results_dir)
     monkeypatch.setattr(ResultRepository, "read_result_by_filename", lambda _: existing_result)
+    invalidated: list[str] = []
+    deleted: list[str] = []
+    monkeypatch.setattr(CacheInvalidator, "invalidate_cv", lambda value: invalidated.append(value))
+    monkeypatch.setattr(cv_result_cache_manager, "delete", lambda value: deleted.append(value))
+    monkeypatch.setattr(cv_result_cache_manager, "delete_by_pattern", lambda value: deleted.append(value))
 
     with pytest.raises(HTTPException) as exc_info:
         await reprocess_candidate("cv_resume", BackgroundTasks())
 
     assert exc_info.value.status_code == 409
     assert result_path.exists()
+    assert invalidated == []
+    assert deleted == []

@@ -1,9 +1,53 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T12:45:41+05:30
+2026-08-03T13:05:13+05:30
 
-## Current Task — Phase 3 Strengthen Structured CV Processing
+## Current Task — Phase 4 Reliable Background Processing
+- Replaced direct FastAPI-only upload execution with one shared Redis/RQ submission service for `/api/cv/upload`, `/api/match/upload`, and candidate reprocessing.
+- Added persisted processing-job records before enqueue, including canonical `QUEUED`, `PROCESSING`, `RETRYING`, `COMPLETED`, and `FAILED` transitions.
+- Added content-addressed job identity using canonical CV key, source SHA-256, parser version, and schema version.
+- Added idempotent duplicate submission handling plus Redis distributed submission/execution locks and local development locks.
+- Changed RQ payloads to contain only the job ID; workers reload, structurally revalidate, and hash-check retained raw sources before invoking `process_cv_file`.
+- Added configurable RQ timeouts, result retention, retries, retry intervals, processing-record TTLs, and distributed-lock leases.
+- Added an explicit development-only in-process fallback with the same persisted state/retry lifecycle; production returns HTTP 503 when Redis/RQ is unavailable.
+- Preserved lowercase legacy processing responses while adding `job_id`, `job_state`, `execution_mode`, and `retry_count` fields.
+- Changed unknown polling IDs to HTTP 404 by default, with a configurable ISO-8601 compatibility deadline for the former synthetic processing response.
+- Preserved and strengthened the reprocessing invariant that retained source availability/validity is checked before prior result or cache invalidation.
+- Added a Docker Compose RQ worker with shared uploads storage, Redis dependency health, worker health, and restart configuration.
+- Added focused Phase 4 regressions for persistence-before-enqueue, duplicate and changed-content isolation, development/production Redis outage behavior,
+  worker source validation, completion/retry transitions, unknown-job 404s, and reprocessing containment.
+- Added `backend/docs/phase4-reliable-background-processing.md` and linked it from the README.
+- Audited the downstream Ollama path and retained the existing centralized `OllamaLLMService`; no LLM client, retry, timeout, model, or cache logic was duplicated.
+- Per repository instructions, did not run the application, tests, linting, builds, dependency restore, migrations, Docker services, or external services.
+
+## Files Created / Modified for Current Task
+- Created: `backend/app/repositories/processing_job.py`, `backend/app/services/processing_queue.py`,
+  `backend/tests/test_phase4_background_processing.py`, `backend/docs/phase4-reliable-background-processing.md`.
+- Modified core/contracts: `backend/app/core/config.py`, `backend/app/core/cache.py`, `backend/app/schemas/contracts.py`,
+  `backend/app/schemas/cv.py`, `backend/app/schemas/analysis.py`.
+- Modified API/worker integration: `backend/app/api/cv.py`, `backend/app/api/analysis.py`, `backend/app/api/candidates.py`,
+  `backend/app/services/cv_service.py`.
+- Modified deployment/tests/docs: `docker-compose.yml`, `backend/.env.example`, `backend/requirements.txt`,
+  `backend/tests/test_upload_service.py`, `README.md`, `workstatus.md`.
+
+## Pending Work
+- Run the focused Phase 4 tests, broader backend suite, Ruff, and Docker Compose configuration validation only when explicitly authorized.
+- Choose and deploy a temporary `JOB_NOT_FOUND_COMPATIBILITY_UNTIL` value only if existing clients still depend on synthetic unknown-job responses.
+- Add an operational reconciler for jobs left `QUEUED` or `PROCESSING` after a full Redis/worker outage if deployment requirements demand automatic stale-job recovery.
+- Continue Phase 0 pending credential rotation and future access-policy enforcement.
+
+## Important Decisions
+- Job identity is content- and extraction-version-addressed; supplied candidate/CV identity remains authoritative through the Phase 2 canonical CV key.
+- Processing records are written to both Redis and the shared file tier so API/worker startup timing cannot hide a persisted job.
+- Raw CV bytes are not placed in Redis; the worker must recover and revalidate the retained source file.
+- Production never silently falls back to FastAPI background execution; the fallback is both environment-gated and visible in response metadata.
+- Existing `status="processing"` consumers remain compatible while canonical job state is additive.
+- Unknown jobs return HTTP 404 when the optional compatibility deadline is absent or expired.
+- Reprocessing source validation remains before cache/result invalidation, and workers repeat source validation before execution.
+- Ollama generation remains centralized in `OllamaLLMService` and is invoked only through the existing CV/match pipeline.
+
+## Previous Task — Phase 3 Strengthen Structured CV Processing
 - Reduced `document_parser.py` to a compatibility façade while moving document conversion, text normalization, deterministic field extraction,
   resume normalization, and quality metrics into focused service modules.
 - Added typed normalized resume schemas for contacts, skills, education, employment intervals, and experience validation.

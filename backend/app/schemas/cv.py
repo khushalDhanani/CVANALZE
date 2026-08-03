@@ -15,6 +15,10 @@ class CVProcessingResponse(BaseModel):
     stage: str | None = Field(default=None, description="Current processing stage")
     failed_step: str | None = Field(default=None, description="Step where the pipeline failed")
     error_details: str | None = Field(default=None, description="Detailed stack trace or technical error info")
+    job_id: str | None = Field(default=None, description="Content-addressed background processing job ID")
+    job_state: str | None = Field(default=None, description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, or FAILED state")
+    execution_mode: str | None = Field(default=None, description="RQ or explicit development fallback execution mode")
+    retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
 
 
 class CVUploadResponse(BaseModel):
@@ -83,6 +87,10 @@ class CVUploadResponse(BaseModel):
     field_confidence: dict[str, float | None] | None = Field(None, description="Per-field confidence raw scores")
     field_confidence_tiers: dict[str, str | None] | None = Field(None, description="Per-field confidence tier labels (HIGH, MEDIUM, LOW)")
     name_extraction_source: str | None = Field(None, description="Source of candidate name extraction")
+    job_id: str | None = Field(default=None, description="Content-addressed background processing job ID")
+    job_state: str | None = Field(default=None, description="Canonical background processing state")
+    execution_mode: str | None = Field(default=None, description="Background execution mode")
+    retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
 
 
 

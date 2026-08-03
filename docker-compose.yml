@@ -10,12 +10,45 @@ services:
       - OLLAMA_MODEL=qwen3:4b
       - DB_URL=postgresql://postgres:postgres@pgvector:5432/cv_analyzer
       - REDIS_URL=redis://redis:6379/0
+      - APP_ENVIRONMENT=production
+      - RQ_DEVELOPMENT_FALLBACK_ENABLED=false
+      - RQ_QUEUE_NAME=cv-processing
     volumes:
       - ./backend/uploads:/app/uploads
     restart: unless-stopped
     depends_on:
-      - pgvector
-      - redis
+      pgvector:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    container_name: cv_analyzer_worker
+    command: ["uv", "run", "rq", "worker", "--url", "redis://redis:6379/0", "cv-processing"]
+    environment:
+      - LLM_ENABLED=true
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=qwen3:4b
+      - DB_URL=postgresql://postgres:postgres@pgvector:5432/cv_analyzer
+      - REDIS_URL=redis://redis:6379/0
+      - APP_ENVIRONMENT=production
+      - RQ_DEVELOPMENT_FALLBACK_ENABLED=false
+      - RQ_QUEUE_NAME=cv-processing
+    volumes:
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      pgvector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "uv run rq info --url redis://redis:6379/0 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   pgvector:
     image: pgvector/pgvector:pg16
@@ -36,8 +69,13 @@ services:
     ports:
       - "6380:6379"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 
 volumes:
   pg_data:
-

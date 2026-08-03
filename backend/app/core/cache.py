@@ -460,10 +460,12 @@ class CacheManager:
         namespace: str,
         providers: list[CacheProvider],
         default_ttl: int | None = None,
+        persist_to_all_providers: bool = False,
     ):
         self._namespace = namespace
         self._providers = providers
         self._default_ttl = default_ttl
+        self._persist_to_all_providers = persist_to_all_providers
 
     def _make_key(self, key: str) -> str:
         return f"{self._namespace}:{key}"
@@ -472,12 +474,15 @@ class CacheManager:
     def active_providers(self) -> list[CacheProvider]:
         """
         Dynamically yields active providers:
+        Namespaces configured for persistence across all providers always use every tier.
         If RedisCache is present and available (_REDIS_CLIENT is not None), FileCache (L3)
         is bypassed during reads/writes to eliminate FileLock disk I/O bottlenecks.
         If RedisCache is down or unavailable, FileCache (L3) is retained as persistent fallback.
         Deletion operations (delete, delete_by_pattern, clear) always execute against all providers
         to ensure clean storage cleanup across all tiers.
         """
+        if self._persist_to_all_providers:
+            return self._providers
         has_active_redis = any(
             isinstance(p, RedisCache) and p.available for p in self._providers
         )
@@ -739,6 +744,7 @@ _llm_file_cache = FileCache(settings.UPLOADS_DIR / ".llm_cache")
 _cv_file_cache = FileCache(settings.RESULTS_DIR)
 _doc_cache_file_cache = FileCache(settings.UPLOADS_DIR / ".doc_cache")
 _embedding_file_cache = FileCache(settings.UPLOADS_DIR / ".embed_cache")
+_processing_job_file_cache = FileCache(settings.RESULTS_DIR / ".processing_jobs")
 
 llm_cache_manager = CacheManager(
     namespace="llm_cache",
@@ -750,6 +756,13 @@ cv_result_cache_manager = CacheManager(
     namespace="cv_result",
     providers=[_memory_cache, _redis_cache, _cv_file_cache],
     default_ttl=604800,
+)
+
+processing_job_cache_manager = CacheManager(
+    namespace="processing_job",
+    providers=[_memory_cache, _redis_cache, _processing_job_file_cache],
+    default_ttl=settings.PROCESSING_JOB_TTL_SECONDS,
+    persist_to_all_providers=True,
 )
 
 doc_cache_manager = CacheManager(

@@ -558,7 +558,7 @@ async def scan_uploads_directory(
 
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
-    q = Queue(connection=conn)
+    q = Queue(settings.RQ_QUEUE_NAME, connection=conn)
 
     import json
 

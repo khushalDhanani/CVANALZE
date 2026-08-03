@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
@@ -101,7 +102,11 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     from app.core.cache import CacheInvalidator, cv_result_cache_manager
     from app.core.config import settings
     from app.core.logging import logger
-    from app.services.cv_service import process_cv_file
+    from app.services.processing_queue import (
+        ProcessingQueueService,
+        ProcessingQueueUnavailableError,
+        run_processing_job_fallback,
+    )
     from app.services.upload_service import UploadService, UploadValidationError
 
     cid = candidate_id.strip()
@@ -183,20 +188,29 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     }
     ResultRepository.save_result(result_filename, processing_marker)
 
-    background_tasks.add_task(
-        process_cv_file,
-        filename=filename,
-        content=raw_bytes,
-        content_type=content_type,
-        force_reprocess=True,
-        candidate_id=existing_result.get("candidate_id"),
-        cv_id=existing_result.get("cv_id"),
-        storage_filename=retained_upload.storage_filename,
-    )
+    try:
+        submission = ProcessingQueueService.submit_upload(
+            cv_key=cv_key,
+            content_hash=hashlib.sha256(raw_bytes).hexdigest(),
+            filename=filename,
+            content_type=content_type,
+            force_reprocess=True,
+            candidate_id=existing_result.get("candidate_id"),
+            cv_id=existing_result.get("cv_id"),
+            storage_filename=retained_upload.storage_filename,
+        )
+    except ProcessingQueueUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if submission.schedule_development_fallback:
+        background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
 
     return {
-        "message": "10% - Caches purged. Reprocessing CV from scratch...",
+        "message": submission.record.message,
         "cv_key": cv_key,
         "status": "processing",
-        "progress": 10,
+        "progress": submission.record.progress,
+        "job_id": submission.record.job_id,
+        "job_state": submission.record.state.value,
+        "execution_mode": submission.record.execution_mode.value,
+        "retry_count": submission.record.attempt,
     }

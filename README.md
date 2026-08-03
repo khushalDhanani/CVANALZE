@@ -10,6 +10,7 @@ Uploads are size-bounded, checked against their declared MIME type and file sign
 See `backend/docs/phase1-secure-uploads.md` for limits, retention, and reprocessing behavior.
 See `backend/docs/phase2-identity-and-caching.md` for canonical CV identity, collision handling, and cache isolation.
 See `backend/docs/phase3-structured-cv-processing.md` for normalized resume contracts, experience authority, and reusable analysis contexts.
+See `backend/docs/phase4-reliable-background-processing.md` for persisted Redis/RQ jobs, retry states, distributed locking, polling compatibility, and the development fallback.
 
 ## Project Structure
 

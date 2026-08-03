@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Mapping
 
@@ -23,6 +24,12 @@ class ProcessingOutcome(str, Enum):
     NEW_CV = "NEW_CV"
     REPROCESSED = "REPROCESSED"
     CACHE_HIT = "CACHE_HIT"
+
+
+class ProcessingExecutionMode(str, Enum):
+    PENDING = "PENDING"
+    RQ = "RQ"
+    DEVELOPMENT_FALLBACK = "DEVELOPMENT_FALLBACK"
 
 
 class ErrorCode(str, Enum):
@@ -149,3 +156,32 @@ class JobStateResponse(BaseModel):
             payload["failed_step"] = self.stage
             payload["error_details"] = None
         return payload
+
+
+class ProcessingJobRecord(BaseModel):
+    job_id: str
+    cv_key: str
+    content_hash: str
+    filename: str
+    storage_filename: str
+    content_type: str | None = None
+    candidate_id: str | None = None
+    cv_id: str | None = None
+    parser_version: str
+    schema_version: str
+    state: JobState = JobState.QUEUED
+    progress: int = Field(default=10, ge=0, le=100)
+    stage: str = "queued"
+    message: str = "CV processing is queued."
+    execution_mode: ProcessingExecutionMode = ProcessingExecutionMode.PENDING
+    rq_job_id: str | None = None
+    attempt: int = 0
+    max_attempts: int = 1
+    enqueue_count: int = 0
+    force_reprocess: bool = False
+    outcome: ProcessingOutcome | None = None
+    error: CanonicalError | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None

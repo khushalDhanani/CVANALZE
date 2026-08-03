@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,7 +10,17 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "CV Analyzer"
     VERSION: str = "0.1.0"
     ALLOWED_ORIGINS: list[str] = ["*"]
+    APP_ENVIRONMENT: str = "development"
     REDIS_URL: str | None = "redis://localhost:6379/0"
+    RQ_QUEUE_NAME: str = "cv-processing"
+    RQ_JOB_TIMEOUT_SECONDS: int = 900
+    RQ_RESULT_TTL_SECONDS: int = 604800
+    RQ_MAX_RETRIES: int = 2
+    RQ_RETRY_INTERVAL_SECONDS: int = 30
+    RQ_DEVELOPMENT_FALLBACK_ENABLED: bool = True
+    PROCESSING_JOB_TTL_SECONDS: int = 604800
+    PROCESSING_JOB_LOCK_TIMEOUT_SECONDS: int = 1200
+    JOB_NOT_FOUND_COMPATIBILITY_UNTIL: datetime | None = None
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
     UPLOAD_READ_CHUNK_SIZE_BYTES: int = 1024 * 1024
     UPLOAD_FILENAME_MAX_CHARS: int = 120
