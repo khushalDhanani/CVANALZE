@@ -81,14 +81,16 @@ def test_incremental_vacancy_embedding_skips_unchanged():
     with patch("app.services.embedding_service.get_vacancy_embedding", return_value=(None, None)):
         with patch("app.services.embedding_service.EmbeddingService._call_ollama_batch_embed", return_value=mock_embeddings) as mock_batch:
             # First sync: Both vacancies are new -> batch embed called once for 2 items
-            JobRepository._cache_vacancy_embeddings(jobs)
+            first_metrics = JobRepository._cache_vacancy_embeddings(jobs)
             assert mock_batch.call_count == 1
             assert len(mock_batch.call_args[0][1]) == 2
+            assert first_metrics == {"total": 2, "synced": 2, "skipped": 0, "failed": 0}
 
         with patch("app.services.embedding_service.EmbeddingService._call_ollama_batch_embed") as mock_batch_second:
             # Second sync: No content changes -> 0 vacancies uncached -> batch embed NOT called!
-            JobRepository._cache_vacancy_embeddings(jobs)
+            second_metrics = JobRepository._cache_vacancy_embeddings(jobs)
             assert mock_batch_second.call_count == 0
+            assert second_metrics == {"total": 2, "synced": 0, "skipped": 2, "failed": 0}
 
 
 def test_vacancy_content_change_triggers_reembedding():

@@ -1,9 +1,41 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T15:12:10+05:30
+2026-08-03T15:26:59+05:30
 
-## Current Task — Authorized Verification Checklist
+## Current Task — Vector Database Background Sync Failure
+- Diagnosed `/api/vector-db/sync` returning its compatible HTTP 200 acknowledgement and then raising `TypeError` from the Starlette background task.
+- Identified the contract mismatch: `VectorDatabaseMigrationService.sync_vacancy_embeddings()` expected an integer while
+  `JobRepository._cache_vacancy_embeddings()` delegated to an embedding sync method that returned `None`.
+- Changed vacancy embedding synchronization to return explicit `total`, `synced`, `skipped`, and `failed` metrics.
+- Added compatibility handling for legacy or unexpected non-dictionary sync results so `None` can no longer reach arithmetic.
+- Added a safe background-task entry point that logs server-side failures without rethrowing them into an already-started ASGI response.
+- Preserved the existing `/api/vector-db/sync` HTTP 200 `{status: "processing"}` response contract.
+- Added regressions for returned vacancy metrics, legacy `None` handling, successful scheduling, and contained background failures.
+- Per repository instructions, did not run tests, Ruff, the application, migrations, Docker services, or external systems for this task.
+
+## Files Modified for Current Task
+- `backend/app/services/embedding_sync_service.py`
+- `backend/app/repositories/job.py`
+- `backend/app/services/vector_migration_service.py`
+- `backend/app/api/vector_db.py`
+- `backend/tests/test_vector_db_integration.py`
+- `backend/tests/test_vacancy_embeddings.py`
+- `workstatus.md`
+
+## Pending Work
+- Run `backend/tests/test_vector_db_integration.py` and `backend/tests/test_vacancy_embeddings.py` when explicitly authorized.
+- Exercise `/api/vector-db/sync` against controlled Ollama/PostgreSQL services to validate real persistence and failure telemetry.
+- Consider a durable synchronization-job/status contract if clients need completion or failure state after the acknowledgement.
+
+## Important Decisions
+- Keep the existing asynchronous acknowledgement response compatible; background failures remain server-side operational events.
+- Treat generated and cached vacancy vectors as synced even if PostgreSQL is unavailable, matching the existing cache fallback behavior.
+- Return structured metrics from the shared embedding sync boundary instead of reconstructing counts in downstream callers.
+- Retain a legacy-result guard because the private compatibility wrapper previously returned `None`.
+- No migration is required or authorized.
+
+## Previous Task — Authorized Verification Checklist
 - Ran the focused upload, parser, cache, scoring, embedding, and Ollama tests with external systems mocked or disabled: 87 passed.
 - Ran the complete backend suite with the same isolation defaults: 298 passed with 6 third-party deprecation warnings.
 - Added explicit upload-matrix regressions for empty files, damaged PDFs, scanned PDFs, and DOCX compression bombs; existing tests cover oversize, MIME spoofing,

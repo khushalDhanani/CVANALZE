@@ -13,14 +13,17 @@ class EmbeddingSyncService:
     """
 
     @classmethod
-    def sync_vacancy_embeddings(cls, job_dicts: list[dict[str, Any]]) -> None:
+    def sync_vacancy_embeddings(cls, job_dicts: list[dict[str, Any]]) -> dict[str, int]:
         """
         Generates and caches semantic vector embeddings for all active vacancies.
         Uses rich canonical text, checks content hashes for incremental updates,
-        and persists embeddings to PostgreSQL and cache manager.
+        and persists embeddings to PostgreSQL and cache manager. Returns explicit
+        sync metrics for operational callers.
         """
+        metrics = {"total": len(job_dicts), "synced": 0, "skipped": 0, "failed": 0}
         if not settings.EMBEDDING_ENABLED:
-            return
+            metrics["skipped"] = metrics["total"]
+            return metrics
 
         from app.core.cache import embedding_cache_manager as _ecm
         from app.services.embedding_service import (
@@ -70,8 +73,17 @@ class EmbeddingSyncService:
                         _ecm.set(f"{model}:vac:{content_hash}", emb)
                         if vac_id_int > 0:
                             save_vacancy_embedding(vac_id_int, emb, content_hash)
+                        metrics["synced"] += 1
+                    else:
+                        metrics["failed"] += 1
+            else:
+                metrics["failed"] = len(uncached)
+
+        metrics["skipped"] = metrics["total"] - len(uncached)
 
         logger.info(
             f"[EMBEDDING_SYNC] Processed {len(job_dicts)} vacancies: "
-            f"{len(uncached)} newly embedded, {len(job_dicts) - len(uncached)} cached/unchanged."
+            f"{metrics['synced']} newly embedded, {metrics['skipped']} cached/unchanged, "
+            f"{metrics['failed']} failed."
         )
+        return metrics

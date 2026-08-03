@@ -326,7 +326,7 @@ class JobRepository:
         return RepositoryMetrics.get_metrics()
 
     @classmethod
-    def _cache_vacancy_embeddings(cls, jobs: list[dict[str, Any]]) -> None:
-        """Compatibility wrapper for batch caching vacancy embeddings."""
+    def _cache_vacancy_embeddings(cls, jobs: list[dict[str, Any]]) -> dict[str, int]:
+        """Compatibility wrapper returning batch vacancy-embedding sync metrics."""
         from app.services.embedding_sync_service import EmbeddingSyncService
         return EmbeddingSyncService.sync_vacancy_embeddings(jobs)

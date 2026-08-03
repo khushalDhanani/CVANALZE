@@ -49,12 +49,40 @@ def test_vector_db_sync_endpoint():
     """
     Verifies POST /api/vector-db/sync triggers background sync task.
     """
-    with patch.object(VectorDatabaseMigrationService, "sync_all_embeddings", return_value={"status": "completed"}):
+    with patch.object(
+        VectorDatabaseMigrationService,
+        "sync_all_embeddings",
+        return_value={"status": "completed"},
+    ) as sync_mock:
         resp = client.post("/api/vector-db/sync")
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "processing"
         assert "started" in data["message"].lower()
+        sync_mock.assert_called_once_with()
+
+
+def test_vector_db_sync_background_failure_is_contained():
+    with patch.object(
+        VectorDatabaseMigrationService,
+        "sync_all_embeddings",
+        side_effect=RuntimeError("background sync failed"),
+    ):
+        resp = client.post("/api/vector-db/sync")
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "processing"
+
+
+def test_vacancy_sync_handles_legacy_none_metrics():
+    jobs = [{"id": "1", "vacancy_id": 1, "title": "Python Developer"}]
+    with (
+        patch("app.services.vector_migration_service.JobRepository.get_all_jobs", return_value=jobs),
+        patch("app.services.vector_migration_service.JobRepository._cache_vacancy_embeddings", return_value=None),
+    ):
+        metrics = VectorDatabaseMigrationService.sync_vacancy_embeddings()
+
+    assert metrics == {"total": 1, "synced": 0, "skipped": 1, "failed": 0}
 
 
 def test_incremental_candidate_sync_skips_unchanged():

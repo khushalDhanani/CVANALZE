@@ -20,7 +20,7 @@ def sync_vector_db(background_tasks: BackgroundTasks) -> dict[str, Any]:
     """
     Trigger background synchronization of candidate and vacancy embeddings into PostgreSQL pgvector database.
     """
-    background_tasks.add_task(VectorDatabaseMigrationService.sync_all_embeddings)
+    background_tasks.add_task(VectorDatabaseMigrationService.run_sync_safely)
     return {
         "message": "Vector database background synchronization started.",
         "status": "processing",

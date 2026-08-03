@@ -80,14 +80,27 @@ class VectorDatabaseMigrationService:
         if not jobs:
             return {"total": 0, "synced": 0, "skipped": 0, "failed": 0}
 
-        synced_count = JobRepository._cache_vacancy_embeddings(jobs)
         total = len(jobs)
-        skipped = total - synced_count
+        sync_metrics = JobRepository._cache_vacancy_embeddings(jobs)
+        if not isinstance(sync_metrics, dict):
+            logger.warning(
+                "[VECTOR_SYNC] Vacancy embedding helper returned no metrics; "
+                "using the legacy all-skipped compatibility result."
+            )
+            sync_metrics = {"total": total, "synced": 0, "skipped": total, "failed": 0}
+
+        metrics = {
+            "total": total,
+            "synced": max(0, int(sync_metrics.get("synced", 0))),
+            "skipped": max(0, int(sync_metrics.get("skipped", 0))),
+            "failed": max(0, int(sync_metrics.get("failed", 0))),
+        }
 
         logger.info(
-            f"[VECTOR_SYNC] Vacancy embedding sync complete: {synced_count} newly embedded, {skipped} cached/unchanged."
+            f"[VECTOR_SYNC] Vacancy embedding sync complete: {metrics['synced']} newly embedded, "
+            f"{metrics['skipped']} cached/unchanged, {metrics['failed']} failed."
         )
-        return {"total": total, "synced": synced_count, "skipped": skipped, "failed": 0}
+        return metrics
 
     @classmethod
     def sync_all_embeddings(cls) -> dict[str, Any]:
@@ -102,6 +115,19 @@ class VectorDatabaseMigrationService:
             "candidate_embeddings": cand_metrics,
             "vacancy_embeddings": vac_metrics,
         }
+
+    @classmethod
+    def run_sync_safely(cls) -> None:
+        """Run an acknowledged background sync without leaking failures into the ASGI response lifecycle."""
+        try:
+            result = cls.sync_all_embeddings()
+            logger.info(
+                f"[VECTOR_SYNC] Background synchronization finished with status='{result.get('status', 'unknown')}'."
+            )
+        except Exception as exc:
+            logger.exception(
+                f"[VECTOR_SYNC] Background synchronization failed: {type(exc).__name__}"
+            )
 
     @classmethod
     def get_migration_status(cls) -> dict[str, Any]:
