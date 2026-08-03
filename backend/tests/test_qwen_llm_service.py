@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import httpx
 
@@ -11,6 +11,23 @@ from app.schemas.analysis import (
 )
 from app.schemas.profile import DynamicCandidateProfile
 from app.services.llm_service import OllamaLLMService
+from app.services.ollama_transport import OllamaTransport
+
+
+def _disable_llm_cache(monkeypatch) -> None:
+    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: None)
+    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.save_cached_entry", lambda key, entry: None)
+
+
+def _mock_transport_client(monkeypatch, response_data: dict) -> MagicMock:
+    response = MagicMock(spec=httpx.Response)
+    response.status_code = 200
+    response.json.return_value = response_data
+    client = MagicMock()
+    client.request.return_value = response
+    monkeypatch.setattr(OllamaTransport, "get_client", classmethod(lambda cls: client))
+    monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 0)
+    return client
 
 
 def test_ollama_default_model_is_qwen3_4b():
@@ -18,11 +35,7 @@ def test_ollama_default_model_is_qwen3_4b():
 
 
 def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: None)
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.save_cached_entry", lambda key, entry: None)
-
-    mock_response = MagicMock(spec=httpx.Response)
-    mock_response.raise_for_status.return_value = None
+    _disable_llm_cache(monkeypatch)
     dummy_profile = {
         "education_domains": ["Computer Science"],
         "professional_domains": ["Software Development"],
@@ -36,70 +49,48 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
         "confidence": "HIGH",
         "evidence_notes": "Extracted from CV",
     }
-    mock_response.json.return_value = {
-        "response": json.dumps(dummy_profile),
-        "eval_count": 100,
-        "eval_duration": 1000000000,
-    }
+    client = _mock_transport_client(
+        monkeypatch,
+        {"response": json.dumps(dummy_profile), "eval_count": 100, "eval_duration": 1_000_000_000},
+    )
 
-    mock_client = MagicMock()
-    mock_client.__enter__.return_value = mock_client
-    mock_client.post.return_value = mock_response
+    result = OllamaLLMService.extract_candidate_profile(
+        prompt="Extract candidate CV details",
+        prompt_version="1.0",
+        cache_key="test_extraction_cache_key",
+    )
 
-    with patch("httpx.Client", return_value=mock_client):
-        result = OllamaLLMService.extract_candidate_profile(
-            prompt="Extract candidate CV details",
-            prompt_version="1.0",
-            cache_key="test_extraction_cache_key",
-        )
-
-    assert result is not None
     assert isinstance(result, DynamicCandidateProfile)
-    assert mock_client.post.called
-
-    call_args = mock_client.post.call_args
-    payload = call_args[1]["json"]
-
+    payload = client.request.call_args.kwargs["json"]
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/no_think")
     assert payload["think"] is False
     assert payload["format"] == DynamicCandidateProfile.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
+    assert payload["keep_alive"] == settings.OLLAMA_KEEP_ALIVE
 
 
 def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: None)
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.save_cached_entry", lambda key, entry: None)
-
-    mock_response = MagicMock(spec=httpx.Response)
-    mock_response.raise_for_status.return_value = None
+    _disable_llm_cache(monkeypatch)
     dummy_analysis = {
         "skill_matches": ["Python"],
         "inferred_skills": ["FastAPI"],
         "missing_critical": [],
         "semantic_reason": "Good match",
     }
-    mock_response.json.return_value = {
-        "response": json.dumps(dummy_analysis),
-        "eval_count": 100,
-        "eval_duration": 1000000000,
-    }
+    client = _mock_transport_client(
+        monkeypatch,
+        {"response": json.dumps(dummy_analysis), "eval_count": 100, "eval_duration": 1_000_000_000},
+    )
 
-    mock_client = MagicMock()
-    mock_client.__enter__.return_value = mock_client
-    mock_client.post.return_value = mock_response
+    result = OllamaLLMService.call_qwen(
+        prompt="Score CV fit for Python Developer",
+        prompt_version="1.0",
+        cache_key="test_call_qwen_cache_key",
+    )
 
-    with patch("httpx.Client", return_value=mock_client):
-        result = OllamaLLMService.call_qwen(
-            prompt="Score CV fit for Python Developer",
-            prompt_version="1.0",
-            cache_key="test_call_qwen_cache_key",
-        )
-
-    assert result is not None
     assert isinstance(result, QwenCVAnalysis)
-
-    payload = mock_client.post.call_args[1]["json"]
+    payload = client.request.call_args.kwargs["json"]
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
@@ -108,11 +99,7 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
 
 
 def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: None)
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.save_cached_entry", lambda key, entry: None)
-
-    mock_response = MagicMock(spec=httpx.Response)
-    mock_response.raise_for_status.return_value = None
+    _disable_llm_cache(monkeypatch)
     dummy_mapping = {
         "matched_vacancies": [
             {
@@ -122,27 +109,19 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
             }
         ]
     }
-    mock_response.json.return_value = {
-        "response": json.dumps(dummy_mapping),
-        "eval_count": 100,
-        "eval_duration": 1000000000,
-    }
+    client = _mock_transport_client(
+        monkeypatch,
+        {"response": json.dumps(dummy_mapping), "eval_count": 100, "eval_duration": 1_000_000_000},
+    )
 
-    mock_client = MagicMock()
-    mock_client.__enter__.return_value = mock_client
-    mock_client.post.return_value = mock_response
+    result = OllamaLLMService.call_qwen_dynamic(
+        prompt="Score candidate dynamic mapping",
+        prompt_version="2.0",
+        cache_key="test_dynamic_cache_key",
+    )
 
-    with patch("httpx.Client", return_value=mock_client):
-        result = OllamaLLMService.call_qwen_dynamic(
-            prompt="Score candidate dynamic mapping",
-            prompt_version="2.0",
-            cache_key="test_dynamic_cache_key",
-        )
-
-    assert result is not None
     assert isinstance(result, DynamicMappingResponse)
-
-    payload = mock_client.post.call_args[1]["json"]
+    payload = client.request.call_args.kwargs["json"]
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
@@ -151,11 +130,7 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
 
 
 def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.get_cached_entry", lambda key: None)
-    monkeypatch.setattr("app.repositories.llm_cache.LLMCacheRepository.save_cached_entry", lambda key, entry: None)
-
-    mock_response = MagicMock(spec=httpx.Response)
-    mock_response.raise_for_status.return_value = None
+    _disable_llm_cache(monkeypatch)
     dummy_optimized = {
         "candidate_profile": {
             "core_skills": ["Python"],
@@ -171,26 +146,19 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
             }
         ],
     }
-    mock_response.json.return_value = {
-        "response": json.dumps(dummy_optimized),
-        "eval_count": 120,
-        "eval_duration": 1500000000,
-    }
+    client = _mock_transport_client(
+        monkeypatch,
+        {"response": json.dumps(dummy_optimized), "eval_count": 120, "eval_duration": 1_500_000_000},
+    )
 
-    mock_httpx_client = MagicMock()
-    mock_httpx_client.post.return_value = mock_response
+    result = OllamaLLMService.run_optimized_match(
+        prompt="Perform optimized match evaluation",
+        prompt_version="3.0",
+        cache_key="test_optimized_match_cache_key",
+    )
 
-    with patch("app.services.llm_service._get_httpx_client", return_value=mock_httpx_client):
-        result = OllamaLLMService.run_optimized_match(
-            prompt="Perform optimized match evaluation",
-            prompt_version="3.0",
-            cache_key="test_optimized_match_cache_key",
-        )
-
-    assert result is not None
     assert isinstance(result, OptimizedLLMMatchResponse)
-
-    payload = mock_httpx_client.post.call_args[1]["json"]
+    payload = client.request.call_args.kwargs["json"]
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
@@ -198,20 +166,13 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
     assert payload["options"]["temperature"] == 0.0
 
 
-def test_ollama_unload_model_sends_keep_alive_zero():
-    mock_response = MagicMock(spec=httpx.Response)
-    mock_response.raise_for_status.return_value = None
+def test_ollama_unload_model_sends_keep_alive_zero(monkeypatch):
+    client = _mock_transport_client(monkeypatch, {})
 
-    mock_httpx_client = MagicMock()
-    mock_httpx_client.post.return_value = mock_response
-
-    with patch("app.services.llm_service._get_httpx_client", return_value=mock_httpx_client):
-        success = OllamaLLMService.unload_model("qwen3:4b")
+    success = OllamaLLMService.unload_model("qwen3:4b")
 
     assert success is True
-    assert mock_httpx_client.post.called
-    call_args = mock_httpx_client.post.call_args
-    payload = call_args[1]["json"]
+    payload = client.request.call_args.kwargs["json"]
     assert payload["model"] == "qwen3:4b"
     assert payload["keep_alive"] == 0
 
@@ -228,11 +189,11 @@ def test_domain_embedding_read_only_disables_live_generation(monkeypatch):
 
     monkeypatch.setattr("app.services.embedding_service.EmbeddingService.generate_embedding", mock_generate)
 
-    # When allow_live_generation=False and DB returns None, generate_embedding should NOT be called
-    res = DomainEmbeddingService.find_semantic_equivalents(
-        term="uncached_skill_test_xyz", category="skills", allow_live_generation=False
+    result = DomainEmbeddingService.find_semantic_equivalents(
+        term="uncached_skill_test_xyz",
+        category="skills",
+        allow_live_generation=False,
     )
 
     assert called is False
-    assert isinstance(res, list)
-
+    assert isinstance(result, list)

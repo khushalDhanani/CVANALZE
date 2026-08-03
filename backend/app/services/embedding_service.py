@@ -5,11 +5,16 @@ import threading
 import time
 from typing import Any
 
-import httpx
-
 from app.core.cache import embedding_cache_manager
 from app.core.config import settings
 from app.core.logging import logger
+from app.services.ollama_transport import (
+    OllamaError,
+    OllamaModelUnavailableError,
+    OllamaTimeoutError,
+    OllamaTransport,
+    OllamaUnavailableError,
+)
 
 
 def get_embedding(text: str, model_name: str | None = None) -> list[float]:
@@ -30,7 +35,7 @@ def get_embedding(text: str, model_name: str | None = None) -> list[float]:
 
 class EmbeddingService:
     """
-    Generates text embeddings via Ollama /api/embed or /api/embeddings with Redis L2 + File L3 caching.
+    Generates text embeddings via the shared Ollama transport with Redis L2 + File L3 caching.
     Cache key = ``embed:{model_version}:{sha256(text)}``.
     Supports thread-safe metrics, timing instrumentation, and detailed logging.
     """
@@ -196,31 +201,24 @@ class EmbeddingService:
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
         if cls._is_model_throttled(model):
             return None
-            
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
-        payload = {"model": model, "input": text}
+
         try:
-            with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
-                resp = client.post(url, json=payload)
-                if resp.status_code == 404:
-                    cls._failed_models_cache[model] = time.time()
-                    logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
-                    return None
-                resp.raise_for_status()
-                data = resp.json()
-                embs = data.get("embeddings")
-                if embs and len(embs) > 0:
-                    return embs[0]
-                return None
-        except httpx.ConnectError:
+            result = OllamaTransport.embed(model, [text])
+            cls._failed_models_cache.pop(model, None)
+            return result.value[0]
+        except OllamaModelUnavailableError:
+            cls._failed_models_cache[model] = time.time()
+            logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
+            return None
+        except OllamaTimeoutError:
+            logger.warning(f"[EMBEDDING] Timeout calling Ollama for model '{model}'")
+            return None
+        except OllamaUnavailableError:
             cls._failed_models_cache[model] = time.time()
             logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
             return None
-        except httpx.TimeoutException:
-            logger.warning(f"[EMBEDDING] Timeout calling Ollama for model '{model}'")
-            return None
-        except Exception as exc:
-            logger.warning(f"[EMBEDDING] Ollama embed call failed for model {model}: {exc}")
+        except OllamaError as exc:
+            logger.warning(f"[EMBEDDING] Ollama embed call failed for model '{model}': {type(exc).__name__}")
             return None
 
     @classmethod
@@ -229,36 +227,27 @@ class EmbeddingService:
     ) -> list[list[float]] | None:
         if cls._is_model_throttled(model):
             return None
-            
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/embed"
+
         all_embeddings: list[list[float]] = []
         for i in range(0, len(texts), cls._BATCH_SIZE):
             batch = texts[i : i + cls._BATCH_SIZE]
             try:
-                with httpx.Client(timeout=httpx.Timeout(60.0, connect=5.0)) as client:
-                    resp = client.post(url, json={"model": model, "input": batch})
-                    if resp.status_code == 404:
-                        cls._failed_models_cache[model] = time.time()
-                        logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
-                        break
-                    resp.raise_for_status()
-                    data = resp.json()
-                    batch_embs = data.get("embeddings")
-                    if batch_embs and len(batch_embs) == len(batch):
-                        all_embeddings.extend(batch_embs)
-                    else:
-                        logger.warning(
-                            f"[EMBEDDING] Ollama batch embed returned {len(batch_embs or [])} embeddings for {len(batch)} texts"
-                        )
-                        for text in batch:
-                            single = cls._call_ollama_embed(model, text)
-                            all_embeddings.append(single if single else [])
-            except httpx.ConnectError:
+                result = OllamaTransport.embed(model, batch)
+                all_embeddings.extend(result.value)
+                cls._failed_models_cache.pop(model, None)
+            except OllamaModelUnavailableError:
+                cls._failed_models_cache[model] = time.time()
+                logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
+                break
+            except OllamaUnavailableError:
                 cls._failed_models_cache[model] = time.time()
                 logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
                 break
-            except Exception as exc:
-                logger.warning(f"[EMBEDDING] Ollama batch embed failed at offset {i}: {exc}")
+            except OllamaError as exc:
+                logger.warning(
+                    f"[EMBEDDING] Ollama batch embed failed at offset {i} for model '{model}': "
+                    f"{type(exc).__name__}; retrying the batch as individual inputs"
+                )
                 for text in batch:
                     single = cls._call_ollama_embed(model, text)
                     all_embeddings.append(single if single else [])
@@ -482,6 +471,4 @@ def get_vacancy_embedding(vacancy_id: int) -> tuple[list[float] | None, str | No
     if cached is not None:
         return cached, None
     return None, None
-
-
 

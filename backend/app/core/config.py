@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "qwen3:4b"  # or qwen2.5:3b etc based on what's available
     OLLAMA_REQUEST_TIMEOUT: float = 90.0
     OLLAMA_MAX_RETRIES: int = 1
+    OLLAMA_RETRY_BACKOFF_SECONDS: float = 0.5
+    OLLAMA_KEEP_ALIVE: str = "30m"
+    OLLAMA_UNLOAD_ON_SHUTDOWN: bool = False
+    OLLAMA_MAX_CONNECTIONS: int = 20
+    OLLAMA_MAX_KEEPALIVE_CONNECTIONS: int = 10
     LLM_BOOST_WEIGHT: float = 0.10
     MAX_LLM_BOOST: float = 10.0
     PREFILTER_TOP_K: int = 5

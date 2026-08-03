@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.core.cache import _REDIS_CLIENT, _memory_cache
 from app.core.logging import logger
 from app.core.metrics import _metrics
+from app.services.ollama_transport import OllamaTransport
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -35,7 +36,6 @@ async def get_cache_analytics() -> dict[str, Any]:
         "items_count": len(_memory_cache._store),
         "max_size": _memory_cache._max_size,
     }
-
     return {
         "global_metrics": {
             "total_hits": metrics_report["total_hits"],
@@ -48,5 +48,6 @@ async def get_cache_analytics() -> dict[str, Any]:
         "system_stats": {
             "redis": redis_stats,
             "memory_cache": memory_cache_stats,
+            "ollama_transport": OllamaTransport.get_metrics(),
         },
     }

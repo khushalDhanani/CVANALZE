@@ -1,12 +1,14 @@
 import hashlib
-import json
 import time
+from dataclasses import dataclass
+from typing import Any, TypeVar, cast
 
 import httpx
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.metrics import _metrics
 from app.core.profiler import PipelineProfiler
 from app.repositories.llm_cache import LLMCacheEntry, LLMCacheRepository
 from app.schemas.analysis import (
@@ -15,403 +17,100 @@ from app.schemas.analysis import (
     QwenCVAnalysis,
 )
 from app.schemas.profile import DynamicCandidateProfile
+from app.services.ollama_transport import (
+    OllamaError,
+    OllamaGenerateEnvelope,
+    OllamaTransport,
+)
 
-_httpx_client_instance: httpx.Client | None = None
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
-def _get_httpx_client(timeout: float = 600.0) -> httpx.Client:
-    global _httpx_client_instance
-    if _httpx_client_instance is None or _httpx_client_instance.is_closed:
-        _httpx_client_instance = httpx.Client(
-            timeout=httpx.Timeout(timeout=timeout, connect=5.0),
-            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
-        )
-    return _httpx_client_instance
+def _get_httpx_client(timeout: float | None = None) -> httpx.Client:
+    """Compatibility alias for callers that previously accessed the pooled client helper."""
+    del timeout
+    return OllamaTransport.get_client()
+
+
+@dataclass(frozen=True)
+class _StructuredGeneration:
+    validated: BaseModel
+    structured_data: dict[str, Any]
+    raw_response: str
+    reasoning: str
+    envelope: OllamaGenerateEnvelope
+    validation_ms: float
 
 
 class OllamaLLMService:
     @classmethod
     def check_health(cls) -> bool:
-        """
-        Check if Ollama server is running and accessible.
-        """
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
         try:
-            client = _get_httpx_client(timeout=5.0)
-            response = client.get(url)
-            return response.status_code == 200
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"Ollama health check failed: {exc}")
+            OllamaTransport.get_tags()
+            return True
+        except OllamaError as exc:
+            logger.warning(f"[OLLAMA] operation=health status=FALLBACK error={type(exc).__name__}")
             return False
 
     @classmethod
     def get_available_models(cls) -> list[str]:
-        """
-        Fetch list of currently available models from Ollama /api/tags endpoint.
-        """
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
         try:
-            client = _get_httpx_client(timeout=5.0)
-            response = client.get(url)
-            response.raise_for_status()
-            data = response.json()
-            return [m.get("name", "") for m in data.get("models", []) if m.get("name")]
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"Failed to fetch available Ollama models: {exc}")
+            result = OllamaTransport.get_tags()
+            return [model.name for model in result.value.models]
+        except OllamaError as exc:
+            logger.warning(f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__}")
             return []
 
-    @staticmethod
+    @classmethod
     def extract_candidate_profile(
+        cls,
         prompt: str,
         prompt_version: str,
         cache_key: str = "",
     ) -> DynamicCandidateProfile | None:
-        if not settings.LLM_ENABLED:
-            logger.info("LLM semantic analysis is disabled via config.")
-            return None
+        return cls._execute_structured_generation(
+            operation="profile_extraction",
+            prompt=prompt,
+            prompt_version=prompt_version,
+            cache_key=cache_key,
+            response_model=DynamicCandidateProfile,
+            think=False,
+            options={"num_predict": 2048, "num_ctx": 4096, "temperature": 0.0},
+        )
 
-        model_name = settings.OLLAMA_MODEL
-
-        if not cache_key:
-            from app.repositories.llm_cache import LLMCacheRepository as LR
-            cache_key = LR.extraction_cache_key(
-                document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-                prompt_version=prompt_version,
-                model_version=model_name,
-                extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
-            )
-
-        # Check Cache First using full entry
-        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
-        if cached_entry is not None:
-            logger.info(
-                f"LLM Cache HIT for profile extraction '{model_name}' (v{prompt_version}). Skipping inference."
-            )
-            return DynamicCandidateProfile(**cached_entry.structured_data)
-
-        if not prompt.startswith("/no_think"):
-            prompt = f"/no_think\n{prompt}"
-
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {
-            "model": model_name,
-            "prompt": prompt,
-            "format": DynamicCandidateProfile.model_json_schema(),
-            "stream": False,
-            "think": False,
-            "keep_alive": "30m",
-            "options": {
-                "num_predict": 2048,
-                "num_ctx": 4096,
-                "temperature": 0.0,
-            },
-        }
-
-        timeout_cfg = httpx.Timeout(timeout=settings.OLLAMA_REQUEST_TIMEOUT, connect=2.0)
-
-        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
-            start_time = time.time()
-            try:
-                with httpx.Client(timeout=timeout_cfg) as client:
-                    response = client.post(url, json=payload)
-                    response.raise_for_status()
-
-                duration_ms = int((time.time() - start_time) * 1000)
-
-                data = response.json()
-                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
-                reasoning = data.get("thinking", "")
-                raw_response = response_text
-
-                if response_text.startswith("```json"):
-                    response_text = response_text[7:]
-                elif response_text.startswith("```"):
-                    response_text = response_text[3:]
-                response_text = response_text.removesuffix("```")
-                response_text = response_text.strip()
-
-                parsed_json = json.loads(response_text)
-                validated_result = DynamicCandidateProfile(**parsed_json)
-
-                logger.info(
-                    f"LLM Profile Extraction SUCCESS: model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
-                )
-
-                entry = LLMCacheEntry(
-                    prompt=prompt,
-                    raw_response=raw_response,
-                    structured_data=parsed_json,
-                    reasoning=reasoning,
-                    processing_time_ms=duration_ms,
-                    token_count=data.get("eval_count", 0),
-                    inference_time_ms=int(data.get("eval_duration", 0) / 1_000_000),
-                    model=model_name,
-                    prompt_version=prompt_version,
-                )
-                LLMCacheRepository.save_cached_entry(cache_key, entry)
-
-                return validated_result
-
-            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
-                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
-                break
-            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
-            except json.JSONDecodeError as exc:
-                logger.warning(
-                    f"Ollama JSON decode error on attempt {attempt}. Raw: {response_text[:100]}... Error: {exc}"
-                )
-            except ValidationError as exc:
-                logger.warning(
-                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
-                )
-
-            if attempt == settings.OLLAMA_MAX_RETRIES:
-                logger.error(
-                    f"Failed to extract profile from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
-                )
-                return None
-
-        return None
-
-    @staticmethod
+    @classmethod
     def call_qwen(
+        cls,
         prompt: str,
         prompt_version: str,
         cache_key: str = "",
     ) -> QwenCVAnalysis | None:
-        if not settings.LLM_ENABLED:
-            logger.info("LLM semantic analysis is disabled via config.")
-            return None
+        return cls._execute_structured_generation(
+            operation="qwen_analysis",
+            prompt=prompt,
+            prompt_version=prompt_version,
+            cache_key=cache_key,
+            response_model=QwenCVAnalysis,
+            think=True,
+            options={"num_predict": 2048, "num_ctx": 4096, "temperature": 0.0},
+        )
 
-        model_name = settings.OLLAMA_MODEL
-
-        if not cache_key:
-            from app.repositories.llm_cache import LLMCacheRepository as LR
-            cache_key = LR.extraction_cache_key(
-                document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-                prompt_version=prompt_version,
-                model_version=model_name,
-                extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
-            )
-
-        # Check Cache First using full entry
-        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
-        if cached_entry is not None:
-            logger.info(
-                f"LLM Cache HIT for model '{model_name}' (v{prompt_version}). Skipping inference."
-            )
-            return QwenCVAnalysis(**cached_entry.structured_data)
-
-        if not prompt.startswith("/think"):
-            prompt = f"/think\n{prompt}"
-
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {
-            "model": model_name,
-            "prompt": prompt,
-            "format": QwenCVAnalysis.model_json_schema(),
-            "stream": False,
-            "think": True,
-            "keep_alive": "30m",
-            "options": {
-                "num_predict": 2048,
-                "num_ctx": 4096,
-                "temperature": 0.0,
-            },
-        }
-
-        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
-            start_time = time.time()
-            try:
-                with httpx.Client(timeout=settings.OLLAMA_REQUEST_TIMEOUT) as client:
-                    response = client.post(url, json=payload)
-                    response.raise_for_status()
-
-                duration_ms = int((time.time() - start_time) * 1000)
-
-                data = response.json()
-                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
-                reasoning = data.get("thinking", "")
-                raw_response = response_text
-
-                # Cleanup potential markdown wrapper if Qwen ignored instructions
-                if response_text.startswith("```json"):
-                    response_text = response_text[7:]
-                elif response_text.startswith("```"):
-                    response_text = response_text[3:]
-                response_text = response_text.removesuffix("```")
-                response_text = response_text.strip()
-
-                parsed_json = json.loads(response_text)
-                validated_result = QwenCVAnalysis(**parsed_json)
-
-                logger.info(
-                    f"LLM Inference SUCCESS: model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
-                )
-
-                entry = LLMCacheEntry(
-                    prompt=prompt,
-                    raw_response=raw_response,
-                    structured_data=parsed_json,
-                    reasoning=reasoning,
-                    processing_time_ms=duration_ms,
-                    token_count=data.get("eval_count", 0),
-                    inference_time_ms=int(data.get("eval_duration", 0) / 1_000_000),
-                    model=model_name,
-                    prompt_version=prompt_version,
-                )
-                LLMCacheRepository.save_cached_entry(cache_key, entry)
-
-                return validated_result
-
-            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
-                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
-                break
-            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
-            except json.JSONDecodeError as exc:
-                logger.warning(
-                    f"Ollama JSON decode error on attempt {attempt}. Raw: {response_text[:100]}... Error: {exc}"
-                )
-            except ValidationError as exc:
-                logger.warning(
-                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
-                )
-
-            if attempt == settings.OLLAMA_MAX_RETRIES:
-                logger.error(
-                    f"Failed to get valid response from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
-                )
-                return None
-
-        return None
-
-    @staticmethod
+    @classmethod
     def call_qwen_dynamic(
+        cls,
         prompt: str,
         prompt_version: str,
         cache_key: str = "",
     ) -> DynamicMappingResponse | None:
-        if not settings.LLM_ENABLED:
-            logger.info("LLM semantic analysis is disabled via config.")
-            return None
-
-        model_name = settings.OLLAMA_MODEL
-
-        if not cache_key:
-            from app.repositories.llm_cache import LLMCacheRepository as LR
-            cache_key = LR.extraction_cache_key(
-                document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-                prompt_version=prompt_version,
-                model_version=model_name,
-                extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
-            )
-
-        # Check Cache First using full entry
-        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
-        if cached_entry is not None:
-            logger.info(
-                f"LLM Cache HIT for dynamic mapping model '{model_name}' (v{prompt_version}). Skipping inference."
-            )
-            return DynamicMappingResponse(**cached_entry.structured_data)
-
-        if not prompt.startswith("/think"):
-            prompt = f"/think\n{prompt}"
-
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {
-            "model": model_name,
-            "prompt": prompt,
-            "format": DynamicMappingResponse.model_json_schema(),
-            "stream": False,
-            "think": True,
-            "keep_alive": "30m",
-            "options": {
-                "num_predict": 2048,
-                "num_ctx": 4096,
-                "temperature": 0.0,
-            },
-        }
-
-        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
-            start_time = time.time()
-            try:
-                with httpx.Client(timeout=settings.OLLAMA_REQUEST_TIMEOUT) as client:
-                    response = client.post(url, json=payload)
-                    response.raise_for_status()
-
-                duration_ms = int((time.time() - start_time) * 1000)
-
-                data = response.json()
-                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
-                reasoning = data.get("thinking", "")
-                raw_response = response_text
-
-                # Cleanup potential markdown wrapper if Qwen ignored instructions
-                if response_text.startswith("```json"):
-                    response_text = response_text[7:]
-                elif response_text.startswith("```"):
-                    response_text = response_text[3:]
-                response_text = response_text.removesuffix("```")
-                response_text = response_text.strip()
-
-                parsed_json = json.loads(response_text)
-                validated_result = DynamicMappingResponse(**parsed_json)
-
-                logger.info(
-                    f"LLM Inference SUCCESS: dynamic mapping model '{model_name}' (v{prompt_version}) took {duration_ms}ms."
-                )
-
-                entry = LLMCacheEntry(
-                    prompt=prompt,
-                    raw_response=raw_response,
-                    structured_data=parsed_json,
-                    reasoning=reasoning,
-                    processing_time_ms=duration_ms,
-                    token_count=data.get("eval_count", 0),
-                    inference_time_ms=int(data.get("eval_duration", 0) / 1_000_000),
-                    model=model_name,
-                    prompt_version=prompt_version,
-                )
-                LLMCacheRepository.save_cached_entry(cache_key, entry)
-
-                return validated_result
-
-            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
-                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
-                break
-            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
-            except json.JSONDecodeError as exc:
-                logger.warning(
-                    f"Ollama JSON decode error on attempt {attempt}. Error: {exc}\n"
-                    f"Tail of response: {response_text[-200:] if len(response_text) > 200 else response_text}"
-                )
-            except ValidationError as exc:
-                logger.warning(
-                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
-                )
-
-            if attempt == settings.OLLAMA_MAX_RETRIES:
-                logger.error(
-                    f"Failed to get valid response from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
-                )
-                return None
-
-        return None
+        return cls._execute_structured_generation(
+            operation="dynamic_mapping",
+            prompt=prompt,
+            prompt_version=prompt_version,
+            cache_key=cache_key,
+            response_model=DynamicMappingResponse,
+            think=True,
+            options={"num_predict": 2048, "num_ctx": 4096, "temperature": 0.0},
+        )
 
     @classmethod
     def run_optimized_match(
@@ -421,160 +120,156 @@ class OllamaLLMService:
         cache_key: str,
         profiler: PipelineProfiler | None = None,
     ) -> OptimizedLLMMatchResponse | None:
-        model_name = settings.OLLAMA_MODEL
-
-        # 1. Check Cache using full entry (preserves metadata on hit)
-        cached_entry = LLMCacheRepository.get_cached_entry(cache_key)
-        if cached_entry is not None:
-            logger.info(
-                f"LLM Cache HIT for optimized match '{model_name}' (v{prompt_version}). "
-                f"Skipping HTTP request."
-            )
-            if profiler:
-                profiler.metrics.cache_hit = True
-                profiler.metrics.ollama_request_ms = cached_entry.processing_time_ms
-                profiler.metrics.model_inference_ms = cached_entry.inference_time_ms
-                profiler.metrics.token_count = cached_entry.token_count
-            return OptimizedLLMMatchResponse(**cached_entry.structured_data)
-
-        if not settings.LLM_ENABLED:
-            logger.info("LLM semantic analysis is disabled via config.")
-            return None
-
-        if not prompt.startswith("/think"):
-            prompt = f"/think\n{prompt}"
-
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {
-            "model": model_name,
-            "prompt": prompt,
-            "format": OptimizedLLMMatchResponse.model_json_schema(),
-            "stream": False,
-            "think": True,
-            "keep_alive": "30m",
-            "options": {
+        return cls._execute_structured_generation(
+            operation="optimized_match",
+            prompt=prompt,
+            prompt_version=prompt_version,
+            cache_key=cache_key,
+            response_model=OptimizedLLMMatchResponse,
+            think=True,
+            options={
                 "num_predict": 4096,
                 "num_ctx": 8192,
                 "temperature": 0.0,
                 "top_p": 0.9,
             },
-        }
+            profiler=profiler,
+        )
 
-        httpx.Timeout(timeout=settings.OLLAMA_REQUEST_TIMEOUT, connect=5.0)
+    @classmethod
+    def _execute_structured_generation(
+        cls,
+        *,
+        operation: str,
+        prompt: str,
+        prompt_version: str,
+        cache_key: str,
+        response_model: type[TModel],
+        think: bool,
+        options: dict[str, Any],
+        profiler: PipelineProfiler | None = None,
+    ) -> TModel | None:
+        model = settings.OLLAMA_MODEL
+        if not settings.LLM_ENABLED:
+            logger.info(f"[OLLAMA] operation={operation} model='{model}' status=DISABLED_FALLBACK")
+            return None
 
-        for attempt in range(1, settings.OLLAMA_MAX_RETRIES + 1):
-            t_req_start = time.perf_counter()
-            logger.info(
-                f"Sending LLM request to Ollama model '{model_name}' (v{prompt_version}) | "
-                f"Prompt: {len(prompt)} chars | Attempt {attempt}/{settings.OLLAMA_MAX_RETRIES}..."
-            )
+        resolved_cache_key = cache_key or LLMCacheRepository.extraction_cache_key(
+            document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            prompt_version=prompt_version,
+            model_version=model,
+            extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
+        )
+
+        cached_entry = LLMCacheRepository.get_cached_entry(resolved_cache_key)
+        if cached_entry is not None:
             try:
-                client = _get_httpx_client(settings.OLLAMA_REQUEST_TIMEOUT)
-                response = client.post(url, json=payload)
-                response.raise_for_status()
-
-                req_duration_ms = round((time.perf_counter() - t_req_start) * 1000.0, 2)
-                data = response.json()
-
-                eval_count = data.get("eval_count", 0)
-                eval_duration_ns = data.get("eval_duration", 0)
-                inference_ms = (
-                    round(eval_duration_ns / 1_000_000.0, 2)
-                    if eval_duration_ns
-                    else req_duration_ms
-                )
-
+                cached = response_model.model_validate(cached_entry.structured_data)
+                _metrics.record_llm_call_prevented()
+                logger.info(f"[OLLAMA] operation={operation} model='{model}' cache=HIT")
                 if profiler:
-                    profiler.metrics.ollama_request_ms = req_duration_ms
-                    profiler.metrics.model_inference_ms = inference_ms
-                    if eval_count:
-                        profiler.metrics.token_count = eval_count
-
-                response_text = data.get("response", "").strip() or data.get("thinking", "").strip()
-                reasoning = data.get("thinking", "")
-                raw_response = response_text
-                if response_text.startswith("```json"):
-                    response_text = response_text[7:]
-                elif response_text.startswith("```"):
-                    response_text = response_text[3:]
-                response_text = response_text.removesuffix("```").strip()
-
-                t_val_start = time.perf_counter()
-                parsed_json = json.loads(response_text)
-                validated_result = OptimizedLLMMatchResponse(**parsed_json)
-                val_duration_ms = round((time.perf_counter() - t_val_start) * 1000.0, 2)
-
-                if profiler:
-                    profiler.metrics.json_validation_ms = val_duration_ms
-
-                logger.info(
-                    f"LLM Optimized Match SUCCESS: model '{model_name}' (v{prompt_version}) "
-                    f"req_time={req_duration_ms}ms, inference_time={inference_ms}ms."
-                )
-
-                # Save full cache entry with all metadata
-                entry = LLMCacheEntry(
-                    prompt=prompt,
-                    raw_response=raw_response,
-                    structured_data=parsed_json,
-                    reasoning=reasoning,
-                    processing_time_ms=req_duration_ms,
-                    token_count=eval_count,
-                    inference_time_ms=int(inference_ms) if inference_ms else 0,
-                    model=model_name,
-                    prompt_version=prompt_version,
-                )
-                LLMCacheRepository.save_cached_entry(cache_key, entry)
-                return validated_result
-
-            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as exc:
-                logger.warning(f"Ollama connection error (service down or unreachable): {exc}")
-                break
-            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-                logger.warning(f"Ollama HTTP error on attempt {attempt}: {exc}")
-            except json.JSONDecodeError as exc:
-                raw_snip = response_text[:500] + ("..." if len(response_text) > 500 else "")
+                    profiler.metrics.cache_hit = True
+                    profiler.metrics.ollama_request_ms = cached_entry.processing_time_ms
+                    profiler.metrics.model_inference_ms = cached_entry.inference_time_ms
+                    profiler.metrics.token_count = cached_entry.token_count
+                return cached
+            except (ValidationError, TypeError, ValueError) as exc:
                 logger.warning(
-                    f"Ollama JSON decode error on attempt {attempt}. Raw: {raw_snip}\nError: {exc}"
+                    f"[OLLAMA] operation={operation} model='{model}' cache=INVALID "
+                    f"error={type(exc).__name__}"
                 )
-            except ValidationError as exc:
-                logger.warning(
-                    f"Ollama Pydantic validation error on attempt {attempt}: {exc}"
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    f"Unexpected error calling Ollama on attempt {attempt}: {exc}", exc_info=True
-                )
+        else:
+            logger.info(f"[OLLAMA] operation={operation} model='{model}' cache=MISS")
 
-            if attempt == settings.OLLAMA_MAX_RETRIES:
-                logger.error(
-                    f"Failed to get valid OptimizedLLMMatchResponse from Ollama after {settings.OLLAMA_MAX_RETRIES} attempts."
-                )
-                return None
+        directive = "/think" if think else "/no_think"
+        normalized_prompt = prompt if prompt.startswith(directive) else f"{directive}\n{prompt}"
+        payload = OllamaTransport.build_generation_payload(
+            model=model,
+            prompt=normalized_prompt,
+            response_schema=response_model.model_json_schema(),
+            think=think,
+            options=options,
+        )
 
-        return None
+        def parse(data: dict[str, Any]) -> _StructuredGeneration:
+            envelope = OllamaGenerateEnvelope.model_validate(data)
+            raw_response = envelope.response.strip() or envelope.thinking.strip()
+            structured_data = OllamaTransport.extract_json(raw_response, operation=operation)
+            if not isinstance(structured_data, dict):
+                raise ValueError("Structured generation must decode to a JSON object.")
+            validation_started = time.perf_counter()
+            validated = response_model.model_validate(structured_data)
+            validation_ms = round((time.perf_counter() - validation_started) * 1000.0, 2)
+            return _StructuredGeneration(
+                validated=validated,
+                structured_data=structured_data,
+                raw_response=raw_response,
+                reasoning=envelope.thinking,
+                envelope=envelope,
+                validation_ms=validation_ms,
+            )
+
+        try:
+            transport_result = OllamaTransport.generate(
+                operation=operation,
+                payload=payload,
+                parser=parse,
+            )
+        except OllamaError as exc:
+            logger.error(
+                f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK "
+                f"error={type(exc).__name__}"
+            )
+            return None
+
+        generation = transport_result.value
+        inference_ms = (
+            round(generation.envelope.eval_duration / 1_000_000.0, 2)
+            if generation.envelope.eval_duration
+            else transport_result.duration_ms
+        )
+        if profiler:
+            profiler.metrics.ollama_request_ms = transport_result.duration_ms
+            profiler.metrics.model_inference_ms = inference_ms
+            profiler.metrics.token_count = generation.envelope.eval_count
+            profiler.metrics.json_validation_ms = generation.validation_ms
+
+        LLMCacheRepository.save_cached_entry(
+            resolved_cache_key,
+            LLMCacheEntry(
+                prompt=normalized_prompt,
+                raw_response=generation.raw_response,
+                structured_data=generation.structured_data,
+                reasoning=generation.reasoning,
+                processing_time_ms=transport_result.duration_ms,
+                token_count=generation.envelope.eval_count,
+                inference_time_ms=int(inference_ms),
+                model=model,
+                prompt_version=prompt_version,
+            ),
+        )
+        return cast(TModel, generation.validated)
 
     @staticmethod
     def unload_model(model_name: str | None = None) -> bool:
-        """
-        Signals Ollama to immediately unload the LLM model from memory (RAM/VRAM)
-        by issuing a POST /api/generate payload with keep_alive: 0.
-        Allows Ollama to go idle immediately when CV matching is finished.
-        """
+        """Compatibility operation for explicit lifecycle shutdowns; no longer called per CV."""
         if not settings.LLM_ENABLED:
             return False
         model = model_name or settings.OLLAMA_MODEL
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {
-            "model": model,
-            "keep_alive": 0,
-        }
         try:
-            client = _get_httpx_client(timeout=10.0)
-            response = client.post(url, json=payload)
-            response.raise_for_status()
-            logger.info(f"Successfully sent idle unload signal to Ollama for model '{model}'.")
+            OllamaTransport.unload(model)
             return True
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"Failed to send unload signal to Ollama for model '{model}': {exc}")
+        except OllamaError as exc:
+            logger.warning(
+                f"[OLLAMA] operation=unload model='{model}' status=FALLBACK "
+                f"error={type(exc).__name__}"
+            )
             return False
+
+    @staticmethod
+    def close_transport() -> None:
+        OllamaTransport.close()
+
+    @staticmethod
+    def get_transport_metrics() -> dict[str, Any]:
+        return OllamaTransport.get_metrics()

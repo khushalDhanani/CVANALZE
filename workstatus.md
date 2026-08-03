@@ -1,9 +1,52 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T13:05:13+05:30
+2026-08-03T13:28:46+05:30
 
-## Current Task — Phase 4 Reliable Background Processing
+## Current Task — Phase 5 Standardize Ollama
+- Added `OllamaTransport` as the only Ollama HTTP boundary for generation, embeddings, tags, and explicit unload operations.
+- Added one process-level pooled `httpx.Client` with configurable connection and keep-alive limits.
+- Centralized generation, embedding, and unload payload construction; Ollama response envelopes; structured JSON extraction; Pydantic validation error mapping;
+  exponential retry/backoff; operation logging; and aggregate/per-operation transport metrics.
+- Applied `OLLAMA_REQUEST_TIMEOUT` and `OLLAMA_MAX_RETRIES` uniformly across every Ollama operation and removed hard-coded embedding timeouts.
+- Routed every structured generation method through one `OllamaLLMService` executor while preserving the legacy public method names, arguments, schemas, cache behavior,
+  profiler metadata, and fallback return types.
+- Kept `EmbeddingService` as the sole embedding boundary and routed both single and batch requests through the shared transport after existing cache lookups.
+- Mapped connection, timeout, HTTP, missing-model, malformed response, and schema-validation failures to typed Ollama errors.
+- Replaced per-CV model unloads with configured request keep-alive and optional process-shutdown unload; the shared HTTP pool always closes at shutdown.
+- Extended startup verification to check each enabled generation/embedding model through the shared tags request.
+- Added Ollama transport metrics additively to the existing cache analytics response.
+- Repaired legacy Ollama tests to target the shared transport and added focused Phase 5 regressions for pooling, cache hits, retries, timeouts, invalid JSON,
+  schema failures, unavailable models, embedding delegation, keep-alive/unload, and disabled-LLM fallback.
+- Added `backend/docs/phase5-standardize-ollama.md`, linked it from the README, and documented all new environment settings.
+- Audited all Ollama integrations before editing; no direct Ollama HTTP client remains outside the shared transport.
+- Per repository instructions, did not run the application, tests, linting, builds, dependency restore, migrations, Docker services, or external services.
+
+## Files Created / Modified for Current Task
+- Created: `backend/app/services/ollama_transport.py`, `backend/tests/test_phase5_ollama_standardization.py`,
+  `backend/docs/phase5-standardize-ollama.md`.
+- Modified service/lifecycle integration: `backend/app/services/llm_service.py`, `backend/app/services/embedding_service.py`,
+  `backend/app/services/cv_service.py`, `backend/app/main.py`.
+- Modified API/configuration: `backend/app/api/analysis.py`, `backend/app/api/analytics.py`, `backend/app/core/config.py`, `backend/.env.example`.
+- Modified deployment/tests/docs/status: `docker-compose.yml`, `backend/tests/test_qwen_llm_service.py`, `README.md`, `workstatus.md`.
+
+## Pending Work
+- Run the focused Phase 5 tests, broader backend suite, Ruff, and an application lifecycle smoke test only when explicitly authorized.
+- Audit external consumers of `extract_candidate_profile`, `call_qwen`, `call_qwen_dynamic`, `unload_model`, and `_get_httpx_client` before removing those compatibility surfaces.
+- Size the connection pool, timeout, retry count, backoff, and keep-alive for production Ollama concurrency and model memory constraints.
+- Continue Phase 0 pending credential rotation and future access-policy enforcement.
+
+## Important Decisions
+- `OLLAMA_MAX_RETRIES` now unambiguously means retries after the initial attempt; the default of `1` permits at most two total attempts.
+- HTTP 404 for a model-scoped request is a non-retryable unavailable-model error; HTTP 408, 429, and 5xx responses are retryable.
+- Generation schema/JSON failures are retryable within the common policy and fall back to the existing `None` contract after exhaustion.
+- `LLM_ENABLED=false` preserves the prior semantic-analysis fallback and bypasses both generation cache access and Ollama transport calls.
+- Cached generation and embedding data remain owned by `LLMCacheRepository` and `EmbeddingService`; the transport owns only HTTP concerns and transport metrics.
+- Normal processing keeps models resident according to `OLLAMA_KEEP_ALIVE`; unload is an explicit compatibility/lifecycle operation, not a per-CV cleanup step.
+- Ollama unload is server-global, so the shutdown unload remains disabled by default and must be coordinated in multi-process API/RQ deployments.
+- Existing API paths and response fields remain compatible; `system_stats.ollama_transport` is additive.
+
+## Previous Task — Phase 4 Reliable Background Processing
 - Replaced direct FastAPI-only upload execution with one shared Redis/RQ submission service for `/api/cv/upload`, `/api/match/upload`, and candidate reprocessing.
 - Added persisted processing-job records before enqueue, including canonical `QUEUED`, `PROCESSING`, `RETRYING`, `COMPLETED`, and `FAILED` transitions.
 - Added content-addressed job identity using canonical CV key, source SHA-256, parser version, and schema version.

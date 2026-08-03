@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 
-import httpx
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
 from app.core.config import settings
@@ -36,7 +35,7 @@ async def check_llm_health():
     from app.services.llm_service import OllamaLLMService
     try:
         model_names = OllamaLLMService.get_available_models()
-        is_healthy = OllamaLLMService.check_health()
+        is_healthy = bool(model_names) or OllamaLLMService.check_health()
         if is_healthy or model_names:
             return {
                 "status": "online",

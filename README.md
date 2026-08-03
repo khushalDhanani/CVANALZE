@@ -11,6 +11,7 @@ See `backend/docs/phase1-secure-uploads.md` for limits, retention, and reprocess
 See `backend/docs/phase2-identity-and-caching.md` for canonical CV identity, collision handling, and cache isolation.
 See `backend/docs/phase3-structured-cv-processing.md` for normalized resume contracts, experience authority, and reusable analysis contexts.
 See `backend/docs/phase4-reliable-background-processing.md` for persisted Redis/RQ jobs, retry states, distributed locking, polling compatibility, and the development fallback.
+See `backend/docs/phase5-standardize-ollama.md` for the pooled Ollama transport, uniform retries/timeouts, structured generation, embeddings, lifecycle, and metrics.
 
 ## Project Structure
 

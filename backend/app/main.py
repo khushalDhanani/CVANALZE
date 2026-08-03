@@ -1,4 +1,3 @@
-import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -123,20 +122,26 @@ async def start_background_warmup():
             "Operating with L1 Memory & File Caching fallback."
         )
 
-    if settings.LLM_ENABLED:
+    if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         try:
             from app.services.llm_service import OllamaLLMService
             models = OllamaLLMService.get_available_models()
             if models:
-                if not any(settings.EMBEDDING_MODEL in m for m in models):
-                    logger.error(
-                        f"[STARTUP CRITICAL] Configured embedding model '{settings.EMBEDDING_MODEL}' is MISSING in Ollama! "
-                        f"Run: ollama pull {settings.EMBEDDING_MODEL}"
-                    )
-                else:
-                    logger.info(f"[STARTUP] Ollama embedding model '{settings.EMBEDDING_MODEL}' verified successfully.")
+                configured_models = []
+                if settings.LLM_ENABLED:
+                    configured_models.append(("generation", settings.OLLAMA_MODEL))
+                if settings.EMBEDDING_ENABLED:
+                    configured_models.append(("embedding", settings.EMBEDDING_MODEL))
+                for purpose, model in configured_models:
+                    if not any(model in available for available in models):
+                        logger.error(
+                            f"[STARTUP CRITICAL] Configured {purpose} model '{model}' is MISSING in Ollama! "
+                            f"Run: ollama pull {model}"
+                        )
+                    else:
+                        logger.info(f"[STARTUP] Ollama {purpose} model '{model}' verified successfully.")
             else:
-                logger.warning("[STARTUP] Ollama server returned no models or is unreachable. Embeddings may fail.")
+                logger.warning("[STARTUP] Ollama server returned no models or is unreachable. LLM operations may fail.")
         except Exception as exc:
             logger.warning(f"[STARTUP] Could not verify Ollama status: {exc}")
 
@@ -144,6 +149,18 @@ async def start_background_warmup():
     thread = threading.Thread(target=_run_background_warmup, daemon=True)
     thread.start()
     logger.info("[WARMUP] Background cache warmup thread started.")
+
+
+@app.on_event("shutdown")
+def close_ollama_lifecycle() -> None:
+    """Apply the configured process-level model lifecycle and close the shared pool."""
+    from app.services.llm_service import OllamaLLMService
+
+    try:
+        if settings.LLM_ENABLED and settings.OLLAMA_UNLOAD_ON_SHUTDOWN:
+            OllamaLLMService.unload_model()
+    finally:
+        OllamaLLMService.close_transport()
 
 
 @app.get("/")
@@ -179,7 +196,7 @@ async def health():
             pg_status = "offline"
 
     ollama_status = "disabled"
-    if settings.LLM_ENABLED:
+    if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         from app.services.llm_service import OllamaLLMService
         ollama_status = "online" if OllamaLLMService.check_health() else "offline"
 
