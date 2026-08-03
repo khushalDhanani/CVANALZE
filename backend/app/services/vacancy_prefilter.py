@@ -8,6 +8,7 @@ from typing import Any
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
+from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.services.dynamic_scoring_prefilter_service import DynamicScoringAndPrefilterService
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
@@ -35,6 +36,7 @@ class CandidateSearchContext:
         candidate_experience: float | None = None,
         cv_embedding: list[float] | None = None,
         resume_json: dict[str, Any] | None = None,
+        analysis_context: CandidateAnalysisContext | None = None,
     ) -> "CandidateSearchContext":
         cv_lower = cv_text.lower()
         cv_tokens = set(re.findall(r"\w+", cv_lower))
@@ -52,9 +54,14 @@ class CandidateSearchContext:
                     logger.warning(f"[PREFILTER] CV embedding generation failed: {e}")
                     cv_embedding = None
 
-        cand_domain, cand_families = TaxonomyClassifier.classify_candidate(
-            cv_text, resume_json=resume_json
-        )
+        if analysis_context is not None:
+            cand_domain = analysis_context.cand_tax_domain
+            cand_families = list(analysis_context.cand_families)
+            candidate_experience = analysis_context.candidate_experience
+        else:
+            cand_domain, cand_families = TaxonomyClassifier.classify_candidate(
+                cv_text, resume_json=resume_json
+            )
 
         return cls(
             cv_text=cv_text,
@@ -184,7 +191,9 @@ class VacancyPreFilter:
         top_k: int | None = None,
         cv_embedding: list[float] | None = None,
         resume_json: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
+        analysis_context: CandidateAnalysisContext | None = None,
+        return_contexts: bool = False,
+    ) -> list[dict[str, Any]] | list[JobEvaluationContext]:
         t_total_start = time.perf_counter()
         if not openings:
             return []
@@ -199,6 +208,8 @@ class VacancyPreFilter:
 
         # Fast exit if total openings <= limit
         if len(job_contexts) <= limit:
+            if return_contexts:
+                return job_contexts
             return [j.raw_job if isinstance(j.raw_job, dict) and j.raw_job else j.__dict__ for j in job_contexts]
 
         # Load prefilter configuration rules ONCE (dynamic MSSQL stop_words & weights)
@@ -210,6 +221,7 @@ class VacancyPreFilter:
             candidate_experience=candidate_experience,
             cv_embedding=cv_embedding,
             resume_json=resume_json,
+            analysis_context=analysis_context,
         )
 
         # STAGE 0: Job Taxonomy Search Space Filtering
@@ -241,8 +253,9 @@ class VacancyPreFilter:
                 job_dict = dict(j.raw_job) if isinstance(j.raw_job, dict) and j.raw_job else dict(j.__dict__)
                 job_dict["_prefilter_score"] = 100.0
                 job_dict["_rrf_details"] = {"rrf_score": 1.0, "stage0_compatible": True}
+                j.raw_job = job_dict
                 res_jobs.append(job_dict)
-            return res_jobs
+            return stage0_jobs if return_contexts else res_jobs
 
         # STAGE 1: Semantic Vector Retrieval (Single pgvector Query Reuse)
         t1 = time.perf_counter()
@@ -341,6 +354,7 @@ class VacancyPreFilter:
 
         # Extract Top-K Selected Jobs & Attach Metadata without shallow dict copies
         selected_results: list[dict[str, Any]] = []
+        selected_contexts: list[JobEvaluationContext] = []
         keyword_only, vector_only, both = 0, 0, 0
 
         for fused_score, rrf_details, job in rrf_scored[:limit]:
@@ -357,7 +371,9 @@ class VacancyPreFilter:
             job_dict = job.raw_job if isinstance(job.raw_job, dict) and job.raw_job else job.__dict__.copy()
             job_dict["_prefilter_score"] = fused_score
             job_dict["_rrf_details"] = rrf_details
+            job.raw_job = job_dict
             selected_results.append(job_dict)
+            selected_contexts.append(job)
 
         total_ms = round((time.perf_counter() - t_total_start) * 1000.0, 2)
 
@@ -368,4 +384,6 @@ class VacancyPreFilter:
             f"Timings: Stage0={t_stage0_ms}ms, Stage1={t_stage1_ms}ms, Lexical={t_lexical_ms}ms, RRF={t_rrf_ms}ms"
         )
 
+        if return_contexts:
+            return selected_contexts
         return selected_results

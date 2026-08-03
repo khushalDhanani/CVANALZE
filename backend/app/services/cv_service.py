@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
+from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import (
     MarkdownGenerator,
     MarkdownResult,
@@ -252,6 +253,7 @@ async def process_cv_file(
             resume_json = ResumeJsonExtractor.extract(
                 markdown_text, quality_metrics, filename=filename
             )
+            normalized_resume = NormalizedResume.model_validate(resume_json["normalized"])
             
             from app.services.experience_calculator import ExperienceCalculator
             calculated_exp = ExperienceCalculator.calculate_total_experience(resume_json, markdown_text)
@@ -289,6 +291,9 @@ async def process_cv_file(
                 candidate_id=cv_key,
                 docling_extraction_ms=docling_duration_ms,
                 cv_embedding=cv_embedding,
+                resume_json=resume_json,
+                normalized_resume=normalized_resume,
+                deterministic_experience=normalized_resume.experience.deterministic_years,
             )
             stage_durations_ms["matching_ms"] = round((asyncio.get_event_loop().time() - t_match_start) * 1000.0, 2)
 
@@ -399,6 +404,7 @@ async def process_cv_file(
                 "stage_durations_ms": stage_durations_ms,
                 "quality_metrics": quality_metrics,
                 "resume_json": resume_json,
+                "normalized_resume": normalized_resume.model_dump(mode="json"),
                 "characters": len(extraction.markdown),
                 "page_count": extraction.page_count,
                 "is_scanned": extraction.is_scanned,

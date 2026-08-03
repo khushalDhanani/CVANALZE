@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.schemas.match import JobMatchResult
+from app.schemas.normalized_resume import NormalizedResume
 
 
 class QwenCVAnalysis(BaseModel):
@@ -165,6 +166,10 @@ class EnrichedCandidateAnalysis(BaseModel):
     llm_skipped: bool = Field(
         default=False,
         description="True if the LLM call was bypassed due to an unambiguous rule-based match",
+    )
+    normalized_resume: NormalizedResume | None = Field(
+        default=None,
+        description="Additive typed resume data with raw/normalized values, confidence, and evidence",
     )
 
 

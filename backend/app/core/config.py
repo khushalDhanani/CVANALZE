@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     THROTTLE_DELAY_SECONDS: float = 1.0
     EXTRACTION_TIMEOUT_SECONDS: float = 300.0
     EXTRACTION_PARSER_VERSION: str = "1.0.0"
-    EXTRACTION_SCHEMA_VERSION: str = "1.0.0"
+    EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
     AUTO_OCR_MIN_TEXT_CHARS: int = 100
 
     # LLM & Semantic Match Configuration

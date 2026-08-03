@@ -4,6 +4,7 @@ from typing import Any
 
 from app.core.rule_config_manager import RuleConfigManager
 from app.schemas.analysis import OptimizedCandidateProfile
+from app.schemas.normalized_resume import NormalizedResume
 from app.schemas.profile import DynamicCandidateProfile
 from app.services.candidate_domain_service import CandidateDomainService
 from app.services.job_taxonomy import TaxonomyClassifier
@@ -27,6 +28,7 @@ class CandidateAnalysisContext:
     dynamic_profile: DynamicCandidateProfile | None = None
     optimized_profile: OptimizedCandidateProfile | None = None
     resume_json: dict[str, Any] | None = field(default=None)
+    normalized_resume: NormalizedResume | None = None
     cand_domain_profile: dict[str, Any] = field(default_factory=dict)
     cand_domain: str = ""
     cand_tax_domain: str = ""
@@ -45,12 +47,17 @@ class CandidateAnalysisContext:
         dynamic_profile: DynamicCandidateProfile | None = None,
         optimized_profile: OptimizedCandidateProfile | None = None,
         resume_json: dict[str, Any] | None = None,
+        normalized_resume: NormalizedResume | None = None,
+        deterministic_experience: float | None = None,
         domain_repository: Any = None,
     ) -> "CandidateAnalysisContext":
         # 1. Normalize CV & Profile Text
         profile_parts = [cv_text]
         current_role = None
-        exp_years = candidate_experience
+        normalized_experience = normalized_resume.experience.deterministic_years if normalized_resume else None
+        exp_years = deterministic_experience if deterministic_experience is not None else normalized_experience
+        if exp_years is None:
+            exp_years = candidate_experience
 
         if optimized_profile:
             profile_parts.extend([
@@ -63,10 +70,6 @@ class CandidateAnalysisContext:
             ])
             current_role = optimized_profile.current_role
             
-            # Prioritize deterministic experience from quality metrics
-            if exp_years is None and resume_json and "quality_metrics" in resume_json:
-                exp_years = resume_json["quality_metrics"].get("experience_years")
-                
             if exp_years is None and optimized_profile.relevant_experience_years is not None:
                 try:
                     exp_years = float(optimized_profile.relevant_experience_years)
@@ -84,15 +87,14 @@ class CandidateAnalysisContext:
             ])
             current_role = dynamic_profile.current_role
             
-            # Prioritize deterministic experience from quality metrics
-            if exp_years is None and resume_json and "quality_metrics" in resume_json:
-                exp_years = resume_json["quality_metrics"].get("experience_years")
-                
             if exp_years is None and dynamic_profile.relevant_experience_years is not None:
                 try:
                     exp_years = float(dynamic_profile.relevant_experience_years)
                 except (ValueError, TypeError):
                     pass
+
+        if not current_role and normalized_resume and normalized_resume.employment:
+            current_role = normalized_resume.employment[0].job_title.normalized_value
 
         if not current_role:
             m = re.search(r"(?:current\s*role|position|title)\s*:\s*([^\n]+)", cv_text, re.IGNORECASE)
@@ -136,6 +138,7 @@ class CandidateAnalysisContext:
             cv_text=cv_text,
             dynamic_profile=dynamic_profile,
             optimized_profile=optimized_profile,
+            resume_json=resume_json,
             domain_repository=domain_repository,
         )
         if optimized_profile and optimized_profile.professional_domains:
@@ -170,6 +173,7 @@ class CandidateAnalysisContext:
             dynamic_profile=dynamic_profile,
             optimized_profile=optimized_profile,
             resume_json=resume_json,
+            normalized_resume=normalized_resume,
             cand_domain_profile=cand_domain_profile,
             cand_domain=cand_domain,
             cand_tax_domain=cand_tax_domain,
@@ -177,4 +181,66 @@ class CandidateAnalysisContext:
             cand_primary_family=cand_primary_family,
             domain_candidate_text=domain_candidate_text,
             is_software_cand=is_software_cand,
+        )
+
+    def apply_optimized_profile(
+        self,
+        optimized_profile: OptimizedCandidateProfile | None,
+        *,
+        domain_repository: Any = None,
+    ) -> None:
+        """Apply LLM enrichment once while keeping deterministic resume values authoritative."""
+        if optimized_profile is None:
+            return
+
+        self.optimized_profile = optimized_profile
+        if optimized_profile.current_role:
+            self.current_role = optimized_profile.current_role
+        if self.candidate_experience is None and optimized_profile.relevant_experience_years is not None:
+            try:
+                self.candidate_experience = float(optimized_profile.relevant_experience_years)
+            except (TypeError, ValueError):
+                pass
+
+        profile_parts = [
+            self.cv_text,
+            *optimized_profile.core_skills,
+            *optimized_profile.inferred_skills,
+            *optimized_profile.professional_domains,
+            optimized_profile.current_role or "",
+            *optimized_profile.education_domains,
+            *optimized_profile.certifications,
+        ]
+        self.norm_text = re.sub(r"[^a-zA-Z0-9\s#+./-]", " ", " ".join(filter(None, profile_parts))).lower()
+        self.norm_text = re.sub(r"\s+", " ", self.norm_text).strip()
+
+        if optimized_profile.professional_domains:
+            self.cand_tax_domain = optimized_profile.professional_domains[0]
+            mapped_families: list[str] = []
+            for rule in RuleConfigManager.get_taxonomy_rules().candidate_rules:
+                if rule.domain == self.cand_tax_domain:
+                    mapped_families.extend(rule.families)
+            self.cand_families = list(dict.fromkeys(mapped_families)) or [self.cand_tax_domain]
+            self.cand_primary_family = self.cand_families[0]
+
+        self.cand_domain_profile = CandidateDomainService.extract_candidate_domain_profile(
+            cv_text=self.cv_text,
+            optimized_profile=optimized_profile,
+            resume_json=self.resume_json,
+            domain_repository=domain_repository,
+        )
+        if optimized_profile.professional_domains:
+            self.cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
+        self.cand_domain = self.cand_domain_profile.get("professional_domain", self.cand_domain)
+        self.domain_candidate_text = CandidateDomainService.build_domain_candidate_text(
+            cv_text=self.cv_text,
+            current_role=self.current_role,
+            optimized_profile=optimized_profile,
+            domain_repository=domain_repository,
+        )
+        guard = RuleConfigManager.get_compiled_cross_domain_guard()
+        self.is_software_cand = (
+            "Information Technology" in self.cand_domain
+            or "Software" in self.cand_domain
+            or any(pattern.search(self.norm_text) for pattern in guard["software_candidate_patterns"])
         )

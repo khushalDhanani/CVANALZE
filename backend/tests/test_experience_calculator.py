@@ -57,8 +57,7 @@ def test_calculate_total_experience_explicit_override():
     exp = ExperienceCalculator.calculate_total_experience(resume_json, cv_text)
     assert exp == 1.9
 
-    # Close match
+    # Close stated values validate the dates but never override them.
     cv_text = "Total Experience: 2.0 years"
-    # Diff is 2.0 - 1.9 = 0.1 <= 1.5. Returns max(1.9, 2.0) = 2.0
     exp = ExperienceCalculator.calculate_total_experience(resume_json, cv_text)
-    assert exp == 2.0
+    assert exp == 1.9

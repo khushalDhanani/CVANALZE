@@ -1,9 +1,49 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T12:21:04+05:30
+2026-08-03T12:45:41+05:30
 
-## Current Task — Phase 2 Correct Identity and Caching
+## Current Task — Phase 3 Strengthen Structured CV Processing
+- Reduced `document_parser.py` to a compatibility façade while moving document conversion, text normalization, deterministic field extraction,
+  resume normalization, and quality metrics into focused service modules.
+- Added typed normalized resume schemas for contacts, skills, education, employment intervals, and experience validation.
+- Added raw values, normalized values, confidence, and evidence while preserving every existing legacy `resume_json` field.
+- Normalized email casing/whitespace, compacted phone representation while retaining the original, canonicalized skill aliases,
+  normalized education degree/domain/institution fields, and added employment date intervals/durations.
+- Made employment dates authoritative for experience, retained stated experience only as validation evidence, and limited LLM experience to fallback use.
+- Passed the already-extracted legacy resume, typed normalized resume, and deterministic experience from `CVService` into `MatchService`.
+- Built one `CandidateAnalysisContext` per match analysis and reused the same `JobEvaluationContext` objects for pre-LLM and final scoring.
+- Removed repeated resume parsing, per-vacancy candidate taxonomy/domain construction, and the final duplicate domain-profile extraction.
+- Added normalized resume data additively to completed CV results and enriched match responses.
+- Bumped `EXTRACTION_SCHEMA_VERSION` to `2.0.0` so older extraction/match cache entries cannot suppress the new structure.
+- Added Phase 3 regressions for façade compatibility, normalized values/evidence, authoritative experience, context reuse, and supplied-resume reuse.
+- Added `backend/docs/phase3-structured-cv-processing.md` and linked it from the README.
+- Per repository instructions, did not run the application, tests, linting, builds, dependency restore, migrations, or external services.
+
+## Files Created / Modified for Current Task
+- Created schemas/services: `backend/app/schemas/normalized_resume.py`, `backend/app/services/document_conversion.py`,
+  `backend/app/services/resume_text_normalizer.py`, `backend/app/services/resume_field_extractor.py`, `backend/app/services/resume_normalizer.py`,
+  `backend/app/services/resume_quality.py`.
+- Created tests/docs: `backend/tests/test_phase3_structured_processing.py`, `backend/docs/phase3-structured-cv-processing.md`.
+- Modified integration: `backend/app/services/document_parser.py`, `backend/app/services/experience_calculator.py`,
+  `backend/app/services/match_service.py`, `backend/app/services/cv_service.py`, `backend/app/services/vacancy_prefilter.py`,
+  `backend/app/schemas/candidate_context.py`, `backend/app/schemas/analysis.py`, `backend/app/schemas/cv.py`, `backend/app/core/config.py`.
+- Modified regression/docs: `backend/tests/test_experience_calculator.py`, `backend/tests/test_cv_idempotency.py`, `README.md`, `workstatus.md`.
+
+## Pending Work
+- Run the focused Phase 3 tests, broader backend suite, and Ruff only when explicitly authorized.
+- Consider regional phone-number enrichment only when a trusted country/region source is available; current normalization intentionally avoids guessing country codes.
+- Continue Phase 0 pending credential rotation and future access-policy enforcement.
+
+## Important Decisions
+- `app.services.document_parser` remains the stable compatibility import surface.
+- Legacy response fields retain raw extracted values; typed normalized data is additive under `resume_json.normalized` and `normalized_resume`.
+- Date-derived experience overrides conflicting or closely matching stated values; LLM experience cannot replace a dated calculation.
+- Candidate and job contexts are created once per analysis and reused across confidence-gate and final scoring passes.
+- `VacancyPreFilter.filter_vacancies` preserves dictionary output by default and returns reusable contexts only when explicitly requested.
+- Ollama generation remains centralized in `OllamaLLMService`; no client, retry, timeout, or cache implementation was duplicated.
+
+## Previous Task — Phase 2 Correct Identity and Caching
 - Added canonical CV identity resolution that prioritizes supplied candidate/CV IDs and preserves normalized filename keys as compatibility aliases.
 - Added collision checks before enqueue and again under the processing lock so unrelated candidates cannot silently overwrite a shared canonical key.
 - Made legacy filename aliases resolve only when they identify one canonical result; ambiguous aliases no longer select an arbitrary candidate.

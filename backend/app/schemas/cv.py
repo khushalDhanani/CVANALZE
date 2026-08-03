@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.schemas.match import CandidateMatchAnalysis
+from app.schemas.normalized_resume import NormalizedResume
 from app.schemas.profile import DynamicCandidateProfile
 
 
@@ -63,6 +64,9 @@ class CVUploadResponse(BaseModel):
     )
     resume_json: dict[str, Any] | None = Field(
         None, description="Normalized structured Resume JSON parsed from extracted text"
+    )
+    normalized_resume: NormalizedResume | None = Field(
+        None, description="Typed additive resume normalization with raw values, confidence, and evidence"
     )
     full_name: str | None = Field(None, description="Extracted candidate full name")
     candidate_name: str | None = Field(None, description="Extracted candidate name")

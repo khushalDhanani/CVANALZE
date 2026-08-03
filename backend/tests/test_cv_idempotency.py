@@ -151,12 +151,12 @@ async def test_schema_version_change_reprocesses(tmp_path, monkeypatch, mock_par
     assert res1["original_status"] == "NEW_CV"
 
     # Simulate schema version upgrade
-    monkeypatch.setattr(settings, "EXTRACTION_SCHEMA_VERSION", "2.0.0")
+    monkeypatch.setattr(settings, "EXTRACTION_SCHEMA_VERSION", "3.0.0")
 
     res2 = await process_cv_file(filename=filename, content=cv_bytes, candidate_id="888")
     assert res2["status"] == "COMPLETED"
     assert res2["original_status"] == "REPROCESSED"
-    assert res2["schema_version"] == "2.0.0"
+    assert res2["schema_version"] == "3.0.0"
     assert mock_parser_and_engine["parser"].call_count == 2
 
     json_files = list(tmp_path.glob("*.json"))

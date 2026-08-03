@@ -67,8 +67,8 @@ class ExperienceCalculator:
 
     @classmethod
     def _extract_date_range(cls, dates_str: str) -> tuple[datetime | None, datetime | None]:
-        # Split by common separators: " - ", " to ", " – "
-        parts = re.split(r"\s*(?:-|to|–|—)\s*", dates_str.lower())
+        # Require a range delimiter boundary so ISO-like values such as 2021-01 stay intact.
+        parts = re.split(r"(?:\s+(?:-|to)\s+|\s*[–—]\s*)", dates_str.lower().strip(), maxsplit=1)
         
         if len(parts) >= 2:
             start_date = cls._parse_date(parts[0], is_end_date=False)
@@ -86,8 +86,25 @@ class ExperienceCalculator:
         Calculates total experience by extracting dates, merging overlapping periods,
         and validating against any explicitly stated experience.
         """
+        intervals = cls.extract_intervals(resume_json)
+        merged_intervals = cls._merge_intervals(intervals)
+        calculated_years = round(sum((end - start).days for start, end in merged_intervals) / 365.25, 1)
+        explicit_years = cls._extract_explicit_experience(cv_text)
+
+        if explicit_years is not None:
+            diff = abs(calculated_years - explicit_years)
+            level = "Significant mismatch" if diff > 1.5 else "Validation match"
+            logger.info(
+                f"[EXPERIENCE] {level}: calculated={calculated_years} years, "
+                f"stated={explicit_years} years. Keeping date-derived value authoritative."
+            )
+
+        return calculated_years
+
+    @classmethod
+    def extract_intervals(cls, resume_json: dict[str, Any]) -> list[tuple[datetime, datetime]]:
+        """Return valid employment intervals without applying stated or LLM experience."""
         intervals: list[tuple[datetime, datetime]] = []
-        
         work_experience = resume_json.get("work_experience") or []
         for job in work_experience:
             dates_str = job.get("dates")
@@ -125,10 +142,17 @@ class ExperienceCalculator:
                 end_date = datetime.now()
                 
             intervals.append((start_date, end_date))
-            
-        # Merge overlapping intervals
+
+        return intervals
+
+    @staticmethod
+    def interval_duration_months(start_date: datetime, end_date: datetime) -> int:
+        return max(0, (end_date.year - start_date.year) * 12 + end_date.month - start_date.month)
+
+    @classmethod
+    def _merge_intervals(cls, intervals: list[tuple[datetime, datetime]]) -> list[tuple[datetime, datetime]]:
         intervals.sort(key=lambda x: x[0])
-        merged_intervals = []
+        merged_intervals: list[tuple[datetime, datetime]] = []
         for interval in intervals:
             if not merged_intervals:
                 merged_intervals.append(interval)
@@ -141,36 +165,7 @@ class ExperienceCalculator:
                     merged_intervals[-1] = (last_start, max(last_end, current_end))
                 else:
                     merged_intervals.append(interval)
-                    
-        # Calculate total days
-        total_days = 0
-        for start, end in merged_intervals:
-            delta = end - start
-            total_days += delta.days
-            
-        calculated_years = total_days / 365.25
-        calculated_years = round(calculated_years, 1)
-        
-        # Extract explicit experience from CV text (first 2000 chars)
-        explicit_years = cls._extract_explicit_experience(cv_text)
-        
-        if explicit_years is not None:
-            # Validate calculated vs explicit
-            diff = abs(calculated_years - explicit_years)
-            if diff > 1.5:
-                logger.warning(
-                    f"[EXPERIENCE] Significant mismatch: Calculated {calculated_years} yrs vs "
-                    f"Explicit {explicit_years} yrs. Defaulting to calculated."
-                )
-                return calculated_years
-            else:
-                logger.info(
-                    f"[EXPERIENCE] Explicit experience matches calculated well "
-                    f"({explicit_years} vs {calculated_years}). Using calculated for precision."
-                )
-                return max(calculated_years, explicit_years)
-                
-        return calculated_years
+        return merged_intervals
 
     @classmethod
     def _extract_explicit_experience(cls, cv_text: str) -> float | None:

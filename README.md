@@ -9,6 +9,7 @@ Legacy `.doc` and plain-text `.txt` uploads are intentionally unsupported.
 Uploads are size-bounded, checked against their declared MIME type and file signature, structurally validated, and persisted under server-generated names before background processing begins.
 See `backend/docs/phase1-secure-uploads.md` for limits, retention, and reprocessing behavior.
 See `backend/docs/phase2-identity-and-caching.md` for canonical CV identity, collision handling, and cache isolation.
+See `backend/docs/phase3-structured-cv-processing.md` for normalized resume contracts, experience authority, and reusable analysis contexts.
 
 ## Project Structure
 

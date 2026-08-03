@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.core.cache import CacheIndex, CacheKey, match_result_cache_manager
 from app.core.config import settings
@@ -13,8 +13,12 @@ from app.repositories.job import JobRepository
 from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
+from app.schemas.candidate_context import CandidateAnalysisContext
+from app.schemas.job_context import JobEvaluationContext
+from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import ResumeJsonExtractor
 from app.services.llm_service import OllamaLLMService
+from app.services.resume_normalizer import ResumeNormalizer
 from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
 
@@ -32,6 +36,9 @@ class MatchService:
         upload_ms: float = 0.0,
         docling_extraction_ms: float = 0.0,
         cv_embedding: list[float] | None = None,
+        resume_json: dict[str, Any] | None = None,
+        normalized_resume: NormalizedResume | None = None,
+        deterministic_experience: float | None = None,
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
         profiler.metrics.upload_ms = upload_ms
@@ -53,13 +60,23 @@ class MatchService:
         extraction_version = f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
 
         # 2. JSON Loading stage timing (parsing CV text input)
-        resume_json = None
         with profiler.time_stage("resume_json"):
-            try:
-                resume_json = ResumeJsonExtractor.extract(cv_text)
-            except Exception as e:
-                logger.warning(f"ResumeJsonExtractor failed in match_service: {e}")
-                resume_json = None
+            if resume_json is None:
+                try:
+                    resume_json = ResumeJsonExtractor.extract(cv_text)
+                except Exception as e:
+                    logger.warning(f"ResumeJsonExtractor failed in match_service: {e}")
+                    resume_json = {}
+            if normalized_resume is None:
+                normalized_payload = resume_json.get("normalized") if resume_json else None
+                normalized_resume = (
+                    NormalizedResume.model_validate(normalized_payload)
+                    if normalized_payload
+                    else ResumeNormalizer.normalize(resume_json or {}, cv_text)
+                )
+
+        if deterministic_experience is None:
+            deterministic_experience = normalized_resume.experience.deterministic_years
 
         from fastapi.concurrency import run_in_threadpool
         # 3. Vacancy retrieval
@@ -72,7 +89,7 @@ class MatchService:
             logger.warning("MatchService.analyze_single_cv: No job openings available for matching.")
             profiler.finish()
             profiler.log_summary()
-            return MatchService._empty_analysis()
+            return MatchService._empty_analysis(normalized_resume=normalized_resume)
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
@@ -106,17 +123,34 @@ class MatchService:
             return EnrichedCandidateAnalysis.model_validate(cached_result)
         profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
 
+        with profiler.time_stage("candidate_context"):
+            candidate_context = CandidateAnalysisContext.create(
+                cv_text=cv_text,
+                candidate_experience=candidate_experience,
+                candidate_ctc=candidate_ctc,
+                resume_json=resume_json,
+                normalized_resume=normalized_resume,
+                deterministic_experience=deterministic_experience,
+                domain_repository=ScoringEngine.domain_repository,
+            )
+
         # 5. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
         with profiler.time_stage("prefilter"):
-            filtered_vacancies = VacancyPreFilter.filter_vacancies(
-                cv_text=cv_text,
-                openings=openings,
-                candidate_experience=candidate_experience,
-                top_k=settings.PREFILTER_TOP_K,
-                cv_embedding=cv_embedding,
-                resume_json=resume_json,
+            filtered_job_contexts = cast(
+                list[JobEvaluationContext],
+                VacancyPreFilter.filter_vacancies(
+                    cv_text=cv_text,
+                    openings=openings,
+                    candidate_experience=candidate_context.candidate_experience,
+                    top_k=settings.PREFILTER_TOP_K,
+                    cv_embedding=cv_embedding,
+                    resume_json=resume_json,
+                    analysis_context=candidate_context,
+                    return_contexts=True,
+                ),
             )
-        profiler.metrics.vacancies_after_filtering = len(filtered_vacancies)
+        filtered_vacancies = [job.raw_job for job in filtered_job_contexts]
+        profiler.metrics.vacancies_after_filtering = len(filtered_job_contexts)
 
 
         # Fetch configuration thresholds once for all jobs to avoid redundant lookups
@@ -140,31 +174,29 @@ class MatchService:
 
         # CONFIDENCE GATE CHECK (Phase 3)
         llm_skipped = False
-        if filtered_vacancies:
+        if filtered_job_contexts:
             pre_llm_matches = []
-            for job in filtered_vacancies:
+            for job_context in filtered_job_contexts:
                 try:
                     pre_llm_match = ScoringEngine.evaluate_job_match(
                         cv_text=cv_text,
-                        job=job,
-                        candidate_experience=candidate_experience,
-                        candidate_ctc=candidate_ctc,
-                        optimized_profile=None,
+                        job=job_context,
                         llm_match=None,
                         scoring_config=scoring_config,
+                        context=candidate_context,
                     )
                     pre_llm_matches.append(pre_llm_match)
                 except Exception as e:
-                    logger.error(f"Error in rule-based matching for job {job.get('id') or job.get('vacancy_id')}: {e}")
+                    logger.error(f"Error in rule-based matching for job {job_context.job_id}: {e}")
                 
             pre_llm_matches.sort(key=lambda m: m.score, reverse=True)
-            top_score = pre_llm_matches[0].score
-            top_coverage = pre_llm_matches[0].coverage
-            second_score = pre_llm_matches[1].score if len(pre_llm_matches) > 1 else 0.0
-            
-            if top_coverage >= settings.LLM_SKIP_COVERAGE_THRESHOLD and (top_score - second_score) >= settings.LLM_SKIP_MARGIN_THRESHOLD:
-                logger.info(f"Unambiguous rule-based match found (Score: {top_score}, Margin: {round(top_score - second_score, 1)}). Skipping LLM.")
-                llm_skipped = True
+            if pre_llm_matches:
+                top_score = pre_llm_matches[0].score
+                top_coverage = pre_llm_matches[0].coverage
+                second_score = pre_llm_matches[1].score if len(pre_llm_matches) > 1 else 0.0
+                if top_coverage >= settings.LLM_SKIP_COVERAGE_THRESHOLD and (top_score - second_score) >= settings.LLM_SKIP_MARGIN_THRESHOLD:
+                    logger.info(f"Unambiguous rule-based match found (Score: {top_score}, Margin: {round(top_score - second_score, 1)}). Skipping LLM.")
+                    llm_skipped = True
 
         optimized_response = None
         optimized_profile = None
@@ -202,6 +234,10 @@ class MatchService:
             )
 
             optimized_profile = optimized_response.candidate_profile if optimized_response else None
+            candidate_context.apply_optimized_profile(
+                optimized_profile,
+                domain_repository=ScoringEngine.domain_repository,
+            )
             if optimized_response:
                 for vm in optimized_response.matched_vacancies:
                     llm_matches_map[str(vm.vacancy_id)] = vm
@@ -210,32 +246,21 @@ class MatchService:
         evaluated_matches = []
         with profiler.time_stage("scoring"):
             
-            # Prefer LLM experience extraction if it's more comprehensive or regex failed
             if optimized_profile:
                 logger.info(f"LLM Extracted Experience: {optimized_profile.relevant_experience_years}, LLM Domain: {optimized_profile.professional_domain}")
-            
-            if optimized_profile and optimized_profile.relevant_experience_years is not None:
-                try:
-                    llm_exp = float(optimized_profile.relevant_experience_years)
-                    curr_exp = float(candidate_experience) if candidate_experience is not None else 0.0
-                    if llm_exp > curr_exp or curr_exp == 0.0:
-                        candidate_experience = llm_exp
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Failed to parse LLM experience: {e}")
 
-            for job in filtered_vacancies:
+            for job_context in filtered_job_contexts:
                 try:
+                    job = job_context.raw_job
                     vac_id_str = str(job.get("vacancy_id") or job.get("id"))
                     llm_match = llm_matches_map.get(vac_id_str)
 
                     job_match = ScoringEngine.evaluate_job_match(
                         cv_text=cv_text,
-                        job=job,
-                        candidate_experience=candidate_experience,
-                        candidate_ctc=candidate_ctc,
-                        optimized_profile=optimized_profile,
+                        job=job_context,
                         llm_match=llm_match,
                         scoring_config=scoring_config,
+                        context=candidate_context,
                     )
 
                     # Wrap into EnrichedJobMatchResult
@@ -318,11 +343,7 @@ class MatchService:
         profiler.finish()
         profiler.log_summary()
 
-        cand_profile = ScoringEngine.extract_candidate_domain_profile(
-            cv_text=cv_text,
-            optimized_profile=optimized_profile,
-            resume_json=resume_json,
-        )
+        cand_profile = candidate_context.cand_domain_profile
         recommended_dept = cand_profile.get("recommended_department", "General")
         professional_domain = cand_profile.get("professional_domain", "General Operations")
         strengths = cand_profile.get("strengths", [])
@@ -386,6 +407,7 @@ class MatchService:
             best_match=best_match,
             suitable_openings=evaluated_matches,
             llm_skipped=llm_skipped,
+            normalized_resume=normalized_resume,
         )
 
         # Cache the match result for instant repeat searches
@@ -432,7 +454,10 @@ class MatchService:
         )
 
     @staticmethod
-    def _empty_analysis(cv_text: str = "") -> EnrichedCandidateAnalysis:
+    def _empty_analysis(
+        cv_text: str = "",
+        normalized_resume: NormalizedResume | None = None,
+    ) -> EnrichedCandidateAnalysis:
         cand_profile = (
             ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
         )
@@ -459,6 +484,7 @@ class MatchService:
             ),
             best_match=best_match,
             suitable_openings=[],
+            normalized_resume=normalized_resume,
         )
 
     @staticmethod
@@ -471,10 +497,22 @@ class MatchService:
 
         cv_hash = data.get("cv_hash", "")
         cand_id = data.get("candidate_id", "")
+        stored_normalized_resume = (
+            NormalizedResume.model_validate(data["normalized_resume"])
+            if data.get("normalized_resume")
+            else None
+        )
         enriched_analysis = await MatchService.analyze_single_cv(
             cv_text,
             document_hash=cv_hash,
             candidate_id=cand_id,
+            resume_json=data.get("resume_json"),
+            normalized_resume=stored_normalized_resume,
+            deterministic_experience=(
+                stored_normalized_resume.experience.deterministic_years
+                if stored_normalized_resume
+                else ((data.get("quality_metrics") or {}).get("experience_years") or None)
+            ),
         )
 
         # Merge back into data
