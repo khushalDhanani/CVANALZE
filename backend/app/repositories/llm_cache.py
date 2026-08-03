@@ -57,16 +57,20 @@ class LLMCacheRepository:
         document_hash: str = "",
         candidate_id: str = "",
         vacancy_ids: list[str] | None = None,
+        vacancy_version: str = "",
         prompt_version: str = "",
         model_version: str = "",
+        extraction_version: str = "",
         matching_version: str = "",
     ) -> str:
         return CacheKey.for_llm_match(
             document_hash=document_hash,
             candidate_id=candidate_id,
             vacancy_ids=vacancy_ids,
+            vacancy_version=vacancy_version,
             prompt_version=prompt_version,
             model_version=model_version,
+            extraction_version=extraction_version,
             matching_version=matching_version,
         ).to_key()
 

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -47,29 +48,11 @@ class MatchService:
                 "OCR could not extract any meaningful content."
             )
 
-        # 2. Match Result Cache Check (instant repeat searches)
-        t_cache_start = asyncio.get_event_loop().time()
-        vacancy_version = JobRepository.get_vacancy_version()
-        match_cache_key = CacheKey.for_match_result(
-            document_hash=document_hash,
-            candidate_id=candidate_id,
-            vacancy_version=vacancy_version,
-            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
-            matching_version=settings.MATCHING_VERSION,
-        ).to_key()
+        document_hash = (document_hash or "").strip() or hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
+        candidate_id = str(candidate_id).strip() if candidate_id else ""
+        extraction_version = f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
 
-        if match_cache_key:
-            cached_result = match_result_cache_manager.get(match_cache_key)
-            if cached_result is not None:
-                logger.info(f"[MATCH_CACHE_HIT] Returning cached match result for doc={document_hash[:12]}...")
-                profiler.metrics.cache_hit = True
-                profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
-                profiler.finish()
-                profiler.log_summary()
-                return EnrichedCandidateAnalysis.model_validate(cached_result)
-        profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
-
-        # 3. JSON Loading stage timing (parsing CV text input)
+        # 2. JSON Loading stage timing (parsing CV text input)
         resume_json = None
         with profiler.time_stage("resume_json"):
             try:
@@ -79,7 +62,7 @@ class MatchService:
                 resume_json = None
 
         from fastapi.concurrency import run_in_threadpool
-        # 2. Vacancy retrieval
+        # 3. Vacancy retrieval
         with profiler.time_stage("vacancy_retrieval"):
             openings = (
                 job_openings if job_openings is not None else await run_in_threadpool(JobRepository.get_all_jobs)
@@ -93,7 +76,37 @@ class MatchService:
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
-        # 3. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
+        vacancy_ids = sorted(
+            str(job.get("vacancy_id") or job.get("id") or "")
+            for job in openings
+            if job.get("vacancy_id") is not None or job.get("id") is not None
+        )
+        vacancy_version = JobRepository.compute_matching_vacancy_version(openings)
+
+        # 4. Match Result Cache Check (instant repeat searches)
+        t_cache_start = asyncio.get_event_loop().time()
+        match_cache_key = CacheKey.for_match_result(
+            document_hash=document_hash,
+            candidate_id=candidate_id,
+            vacancy_version=vacancy_version,
+            vacancy_ids=vacancy_ids,
+            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
+            model_version=settings.OLLAMA_MODEL,
+            extraction_version=extraction_version,
+            matching_version=settings.MATCHING_VERSION,
+        ).to_key()
+
+        cached_result = match_result_cache_manager.get(match_cache_key)
+        if cached_result is not None:
+            logger.info(f"[MATCH_CACHE_HIT] Returning cached match result for doc={document_hash[:12]}...")
+            profiler.metrics.cache_hit = True
+            profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
+            profiler.finish()
+            profiler.log_summary()
+            return EnrichedCandidateAnalysis.model_validate(cached_result)
+        profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
+
+        # 5. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
         with profiler.time_stage("prefilter"):
             filtered_vacancies = VacancyPreFilter.filter_vacancies(
                 cv_text=cv_text,
@@ -167,14 +180,16 @@ class MatchService:
                 profiler.metrics.context_char_count = char_count
 
             # Compute version-aware cache key
-            vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in filtered_vacancies]
+            filtered_vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in filtered_vacancies]
             cache_key = LLMCacheRepository.compute_composite_hash(
                 document_hash=document_hash,
                 candidate_id=candidate_id,
-                vacancy_ids=vacancy_ids,
+                vacancy_ids=filtered_vacancy_ids,
+                vacancy_version=vacancy_version,
                 prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
                 model_version=settings.OLLAMA_MODEL,
-                matching_version=settings.OPTIMIZED_PROMPT_VERSION,
+                extraction_version=extraction_version,
+                matching_version=settings.MATCHING_VERSION,
             )
 
             # 5. Single Optimized LLM Call + Pydantic Validation (with cache check & retries)
@@ -374,12 +389,11 @@ class MatchService:
         )
 
         # Cache the match result for instant repeat searches
-        if match_cache_key:
-            match_result_cache_manager.set(match_cache_key, result.model_dump())
-            CacheIndex.add("match_by_doc", document_hash, match_cache_key)
-            if candidate_id:
-                CacheIndex.add("match_by_cand", candidate_id, match_cache_key)
-            logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
+        match_result_cache_manager.set(match_cache_key, result.model_dump())
+        CacheIndex.add("match_by_doc", document_hash, match_cache_key)
+        if candidate_id:
+            CacheIndex.add("match_by_cand", candidate_id, match_cache_key)
+        logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
 
         return result
 

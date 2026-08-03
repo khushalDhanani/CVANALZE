@@ -74,16 +74,7 @@ def get_candidate_detail(candidate_id: str):
     Retrieve complete parsed candidate result and full match analysis by candidate ID / scan key.
     """
     cid = candidate_id.strip()
-    filename = f"{cid}.json" if not cid.endswith(".json") else cid
-    result = ResultRepository.read_result_by_filename(filename)
-    
-    if not result:
-        # Fallback search by scan_id / stem
-        stem = cid.removesuffix(".json")
-        matches = ResultRepository.find_results_by_scan_id(stem)
-        if matches:
-            first_match = matches[0]
-            result = ResultRepository.read_result(first_match)
+    result = ResultRepository.resolve_result(cid)
 
     if not result:
         raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
@@ -91,7 +82,7 @@ def get_candidate_detail(candidate_id: str):
     if "similar_candidates" not in result or result.get("similar_candidates") is None:
         from app.services.embedding_service import get_candidate_embedding
         from app.services.similar_candidate_service import SimilarCandidateService
-        stem = cid.removesuffix(".json")
+        stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
         cand_emb = get_candidate_embedding(stem)
         if cand_emb:
             result["similar_candidates"] = SimilarCandidateService.detect_similar_candidates(stem, cand_emb)
@@ -107,30 +98,21 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     Invalidate and delete all existing cache entries related to candidate CV,
     preserve original CV file, and reprocess CV from scratch using latest pipeline.
     """
-    from app.core.cache import (
-        cv_result_cache_manager,
-        doc_cache_manager,
-        embedding_cache_manager,
-        llm_cache_manager,
-        match_result_cache_manager,
-    )
+    from app.core.cache import CacheInvalidator, cv_result_cache_manager
     from app.core.config import settings
     from app.core.logging import logger
     from app.services.cv_service import process_cv_file
     from app.services.upload_service import UploadService, UploadValidationError
 
     cid = candidate_id.strip()
-    result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
-    cv_key = result_filename.removesuffix(".json")
-    
-    existing_result = ResultRepository.read_result_by_filename(result_filename)
-    if not existing_result:
-        matches = ResultRepository.find_results_by_scan_id(cv_key)
-        if matches:
-            existing_result = ResultRepository.read_result(matches[0])
+    requested_key = cid.removesuffix(".json")
+    existing_result = ResultRepository.resolve_result(requested_key)
 
     if not existing_result:
-        raise HTTPException(status_code=404, detail=f"Candidate record '{cv_key}' not found.")
+        raise HTTPException(status_code=404, detail=f"Candidate record '{requested_key}' not found.")
+
+    cv_key = str(existing_result.get("id") or existing_result.get("scan_id") or requested_key)
+    result_filename = f"{cv_key}.json"
 
 
     # Prevent duplicate concurrent reprocessing jobs
@@ -172,11 +154,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     cv_result_cache_manager.delete(result_filename)
     cv_result_cache_manager.delete_by_pattern(f"*{cv_key}*")
     if cv_hash:
-        doc_cache_manager.delete(cv_hash)
-        doc_cache_manager.delete_by_pattern(f"*{cv_hash}*")
-        llm_cache_manager.delete_by_pattern(f"*{cv_hash}*")
-        embedding_cache_manager.delete_by_pattern(f"*{cv_hash}*")
-        match_result_cache_manager.delete_by_pattern(f"*{cv_hash}*")
+        CacheInvalidator.invalidate_cv(cv_hash)
 
     # Unlink old result file on disk to ensure fresh reprocessing
     disk_path = settings.RESULTS_DIR / result_filename
@@ -192,6 +170,11 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         "scan_id": cv_key,
         "filename": filename,
         "storage_filename": retained_upload.storage_filename,
+        "candidate_id": existing_result.get("candidate_id"),
+        "cv_id": existing_result.get("cv_id"),
+        "cv_hash": cv_hash,
+        "identity": existing_result.get("identity"),
+        "legacy_cv_keys": existing_result.get("legacy_cv_keys") or [],
         "status": "processing",
         "message": "10% - Caches purged. Reprocessing CV from scratch...",
         "progress": 10,

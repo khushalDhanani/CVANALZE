@@ -1,6 +1,6 @@
 import asyncio
 import hashlib
-import re
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -8,8 +8,9 @@ from typing import Any
 from redis import Redis
 from rq import Queue
 
-from app.core.cache import CacheInvalidator
+from app.core.cache import CacheIndex, CacheInvalidator, CacheKey, doc_cache_manager
 from app.core.config import settings
+from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
 from app.services.document_parser import (
@@ -20,8 +21,6 @@ from app.services.document_parser import (
 )
 from app.services.embedding_service import EmbeddingService
 from app.services.upload_service import UploadService
-
-from contextlib import asynccontextmanager
 
 _cv_locks: dict[str, asyncio.Lock] = {}
 _MAX_CV_LOCKS = 1000
@@ -68,16 +67,8 @@ def get_stable_cv_key(
     candidate_id: str | int | None = None,
     cv_id: str | int | None = None,
 ) -> str:
-    """
-    Returns a single deterministic, canonical cv_key for a given CV filename.
-    Standardizes on cv_{safe_stem} across all upload routes (/cv/upload, /match/upload)
-    and processing lifecycle stages (interim status, final save, status polling).
-    """
-    raw_stem = Path(filename).stem
-    safe_stem = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_stem)
-    if safe_stem.lower().startswith("cv_"):
-        safe_stem = safe_stem[3:]
-    return f"cv_{safe_stem}"
+    """Return the canonical ID-based key, falling back to the legacy filename key."""
+    return resolve_cv_identity(filename, candidate_id, cv_id).canonical_key
 
 
 
@@ -91,10 +82,12 @@ async def process_cv_file(
     force_reprocess: bool = False,
     storage_filename: str | None = None,
 ) -> dict[str, Any]:
-    cv_key = get_stable_cv_key(filename, candidate_id, cv_id)
+    identity = resolve_cv_identity(filename, candidate_id, cv_id)
+    cv_key = identity.canonical_key
     cv_hash = hashlib.sha256(content).hexdigest()
     result_filename = f"{cv_key}.json"
-    result_path = settings.RESULTS_DIR / result_filename
+    identity_metadata = identity.to_metadata()
+    legacy_cv_keys = [identity.legacy_key]
 
     async with get_cv_lock(cv_key):
         current_stage = "initialization"
@@ -102,6 +95,12 @@ async def process_cv_file(
         stage_durations_ms: dict[str, float] = {}
 
         try:
+            await asyncio.to_thread(
+                ResultRepository.assert_identity_available,
+                identity,
+                cv_hash,
+                allow_legacy_content_change=force_reprocess,
+            )
             existing_data = await asyncio.to_thread(ResultRepository.read_result_by_filename, result_filename)
 
             if existing_data and not force_reprocess and existing_data.get("status") != "FAILED":
@@ -127,6 +126,8 @@ async def process_cv_file(
                     existing_data["stage"] = "complete"
                     existing_data["is_complete"] = True
                     existing_data["storage_filename"] = storage_filename or existing_data.get("storage_filename")
+                    existing_data["identity"] = identity_metadata
+                    existing_data["legacy_cv_keys"] = legacy_cv_keys
                     
                     # 1. Disk/Cache Persistence Parity
                     saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, existing_data)
@@ -186,6 +187,11 @@ async def process_cv_file(
                     "stage": stage,
                     "filename": filename,
                     "storage_filename": storage_filename,
+                    "candidate_id": identity.candidate_id,
+                    "cv_id": identity.cv_id,
+                    "cv_hash": cv_hash,
+                    "identity": identity_metadata,
+                    "legacy_cv_keys": legacy_cv_keys,
                 }
                 try:
                     await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, interim_data)
@@ -200,43 +206,35 @@ async def process_cv_file(
 
             # Markdown Generation & Persistence stage
             t_doc_start = asyncio.get_event_loop().time()
-            md_filename = f"{cv_key}.md"
-            md_path = settings.RESULTS_DIR / md_filename
-            
-            if md_path.exists() and not force_reprocess:
-                logger.info(f"[MD_CACHE_HIT] Reading existing markdown from '{md_filename}'.")
-                markdown_text = await asyncio.to_thread(md_path.read_text, encoding="utf-8")
-                
-                stage_metrics = existing_data.get("stage_metrics", {}) if existing_data else {}
-                page_count = existing_data.get("page_count", 1) if existing_data else 1
-                is_scanned = existing_data.get("is_scanned", False) if existing_data else False
-                ocr_applied = existing_data.get("ocr_applied", False) if existing_data else False
-                pdf_type = existing_data.get("pdf_type", "NON_PDF") if existing_data else "NON_PDF"
-                parser_used = existing_data.get("parser_used", "cached") if existing_data else "cached"
-                ocr_decision = existing_data.get("ocr_decision", "cached") if existing_data else "cached"
-                
-                extraction = MarkdownResult(
-                    markdown=markdown_text,
-                    page_count=page_count,
-                    is_scanned=is_scanned,
-                    ocr_applied=ocr_applied,
-                    pdf_type=pdf_type,
-                    parser_used=parser_used,
-                    ocr_decision=ocr_decision,
-                    stage_metrics=stage_metrics,
-                )
-            else:
+            document_cache_key = CacheKey.for_document_extraction(
+                document_hash=cv_hash,
+                parser_version=settings.EXTRACTION_PARSER_VERSION,
+                schema_version=settings.EXTRACTION_SCHEMA_VERSION,
+            ).to_key()
+            cached_extraction = None
+            if not force_reprocess:
+                cached_extraction = await asyncio.to_thread(doc_cache_manager.get, document_cache_key)
+
+            if isinstance(cached_extraction, dict):
+                try:
+                    extraction = MarkdownResult.from_dict(cached_extraction)
+                    logger.info(f"[MD_CACHE_HIT] Reusing versioned extraction for doc={cv_hash[:12]}...")
+                except Exception as cache_exc:
+                    logger.warning(f"Invalid cached extraction for doc={cv_hash[:12]}: {cache_exc}")
+                    cached_extraction = None
+
+            if not isinstance(cached_extraction, dict):
                 extraction = await asyncio.to_thread(
                     MarkdownGenerator.generate_with_timeout,
                     filename=filename,
                     content=content,
                     timeout_seconds=timeout_seconds,
                 )
-                markdown_text = extraction.markdown
-                settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-                await asyncio.to_thread(md_path.write_text, markdown_text, encoding="utf-8")
-                logger.info(f"[MD_SAVED] Saved generated markdown to '{md_filename}'.")
-                
+                await asyncio.to_thread(doc_cache_manager.set, document_cache_key, extraction.to_dict())
+                logger.info(f"[MD_CACHE_SET] Cached versioned extraction for doc={cv_hash[:12]}...")
+
+            CacheIndex.add("doc_by_hash", cv_hash, document_cache_key)
+            markdown_text = extraction.markdown
             docling_duration_ms = round((asyncio.get_event_loop().time() - t_doc_start) * 1000.0, 2)
             stage_durations_ms["docling_parsing_ms"] = docling_duration_ms
             
@@ -288,7 +286,7 @@ async def process_cv_file(
             match_analysis = await MatchService.analyze_single_cv(
                 extraction.markdown,
                 document_hash=cv_hash,
-                candidate_id=str(candidate_id) if candidate_id is not None else "",
+                candidate_id=cv_key,
                 docling_extraction_ms=docling_duration_ms,
                 cv_embedding=cv_embedding,
             )
@@ -358,12 +356,14 @@ async def process_cv_file(
                 "id": cv_key,
                 "scan_id": cv_key,
                 "parsed_at": now_iso,
-                "candidate_id": str(candidate_id) if candidate_id is not None else None,
-                "cv_id": str(cv_id) if cv_id is not None else None,
+                "candidate_id": identity.candidate_id,
+                "cv_id": identity.cv_id,
                 "filename": filename,
                 "storage_filename": storage_filename,
                 "content_type": content_type,
                 "cv_hash": cv_hash,
+                "identity": identity_metadata,
+                "legacy_cv_keys": legacy_cv_keys,
                 "full_name": extracted_name if extracted_name != "Unknown Candidate" else None,
                 "candidate_name": extracted_name if extracted_name != "Unknown Candidate" else None,
                 "email": email,
@@ -427,6 +427,10 @@ async def process_cv_file(
 
             return result_data
 
+        except CVIdentityCollisionError:
+            UploadService.remove_stored_upload(storage_filename)
+            logger.warning(f"Rejected colliding CV identity '{cv_key}' without altering its existing result.")
+            raise
         except Exception as exc:
             import traceback
             error_details = traceback.format_exc()
@@ -449,8 +453,11 @@ async def process_cv_file(
                 "filename": filename,
                 "storage_filename": storage_filename,
                 "content_type": content_type,
-                "candidate_id": str(candidate_id) if candidate_id is not None else None,
-                "cv_id": str(cv_id) if cv_id is not None else None,
+                "cv_hash": cv_hash,
+                "identity": identity_metadata,
+                "legacy_cv_keys": legacy_cv_keys,
+                "candidate_id": identity.candidate_id,
+                "cv_id": identity.cv_id,
                 "parsed_at": now_iso,
                 "created_at": now_iso,
                 "updated_at": now_iso,

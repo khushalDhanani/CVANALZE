@@ -1,3 +1,4 @@
+import hashlib
 import json
 import time
 
@@ -74,8 +75,10 @@ class OllamaLLMService:
         if not cache_key:
             from app.repositories.llm_cache import LLMCacheRepository as LR
             cache_key = LR.extraction_cache_key(
+                document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
                 prompt_version=prompt_version,
                 model_version=model_name,
+                extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
             )
 
         # Check Cache First using full entry
@@ -190,8 +193,10 @@ class OllamaLLMService:
         if not cache_key:
             from app.repositories.llm_cache import LLMCacheRepository as LR
             cache_key = LR.extraction_cache_key(
+                document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
                 prompt_version=prompt_version,
                 model_version=model_name,
+                extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
             )
 
         # Check Cache First using full entry
@@ -305,8 +310,10 @@ class OllamaLLMService:
         if not cache_key:
             from app.repositories.llm_cache import LLMCacheRepository as LR
             cache_key = LR.extraction_cache_key(
+                document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
                 prompt_version=prompt_version,
                 model_version=model_name,
+                extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
             )
 
         # Check Cache First using full entry
@@ -571,4 +578,3 @@ class OllamaLLMService:
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Failed to send unload signal to Ollama for model '{model}': {exc}")
             return False
-

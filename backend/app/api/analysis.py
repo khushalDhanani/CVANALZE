@@ -4,6 +4,7 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
 from app.core.config import settings
+from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.job import JobRepository
 from app.repositories.result import ResultRepository
@@ -14,7 +15,7 @@ from app.schemas.analysis import (
     TrainingExample,
 )
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse
-from app.services.cv_service import get_stable_cv_key, process_cv_file
+from app.services.cv_service import process_cv_file
 from app.services.match_service import MatchService
 from app.services.upload_service import UploadService, UploadValidationError
 
@@ -87,9 +88,11 @@ async def upload_and_analyze(
     """Upload CV, parse with Docling, and perform LLM-enriched semantic matching in background."""
     try:
         normalized = UploadService.normalize_filename(file.filename)
-        cv_key = get_stable_cv_key(normalized.safe_filename)
+        identity = resolve_cv_identity(normalized.safe_filename)
+        cv_key = identity.canonical_key
         accepted = await UploadService.accept_and_persist(file, storage_key=cv_key)
         try:
+            ResultRepository.assert_identity_available(identity, accepted.content_hash)
             background_tasks.add_task(
                 background_upload_and_analyze,
                 filename=accepted.safe_filename,
@@ -98,7 +101,8 @@ async def upload_and_analyze(
                 storage_filename=accepted.storage_filename,
             )
         except Exception:
-            UploadService.remove_stored_upload(accepted.storage_filename)
+            if not accepted.was_already_stored:
+                UploadService.remove_stored_upload(accepted.storage_filename)
             raise
 
         return CVProcessingResponse(
@@ -108,6 +112,8 @@ async def upload_and_analyze(
             progress=10
         )
 
+    except CVIdentityCollisionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except UploadValidationError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except Exception as exc:

@@ -52,6 +52,7 @@ class AcceptedUpload:
     content_hash: str
     content: bytes
     path: Path
+    was_already_stored: bool
 
 
 @dataclass(frozen=True)
@@ -105,7 +106,7 @@ class UploadService:
         )
         content_hash = hashlib.sha256(content).hexdigest()
         storage_filename = cls._storage_filename(storage_key, content_hash, normalized.extension)
-        path = await asyncio.to_thread(cls._persist_atomically, storage_filename, content)
+        path, was_already_stored = await asyncio.to_thread(cls._persist_atomically, storage_filename, content)
         try:
             await asyncio.to_thread(cls.cleanup_expired)
         except OSError as exc:
@@ -120,6 +121,7 @@ class UploadService:
             content_hash=content_hash,
             content=content,
             path=path,
+            was_already_stored=was_already_stored,
         )
 
     @classmethod
@@ -338,10 +340,11 @@ class UploadService:
         return f"{safe_key}_{content_hash}.{extension}"
 
     @classmethod
-    def _persist_atomically(cls, storage_filename: str, content: bytes) -> Path:
+    def _persist_atomically(cls, storage_filename: str, content: bytes) -> tuple[Path, bool]:
         uploads_dir = settings.UPLOADS_DIR.resolve()
         uploads_dir.mkdir(parents=True, exist_ok=True)
         target = cls._contained_path(storage_filename)
+        was_already_stored = target.is_file()
         file_descriptor, temporary_name = tempfile.mkstemp(prefix=".upload-", suffix=".tmp", dir=uploads_dir)
         temporary_path = Path(temporary_name)
         try:
@@ -354,7 +357,7 @@ class UploadService:
             if temporary_path.exists():
                 temporary_path.unlink()
         logger.info(f"Persisted validated raw upload as '{target.name}'.")
-        return target
+        return target, was_already_stored
 
     @classmethod
     def _contained_path(cls, filename: str) -> Path:

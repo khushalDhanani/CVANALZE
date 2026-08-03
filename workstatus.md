@@ -1,9 +1,46 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T11:56:32+05:30
+2026-08-03T12:21:04+05:30
 
-## Current Task — Phase 1 Secure Uploads
+## Current Task — Phase 2 Correct Identity and Caching
+- Added canonical CV identity resolution that prioritizes supplied candidate/CV IDs and preserves normalized filename keys as compatibility aliases.
+- Added collision checks before enqueue and again under the processing lock so unrelated candidates cannot silently overwrite a shared canonical key.
+- Made legacy filename aliases resolve only when they identify one canonical result; ambiguous aliases no longer select an arbitrary candidate.
+- Replaced filename-based Markdown reuse with `doc_cache_manager` entries keyed by document SHA-256, parser version, and schema version.
+- Added indexed invalidation for versioned document extractions and routed candidate reprocessing through the centralized cache invalidator.
+- Made `MatchService` compute SHA-256 for raw text when no document hash is supplied.
+- Expanded final-match and optimized-LLM cache keys with document hash, canonical candidate identity, vacancy content version/IDs, prompt version,
+  model, extraction version, and `MATCHING_VERSION`.
+- Added full-vacancy-content version hashing so changed requirements isolate cached results even when vacancy IDs/titles remain unchanged.
+- Isolated generic Ollama extraction fallbacks by prompt digest, prompt/model versions, and extraction version while retaining `OllamaLLMService` as the centralized client.
+- Added cache-isolation, changed-content, identity-collision, legacy-alias, vacancy-version, and raw-text-hash regression tests.
+- Documented the new identity, collision, compatibility, and cache contracts in `backend/docs/phase2-identity-and-caching.md`.
+- Per repository instructions, did not run the application, tests, linting, builds, dependency restore, migrations, or external services.
+
+## Files Created / Modified for Current Task
+- Created: `backend/app/core/cv_identity.py`, `backend/docs/phase2-identity-and-caching.md`, `backend/tests/test_phase2_identity_cache.py`.
+- Modified core/repositories: `backend/app/core/cache.py`, `backend/app/repositories/job.py`, `backend/app/repositories/llm_cache.py`,
+  `backend/app/repositories/result.py`.
+- Modified services/APIs: `backend/app/services/cv_service.py`, `backend/app/services/match_service.py`, `backend/app/services/llm_service.py`,
+  `backend/app/services/upload_service.py`, `backend/app/api/cv.py`, `backend/app/api/analysis.py`, `backend/app/api/candidates.py`, `backend/app/api/batch.py`.
+- Modified tests/docs: `backend/tests/test_cv_idempotency.py`, `backend/tests/test_audit_fixes.py`, `README.md`, `workstatus.md`.
+
+## Pending Work
+- Run the focused Phase 2 tests, broader backend suite, and Ruff only when explicitly authorized.
+- Decide whether ambiguous legacy filename aliases should receive a dedicated canonical HTTP error contract in a later API-contract phase.
+- Remove ignored legacy `{cv_key}.md` artifacts through a separate operational migration if disk cleanup is desired.
+- Continue Phase 0 pending credential rotation and future access-policy enforcement.
+
+## Important Decisions
+- Supplied candidate/CV IDs define identity; filename-derived keys are canonical only when no IDs are supplied.
+- The same supplied identity may receive changed content, while changed filename-only content returns HTTP 409 unless explicitly reprocessed.
+- Legacy aliases are compatibility lookups, not ownership keys, and resolve only when unambiguous.
+- Document extraction cache entries are content- and version-addressed; old result-directory Markdown files are never reused.
+- Complete vacancy content is hashed separately from the existing lightweight repository staleness version to avoid altering current vacancy-cache behavior.
+- Existing upload acknowledgements and polling response shapes remain unchanged.
+
+## Previous Task — Phase 1 Secure Uploads
 - Added `UploadService` as the single upload acceptance path for `/api/cv/upload` and `/api/match/upload`.
 - Replaced unbounded upload reads with configurable bounded chunk reads and HTTP 413 responses at the configured size limit.
 - Added cross-platform basename extraction, Unicode/character normalization, deterministic CV keys, and content-addressed server storage names.

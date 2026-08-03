@@ -53,9 +53,9 @@ def mock_parser_and_engine(monkeypatch):
 
 
 def test_get_stable_cv_key():
-    assert get_stable_cv_key("resume.pdf", 101, 501) == "cv_resume"
-    assert get_stable_cv_key("resume.pdf", candidate_id=101) == "cv_resume"
-    assert get_stable_cv_key("resume.pdf", cv_id=501) == "cv_resume"
+    assert get_stable_cv_key("resume.pdf", 101, 501) == "cv_candidate_101_document_501"
+    assert get_stable_cv_key("resume.pdf", candidate_id=101) == "cv_candidate_101"
+    assert get_stable_cv_key("resume.pdf", cv_id=501) == "cv_document_501"
     assert get_stable_cv_key("john_doe_cv.pdf") == "cv_john_doe_cv"
 
 
@@ -76,14 +76,14 @@ async def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mo
 
     assert res1["status"] == "COMPLETED"
     assert res1["original_status"] == "NEW_CV"
-    assert res1["id"] == "cv_jane_doe"
+    assert res1["id"] == "cv_candidate_user_123_document_cv_456"
     assert res1["cv_hash"] is not None
     assert res1["created_at"] is not None
     assert res1["updated_at"] is not None
     assert mock_parser_and_engine["parser"].call_count == 1
     assert mock_parser_and_engine["match"].await_count == 1
 
-    expected_json_path = tmp_path / "cv_jane_doe.json"
+    expected_json_path = tmp_path / "cv_candidate_user_123_document_cv_456.json"
     assert expected_json_path.is_file()
 
     # Reset mock call count
@@ -109,7 +109,7 @@ async def test_cv_processing_idempotency_and_cache_hit(tmp_path, monkeypatch, mo
     # Ensure no duplicate JSON files were created
     json_files = list(tmp_path.glob("*.json"))
     assert len(json_files) == 1
-    assert json_files[0].name == "cv_jane_doe.json"
+    assert json_files[0].name == "cv_candidate_user_123_document_cv_456.json"
 
 
 @pytest.mark.asyncio
@@ -135,7 +135,8 @@ async def test_cv_content_change_reprocesses(tmp_path, monkeypatch, mock_parser_
 
     json_files = list(tmp_path.glob("*.json"))
     assert len(json_files) == 1
-    assert json_files[0].name == "cv_resume.json"
+    assert json_files[0].name == "cv_candidate_777.json"
+    assert mock_parser_and_engine["parser"].call_count == 2
 
 
 @pytest.mark.asyncio
@@ -156,6 +157,7 @@ async def test_schema_version_change_reprocesses(tmp_path, monkeypatch, mock_par
     assert res2["status"] == "COMPLETED"
     assert res2["original_status"] == "REPROCESSED"
     assert res2["schema_version"] == "2.0.0"
+    assert mock_parser_and_engine["parser"].call_count == 2
 
     json_files = list(tmp_path.glob("*.json"))
     assert len(json_files) == 1
@@ -182,4 +184,17 @@ async def test_concurrent_processing_protection(tmp_path, monkeypatch, mock_pars
     # Exactly 1 JSON file created
     json_files = list(tmp_path.glob("*.json"))
     assert len(json_files) == 1
-    assert json_files[0].name == "cv_concurrent_resume.json"
+    assert json_files[0].name == "cv_candidate_c_concurrent_document_cv_concurrent.json"
+
+
+@pytest.mark.asyncio
+async def test_same_filename_different_candidates_do_not_overwrite(tmp_path, monkeypatch, mock_parser_and_engine):
+    monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
+
+    first = await process_cv_file("resume.pdf", b"Candidate one", candidate_id="candidate-1", cv_id="cv-1")
+    second = await process_cv_file("resume.pdf", b"Candidate two", candidate_id="candidate-2", cv_id="cv-2")
+
+    assert first["id"] == "cv_candidate_candidate-1_document_cv-1"
+    assert second["id"] == "cv_candidate_candidate-2_document_cv-2"
+    assert first["id"] != second["id"]
+    assert len(list(tmp_path.glob("*.json"))) == 2

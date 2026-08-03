@@ -503,35 +503,41 @@ def test_match_result_cache_key_includes_version_components():
 
     key_a = CacheKey.for_match_result(
         document_hash="abc", candidate_id="1",
-        vacancy_version="v1", prompt_version="p1", matching_version="m1",
+        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
+        model_version="model1", extraction_version="extract1", matching_version="m1",
     ).to_key()
     key_b = CacheKey.for_match_result(
         document_hash="abc", candidate_id="1",
-        vacancy_version="v1", prompt_version="p1", matching_version="m1",
+        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
+        model_version="model1", extraction_version="extract1", matching_version="m1",
     ).to_key()
     assert key_a == key_b, "Same components must produce same key"
 
     key_c = CacheKey.for_match_result(
         document_hash="abc", candidate_id="1",
-        vacancy_version="v2", prompt_version="p1", matching_version="m1",
+        vacancy_version="v2", vacancy_ids=["10"], prompt_version="p1",
+        model_version="model1", extraction_version="extract1", matching_version="m1",
     ).to_key()
     assert key_a != key_c, "Different vacancy version must produce different key"
 
     key_d = CacheKey.for_match_result(
         document_hash="abc", candidate_id="1",
-        vacancy_version="v1", prompt_version="p2", matching_version="m1",
+        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p2",
+        model_version="model1", extraction_version="extract1", matching_version="m1",
     ).to_key()
     assert key_a != key_d, "Different prompt version must produce different key"
 
     key_e = CacheKey.for_match_result(
         document_hash="abc", candidate_id="1",
-        vacancy_version="v1", prompt_version="p1", matching_version="m2",
+        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
+        model_version="model1", extraction_version="extract1", matching_version="m2",
     ).to_key()
     assert key_a != key_e, "Different matching version must produce different key"
 
     key_f = CacheKey.for_match_result(
         document_hash="xyz", candidate_id="1",
-        vacancy_version="v1", prompt_version="p1", matching_version="m1",
+        vacancy_version="v1", vacancy_ids=["10"], prompt_version="p1",
+        model_version="model1", extraction_version="extract1", matching_version="m1",
     ).to_key()
     assert key_a != key_f, "Different document hash must produce different key"
 

@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from app.core.cache import _REDIS_CLIENT, cv_result_cache_manager
+from app.core.cache import CacheIndex, _REDIS_CLIENT, cv_result_cache_manager
 from app.core.config import settings
+from app.core.cv_identity import CVIdentity, CVIdentityCollisionError
 from app.core.logging import logger
 
 
@@ -23,6 +24,8 @@ class ResultRepository:
     @classmethod
     def atomic_save_result(cls, filename: str, data: dict[str, Any]) -> Path | str:
         cv_result_cache_manager.set(filename, data, ttl=cls.CACHE_TTL_SECONDS)
+        for legacy_key in data.get("legacy_cv_keys") or []:
+            CacheIndex.add("cv_legacy_alias", str(legacy_key).lower(), filename)
 
         settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         result_path = (settings.RESULTS_DIR / filename).resolve()
@@ -78,6 +81,38 @@ class ResultRepository:
         return None
 
     @classmethod
+    def assert_identity_available(
+        cls,
+        identity: CVIdentity,
+        content_hash: str,
+        *,
+        allow_legacy_content_change: bool = False,
+    ) -> None:
+        existing = cls.read_result_by_filename(f"{identity.canonical_key}.json")
+        if existing is None:
+            return
+
+        existing_candidate_id = cls._optional_str(existing.get("candidate_id"))
+        existing_cv_id = cls._optional_str(existing.get("cv_id"))
+        if identity.uses_supplied_ids:
+            if existing_candidate_id == identity.candidate_id and existing_cv_id == identity.cv_id:
+                return
+        elif existing_candidate_id is None and existing_cv_id is None:
+            if existing.get("cv_hash") == content_hash or allow_legacy_content_change:
+                return
+
+        raise CVIdentityCollisionError(
+            f"CV identity collision for '{identity.canonical_key}'. Supply distinct candidate_id/cv_id values or reprocess the existing record."
+        )
+
+    @staticmethod
+    def _optional_str(value: Any) -> str | None:
+        if value is None:
+            return None
+        cleaned = str(value).strip()
+        return cleaned or None
+
+    @classmethod
     def resolve_result(cls, cv_key: str) -> dict[str, Any] | None:
         """
         Idempotently resolves result dictionary by cv_key, handling prefix variations (cv_ / CV_),
@@ -107,7 +142,7 @@ class ResultRepository:
             if alt_res and alt_res.get("status") not in ("processing", None):
                 return alt_res
 
-        # 3. Fallback search by scan_id / glob
+        # 3. Fallback search by exact stored scan ID.
         matches = cls.find_results_by_scan_id(stem)
         if matches:
             for match in matches:
@@ -117,6 +152,14 @@ class ResultRepository:
                         return alt_res
                 except Exception as exc:
                     logger.warning(f"Failed loading matched result for stem {stem}: {exc}")
+
+        # 4. Legacy filename aliases resolve only when unambiguous.
+        alias_matches = cls._find_results_by_legacy_alias(stem)
+        if len(alias_matches) == 1:
+            return alias_matches[0]
+        if len(alias_matches) > 1:
+            logger.warning(f"Legacy CV key '{stem}' is ambiguous across {len(alias_matches)} canonical identities.")
+            return None
 
         # Return direct_res (even if processing) if no completed result was found anywhere
         if direct_res:
@@ -137,16 +180,59 @@ class ResultRepository:
                 pattern = f"cv_result:*{scan_id}*.json"
                 while True:
                     cursor, keys = _REDIS_CLIENT.scan(cursor=cursor, match=pattern, count=100)
-                    results.extend([f"redis://{k}" for k in keys])
+                    for key in keys:
+                        redis_path = f"redis://{key}"
+                        try:
+                            data = cls.read_result(redis_path)
+                            if cls._result_matches_scan_id(data, scan_id):
+                                results.append(redis_path)
+                        except Exception:
+                            continue
                     if cursor == 0:
                         break
             except Exception as exc:
                 logger.warning(f"Redis scan failed for scan_id {scan_id}: {exc}")
 
         if settings.RESULTS_DIR.exists():
-            results.extend(sorted(settings.RESULTS_DIR.glob(f"*{scan_id}*.json")))
+            for path in sorted(settings.RESULTS_DIR.glob("*.json")):
+                try:
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    if cls._result_matches_scan_id(data, scan_id):
+                        results.append(path)
+                except Exception:
+                    continue
 
         return results
+
+    @classmethod
+    def _find_results_by_legacy_alias(cls, cv_key: str) -> list[dict[str, Any]]:
+        normalized_key = cv_key.removesuffix(".json").lower()
+        candidate_filenames = CacheIndex.get_keys("cv_legacy_alias", normalized_key)
+        matches: dict[str, dict[str, Any]] = {}
+
+        for filename in candidate_filenames:
+            data = cls.read_result_by_filename(filename)
+            if data and normalized_key in {str(key).lower() for key in data.get("legacy_cv_keys") or []}:
+                matches[str(data.get("id") or filename)] = data
+
+        for data in cls.list_all_results():
+            aliases = {str(key).lower() for key in data.get("legacy_cv_keys") or []}
+            if normalized_key in aliases:
+                matches[str(data.get("id") or data.get("scan_id") or id(data))] = data
+
+        return list(matches.values())
+
+    @staticmethod
+    def _result_matches_scan_id(data: dict[str, Any], scan_id: str) -> bool:
+        target = scan_id.removesuffix(".json").lower()
+        target_without_prefix = target.removeprefix("cv_")
+        for value in (data.get("id"), data.get("scan_id")):
+            if value is None:
+                continue
+            normalized = str(value).removesuffix(".json").lower()
+            if normalized == target or normalized.removeprefix("cv_") == target_without_prefix:
+                return True
+        return False
 
     @classmethod
     def list_all_results(cls) -> list[dict[str, Any]]:

@@ -71,6 +71,7 @@ async def match_candidates_against_vacancies(
         analysis = await MatchService.analyze_single_cv(
             cv_text=cv_text,
             job_openings=job_dicts,
+            candidate_id=str(candidate.CandidateID) if candidate.CandidateID is not None else "",
             candidate_experience=float(candidate.CandidateTotExperience) if candidate.CandidateTotExperience else None,
             candidate_ctc=float(candidate.CandidateExpectedCtc) if candidate.CandidateExpectedCtc else None
         )

@@ -1,11 +1,12 @@
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
+from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse, CVUploadResponse
 from app.schemas.match import CandidateMatchAnalysis
-from app.services.cv_service import get_stable_cv_key, process_cv_file
+from app.services.cv_service import process_cv_file
 from app.services.scoring_engine import ScoringEngine
 from app.services.upload_service import UploadService, UploadValidationError
 
@@ -31,9 +32,11 @@ async def upload_cv(
 ):
     try:
         normalized = UploadService.normalize_filename(file.filename)
-        cv_key = get_stable_cv_key(normalized.safe_filename, candidate_id, cv_id)
+        identity = resolve_cv_identity(normalized.safe_filename, candidate_id, cv_id)
+        cv_key = identity.canonical_key
         accepted = await UploadService.accept_and_persist(file, storage_key=cv_key)
         try:
+            ResultRepository.assert_identity_available(identity, accepted.content_hash)
             background_tasks.add_task(
                 background_process_cv,
                 filename=accepted.safe_filename,
@@ -44,7 +47,8 @@ async def upload_cv(
                 storage_filename=accepted.storage_filename,
             )
         except Exception:
-            UploadService.remove_stored_upload(accepted.storage_filename)
+            if not accepted.was_already_stored:
+                UploadService.remove_stored_upload(accepted.storage_filename)
             raise
 
         return CVProcessingResponse(
@@ -53,6 +57,8 @@ async def upload_cv(
             status="processing",
             progress=10
         )
+    except CVIdentityCollisionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except UploadValidationError as exc:
         raise HTTPException(
             status_code=exc.status_code,

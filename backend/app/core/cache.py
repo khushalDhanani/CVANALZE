@@ -49,8 +49,10 @@ class CacheKey:
         document_hash: str = "",
         candidate_id: str = "",
         vacancy_ids: list[str] | None = None,
+        vacancy_version: str = "",
         prompt_version: str = "",
         model_version: str = "",
+        extraction_version: str = "",
         matching_version: str = "",
     ) -> "CacheKey":
         components: dict[str, str] = {}
@@ -60,10 +62,14 @@ class CacheKey:
             components["cand_id"] = candidate_id
         if vacancy_ids:
             components["vac_ids"] = ",".join(sorted(str(v) for v in vacancy_ids))
+        if vacancy_version:
+            components["vac_ver"] = vacancy_version
         if prompt_version:
             components["prompt_ver"] = prompt_version
         if model_version:
             components["model_ver"] = model_version
+        if extraction_version:
+            components["extract_ver"] = extraction_version
         if matching_version:
             components["match_ver"] = matching_version
         return cls(components=components)
@@ -74,7 +80,10 @@ class CacheKey:
         document_hash: str = "",
         candidate_id: str = "",
         vacancy_version: str = "",
+        vacancy_ids: list[str] | None = None,
         prompt_version: str = "",
+        model_version: str = "",
+        extraction_version: str = "",
         matching_version: str = "",
     ) -> "CacheKey":
         components: dict[str, str] = {}
@@ -84,11 +93,32 @@ class CacheKey:
             components["cand_id"] = candidate_id
         if vacancy_version:
             components["vac_ver"] = vacancy_version
+        if vacancy_ids:
+            components["vac_ids"] = ",".join(sorted(str(v) for v in vacancy_ids))
         if prompt_version:
             components["prompt_ver"] = prompt_version
+        if model_version:
+            components["model_ver"] = model_version
+        if extraction_version:
+            components["extract_ver"] = extraction_version
         if matching_version:
             components["match_ver"] = matching_version
         return cls(components=components)
+
+    @classmethod
+    def for_document_extraction(
+        cls,
+        document_hash: str,
+        parser_version: str,
+        schema_version: str,
+    ) -> "CacheKey":
+        return cls(
+            components={
+                "doc_hash": document_hash,
+                "parser_ver": parser_version,
+                "schema_ver": schema_version,
+            }
+        )
 
     @classmethod
     def for_llm_extraction(
@@ -628,6 +658,10 @@ class CacheInvalidator:
 
     @classmethod
     def invalidate_cv(cls, doc_hash: str) -> None:
+        extraction_keys = CacheIndex.get_keys("doc_by_hash", doc_hash)
+        for key in extraction_keys:
+            doc_cache_manager.delete(key)
+        CacheIndex.remove("doc_by_hash", doc_hash)
         doc_cache_manager.delete(doc_hash)
         doc_cache_manager.delete_by_pattern(f"*{doc_hash}*")
         cv_result_cache_manager.delete(doc_hash)

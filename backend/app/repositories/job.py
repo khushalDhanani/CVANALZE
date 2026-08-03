@@ -114,6 +114,22 @@ class JobRepository:
         return hashlib.sha256(json.dumps(identity_pairs).encode()).hexdigest()
 
     @classmethod
+    def compute_matching_vacancy_version(cls, job_dicts: list[dict[str, Any]]) -> str:
+        """Hash the complete matching inputs so requirement changes isolate cached results."""
+        ordered_jobs = sorted(
+            job_dicts,
+            key=lambda job: str(job.get("vacancy_id") or job.get("id") or ""),
+        )
+        canonical_payload = json.dumps(
+            ordered_jobs,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+            ensure_ascii=False,
+        )
+        return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+
+    @classmethod
     def get_all_jobs(cls, db: Session | None = None) -> list[dict[str, Any]]:
         cached_entry = vacancy_cache_manager.get(cls._VACANCY_CACHE_KEY)
         if cached_entry is not None:
