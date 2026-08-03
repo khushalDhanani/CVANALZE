@@ -13,7 +13,7 @@ from app.services.document_parser import MarkdownResult
 
 FIXTURES_DIR = backend_dir / "tests" / "fixtures"
 
-async def test_candidate(name: str, fixture_file: str, cv_id: str):
+async def run_candidate_test(name: str, fixture_file: str, cv_id: str):
     print("\n=========================================")
     print(f"Testing Candidate: {name} (Fixture: {fixture_file})")
     print("=========================================")
@@ -46,14 +46,14 @@ async def run_tests():
     print(f"Loaded {len(openings)} vacancies.")
     
     # 1. Domain-Collision Case
-    await test_candidate(
+    await run_candidate_test(
         "Domain-Collision (Flutter Tech Role)", 
         "domain_collision_flutter.md", 
         "fixture_flutter"
     )
     
     # 2. Skill-Specific Tech Case
-    await test_candidate(
+    await run_candidate_test(
         "Skill-Specific (ASP.NET)", 
         "skill_specific_aspnet.md", 
         "fixture_aspnet"
@@ -72,7 +72,7 @@ async def run_tests():
             break
             
     if empty_req_vid:
-        await test_candidate(
+        await run_candidate_test(
             "Empty-Requirements", 
             "empty_requirements.md", 
             "fixture_empty"
