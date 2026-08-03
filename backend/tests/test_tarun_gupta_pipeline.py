@@ -1,93 +1,70 @@
-import asyncio
+from unittest.mock import patch
 
 import pytest
 
-from app.repositories.job import JobRepository
-from app.services.embedding_service import get_embedding
+from app.services.embedding_service import EmbeddingService, get_embedding
 from app.services.match_service import MatchService
 from app.services.vacancy_prefilter import VacancyPreFilter
 
 TARUN_GUPTA_CV_TEXT = """
 Tarun Gupta
-Software Engineer | Mobile Developer
-
-Location: Surat, Gujarat
-Email: tarun.gupta@example.com
+Software Engineer | Flutter Mobile Developer
 
 SKILLS
-- Flutter & Dart
-- Cross-platform Mobile App Development
-- State Management (Provider, Riverpod, BLoC)
-- REST APIs & Firebase
-- iOS & Android native bridging
+- Flutter, Dart, Firebase, REST APIs, iOS, Android
 
 EXPERIENCE
-Flutter Developer
-Tech Solutions Inc, Surat (2021 - Present)
+Flutter Developer, Tech Solutions Inc (2021 - Present)
 - Developed and maintained cross-platform mobile apps using Flutter.
-- Collaborated with UI/UX designers to implement pixel-perfect designs.
-- Integrated RESTful APIs for real-time data fetching.
 
 EDUCATION
-B.Tech in Computer Science
-Gujarat Technological University (2020)
+B.Tech in Computer Science (2020)
 """
 
 
 @pytest.mark.asyncio
-async def test_tarun_gupta_flutter_retrieval_and_ranking():
-    openings = JobRepository.get_all_jobs()
-    assert openings, "No job openings loaded from JobRepository"
+async def test_tarun_gupta_flutter_retrieval_and_ranking_with_external_systems_mocked():
+    openings = [
+        {
+            "id": "1065",
+            "vacancy_id": 1065,
+            "title": "Flutter Developer",
+            "department": "Engineering",
+            "required_skills": ["Flutter", "Dart", "REST APIs"],
+            "preferred_keywords": ["Firebase"],
+            "min_experience_years": 2.0,
+        },
+        {
+            "id": "2001",
+            "vacancy_id": 2001,
+            "title": "Plant Maintenance Executive",
+            "department": "Operations",
+            "required_skills": ["Preventive Maintenance", "Switchgear"],
+            "min_experience_years": 2.0,
+        },
+    ]
+    mock_embedding = [0.1] * 768
 
-    # Step 1: Pre-filter test
-    cv_emb = get_embedding(TARUN_GUPTA_CV_TEXT[:8000])
-    shortlist = VacancyPreFilter.filter_vacancies(
-        cv_text=TARUN_GUPTA_CV_TEXT,
-        openings=openings,
-        top_k=5,
-        cv_embedding=cv_emb,
-    )
+    with (
+        patch.object(EmbeddingService, "generate_embedding", return_value=mock_embedding),
+        patch("app.services.match_service.OllamaLLMService.run_optimized_match", return_value=None),
+    ):
+        cv_embedding = get_embedding(TARUN_GUPTA_CV_TEXT)
+        shortlist = VacancyPreFilter.filter_vacancies(
+            cv_text=TARUN_GUPTA_CV_TEXT,
+            openings=openings,
+            top_k=5,
+            cv_embedding=cv_embedding,
+        )
+        analysis = await MatchService.analyze_single_cv(
+            cv_text=TARUN_GUPTA_CV_TEXT,
+            job_openings=openings,
+            candidate_experience=5.0,
+            document_hash="tarun_gupta_test_hash",
+            candidate_id="tarun_gupta",
+            cv_embedding=cv_embedding,
+        )
 
-    shortlist_vids = [str(j.get("vacancy_id") or j.get("id")) for j in shortlist]
-    print(f"\n[PRE-FILTER SHORTLIST VIDS]: {shortlist_vids}")
-
-    flutter_job_in_shortlist = None
-    flutter_shortlist_rank = None
-    for rank, job in enumerate(shortlist, 1):
-        vid = str(job.get("vacancy_id") or job.get("id"))
-        title = job.get("title", "")
-        print(f"  Shortlist Rank #{rank}: Vacancy #{vid} - '{title}' (RRF score={job.get('_prefilter_score'):.5f}, details={job.get('_rrf_details')})")
-        if vid == "1065" or "flutter" in title.lower():
-            flutter_job_in_shortlist = job
-            flutter_shortlist_rank = rank
-
-    assert flutter_job_in_shortlist is not None, (
-        "FAIL: Vacancy 1065 ('Flutter Developer') was NOT found in the pre-filter shortlist!"
-    )
-
-    # Step 2: Full pipeline analysis test
-    analysis = await MatchService.analyze_single_cv(
-        cv_text=TARUN_GUPTA_CV_TEXT,
-        job_openings=openings,
-        document_hash="tarun_gupta_test_hash_p5",
-        candidate_id="tarun_gupta_p5",
-    )
-
-    print("\n[FULL PIPELINE MATCH RESULTS SUMMARY]:")
-    print(f"Primary Department: {analysis.primary_department}")
-    if analysis.best_match:
-        print(f"Best Match: Vacancy #{analysis.best_match.vacancy_id} ('{analysis.best_match.job_title}') - Score: {analysis.best_match.score}%")
-
-    top_matches = analysis.suitable_openings
-    for idx, m in enumerate(top_matches, 1):
-        print(f"  Rank #{idx}: Vacancy #{m.vacancy_id} ('{m.job_title}') - Score: {m.score}% (Coverage: {m.coverage})")
-
-
-
-    print("\n[PHASE 5 PROOF]")
-    print("Vacancy 1065 ('Flutter Developer') in Pre-filter Shortlist: True")
-    print(f"Pre-filter Shortlist Rank: #{flutter_shortlist_rank} out of {len(shortlist)}")
-
-
-if __name__ == "__main__":
-    asyncio.run(test_tarun_gupta_flutter_retrieval_and_ranking())
+    assert any("flutter" in job["title"].lower() for job in shortlist)
+    assert analysis.best_match.vacancy_id == 1065
+    assert any(match.vacancy_id == 1065 for match in analysis.suitable_openings)

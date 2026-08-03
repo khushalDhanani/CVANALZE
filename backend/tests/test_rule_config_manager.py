@@ -113,7 +113,8 @@ def test_scoring_accessors_expose_data_driven_rules():
     assert taxonomy.default_family == "General Professional"
     assert "Software Engineering & Development" in taxonomy.compatibility_map
     assert len(taxonomy.vacancy_rules) == 14
-    assert len(taxonomy.candidate_rules) == 7
+    assert len(taxonomy.candidate_rules) == 8
+    assert any(rule.name == "finance_administration" for rule in taxonomy.candidate_rules)
 
     resume_quality = RuleConfigManager.get_resume_quality_rules()
     assert set(resume_quality.core_sections) == {"contact", "summary", "experience", "education", "skills"}
@@ -216,5 +217,4 @@ def test_rule_config_manager_metrics_and_reload():
 
     reloaded = RuleConfigManager.reload_if_changed()
     assert reloaded is False
-
 

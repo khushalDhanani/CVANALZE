@@ -202,7 +202,7 @@ def test_embedding_service_routes_through_shared_transport(monkeypatch):
     embed.assert_called_once_with("embedding-model", ["resume"])
 
 
-def test_batch_embedding_preserves_single-input_fallback(monkeypatch):
+def test_batch_embedding_preserves_single_input_fallback(monkeypatch):
     first = OllamaTransportResult(
         value=[[0.1]],
         response_data={"embeddings": [[0.1]]},

@@ -1,9 +1,50 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T14:50:58+05:30
+2026-08-03T15:12:10+05:30
 
-## Current Task — Phase 7 Documentation and Final Verification
+## Current Task — Authorized Verification Checklist
+- Ran the focused upload, parser, cache, scoring, embedding, and Ollama tests with external systems mocked or disabled: 87 passed.
+- Ran the complete backend suite with the same isolation defaults: 298 passed with 6 third-party deprecation warnings.
+- Added explicit upload-matrix regressions for empty files, damaged PDFs, scanned PDFs, and DOCX compression bombs; existing tests cover oversize, MIME spoofing,
+  wrong signatures, traversal filenames, malformed DOCX, entry/expanded-size limits, and rejected DOC/TXT formats.
+- Added exact OpenAPI method/path and primary success-response-field snapshots.
+- Strengthened deterministic-experience verification so both scoring passes receive 1.9 date-derived years and a conflicting 12.0-year LLM value cannot override it.
+- Strengthened error-envelope verification against stack details, local paths, secret-like values, and raw email PII.
+- Fixed file-tier wildcard deletion so invalidated L1 entries cannot be rehydrated from stale disk cache.
+- Fixed the cache-hit embedding synchronization path where a function-local import shadowed `EmbeddingService` and raised `NameError`.
+- Added the missing finance candidate-taxonomy rule found by cross-domain scoring verification.
+- Repaired stale tests for FastAPI included-router wrappers, current lifecycle helpers, RQ enqueue arguments, pgvector query boundaries, result resolution, and current scoring.
+- Replaced live Ollama/PostgreSQL assumptions in candidate embedding, similarity, and pipeline tests with deterministic mocks.
+- Ran `docker compose config --quiet` and `git diff --check`; both passed.
+- Ran Ruff lint and formatting checks. They remain non-zero at the repository baseline: 268 lint findings and 143 files requiring formatting; focused lint for the
+  expanded verification tests passes.
+- Did not run migrations, Docker builds/services, or live Redis/Ollama/database operations.
+
+## Files Modified for Current Task
+- Production: `backend/app/core/cache.py`, `backend/app/core/rule_config.json`, `backend/app/services/cv_service.py`.
+- Contracts/security/upload tests: `backend/tests/test_phase0_contracts.py`, `backend/tests/test_phase3_structured_processing.py`,
+  `backend/tests/test_phase6_api_reliability.py`, `backend/tests/test_upload_service.py`.
+- Repaired/isolated regressions: `backend/tests/test_audit_fixes.py`, `backend/tests/test_candidate_embedding.py`, `backend/tests/test_config.py`,
+  `backend/tests/test_embedding_similarity.py`, `backend/tests/test_hybrid_matching_pipeline.py`, `backend/tests/test_phase4_background_processing.py`,
+  `backend/tests/test_phase5_ollama_standardization.py`, `backend/tests/test_rule_config_manager.py`, `backend/tests/test_semantic_vacancy_retrieval.py`,
+  `backend/tests/test_similar_candidate_detection.py`, `backend/tests/test_tarun_gupta_pipeline.py`, `backend/tests/test_two_stage_matching.py`.
+- Documentation/status: `backend/docs/phase7-documentation-and-final-verification.md`, `workstatus.md`.
+
+## Pending Work
+- Resolve the repository-wide Ruff baseline in a separately scoped cleanup; do not auto-format 143 files as part of this verification task.
+- Run live target-environment smoke and outage tests, including actual RQ worker termination/restart and recovery, with controlled test infrastructure.
+- Run Docker image builds only if authorized and apply migrations only with separate explicit authorization.
+- Complete external credential rotation, ingress/malware/PII controls, and stale-job reconciliation from the Phase 7 release checklist.
+
+## Important Decisions
+- External systems were mocked/disabled by default; loopback/no-database settings prevented accidental integration access.
+- Response snapshots are exact for the primary upload acknowledgement, completed upload, and enriched analysis models.
+- Existing API paths and compatibility fields remain unchanged; all production changes correct invalidation/import behavior or add missing finance classification.
+- Ruff failures are reported as known baseline debt rather than hidden through a broad unrelated rewrite.
+- Migrations were not authorized and were not run.
+
+## Previous Task — Phase 7 Documentation and Final Verification
 - Replaced the stale minimal README with the implemented Phase 0–6 architecture, actual `backend/` layout, supported-format matrix, request and processing flow,
   access model, canonical job states, stable error envelope, and compatibility behavior.
 - Documented every operator-facing setting from `backend/.env.example`, grouped across runtime/access, databases/Redis/RQ, secure uploads, and Ollama/embeddings.

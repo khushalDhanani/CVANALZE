@@ -592,6 +592,18 @@
           ]
         },
         {
+          "name": "finance_administration",
+          "domain": "Finance & Administration",
+          "families": ["Finance & Administration"],
+          "branches": [
+            {
+              "conditions": [
+                { "scope": "candidate_full_text", "keywords": ["financial analyst", "financial modeling", "investment bank", "accountant", "finance manager"], "mode": "any" }
+              ]
+            }
+          ]
+        },
+        {
           "name": "ehs_safety",
           "domain": "Environmental Health & Safety (EHS)",
           "families": ["Fire, Safety & EHS", "Environment & ETP Operations"],

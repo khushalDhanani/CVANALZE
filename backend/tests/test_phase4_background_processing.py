@@ -42,12 +42,12 @@ def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempote
         def __init__(self, *_args, **_kwargs):
             pass
 
-        def enqueue(self, _function, job_id, **_kwargs):
-            persisted = ProcessingJobRepository.get(job_id)
+        def enqueue(self, _function, processing_job_id, **_kwargs):
+            persisted = ProcessingJobRepository.get(processing_job_id)
             assert persisted is not None
             assert persisted.state == JobState.QUEUED
             assert persisted.execution_mode == ProcessingExecutionMode.RQ
-            enqueued.append(job_id)
+            enqueued.append(processing_job_id)
 
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
     monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))

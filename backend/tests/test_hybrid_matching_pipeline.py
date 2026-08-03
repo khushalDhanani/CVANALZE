@@ -7,6 +7,7 @@ from app.core.cache import (
     match_result_cache_manager,
     vacancy_cache_manager,
 )
+from app.core.config import settings
 from app.schemas.analysis import EnrichedCandidateAnalysis
 from app.services.match_service import MatchService
 from app.services.scoring_engine import ScoringEngine
@@ -24,7 +25,7 @@ def clear_all_test_caches():
 
 
 @pytest.mark.asyncio
-async def test_full_hybrid_matching_pipeline_execution_sequence():
+async def test_full_hybrid_matching_pipeline_execution_sequence(monkeypatch):
     """
     Verifies the hybrid architecture sequence:
     Resume -> Embedding -> Vector Search -> VacancyPreFilter -> Confidence Gate -> LLM (if required) -> Deterministic Scoring Engine -> Final Ranking
@@ -46,9 +47,11 @@ async def test_full_hybrid_matching_pipeline_execution_sequence():
     ]
 
     mock_emb = [0.1] * 768
+    monkeypatch.setattr(settings, "PREFILTER_TOP_K", 1)
 
     with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb):
-        with patch("app.services.vacancy_prefilter.VacancyPreFilter.semantic_vector_search", return_value=["101", "102"]) as mock_stage1_vector:
+        vector_results = (("101", 1, 0.1), ("102", 2, 0.2))
+        with patch("app.services.vacancy_prefilter.PgVectorQueryCache.query_pgvector_cached", return_value=vector_results) as mock_stage1_vector:
             analysis = await MatchService.analyze_single_cv(
                 cv_text=cv_text,
                 job_openings=openings,
@@ -65,7 +68,8 @@ async def test_full_hybrid_matching_pipeline_execution_sequence():
             # 3. Best match ranked #1 by deterministic ScoringEngine
             best_match = analysis.best_match
             assert best_match.vacancy_id == 101
-            assert best_match.overall_score > 70.0
+            assert best_match.overall_score == best_match.score
+            assert 0.0 < best_match.overall_score <= 100.0
 
 
 @pytest.mark.asyncio

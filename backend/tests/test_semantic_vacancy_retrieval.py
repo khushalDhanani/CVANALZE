@@ -27,21 +27,21 @@ def test_stage1_semantic_retrieval_narrows_openings():
 
     mock_emb = [0.1] * 768
 
-    with patch("app.services.vacancy_prefilter.VacancyPreFilter.semantic_vector_search", return_value=["1", "2"]) as mock_stage1:
-        # Pass top_k=2
+    vector_rows = (("1", 1, 0.1), ("2", 2, 0.2))
+    with patch("app.services.vacancy_prefilter.PgVectorQueryCache.query_pgvector_cached", return_value=vector_rows) as mock_stage1:
         selected = VacancyPreFilter.filter_vacancies(
             cv_text="Python and React developer with 5 years experience",
             openings=openings,
-            top_k=2,
+            top_k=1,
             cv_embedding=mock_emb,
         )
 
-        assert len(selected) <= 2
+        assert len(selected) <= 1
         # Semantic vector search Stage 1 was invoked
         mock_stage1.assert_called_once()
         selected_ids = {str(j.get("vacancy_id")) for j in selected}
         # Only candidates returned by Stage 1 ("1" or "2") reached Stage 2
-        assert selected_ids.issubset({"1", "2"})
+        assert selected_ids.issubset({"1"})
 
 
 def test_fallback_when_embedding_disabled():
@@ -50,16 +50,18 @@ def test_fallback_when_embedding_disabled():
         {"id": "vac_2", "vacancy_id": 2, "title": "Java Developer", "department": "Engineering", "required_skills": ["Java"]},
     ]
 
-    with patch.object(settings, "EMBEDDING_ENABLED", False):
-        with patch("app.services.vacancy_prefilter.VacancyPreFilter.semantic_vector_search") as mock_stage1:
-            selected = VacancyPreFilter.filter_vacancies(
-                cv_text="Python developer",
-                openings=openings,
-                top_k=1,
-            )
-            # Stage 1 semantic search skipped when EMBEDDING_ENABLED is False
-            assert mock_stage1.call_count == 0
-            assert len(selected) == 1
+    with (
+        patch.object(settings, "EMBEDDING_ENABLED", False),
+        patch("app.services.vacancy_prefilter.PgVectorQueryCache.query_pgvector_cached") as mock_stage1,
+    ):
+        selected = VacancyPreFilter.filter_vacancies(
+            cv_text="Python developer",
+            openings=openings,
+            top_k=1,
+        )
+        # Stage 1 semantic search skipped when EMBEDDING_ENABLED is False
+        assert mock_stage1.call_count == 0
+        assert len(selected) == 1
 
 
 def test_scoring_engine_retains_final_ranking_authority():

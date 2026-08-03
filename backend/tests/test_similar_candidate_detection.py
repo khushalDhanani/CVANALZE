@@ -58,18 +58,21 @@ def test_detect_similar_candidates_above_threshold():
         # Return high similarity for cand_similar (0.88), low for cand_different (0.30)
         return {"cand_similar": 0.88, "cand_different": 0.30}
 
-    with patch("app.repositories.result.ResultRepository.list_all_results", return_value=mock_results):
-        with patch.object(SimilarCandidateService, "_vector_search_pg", side_effect=mock_vector_pg):
-            similar = SimilarCandidateService.detect_similar_candidates(
-                cv_key="cand_target",
-                cv_embedding=target_emb,
-                threshold=0.85,
-            )
+    result_by_id = {item["id"]: item for item in mock_results}
+    with (
+        patch("app.repositories.result.ResultRepository.resolve_result", side_effect=result_by_id.get),
+        patch.object(SimilarCandidateService, "_vector_search_pg", side_effect=mock_vector_pg),
+    ):
+        similar = SimilarCandidateService.detect_similar_candidates(
+            cv_key="cand_target",
+            cv_embedding=target_emb,
+            threshold=0.85,
+        )
 
-            assert len(similar) == 1
-            assert similar[0]["cv_key"] == "cand_similar"
-            assert similar[0]["similarity_score"] == 0.88
-            assert similar[0]["is_duplicate_flag"] is False
+        assert len(similar) == 1
+        assert similar[0]["cv_key"] == "cand_similar"
+        assert similar[0]["similarity_score"] == 0.88
+        assert similar[0]["is_duplicate_flag"] is False
 
 
 def test_duplicate_flag_identification():
@@ -85,18 +88,21 @@ def test_duplicate_flag_identification():
         }
     ]
 
-    with patch("app.repositories.result.ResultRepository.list_all_results", return_value=mock_results):
-        with patch.object(SimilarCandidateService, "_vector_search_pg", return_value={"cand_dup": 0.97}):
-            similar = SimilarCandidateService.detect_similar_candidates(
-                cv_key="cand_original",
-                cv_embedding=[0.1] * 768,
-                threshold=0.85,
-            )
+    result_by_id = {item["id"]: item for item in mock_results}
+    with (
+        patch("app.repositories.result.ResultRepository.resolve_result", side_effect=result_by_id.get),
+        patch.object(SimilarCandidateService, "_vector_search_pg", return_value={"cand_dup": 0.97}),
+    ):
+        similar = SimilarCandidateService.detect_similar_candidates(
+            cv_key="cand_original",
+            cv_embedding=[0.1] * 768,
+            threshold=0.85,
+        )
 
-            assert len(similar) == 1
-            assert similar[0]["cv_key"] == "cand_dup"
-            assert similar[0]["similarity_score"] == 0.97
-            assert similar[0]["is_duplicate_flag"] is True
+        assert len(similar) == 1
+        assert similar[0]["cv_key"] == "cand_dup"
+        assert similar[0]["similarity_score"] == 0.97
+        assert similar[0]["is_duplicate_flag"] is True
 
 
 def test_no_false_merges_records_preserved():
@@ -108,14 +114,17 @@ def test_no_false_merges_records_preserved():
         {"id": "cand_2", "filename": "c2.pdf", "markdown": "Python Dev copy"},
     ]
 
-    with patch("app.repositories.result.ResultRepository.list_all_results", return_value=mock_results):
-        with patch.object(SimilarCandidateService, "_vector_search_pg", return_value={"cand_2": 0.92}):
-            _ = SimilarCandidateService.detect_similar_candidates("cand_1", [0.1] * 768)
+    result_by_id = {item["id"]: item for item in mock_results}
+    with (
+        patch("app.repositories.result.ResultRepository.resolve_result", side_effect=result_by_id.get),
+        patch.object(SimilarCandidateService, "_vector_search_pg", return_value={"cand_2": 0.92}),
+    ):
+        _ = SimilarCandidateService.detect_similar_candidates("cand_1", [0.1] * 768)
 
-            # Both records remain intact in mock_results (no deletion/mutation)
-            assert len(mock_results) == 2
-            assert mock_results[0]["id"] == "cand_1"
-            assert mock_results[1]["id"] == "cand_2"
+        # Both records remain intact in mock_results (no deletion/mutation)
+        assert len(mock_results) == 2
+        assert mock_results[0]["id"] == "cand_1"
+        assert mock_results[1]["id"] == "cand_2"
 
 
 def test_candidate_360_similar_candidates_api():

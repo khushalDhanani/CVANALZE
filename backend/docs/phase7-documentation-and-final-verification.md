@@ -114,7 +114,19 @@ Important deployment distinctions are explicit:
 
 ## Final verification status
 
-Phase 7 verification is documentation-only under the repository execution policy. The following static checks completed without findings:
+The authorized follow-up verification completed on 2026-08-03. Runtime dependencies were disabled or mocked by default; no migration or live Redis, Ollama, MSSQL,
+or PostgreSQL operation was executed.
+
+Completed checks:
+
+- focused upload, parser, cache, scoring, embedding, and Ollama suites: 87 passed;
+- complete backend pytest suite: 298 passed with 6 dependency deprecation warnings;
+- upload matrix: empty, oversized, spoofed MIME, wrong signature, traversal filename, malformed DOCX, compression bomb, damaged PDF, scanned PDF, DOC, and TXT;
+- cache/content isolation, deterministic experience authority, duplicate job idempotency, retries, Redis/Ollama/database fallbacks, access rejection, and response redaction;
+- exact OpenAPI method/path and primary success-response field snapshots;
+- `docker compose config --quiet` and `git diff --check`.
+
+The following static documentation checks also completed without findings:
 
 - compare architecture claims with current modules and service boundaries;
 - compare format/limit claims with upload configuration and validation;
@@ -127,8 +139,10 @@ Phase 7 verification is documentation-only under the repository execution policy
 - confirm every relative README link resolves to an existing repository path;
 - validate changed Markdown for whitespace errors and the practical 200-character line limit.
 
-The application, test suite, Ruff, Docker configuration/build, migrations, and external services are not executed without explicit authorization. A release is not fully
-verified until the commands and smoke tests listed in the README succeed in the target environment.
+Ruff was executed but is not clean: `ruff check .` reports 268 repository-wide findings, and `ruff format --check .` reports 143 files that would be reformatted. A focused
+lint pass over the newly expanded verification tests is clean; the formatter still identifies older formatting in files that those tests extend. The repository-wide
+baseline was not auto-fixed because doing so would create a broad unrelated diff. Docker image builds, live dependency outage exercises, target-environment smoke tests,
+and migrations remain pending. Migrations still require separate explicit authorization.
 
 ## Release checklist
 

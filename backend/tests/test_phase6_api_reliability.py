@@ -85,7 +85,9 @@ def test_unhandled_exception_returns_stable_envelope_without_trace(monkeypatch):
 
     @test_app.get("/boom")
     async def boom():
-        raise RuntimeError("private stack detail")
+        raise RuntimeError(
+            "private stack detail /Users/operator/cv-analyzer secret-token raw.person@example.com"
+        )
 
     test_app.add_middleware(RequestContextMiddleware)
     client = TestClient(test_app, raise_server_exceptions=False)
@@ -110,6 +112,9 @@ def test_unhandled_exception_returns_stable_envelope_without_trace(monkeypatch):
         "detail": "An internal error occurred.",
     }
     assert "private stack detail" not in response.text
+    assert "/Users/operator" not in response.text
+    assert "secret-token" not in response.text
+    assert "raw.person@example.com" not in response.text
 
 
 def test_framework_not_found_uses_stable_error_envelope():

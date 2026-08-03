@@ -854,14 +854,13 @@ def test_cache_manager_tier_simplification():
         assert file_c in active_fallback, "FileCache should be retained as fallback when Redis is down"
 
 
-@pytest.mark.asyncio
-async def test_startup_warns_and_proceeds_when_redis_inactive():
+def test_startup_warns_and_proceeds_when_redis_inactive():
     """Verify that startup logs fallback warning and proceeds cleanly when Redis is inactive."""
-    from app.main import start_background_warmup
+    from app.core.lifecycle import verify_redis
 
     with patch("app.core.cache._REDIS_CLIENT", None):
         # Should complete cleanly without raising RuntimeError
-        await start_background_warmup()
+        verify_redis()
 
 
 def test_cache_delete_by_pattern():
@@ -975,10 +974,10 @@ def test_cache_warmer_warm_vacancies_handles_no_db():
 
 def test_background_warmup_fails_gracefully():
     """Test that the background warmup function handles errors without raising."""
-    from app.main import _run_background_warmup
+    from app.core.lifecycle import _run_cache_warmup
 
     with patch("app.services.cache_warmer.SessionLocal", None):
-        _run_background_warmup()
+        _run_cache_warmup()
 
 
 def test_cli_warmup_does_not_raise():

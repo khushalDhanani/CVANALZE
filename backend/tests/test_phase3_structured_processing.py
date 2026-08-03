@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.core.config import settings
-from app.schemas.analysis import OptimizedCandidateProfile
+from app.schemas.analysis import OptimizedCandidateProfile, OptimizedLLMMatchResponse
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.normalized_resume import NormalizedResume
@@ -99,24 +99,20 @@ def test_candidate_context_keeps_dates_authoritative_and_uses_llm_only_as_fallba
 
 @pytest.mark.asyncio
 async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
-    raw_text = "Python developer with dated experience."
-    resume_json = {"contact_info": {}, "work_experience": [], "education": [], "skills": {"all_skills": []}}
-    normalized = ResumeNormalizer.normalize(resume_json, raw_text)
-    candidate_context = CandidateAnalysisContext(
+    raw_text = _structured_resume_text()
+    resume_json = ResumeJsonExtractor.extract(raw_text)
+    normalized = NormalizedResume.model_validate(resume_json["normalized"])
+    candidate_context = CandidateAnalysisContext.create(
         cv_text=raw_text,
-        norm_text=raw_text.lower(),
-        cand_domain_profile={
-            "recommended_department": "Engineering",
-            "professional_domain": "Software",
-            "strengths": ["Python"],
-            "suitable_job_roles": ["Developer"],
-        },
+        resume_json=resume_json,
+        normalized_resume=normalized,
+        deterministic_experience=normalized.experience.deterministic_years,
     )
     job_contexts = [
         JobEvaluationContext.create({"id": "job-1", "title": "Python Developer", "department": "Engineering"}),
         JobEvaluationContext.create({"id": "job-2", "title": "API Developer", "department": "Engineering"}),
     ]
-    scoring_calls: list[tuple[int, int]] = []
+    scoring_calls: list[tuple[int, int, float | None]] = []
 
     monkeypatch.setattr(
         CandidateAnalysisContext,
@@ -130,14 +126,22 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
     )
 
     def evaluate(cls, **kwargs):
-        scoring_calls.append((id(kwargs["context"]), id(kwargs["job"])))
+        scoring_calls.append(
+            (id(kwargs["context"]), id(kwargs["job"]), kwargs["context"].candidate_experience)
+        )
         return MatchService._empty_job_match().model_copy(
             update={"job_id": kwargs["job"].job_id, "vacancy_id": kwargs["job"].job_id}
         )
 
     monkeypatch.setattr("app.services.match_service.ScoringEngine.evaluate_job_match", classmethod(evaluate))
     monkeypatch.setattr("app.services.match_service.ConfigRepository.get_setting", lambda key, default=None: default)
-    monkeypatch.setattr("app.services.match_service.OllamaLLMService.run_optimized_match", MagicMock(return_value=None))
+    llm_response = OptimizedLLMMatchResponse(
+        candidate_profile=OptimizedCandidateProfile(relevant_experience_years=12.0)
+    )
+    monkeypatch.setattr(
+        "app.services.match_service.OllamaLLMService.run_optimized_match",
+        MagicMock(return_value=llm_response),
+    )
     monkeypatch.setattr("app.services.match_service.match_result_cache_manager.get", lambda key: None)
     monkeypatch.setattr("app.services.match_service.match_result_cache_manager.set", lambda key, value: None)
     monkeypatch.setattr(settings, "LLM_SKIP_COVERAGE_THRESHOLD", 2.0)
@@ -147,13 +151,15 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
         job_openings=[context.raw_job for context in job_contexts],
         resume_json=resume_json,
         normalized_resume=normalized,
+        deterministic_experience=normalized.experience.deterministic_years,
     )
 
     assert result.normalized_resume == normalized
     assert len(scoring_calls) == 4
-    assert {context_id for context_id, _ in scoring_calls} == {id(candidate_context)}
-    assert [job_id for _, job_id in scoring_calls].count(id(job_contexts[0])) == 2
-    assert [job_id for _, job_id in scoring_calls].count(id(job_contexts[1])) == 2
+    assert {context_id for context_id, _, _ in scoring_calls} == {id(candidate_context)}
+    assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[0])) == 2
+    assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[1])) == 2
+    assert {experience for _, _, experience in scoring_calls} == {1.9}
 
 
 @pytest.mark.asyncio
@@ -170,4 +176,3 @@ async def test_match_service_does_not_reparse_supplied_resume(monkeypatch):
     )
 
     assert result.normalized_resume == normalized
-

@@ -135,7 +135,10 @@ async def process_cv_file(
                     existing_data["result_file_path"] = str(saved_path)
                     
                     # 2. Vector DB Synchronization Parity
-                    from app.services.embedding_service import get_candidate_embedding, EmbeddingService, save_candidate_embedding
+                    from app.services.embedding_service import (
+                        get_candidate_embedding,
+                        save_candidate_embedding,
+                    )
                     cand_emb = await asyncio.to_thread(get_candidate_embedding, cv_key)
                     if cand_emb is None:
                         logger.info(f"[CACHE_HIT] Missing vector embedding for '{cv_key}'. Syncing to pgvector...")

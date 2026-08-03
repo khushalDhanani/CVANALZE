@@ -413,10 +413,8 @@ class FileCache(CacheProvider):
             clean_pat = clean_pat.rsplit(":", 1)[-1]
         clean_pat = re.sub(r"\*+", "*", clean_pat)
         glob_pat = f"{self._key_prefix}*{clean_pat}" if not clean_pat.startswith("*") else f"{self._key_prefix}{clean_pat}"
-        if not glob_pat.endswith(".json") and not glob_pat.endswith("*"):
+        if not glob_pat.endswith(".json"):
             glob_pat = f"{glob_pat}.json"
-        elif not glob_pat.endswith(".json") and glob_pat.endswith("*"):
-            glob_pat = f"{glob_pat[:-1]}.json"
         for f in self._cache_dir.glob(glob_pat):
             try:
                 f.unlink()

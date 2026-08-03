@@ -1,4 +1,5 @@
 from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import fitz
 import pytest
@@ -9,7 +10,11 @@ from starlette.datastructures import Headers
 
 from app.core.config import settings
 from app.main import app
-from app.services.upload_service import UploadService, UploadTooLargeError, UploadValidationError
+from app.services.upload_service import (
+    UploadService,
+    UploadTooLargeError,
+    UploadValidationError,
+)
 
 
 def _pdf_bytes(page_count: int = 1) -> bytes:
@@ -38,6 +43,17 @@ def _upload(filename: str, content: bytes, content_type: str) -> UploadFile:
     )
 
 
+def _scanned_pdf_bytes() -> bytes:
+    document = fitz.open()
+    page = document.new_page()
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 32, 32), False)
+    pixmap.clear_with(255)
+    page.insert_image(page.rect, stream=pixmap.tobytes("png"))
+    content = document.tobytes()
+    document.close()
+    return content
+
+
 def test_normalize_filename_removes_paths_unicode_and_unsafe_characters():
     normalized = UploadService.normalize_filename("../../Résumé (Final)!!.PDF")
 
@@ -58,6 +74,20 @@ async def test_bounded_reader_raises_413_before_validation(monkeypatch, tmp_path
         )
 
     assert exc_info.value.status_code == 413
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_empty_upload_is_rejected_before_disk_write(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
+
+    with pytest.raises(UploadValidationError, match="empty") as exc_info:
+        await UploadService.accept_and_persist(
+            _upload("resume.pdf", b"", "application/pdf"),
+            storage_key="cv_resume",
+        )
+
+    assert exc_info.value.code == "empty_upload"
     assert list(tmp_path.iterdir()) == []
 
 
@@ -105,6 +135,27 @@ def test_pdf_page_limit_is_configurable(monkeypatch):
     assert exc_info.value.code == "pdf_page_limit_exceeded"
 
 
+def test_damaged_pdf_structure_is_rejected():
+    damaged_pdf = b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog"
+
+    with pytest.raises(UploadValidationError) as exc_info:
+        UploadService.validate_content("resume.pdf", damaged_pdf, "application/pdf")
+
+    assert exc_info.value.code in {"signature_mismatch", "invalid_document_structure"}
+
+
+def test_scanned_pdf_structure_is_accepted_and_classified():
+    from app.services.document_conversion import _classify_pdf
+
+    scanned_pdf = _scanned_pdf_bytes()
+
+    assert UploadService.validate_content("resume.pdf", scanned_pdf, "application/pdf") == "application/pdf"
+    pdf_type, native_text, _character_count, has_images = _classify_pdf(scanned_pdf)
+    assert pdf_type == "SCANNED_PDF"
+    assert native_text == ""
+    assert has_images is True
+
+
 def test_docx_entry_limit_is_configurable(monkeypatch):
     monkeypatch.setattr(settings, "MAX_DOCX_ENTRIES", 1)
 
@@ -125,6 +176,20 @@ def test_docx_expanded_size_limit_is_configurable(monkeypatch):
         UploadService.validate_content("resume.docx", _docx_bytes())
 
     assert exc_info.value.code == "docx_expanded_size_exceeded"
+
+
+def test_docx_zip_bomb_compression_ratio_is_rejected(monkeypatch):
+    output = BytesIO()
+    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", "A" * 10_000)
+        archive.writestr("_rels/.rels", "rels")
+        archive.writestr("word/document.xml", "document")
+    monkeypatch.setattr(settings, "MAX_DOCX_COMPRESSION_RATIO", 2.0)
+
+    with pytest.raises(UploadValidationError, match="compression ratio") as exc_info:
+        UploadService.validate_content("resume.docx", output.getvalue())
+
+    assert exc_info.value.code == "docx_compression_ratio_exceeded"
 
 
 @pytest.mark.asyncio
