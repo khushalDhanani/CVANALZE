@@ -159,6 +159,7 @@ export function useCvUpload() {
               (res as any).status === 'COMPLETED' ||
               (res as any).status === 'NEW_CV' ||
               (res as any).status === 'REPROCESSED' ||
+              (res as any).status === 'CACHE_HIT' ||
               (res as any).progress === 100 ||
               (res as any).is_complete === true
             ) {
@@ -170,7 +171,11 @@ export function useCvUpload() {
               setUploading(false);
               setIsComplete(true);
               setCurrentStepIndex(7);
-              setStatusMessage('Candidate analysis & job matching complete!');
+              
+              const statusStr = (res as any).status?.toUpperCase() || '';
+              const isCacheHit = statusStr === 'CACHE_HIT';
+              setStatusMessage(isCacheHit ? 'Loaded from cache instantly!' : 'Candidate analysis & job matching complete!');
+              
               setStepStates([
                 'completed',
                 'completed',
@@ -392,6 +397,59 @@ export function useCvUpload() {
     [pollCvStatus, startTimer, stopTimer]
   );
 
+  const forceReanalyze = useCallback(async (scanId: string) => {
+    stopPollTimer();
+    setUploading(true);
+    setIsComplete(false);
+    setError(null);
+    setErrorDetails(null);
+    setFailedStepName(null);
+    setStatusMessage('Re-analyzing CV against live vacancies...');
+    startTimer();
+    
+    const initialStates: StepState[] = [
+      'completed',
+      'completed',
+      'completed',
+      'completed',
+      'active',
+      'pending',
+      'pending',
+      'pending',
+    ];
+    setStepStates(initialStates);
+    setCurrentStepIndex(4);
+    
+    try {
+      const res = await matchService.reanalyzeScan(scanId);
+      stopTimer();
+      setEnrichedResult(res);
+      setUploading(false);
+      setIsComplete(true);
+      setCurrentStepIndex(7);
+      setStatusMessage('Re-analysis & job matching complete!');
+      setStepStates([
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+      ]);
+    } catch (err: any) {
+      stopTimer();
+      setUploading(false);
+      setError(err.message || 'Re-analysis failed');
+      setStepStates((prev) => {
+        const next = [...prev];
+        next[4] = 'failed';
+        return next;
+      });
+    }
+  }, [startTimer, stopTimer]);
+
   return {
     uploading,
     isComplete,
@@ -405,5 +463,6 @@ export function useCvUpload() {
     currentStepIndex,
     stepStates,
     uploadAndProcess,
+    forceReanalyze,
   };
 }

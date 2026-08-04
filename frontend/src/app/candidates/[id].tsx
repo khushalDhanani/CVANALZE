@@ -53,6 +53,7 @@ export default function CandidateDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showFullText, setShowFullText] = useState<boolean>(false);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
+  const [selectedJobForReview, setSelectedJobForReview] = useState<any>(null);
 
   // Reprocessing state
   const [reprocessModalVisible, setReprocessModalVisible] = useState<boolean>(false);
@@ -266,18 +267,32 @@ export default function CandidateDetailScreen() {
         </Card>
 
         {/* Experience Timeline */}
-        {data?.resume_json?.experience && data.resume_json.experience.length > 0 && (
+        {((data?.resume_json?.work_experience && data.resume_json.work_experience.length > 0) ||
+          (data?.resume_json?.experience && data.resume_json.experience.length > 0) ||
+          (data?.normalized_resume?.employment && data.normalized_resume.employment.length > 0)) && (
           <Card className="p-3 gap-3 border-border shadow-none">
             <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Experience</Text>
-            {data.resume_json.experience.slice(0, 5).map((exp: any, idx: number) => (
-              <View key={idx} className="border-l-2 border-border pl-3 pb-3">
-                <Text className="text-xs font-sans-bold text-text-primary">{exp.job_title}</Text>
-                <Text className="text-xs font-sans text-text-muted">{exp.company_name} • {exp.duration || 'N/A'}</Text>
-              </View>
-            ))}
-            {data.resume_json.experience.length > 5 && (
+            {(
+              data?.resume_json?.work_experience ||
+              data?.resume_json?.experience ||
+              data?.normalized_resume?.employment ||
+              []
+            ).slice(0, 5).map((exp: any, idx: number) => {
+              const title = exp.job_title?.normalized_value || exp.job_title || 'Untitled Role';
+              const company = exp.company?.normalized_value || exp.company || exp.company_name || 'Organization';
+              const dates = exp.interval?.raw_value || exp.dates || exp.duration || 'N/A';
+              return (
+                <View key={idx} className="border-l-2 border-border pl-3 pb-3">
+                  <Text className="text-xs font-sans-bold text-text-primary">{title}</Text>
+                  <Text className="text-xs font-sans text-text-muted">{company} • {dates}</Text>
+                </View>
+              );
+            })}
+            {(
+              (data?.resume_json?.work_experience || data?.resume_json?.experience || data?.normalized_resume?.employment || []).length > 5
+            ) && (
               <Text className="text-[10px] text-primary font-sans-medium cursor-pointer" onPress={() => setShowFullText(true)}>
-                + {data.resume_json.experience.length - 5} more roles
+                + {(data?.resume_json?.work_experience || data?.resume_json?.experience || data?.normalized_resume?.employment || []).length - 5} more roles
               </Text>
             )}
           </Card>
@@ -309,8 +324,84 @@ export default function CandidateDetailScreen() {
           )}
         </Card>
 
-        {/* Best Match Vacancy */}
-        {bestMatch && analysis?.has_genuine_match && (
+        {/* Candidate Skills */}
+        {(data?.resume_json?.skills || []).length > 0 && (
+          <Card className="p-3 gap-2 border-border shadow-none">
+            <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Skills</Text>
+            <View className="flex-row flex-wrap gap-1">
+              {data!.resume_json!.skills!.map((skill: string, idx: number) => (
+                <Badge key={idx} label={skill} tone="neutral" />
+              ))}
+            </View>
+          </Card>
+        )}
+
+        {/* Suitable Openings */}
+        {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
+          analysis.suitable_openings.map((match: any, idx: number) => {
+            const matchLabel = match.classification === 'HIGH'
+              ? (idx === 0 ? 'Top Job Match' : 'Strong Match')
+              : 'Potential Match';
+            const isTop = idx === 0 && match.classification === 'HIGH';
+            return (
+            <Card key={idx} className={`p-3 border-primary/40 shadow-none gap-2 ${idx > 0 ? 'mt-3 opacity-90 border-border' : ''}`}>
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1">
+                  <View className="flex-row items-center gap-1.5 mb-1">
+                    <Award size={14} color={isTop ? COLORS.primary : COLORS.textMuted} />
+                    <Text className={`text-xs font-sans-bold uppercase tracking-wider ${isTop ? 'text-primary' : 'text-text-muted'}`}>
+                      {matchLabel}
+                    </Text>
+                  </View>
+                  <Text className="text-sm font-sans-bold text-text-primary">{match.job_title}</Text>
+                  <Text className="text-[11px] font-sans-medium text-text-muted">{match.department_name || match.department}</Text>
+                </View>
+                <ScoreBadge score={match.overall_score || match.score || 0} classification={match.classification} />
+              </View>
+              
+              {match.component_scores ? (
+                 <ComponentScoreBar scores={match.component_scores} />
+              ) : null}
+
+              {match.llm_reason ? (
+                <View className="bg-primary/5 p-2 mt-1 rounded border border-primary/10">
+                  <Text className="text-xs text-text-primary leading-4 font-sans-bold mb-1">AI Reasoning:</Text>
+                  <Text className="text-xs text-text-primary leading-4">{match.llm_reason}</Text>
+                </View>
+              ) : null}
+              
+              {match.missing_skills && match.missing_skills.length > 0 && (
+                 <View className="mt-1">
+                   <Text className="text-[10px] font-sans-bold text-danger uppercase mb-1">Skill Gaps:</Text>
+                   <View className="flex-row flex-wrap gap-1">
+                     {match.missing_skills.map((s: string, sIdx: number) => (
+                       <Badge key={sIdx} label={s} tone="danger" />
+                     ))}
+                   </View>
+                 </View>
+              )}
+
+              {(match.recommendation && !match.llm_reason) ? (
+                <View className="bg-primary/5 p-2 mt-1 rounded border border-primary/10">
+                  <Text className="text-xs text-text-primary leading-4">💡 {match.recommendation}</Text>
+                </View>
+              ) : null}
+
+              <View className="flex-row justify-end mt-2">
+                <Button
+                  label="HR Review"
+                  variant="secondary"
+                  size="sm"
+                  icon={<Edit3 size={12} color={COLORS.primary} />}
+                  onPress={() => {
+                    setSelectedJobForReview(match);
+                    setReviewModalVisible(true);
+                  }}
+                />
+              </View>
+            </Card>
+          );})
+        ) : bestMatch && analysis?.has_genuine_match ? (
           <Card className="p-3 border-primary/40 shadow-none gap-2">
             <View className="flex-row justify-between items-start">
               <View className="flex-1">
@@ -323,20 +414,63 @@ export default function CandidateDetailScreen() {
               </View>
               <ScoreBadge score={bestMatch.overall_score || bestMatch.score || 0} classification={bestMatch.classification} />
             </View>
-            {bestMatch.recommendation && (
+            
+            {bestMatch.component_scores ? (
+               <ComponentScoreBar scores={bestMatch.component_scores} />
+            ) : null}
+
+            {bestMatch.recommendation ? (
               <View className="bg-primary/5 p-2 mt-1 rounded border border-primary/10">
                 <Text className="text-xs text-text-primary leading-4">💡 {bestMatch.recommendation}</Text>
               </View>
-            )}
+            ) : null}
             <View className="flex-row justify-end mt-2">
               <Button
                 label="HR Review"
                 variant="secondary"
                 size="sm"
                 icon={<Edit3 size={12} color={COLORS.primary} />}
-                onPress={() => setReviewModalVisible(true)}
+                onPress={() => {
+                  setSelectedJobForReview(bestMatch);
+                  setReviewModalVisible(true);
+                }}
               />
             </View>
+          </Card>
+        ) : null}
+
+        {/* Unsuitable Openings — Manual Review Required */}
+        {analysis?.unsuitable_openings && analysis.unsuitable_openings.length > 0 && (
+          <Card className="p-3 border-warning/30 shadow-none gap-2 bg-warning/5">
+            <View className="flex-row items-center gap-1.5 mb-1 border-b border-warning/20 pb-2">
+              <AlertTriangle size={14} color={COLORS.warning} />
+              <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
+                Manual Review Required ({analysis.unsuitable_openings.length})
+              </Text>
+            </View>
+            <Text className="text-[10px] text-text-muted mb-1">
+              These vacancies scored below the suitability threshold. HR review is recommended before any decision.
+            </Text>
+            {analysis.unsuitable_openings.map((match: any, idx: number) => (
+              <View key={idx} className="flex-row justify-between items-center p-2 bg-background border border-border rounded">
+                <View className="flex-1 pr-2">
+                  <Text className="text-xs font-sans-bold text-text-primary">{match.job_title}</Text>
+                  <Text className="text-[10px] text-text-muted">{match.department_name || match.department}</Text>
+                </View>
+                <View className="flex-row items-center gap-2">
+                  <ScoreBadge score={match.overall_score || match.score || 0} classification={match.classification} />
+                  <Button
+                    label="Review"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => {
+                      setSelectedJobForReview(match);
+                      setReviewModalVisible(true);
+                    }}
+                  />
+                </View>
+              </View>
+            ))}
           </Card>
         )}
 
@@ -481,9 +615,9 @@ export default function CandidateDetailScreen() {
               <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">AI Domain Analysis</Text>
             </View>
 
-            {analysis?.ai_career_summary && (
+            {analysis?.ai_career_summary ? (
               <Text className="text-xs font-sans text-text-primary leading-5 mb-2">{analysis.ai_career_summary}</Text>
-            )}
+            ) : null}
 
             <View className="flex-row items-center justify-between">
               <Text className="text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
@@ -623,20 +757,20 @@ export default function CandidateDetailScreen() {
           {/* Right Side: Primary Metric & Actions */}
           <View className="flex-row items-center gap-3">
             {/* Hiring Recommendation Badge placed prominently */}
-            {recommendations && !recommendationsLoading && recommendations.hiring_recommendation && (
+            {recommendations && !recommendationsLoading && recommendations.hiring_recommendation ? (
               <View className="hidden md:flex">
                 <Badge
                   label={formatHiringRecLabel(recommendations.hiring_recommendation)}
                   tone={getHiringRecTone(recommendations.hiring_recommendation)}
                 />
               </View>
-            )}
-            {bestMatch?.overall_score && (
+            ) : null}
+            {bestMatch?.overall_score != null ? (
               <View className="items-center px-3 py-1 bg-background border border-border rounded">
                 <Text className="text-[10px] text-text-muted uppercase font-sans-bold">AI Match</Text>
                 <Text className="text-xs font-sans-bold text-primary">{Math.round(bestMatch.overall_score)}%</Text>
               </View>
-            )}
+            ) : null}
             <View className="flex-row gap-2">
               <View className="h-8 rounded-md overflow-hidden bg-secondary">
                 <Button
@@ -702,12 +836,15 @@ export default function CandidateDetailScreen() {
       </ScrollView>
 
       {/* Modals */}
-      {bestMatch && (
+      {selectedJobForReview && (
         <HrReviewModal
           visible={reviewModalVisible}
           scanId={scanId}
-          job={bestMatch}
-          onClose={() => setReviewModalVisible(false)}
+          job={selectedJobForReview}
+          onClose={() => {
+            setReviewModalVisible(false);
+            setSelectedJobForReview(null);
+          }}
           onSubmitted={fetchDetail}
         />
       )}

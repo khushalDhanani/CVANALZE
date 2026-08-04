@@ -404,6 +404,11 @@ export interface CandidateSearchOptions {
   department?: string;
   min_experience?: number;
   max_experience?: number;
+  location?: string;
+  skills?: string[];
+  education?: string;
+  status?: string;
+  min_similarity?: number;
   limit?: number;
 }
 

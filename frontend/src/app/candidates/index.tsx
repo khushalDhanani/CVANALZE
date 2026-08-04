@@ -14,7 +14,7 @@ import { COLORS } from '@/constants/colors';
 export default function CandidateListScreen() {
   usePageTitle('Candidate Directory | AIRIS');
   const router = useRouter();
-  const params = useLocalSearchParams<{ query?: string; classification?: string; department?: string }>();
+  const params = useLocalSearchParams<{ query?: string; classification?: string; department?: string; location?: string; skills?: string; education?: string; min_experience?: string; max_experience?: string; limit?: string }>();
   const { candidates, loading, error, searchMode, refreshCandidates } = useCandidates();
 
   const [searchQuery, setSearchQuery] = useState<string>(params.query || '');
@@ -22,9 +22,21 @@ export default function CandidateListScreen() {
     (params.classification as any) || 'ALL'
   );
   const [filterDept, setFilterDept] = useState<string>(params.department || '');
+  const [filterLocation, setFilterLocation] = useState<string>(params.location || '');
+  const [filterSkills, setFilterSkills] = useState<string>(params.skills || '');
+  const [filterEducation, setFilterEducation] = useState<string>(params.education || '');
+  const [filterMinExp, setFilterMinExp] = useState<string>(params.min_experience || '');
+  const [filterMaxExp, setFilterMaxExp] = useState<string>(params.max_experience || '');
+  const [filterLimit, setFilterLimit] = useState<string>(params.limit || '50');
 
   const debouncedSearch = useDebounce(searchQuery, 300);
   const debouncedDept = useDebounce(filterDept, 300);
+  const debouncedLocation = useDebounce(filterLocation, 300);
+  const debouncedSkills = useDebounce(filterSkills, 300);
+  const debouncedEducation = useDebounce(filterEducation, 300);
+  const debouncedMinExp = useDebounce(filterMinExp, 300);
+  const debouncedMaxExp = useDebounce(filterMaxExp, 300);
+  const debouncedLimit = useDebounce(filterLimit, 300);
 
   // Synchronize state changes with URL query parameters
   useEffect(() => {
@@ -32,22 +44,42 @@ export default function CandidateListScreen() {
     if (debouncedSearch) nextParams.query = debouncedSearch;
     if (filterClassification && filterClassification !== 'ALL') nextParams.classification = filterClassification;
     if (debouncedDept) nextParams.department = debouncedDept;
+    if (debouncedLocation) nextParams.location = debouncedLocation;
+    if (debouncedSkills) nextParams.skills = debouncedSkills;
+    if (debouncedEducation) nextParams.education = debouncedEducation;
+    if (debouncedMinExp) nextParams.min_experience = debouncedMinExp;
+    if (debouncedMaxExp) nextParams.max_experience = debouncedMaxExp;
+    if (debouncedLimit && debouncedLimit !== '50') nextParams.limit = debouncedLimit;
 
     router.setParams(nextParams);
-  }, [debouncedSearch, filterClassification, debouncedDept]);
+  }, [debouncedSearch, filterClassification, debouncedDept, debouncedLocation, debouncedSkills, debouncedEducation, debouncedMinExp, debouncedMaxExp, debouncedLimit]);
+
+  const refreshPayload = React.useMemo(() => ({
+    query: debouncedSearch || undefined,
+    department: debouncedDept || undefined,
+    location: debouncedLocation || undefined,
+    education: debouncedEducation || undefined,
+    skills: debouncedSkills ? debouncedSkills.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+    min_experience: debouncedMinExp ? parseFloat(debouncedMinExp) : undefined,
+    max_experience: debouncedMaxExp ? parseFloat(debouncedMaxExp) : undefined,
+    limit: debouncedLimit ? parseInt(debouncedLimit, 10) : 50,
+  }), [debouncedSearch, debouncedDept, debouncedLocation, debouncedSkills, debouncedEducation, debouncedMinExp, debouncedMaxExp, debouncedLimit]);
 
   useEffect(() => {
-    refreshCandidates({
-      query: debouncedSearch || undefined,
-      department: debouncedDept || undefined,
-    });
-  }, [debouncedSearch, debouncedDept, refreshCandidates]);
+    refreshCandidates(refreshPayload);
+  }, [refreshPayload, refreshCandidates]);
 
   const handleOpenCandidateDetail = (candId: string) => {
     const queryParams: Record<string, string> = {};
     if (searchQuery) queryParams.query = searchQuery;
     if (filterClassification !== 'ALL') queryParams.classification = filterClassification;
     if (filterDept) queryParams.department = filterDept;
+    if (filterLocation) queryParams.location = filterLocation;
+    if (filterSkills) queryParams.skills = filterSkills;
+    if (filterEducation) queryParams.education = filterEducation;
+    if (filterMinExp) queryParams.min_experience = filterMinExp;
+    if (filterMaxExp) queryParams.max_experience = filterMaxExp;
+    if (filterLimit && filterLimit !== '50') queryParams.limit = filterLimit;
 
     router.push({
       pathname: '/candidates/[id]',
@@ -186,7 +218,7 @@ export default function CandidateListScreen() {
           label="Refresh"
           variant="secondary"
           size="sm"
-          onPress={() => refreshCandidates({ query: searchQuery || undefined, department: filterDept || undefined })}
+          onPress={() => refreshCandidates(refreshPayload)}
         />
       </View>
 
@@ -216,14 +248,71 @@ export default function CandidateListScreen() {
             value={filterClassification}
             onChange={(val) => setFilterClassification(val as 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED')}
           />
-          <TextField
-            label="Department / Role Filter"
-            value={filterDept}
-            onChangeText={(text) => {
-              setFilterDept(text);
-            }}
-            placeholder="e.g. Engineering, Sales..."
-          />
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <TextField
+                label="Department / Role"
+                value={filterDept}
+                onChangeText={setFilterDept}
+                placeholder="e.g. Engineering..."
+              />
+            </View>
+            <View className="flex-1">
+              <TextField
+                label="Location"
+                value={filterLocation}
+                onChangeText={setFilterLocation}
+                placeholder="e.g. Remote, NY..."
+              />
+            </View>
+          </View>
+          <View className="flex-row gap-3">
+            <View className="flex-[2]">
+              <TextField
+                label="Required Skills (comma separated)"
+                value={filterSkills}
+                onChangeText={setFilterSkills}
+                placeholder="e.g. Python, React, SQL..."
+              />
+            </View>
+            <View className="flex-[1]">
+              <TextField
+                label="Limit"
+                value={filterLimit}
+                onChangeText={setFilterLimit}
+                placeholder="50"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <TextField
+                label="Min Exp (Yrs)"
+                value={filterMinExp}
+                onChangeText={setFilterMinExp}
+                placeholder="e.g. 2"
+                keyboardType="numeric"
+              />
+            </View>
+            <View className="flex-1">
+              <TextField
+                label="Max Exp (Yrs)"
+                value={filterMaxExp}
+                onChangeText={setFilterMaxExp}
+                placeholder="e.g. 5"
+                keyboardType="numeric"
+              />
+            </View>
+            <View className="flex-1">
+              <TextField
+                label="Education"
+                value={filterEducation}
+                onChangeText={setFilterEducation}
+                placeholder="e.g. Bachelor"
+              />
+            </View>
+          </View>
         </View>
 
         {/* Loading state */}

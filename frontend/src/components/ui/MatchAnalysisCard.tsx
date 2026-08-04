@@ -167,6 +167,60 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
         );
       })()}
 
+      {/* Skills Analysis */}
+      {(() => {
+        const matched = bestMatch.matched_skills || [];
+        const missing = bestMatch.missing_skills || [];
+        const inferred = bestMatch.inferred_skills || [];
+
+        if (matched.length === 0 && missing.length === 0 && inferred.length === 0) {
+          return null;
+        }
+
+        return (
+          <View className="gap-2 mt-2">
+            {matched.length > 0 && (
+              <View>
+                <Text className="text-xs font-sans-bold text-success mb-1">✓ Matched Skills</Text>
+                <View className="flex-row flex-wrap gap-1.5">
+                  {matched.map((s: string, i: number) => (
+                    <View key={i} className="bg-success/10 border border-success/30 px-2 py-0.5 rounded-md">
+                      <Text className="text-[10px] font-sans text-success">{s}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            
+            {inferred.length > 0 && (
+              <View>
+                <Text className="text-xs font-sans-bold text-info mb-1">✨ Inferred Skills</Text>
+                <View className="flex-row flex-wrap gap-1.5">
+                  {inferred.map((s: string, i: number) => (
+                    <View key={i} className="bg-info/10 border border-info/30 px-2 py-0.5 rounded-md">
+                      <Text className="text-[10px] font-sans text-info">{s}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {missing.length > 0 && (
+              <View>
+                <Text className="text-xs font-sans-bold text-text-muted mb-1">✗ Missing Skills</Text>
+                <View className="flex-row flex-wrap gap-1.5">
+                  {missing.map((s: string, i: number) => (
+                    <View key={i} className="bg-surface-elevated border border-border/60 px-2 py-0.5 rounded-md">
+                      <Text className="text-[10px] font-sans text-text-muted">{s}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        );
+      })()}
+
       {/* Component Breakdown */}
       {!!bestMatch.component_scores && (
         <View>

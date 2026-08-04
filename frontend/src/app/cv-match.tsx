@@ -12,7 +12,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
-import { useCvUpload } from '@/hooks/useCvUpload';
+import { CandidateProfileSummary } from '@/components/ui/CandidateProfileSummary';
+import { useCvUpload, FilePickerAsset } from '@/hooks/useCvUpload';
 import { matchService } from '@/services/matchService';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { CandidateMatchAnalysis, JobMatchScore } from '@/types/api';
@@ -59,10 +60,32 @@ export default function CvMatchScreen() {
     currentStepIndex,
     stepStates,
     uploadAndProcess,
+    forceReanalyze,
   } = useCvUpload();
 
   const [selectedJobForReview, setSelectedJobForReview] = useState<JobMatchScore | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
+  const [selectedFile, setSelectedFile] = useState<FilePickerAsset | null>(null);
+
+  const triggerUpload = (file: FilePickerAsset & { size?: number }) => {
+    // Check file size (max 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    const size = file.size || (file.rawFile && file.rawFile.size) || 0;
+    if (size > MAX_SIZE) {
+      alert("File is too large. Maximum allowed size is 10MB.");
+      return;
+    }
+    setSelectedFile(file);
+    uploadAndProcess(file, useLlmEnrichment);
+  };
+
+  const handleRetry = () => {
+    if (selectedFile) {
+      triggerUpload(selectedFile);
+    } else {
+      handlePickAndUploadFile();
+    }
+  };
 
   const handleAnalyzeText = async () => {
     if (!cvText.trim()) {
@@ -90,15 +113,13 @@ export default function CvMatchScreen() {
       input.onchange = (e: any) => {
         const selectedFile = e.target?.files?.[0];
         if (selectedFile) {
-          uploadAndProcess(
-            {
-              uri: URL.createObjectURL(selectedFile),
-              name: selectedFile.name,
-              type: selectedFile.type || 'application/pdf',
-              rawFile: selectedFile,
-            },
-            useLlmEnrichment
-          );
+          triggerUpload({
+            uri: URL.createObjectURL(selectedFile),
+            name: selectedFile.name,
+            type: selectedFile.type || 'application/pdf',
+            rawFile: selectedFile,
+            size: selectedFile.size,
+          });
         }
       };
       input.click();
@@ -116,15 +137,13 @@ export default function CvMatchScreen() {
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
           const picked = result.assets[0];
-          uploadAndProcess(
-            {
-              uri: picked.uri,
-              name: picked.name,
-              type: picked.mimeType || 'application/pdf',
-              rawFile: (picked as any).file,
-            },
-            useLlmEnrichment
-          );
+          triggerUpload({
+            uri: picked.uri,
+            name: picked.name,
+            type: picked.mimeType || 'application/pdf',
+            rawFile: (picked as any).file,
+            size: picked.size,
+          });
         }
       } catch (err: any) {
         console.warn('Native document picker failed:', err);
@@ -228,7 +247,7 @@ export default function CvMatchScreen() {
                   statusMessage={statusMessage}
                   error={uploadError}
                   useLlmEnrichment={useLlmEnrichment}
-                  onRetry={handlePickAndUploadFile}
+                  onRetry={handleRetry}
                   isProcessing={uploading}
                   isComplete={isComplete}
                 />
@@ -263,9 +282,23 @@ export default function CvMatchScreen() {
           {/* ANALYSIS RESULTS SECTION */}
           {currentAnalysis && (
             <View className="gap-4">
-              <Text className="text-base font-sans-bold text-text-primary border-b border-border pb-2">
-                Match Results Summary
-              </Text>
+              <View className="flex-row items-center justify-between border-b border-border pb-2">
+                <Text className="text-base font-sans-bold text-text-primary">
+                  Match Results Summary
+                </Text>
+                {activeTab === 'file' && scanId && (
+                  <Button
+                    label="Force Re-analyze"
+                    variant="outline"
+                    size="sm"
+                    onPress={() => forceReanalyze(scanId)}
+                    disabled={uploading}
+                  />
+                )}
+              </View>
+
+              {/* Candidate Profile Details */}
+              <CandidateProfileSummary analysis={currentAnalysis as any} />
 
               {/* Best Match Card */}
               <MatchAnalysisCard
