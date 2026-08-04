@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from app.core.config import settings
 from app.prompts.optimized_match import build_optimized_match_prompt
 from app.services.llm_service import OllamaLLMService
 
@@ -8,6 +9,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def run():
+    if not settings.OLLAMA_LIVE_TESTS_ENABLED:
+        raise RuntimeError("Set OLLAMA_LIVE_TESTS_ENABLED=true to run the manual live Ollama check.")
+
     cv_text = """
 ## RESUME
 
@@ -50,4 +54,8 @@ EMAIL-niteshparmar0711@gmail.com
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    try:
+        asyncio.run(run())
+    finally:
+        OllamaLLMService.unload_model(settings.OLLAMA_MODEL)
+        OllamaLLMService.close_transport()

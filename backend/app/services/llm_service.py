@@ -44,22 +44,24 @@ class _StructuredGeneration:
 
 class OllamaLLMService:
     @classmethod
-    def check_health(cls) -> bool:
+    def get_status(cls) -> tuple[bool, list[str]]:
+        """Return Ollama reachability and normalized models from one tags request."""
         try:
-            OllamaTransport.get_tags()
-            return True
+            result = OllamaTransport.get_tags()
+            return True, [model.name for model in result.value.models]
         except OllamaError as exc:
-            logger.warning(f"[OLLAMA] operation=health status=FALLBACK error={type(exc).__name__}")
-            return False
+            logger.warning(f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__}")
+            return False, []
+
+    @classmethod
+    def check_health(cls) -> bool:
+        healthy, _ = cls.get_status()
+        return healthy
 
     @classmethod
     def get_available_models(cls) -> list[str]:
-        try:
-            result = OllamaTransport.get_tags()
-            return [model.name for model in result.value.models]
-        except OllamaError as exc:
-            logger.warning(f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__}")
-            return []
+        _, models = cls.get_status()
+        return models
 
     @classmethod
     def extract_candidate_profile(
@@ -75,7 +77,11 @@ class OllamaLLMService:
             cache_key=cache_key,
             response_model=DynamicCandidateProfile,
             think=False,
-            options={"num_predict": 2048, "num_ctx": 4096, "temperature": 0.0},
+            options={
+                "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
+                "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
+                "temperature": 0.0,
+            },
         )
 
     @classmethod
@@ -92,7 +98,11 @@ class OllamaLLMService:
             cache_key=cache_key,
             response_model=QwenCVAnalysis,
             think=True,
-            options={"num_predict": 2048, "num_ctx": 4096, "temperature": 0.0},
+            options={
+                "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
+                "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
+                "temperature": 0.0,
+            },
         )
 
     @classmethod
@@ -109,7 +119,11 @@ class OllamaLLMService:
             cache_key=cache_key,
             response_model=DynamicMappingResponse,
             think=True,
-            options={"num_predict": 2048, "num_ctx": 4096, "temperature": 0.0},
+            options={
+                "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
+                "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
+                "temperature": 0.0,
+            },
         )
 
     @classmethod
@@ -128,8 +142,8 @@ class OllamaLLMService:
             response_model=OptimizedLLMMatchResponse,
             think=True,
             options={
-                "num_predict": 4096,
-                "num_ctx": 8192,
+                "num_predict": settings.OLLAMA_OPTIMIZED_NUM_PREDICT,
+                "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
                 "temperature": 0.0,
                 "top_p": 0.9,
             },
@@ -242,8 +256,8 @@ class OllamaLLMService:
 
     @staticmethod
     def unload_model(model_name: str | None = None) -> bool:
-        """Compatibility operation for explicit lifecycle shutdowns; no longer called per CV."""
-        if not settings.LLM_ENABLED:
+        """Compatibility operation for explicit lifecycle and shutdown cleanup."""
+        if model_name is None and not settings.LLM_ENABLED:
             return False
         model = model_name or settings.OLLAMA_MODEL
         try:

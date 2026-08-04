@@ -47,13 +47,16 @@ REDIS_URL=redis://localhost:6379/0
 The backend code is located in the `backend/` directory. You should run these commands in separate terminal tabs, making sure to `cd backend` in each one.
 
 ### A. Start the RQ Workers (Background Processing)
-The background workers process the heavy CV extraction and LLM matching tasks. You can start one or more workers:
+The background worker processes the heavy CV extraction and LLM matching tasks. On an 8 GB Apple Silicon Mac, run exactly one worker:
 
 ```bash
 cd backend
 OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run python start_worker.py
 ```
-*(To scale up, simply open another terminal, `cd backend`, and run the exact same command to spawn a second worker).*
+Additional workers are intended only for larger environments. Ollama model calls remain serialized by the shared lock even when more than one process is running.
+
+For lightweight local Ollama, use `qwen3:1.7b`, keep `OLLAMA_MAX_LOADED_MODELS=1` and `OLLAMA_NUM_PARALLEL=1` in the host Ollama environment, and leave live AI disabled
+unless the current task needs it. The backend unloads each model after a logical generation or embedding batch.
 
 ### B. Start the FastAPI Server (Web API & WebSockets)
 The FastAPI server exposes the REST endpoints and the real-time WebSocket progress endpoint.

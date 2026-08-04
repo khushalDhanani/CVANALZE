@@ -83,16 +83,16 @@ def test_incremental_vacancy_embedding_skips_unchanged():
         return_value=(None, None),
     ):
         with patch(
-            "app.services.embedding_service.EmbeddingService._call_ollama_batch_embed",
-            return_value=mock_embeddings,
+            "app.services.embedding_service.EmbeddingService.generate_batch_embeddings",
+            return_value={"0": mock_embeddings[0], "1": mock_embeddings[1]},
         ) as mock_batch:
             # First sync: Both vacancies are new -> batch embed called once for 2 items
             first_metrics = JobRepository._cache_vacancy_embeddings(jobs)
             assert mock_batch.call_count == 1
-            assert len(mock_batch.call_args[0][1]) == 2
+            assert len(mock_batch.call_args.args[0]) == 2
             assert first_metrics == {"total": 2, "synced": 2, "skipped": 0, "failed": 0}
 
-        with patch("app.services.embedding_service.EmbeddingService._call_ollama_batch_embed") as mock_batch_second:
+        with patch("app.services.embedding_service.EmbeddingService.generate_batch_embeddings") as mock_batch_second:
             # Second sync: No content changes -> 0 vacancies uncached -> batch embed NOT called!
             second_metrics = JobRepository._cache_vacancy_embeddings(jobs)
             assert mock_batch_second.call_count == 0
@@ -126,15 +126,15 @@ def test_vacancy_content_change_triggers_reembedding():
     ]
 
     with patch(
-        "app.services.embedding_service.EmbeddingService._call_ollama_batch_embed",
-        return_value=[[0.3] * 768],
+        "app.services.embedding_service.EmbeddingService.generate_batch_embeddings",
+        return_value={"0": [0.3] * 768},
     ) as mock_batch:
         JobRepository._cache_vacancy_embeddings(job_v1)
         assert mock_batch.call_count == 1
 
     with patch(
-        "app.services.embedding_service.EmbeddingService._call_ollama_batch_embed",
-        return_value=[[0.4] * 768],
+        "app.services.embedding_service.EmbeddingService.generate_batch_embeddings",
+        return_value={"0": [0.4] * 768},
     ) as mock_batch_v2:
         # Second sync with updated skills -> Hash changed -> batch embed called again!
         JobRepository._cache_vacancy_embeddings(job_v2)

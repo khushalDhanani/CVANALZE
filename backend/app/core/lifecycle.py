@@ -102,7 +102,13 @@ def close_ollama_lifecycle() -> None:
     from app.services.llm_service import OllamaLLMService
 
     try:
-        if settings.LLM_ENABLED and settings.OLLAMA_UNLOAD_ON_SHUTDOWN:
-            OllamaLLMService.unload_model()
+        if settings.OLLAMA_UNLOAD_ON_SHUTDOWN:
+            models: set[str] = set()
+            if settings.LLM_ENABLED:
+                models.add(settings.OLLAMA_MODEL)
+            if settings.EMBEDDING_ENABLED:
+                models.add(settings.EMBEDDING_MODEL)
+            for model in models:
+                OllamaLLMService.unload_model(model)
     finally:
         OllamaLLMService.close_transport()

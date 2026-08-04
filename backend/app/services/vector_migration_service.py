@@ -31,6 +31,7 @@ class VectorDatabaseMigrationService:
         metrics = {"total": len(results), "synced": 0, "skipped": 0, "failed": 0}
 
         model_version = settings.EMBEDDING_MODEL
+        pending: list[tuple[str, str, str]] = []
 
         for r in results:
             if not r or not isinstance(r, dict):
@@ -52,16 +53,23 @@ class VectorDatabaseMigrationService:
                 metrics["skipped"] += 1
                 continue
 
+            pending.append((cv_key, markdown_text, cv_hash))
+
+        if pending:
             try:
-                new_emb = EmbeddingService.generate_embedding(markdown_text, model_version=model_version, identifier=cv_key)
-                if new_emb:
-                    save_candidate_embedding(cv_key, new_emb, cv_hash)
-                    metrics["synced"] += 1
-                else:
-                    metrics["failed"] += 1
+                batch = EmbeddingService.generate_batch_embeddings(
+                    [markdown_text for _, markdown_text, _ in pending],
+                    model_version=model_version,
+                )
+                for index, (cv_key, _, cv_hash) in enumerate(pending):
+                    new_emb = batch.get(str(index))
+                    if new_emb and save_candidate_embedding(cv_key, new_emb, cv_hash):
+                        metrics["synced"] += 1
+                    else:
+                        metrics["failed"] += 1
             except Exception as exc:
-                logger.warning(f"[VECTOR_SYNC] Failed embedding candidate '{cv_key}': {exc}")
-                metrics["failed"] += 1
+                logger.warning(f"[VECTOR_SYNC] Candidate embedding batch failed: {type(exc).__name__}")
+                metrics["failed"] += len(pending)
 
         logger.info(f"[VECTOR_SYNC] Candidate embedding sync complete: {metrics['synced']} synced, {metrics['skipped']} skipped/unchanged, {metrics['failed']} failed.")
         return metrics

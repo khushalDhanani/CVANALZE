@@ -35,9 +35,8 @@ async def check_llm_health():
     from app.services.llm_service import OllamaLLMService
 
     try:
-        model_names = OllamaLLMService.get_available_models()
-        is_healthy = bool(model_names) or OllamaLLMService.check_health()
-        if is_healthy or model_names:
+        is_healthy, model_names = OllamaLLMService.get_status()
+        if is_healthy:
             return {
                 "status": "online",
                 "model_configured": settings.OLLAMA_MODEL,

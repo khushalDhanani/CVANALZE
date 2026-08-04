@@ -1,9 +1,51 @@
 # Work Status
 
 ## Last Updated
-2026-08-03T16:33:48+05:30
+2026-08-03T18:16:47+05:30
 
-## Current Task — Lightweight Apple Silicon Docker Optimization
+## Current Task — Ollama Optimization Implementation
+- Implemented strict normalized contracts for tags, generation, embeddings, and unload responses, including HTTP-200 error rejection, completion/model validation,
+  bounded streamed response reads, finite vector checks, consistent/expected dimensions, and zero-vector rejection.
+- Added one thread lock plus a shared file lock across API/RQ processes, total operation deadlines, one pooled client per logical scope, deterministic response closure,
+  unload-in-`finally`, and client reset after every Ollama operation.
+- Kept all embedding chunks inside one serialized model scope, deduplicated repeated inputs, bounded schema-failure splitting, and removed batch-to-individual request fan-out.
+- Batched candidate migration/search fallback, vacancy synchronization, performance embedding, taxonomy terms, and RQ vacancy synchronization so loops no longer load the
+  same model once per item.
+- Added single-request Ollama health status, shutdown cleanup for both configured models, offline pytest protection, a shared cross-process test lock, and an explicit live
+  opt-in for the manual Ollama script.
+- Applied strict local defaults: AI remains disabled by default; opt-in generation uses `qwen3:1.7b`; `nomic-embed-text` remains for the 768-dimensional contract; one
+  connection, zero default retries, strict per-operation deadlines, 4 MiB response limit, and reduced context/output budgets are enforced.
+- Added focused regressions for serialization, unload after failure, non-finite vectors, one unload across embedding chunks, no per-item fan-out, and serialized
+  performance batching.
+- Updated environment, Compose, README, run guide, and `ollama-optimization.md` documentation.
+- Confirmed by static search that `OllamaTransport` remains the only production Ollama HTTP client and `git diff --check` passes.
+- Per repository policy, did not run tests, Ruff, builds, Compose, services, model pulls, live Ollama calls, or migrations without separate explicit authorization.
+
+## Files Created / Modified for Current Task
+- Created: `ollama-optimization.md`, `backend/tests/conftest.py`.
+- Transport/configuration: `backend/app/services/ollama_transport.py`, `backend/app/services/llm_service.py`, `backend/app/services/embedding_service.py`,
+  `backend/app/core/config.py`, `backend/app/core/lifecycle.py`, `backend/.env.example`.
+- Batched callers: `backend/app/services/performance_service.py`, `backend/app/services/vector_migration_service.py`,
+  `backend/app/services/candidate_search_service.py`, `backend/app/services/domain_embedding_service.py`, `backend/app/services/dynamic_taxonomy_service.py`,
+  `backend/app/services/embedding_sync_service.py`, `backend/app/core/tasks.py`, `backend/app/api/analysis.py`.
+- Tests/tooling: `backend/tests/test_phase5_ollama_standardization.py`, `backend/tests/test_qwen_llm_service.py`,
+  `backend/tests/test_enterprise_performance.py`, `backend/tests/test_vacancy_embeddings.py`, `backend/test_llm.py`, `backend/pyproject.toml`.
+- Deployment/documentation: `docker-compose.yml`, `docker-compose.local.yml`, `README.md`, `run.md`, `backend/docs/phase5-standardize-ollama.md`, `workstatus.md`.
+
+## Pending Work
+- With explicit authorization, run focused Ollama/embedding/matching/vector/performance tests, the complete mocked pytest suite, Ruff checks, Compose validation, and
+  `git diff --check` again after any verification fixes.
+- With separate live authorization, measure one `qwen3:1.7b` generation and one `nomic-embed-text` batch, confirm resident models unload, and record peak host memory.
+- PostgreSQL migration `007_create_vector_embeddings.sql` still requires separate explicit authorization; this implementation did not change or run migrations.
+
+## Important Decisions
+- Treat each serialized logical generation or embedding batch as the cleanup boundary; unloading after every low-level batch chunk would cause repeated model loads.
+- Tags checks do not load a model and therefore need deterministic response/client cleanup, not an artificial unload request.
+- Keep local AI disabled by default and require explicit opt-in; host Ollama unified-memory use is outside Docker container limits.
+- Preserve the centralized transport, public service/API contracts, model-versioned caches, and existing production overrides.
+- Keep `nomic-embed-text` to avoid an embedding migration/reindex; a future model switch must use a new model-versioned cache and controlled vector rebuild.
+
+## Previous Task — Lightweight Apple Silicon Docker Optimization
 - Added an explicit `docker-compose.local.yml` override for 8 GB Apple Silicon machines while retaining `docker-compose.yml` as the production-oriented base.
 - Limited the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.
 - Disabled local startup warmup, LLM generation, embeddings, Torch compilation, and Docling table-structure analysis by default; each remains configurable.

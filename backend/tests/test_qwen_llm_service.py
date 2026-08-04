@@ -26,14 +26,46 @@ def _disable_llm_cache(monkeypatch) -> None:
 
 
 def _mock_transport_client(monkeypatch, response_data: dict) -> MagicMock:
-    response = MagicMock(spec=httpx.Response)
-    response.status_code = 200
-    response.json.return_value = response_data
     client = MagicMock()
-    client.request.return_value = response
+
+    def stream(_method, _path, **kwargs):
+        payload = kwargs.get("json") or {}
+        if payload.get("keep_alive") == 0:
+            data = {
+                "model": payload["model"],
+                "response": "",
+                "done": True,
+                "done_reason": "unload",
+            }
+        else:
+            data = {
+                "model": payload.get("model", settings.OLLAMA_MODEL),
+                "done": True,
+                "done_reason": "stop",
+                **response_data,
+            }
+        response = httpx.Response(
+            200,
+            json=data,
+            request=httpx.Request("POST", "http://ollama.test/api/generate"),
+        )
+        context = MagicMock()
+        context.__enter__.return_value = response
+        context.__exit__.return_value = False
+        return context
+
+    client.stream.side_effect = stream
     monkeypatch.setattr(OllamaTransport, "get_client", classmethod(lambda cls: client))
     monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 0)
     return client
+
+
+def _generation_payload(client: MagicMock) -> dict:
+    for request_call in client.stream.call_args_list:
+        payload = request_call.kwargs.get("json") or {}
+        if payload.get("keep_alive") != 0:
+            return payload
+    raise AssertionError("No generation request was recorded.")
 
 
 def test_ollama_default_model_is_qwen3_4b():
@@ -71,7 +103,7 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
     )
 
     assert isinstance(result, DynamicCandidateProfile)
-    payload = client.request.call_args.kwargs["json"]
+    payload = _generation_payload(client)
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/no_think")
     assert payload["think"] is False
@@ -104,7 +136,7 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
     )
 
     assert isinstance(result, QwenCVAnalysis)
-    payload = client.request.call_args.kwargs["json"]
+    payload = _generation_payload(client)
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
@@ -139,7 +171,7 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
     )
 
     assert isinstance(result, DynamicMappingResponse)
-    payload = client.request.call_args.kwargs["json"]
+    payload = _generation_payload(client)
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
@@ -180,7 +212,7 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
     )
 
     assert isinstance(result, OptimizedLLMMatchResponse)
-    payload = client.request.call_args.kwargs["json"]
+    payload = _generation_payload(client)
     assert payload["model"] == "qwen3:4b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
@@ -194,7 +226,7 @@ def test_ollama_unload_model_sends_keep_alive_zero(monkeypatch):
     success = OllamaLLMService.unload_model("qwen3:4b")
 
     assert success is True
-    payload = client.request.call_args.kwargs["json"]
+    payload = client.stream.call_args.kwargs["json"]
     assert payload["model"] == "qwen3:4b"
     assert payload["keep_alive"] == 0
 
@@ -210,7 +242,7 @@ def test_domain_embedding_read_only_disables_live_generation(monkeypatch):
         return [0.1, 0.2, 0.3]
 
     monkeypatch.setattr(
-        "app.services.embedding_service.EmbeddingService.generate_embedding",
+        "app.services.embedding_service.EmbeddingService.generate_batch_embeddings",
         mock_generate,
     )
 

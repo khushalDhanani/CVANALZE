@@ -107,12 +107,13 @@ def embed_vacancy(vacancy_id: int | str, job_dict: dict[str, Any] | None = None)
 
 def sync_all_vacancies() -> str:
     """
-    Enqueues embed_vacancy for all active vacancies.
+    Enqueue one bounded vacancy batch so Ollama is loaded and unloaded once.
     """
     from app.repositories.job import JobRepository
 
     jobs = JobRepository.get_all_jobs()
-    count = 0
+    valid_jobs = [job for job in jobs if str(job.get("vacancy_id") or job.get("id") or "").isdigit()]
+    count = len(valid_jobs)
 
     try:
         from redis import Redis
@@ -120,19 +121,17 @@ def sync_all_vacancies() -> str:
 
         redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
         conn = Redis.from_url(redis_url)
-        q = Queue("default", connection=conn)
-
-        for job in jobs:
-            vid = job.get("vacancy_id") or job.get("id")
-            if vid is not None and str(vid).isdigit():
-                q.enqueue("app.core.tasks.embed_vacancy", int(vid))
-                count += 1
+        q = Queue(settings.RQ_QUEUE_NAME, connection=conn)
+        q.enqueue("app.core.tasks.embed_vacancies_batch", valid_jobs)
         return f"Enqueued {count} vacancies for embedding sync."
     except Exception as exc:
         logger.warning(f"RQ queue sync failed, running synchronously: {exc}")
-        for job in jobs:
-            vid = job.get("vacancy_id") or job.get("id")
-            if vid is not None and str(vid).isdigit():
-                embed_vacancy(int(vid), job_dict=job)
-                count += 1
+        embed_vacancies_batch(valid_jobs)
         return f"Synchronously processed {count} vacancies for embedding sync."
+
+
+def embed_vacancies_batch(job_dicts: list[dict[str, Any]]) -> dict[str, int]:
+    """RQ-compatible vacancy batch entry point using the centralized embedding service."""
+    from app.services.embedding_sync_service import EmbeddingSyncService
+
+    return EmbeddingSyncService.sync_vacancy_embeddings(job_dicts)

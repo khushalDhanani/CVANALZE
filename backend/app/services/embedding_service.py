@@ -39,8 +39,6 @@ class EmbeddingService:
     Supports thread-safe metrics, timing instrumentation, and detailed logging.
     """
 
-    _BATCH_SIZE = 10
-
     _metrics_lock = threading.Lock()
     _total_requests: int = 0
     _cache_hits: int = 0
@@ -155,30 +153,40 @@ class EmbeddingService:
         cls,
         texts: list[str],
         model_version: str | None = None,
+        identifiers: list[str | None] | None = None,
     ) -> dict[str, list[float]]:
         if not settings.EMBEDDING_ENABLED:
             return {}
+        if identifiers is not None and len(identifiers) != len(texts):
+            raise ValueError("Embedding identifiers must match the number of texts.")
         model = model_version or settings.EMBEDDING_MODEL
         result: dict[str, list[float]] = {}
-        uncached: list[tuple[str, int]] = []
+        uncached: list[tuple[str, int, str | None]] = []
 
         for idx, text in enumerate(texts):
+            if not text or not text.strip():
+                continue
+            identifier = identifiers[idx] if identifiers is not None else None
             content_hash = cls._content_hash(text)
             cache_key = cls._cache_key(content_hash, model)
             cached = embedding_cache_manager.get(cache_key)
+            if cached is None and identifier:
+                cached = embedding_cache_manager.get(cls._cache_key(identifier, model))
             if cached is not None:
                 result[str(idx)] = cached
             else:
-                uncached.append((text, idx))
+                uncached.append((text, idx, identifier))
 
         if uncached:
-            texts_to_fetch = [t for t, _ in uncached]
+            texts_to_fetch = [text for text, _, _ in uncached]
             embeddings = cls._call_ollama_batch_embed(model, texts_to_fetch)
             if embeddings is not None:
-                for (text, idx), emb in zip(uncached, embeddings):
+                for (text, idx, identifier), emb in zip(uncached, embeddings):
                     content_hash = cls._content_hash(text)
                     cache_key = cls._cache_key(content_hash, model)
                     embedding_cache_manager.set(cache_key, emb)
+                    if identifier:
+                        embedding_cache_manager.set(cls._cache_key(identifier, model), emb)
                     result[str(idx)] = emb
         return result
 
@@ -217,27 +225,24 @@ class EmbeddingService:
         if cls._is_model_throttled(model):
             return None
 
-        all_embeddings: list[list[float]] = []
-        for i in range(0, len(texts), cls._BATCH_SIZE):
-            batch = texts[i : i + cls._BATCH_SIZE]
-            try:
-                result = OllamaTransport.embed(model, batch)
-                all_embeddings.extend(result.value)
-                cls._failed_models_cache.pop(model, None)
-            except OllamaModelUnavailableError:
-                cls._failed_models_cache[model] = time.time()
-                logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
-                break
-            except OllamaUnavailableError:
-                cls._failed_models_cache[model] = time.time()
-                logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
-                break
-            except OllamaError as exc:
-                logger.warning(f"[EMBEDDING] Ollama batch embed failed at offset {i} for model '{model}': {type(exc).__name__}; retrying the batch as individual inputs")
-                for text in batch:
-                    single = cls._call_ollama_embed(model, text)
-                    all_embeddings.append(single if single else [])
-        return all_embeddings if len(all_embeddings) == len(texts) else None
+        try:
+            result = OllamaTransport.embed(model, texts)
+            cls._failed_models_cache.pop(model, None)
+            return result.value
+        except OllamaModelUnavailableError:
+            cls._failed_models_cache[model] = time.time()
+            logger.error(f"[EMBEDDING CRITICAL] Model '{model}' not found in Ollama. Run: ollama pull {model}")
+            return None
+        except OllamaTimeoutError:
+            logger.warning(f"[EMBEDDING] Batch timeout calling Ollama for model '{model}'")
+            return None
+        except OllamaUnavailableError:
+            cls._failed_models_cache[model] = time.time()
+            logger.error(f"[EMBEDDING CRITICAL] Ollama server is NOT running at {settings.OLLAMA_BASE_URL}.")
+            return None
+        except OllamaError as exc:
+            logger.warning(f"[EMBEDDING] Ollama batch embed failed for model '{model}': {type(exc).__name__}; no per-item retry was attempted")
+            return None
 
     @classmethod
     def cosine_similarity(cls, a: list[float], b: list[float]) -> float:

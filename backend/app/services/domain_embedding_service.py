@@ -41,11 +41,54 @@ class DomainEmbeddingService:
             return None
 
         clean_term = term.strip().lower()
+        return cls.get_or_generate_domain_embeddings(
+            [clean_term],
+            category,
+            allow_live_generation=allow_live_generation,
+        ).get(clean_term)
+
+    @classmethod
+    def get_or_generate_domain_embeddings(
+        cls,
+        terms: list[str],
+        category: str,
+        allow_live_generation: bool = True,
+    ) -> dict[str, list[float]]:
+        """Resolve related domain terms through one cached, serialized Ollama batch."""
         cat = category.strip().lower()
+        clean_terms = list(dict.fromkeys(term.strip().lower() for term in terms if term and term.strip()))
+        resolved: dict[str, list[float]] = {}
+        pending: list[str] = []
 
-        model_version = settings.EMBEDDING_MODEL
+        for clean_term in clean_terms:
+            stored = cls._load_domain_embedding(clean_term, cat)
+            if stored is not None:
+                resolved[clean_term] = stored
+            elif allow_live_generation:
+                pending.append(clean_term)
 
-        # 1. DB Lookup in PostgreSQL domain_embeddings table
+        if not allow_live_generation:
+            for clean_term in clean_terms:
+                if clean_term not in resolved:
+                    logger.debug(f"[DOMAIN_EMBEDDING] Live generation disabled for '{clean_term}' ({cat}). Returning None.")
+            return resolved
+
+        if pending:
+            model_version = settings.EMBEDDING_MODEL
+            generated = EmbeddingService.generate_batch_embeddings(
+                pending,
+                model_version=model_version,
+                identifiers=[f"domain:{cat}:{term}" for term in pending],
+            )
+            for index, clean_term in enumerate(pending):
+                embedding = generated.get(str(index))
+                if embedding:
+                    resolved[clean_term] = embedding
+                    cls._save_domain_embedding(clean_term, cat, embedding, model_version)
+        return resolved
+
+    @staticmethod
+    def _load_domain_embedding(clean_term: str, category: str) -> list[float] | None:
         try:
             from app.core.database import pg_SessionLocal
             from app.models.pg import DomainEmbedding
@@ -53,42 +96,37 @@ class DomainEmbeddingService:
             if pg_SessionLocal is not None:
                 with pg_SessionLocal() as session:
                     stmt = select(DomainEmbedding.embedding).where(
-                        DomainEmbedding.category == cat,
+                        DomainEmbedding.category == category,
                         DomainEmbedding.term == clean_term,
                     )
-                    emb = session.execute(stmt).scalar_one_or_none()
-                    if emb is not None:
-                        return list(emb)
+                    embedding = session.execute(stmt).scalar_one_or_none()
+                    if embedding is not None:
+                        return list(embedding)
         except Exception as exc:
             logger.warning(f"[DOMAIN_EMBEDDING] DB lookup failed for '{clean_term}': {exc}")
+        return None
 
-        if not allow_live_generation:
-            logger.debug(f"[DOMAIN_EMBEDDING] Live generation disabled for '{clean_term}' ({cat}). Returning None.")
-            return None
-
-        # 2. Generate embedding via EmbeddingService if missing and live generation allowed
+    @staticmethod
+    def _save_domain_embedding(clean_term: str, category: str, embedding: list[float], model_version: str) -> None:
         try:
-            emb = EmbeddingService.generate_embedding(
-                clean_term,
-                model_version=model_version,
-                identifier=f"domain:{cat}:{clean_term}",
-            )
-            if emb and pg_SessionLocal is not None:
-                content_hash = hashlib.sha256(clean_term.encode("utf-8")).hexdigest()
-                with pg_SessionLocal() as session:
-                    rec = DomainEmbedding(
-                        category=cat,
-                        term=clean_term,
-                        embedding=emb,
-                        embedding_model_version=model_version,
-                        content_hash=content_hash,
-                    )
-                    session.add(rec)
-                    session.commit()
-            return emb
+            from app.core.database import pg_SessionLocal
+            from app.models.pg import DomainEmbedding
+
+            if pg_SessionLocal is None:
+                return
+            content_hash = hashlib.sha256(clean_term.encode("utf-8")).hexdigest()
+            with pg_SessionLocal() as session:
+                rec = DomainEmbedding(
+                    category=category,
+                    term=clean_term,
+                    embedding=embedding,
+                    embedding_model_version=model_version,
+                    content_hash=content_hash,
+                )
+                session.add(rec)
+                session.commit()
         except Exception as exc:
-            logger.warning(f"[DOMAIN_EMBEDDING] Generation failed for '{clean_term}': {exc}")
-            return None
+            logger.warning(f"[DOMAIN_EMBEDDING] DB persistence failed for '{clean_term}': {exc}")
 
     @classmethod
     def find_semantic_equivalents(
@@ -206,8 +244,9 @@ class DomainEmbeddingService:
         if job_title.strip().lower() == candidate_title.strip().lower():
             return 1.0
 
-        t1_emb = cls.get_or_generate_domain_embedding(job_title, "job_titles")
-        t2_emb = cls.get_or_generate_domain_embedding(candidate_title, "job_titles")
+        embeddings = cls.get_or_generate_domain_embeddings([job_title, candidate_title], "job_titles")
+        t1_emb = embeddings.get(job_title.strip().lower())
+        t2_emb = embeddings.get(candidate_title.strip().lower())
 
         if t1_emb and t2_emb:
             return round(EmbeddingService.cosine_similarity(t1_emb, t2_emb), 4)

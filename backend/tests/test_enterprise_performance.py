@@ -30,13 +30,13 @@ def clear_caches():
 @pytest.mark.asyncio
 async def test_async_batch_embedding_generation():
     """
-    Verifies async batch embedding generation with concurrent worker execution and multi-level caching.
+    Verifies async batch embedding generation uses one serialized transport call and multi-level caching.
     """
     mock_emb = [0.1] * 768
     with patch(
-        "app.services.embedding_service.EmbeddingService.generate_embedding",
-        return_value=mock_emb,
-    ):
+        "app.services.embedding_service.EmbeddingService.generate_batch_embeddings",
+        return_value={"0": mock_emb, "1": mock_emb, "2": mock_emb},
+    ) as batch_mock:
         texts = [
             "Python Backend Developer",
             "React Frontend Developer",
@@ -48,6 +48,7 @@ async def test_async_batch_embedding_generation():
         assert results[0] == mock_emb
         assert results[1] == mock_emb
         assert results[2] == mock_emb
+        batch_mock.assert_called_once()
 
 
 def test_multilevel_caching_l1_l2():

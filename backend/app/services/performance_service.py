@@ -124,54 +124,54 @@ class EnterprisePerformanceService:
         return cleared_count
 
     @classmethod
-    async def generate_embeddings_batch_async(cls, texts: list[str], max_concurrent: int = 5, max_retries: int = 3) -> list[list[float] | None]:
+    async def generate_embeddings_batch_async(cls, texts: list[str], max_concurrent: int = 1, max_retries: int = 1) -> list[list[float] | None]:
         """
-        Asynchronous concurrent batch embedding generation with exponential backoff retries.
+        Generate one serialized, cached embedding batch without parallel Ollama calls.
         """
         if not texts:
             return []
 
+        del max_concurrent, max_retries
         cls._metrics["batch_requests"] += 1
-        semaphore = asyncio.Semaphore(max_concurrent)
-
-        async def _worker(text: str) -> list[float] | None:
+        results: list[list[float] | None] = [None] * len(texts)
+        uncached: list[tuple[int, str, str]] = []
+        for index, text in enumerate(texts):
             if not text or not text.strip():
-                return None
+                continue
 
             cache_key = f"{settings.EMBEDDING_MODEL}:{text.strip().lower()}"
             cached = cls.get_multilevel_cache(cache_key)
             if cached is not None:
-                return cached
+                results[index] = cached
+            else:
+                uncached.append((index, text, cache_key))
 
-            async with semaphore:
-                retries = 0
-                backoff = 0.1
-                while retries < max_retries:
-                    try:
-                        start_t = time.perf_counter()
-                        # Execute in threadpool so event loop is non-blocking
-                        loop = asyncio.get_running_loop()
-                        emb = await loop.run_in_executor(None, EmbeddingService.generate_embedding, text)
-                        dur_ms = (time.perf_counter() - start_t) * 1000.0
+        if not uncached:
+            return results
 
-                        if emb:
-                            cls.set_multilevel_cache(cache_key, emb)
-                            cls._metrics["total_embeddings_generated"] += 1
-                            cls._metrics["stage_timings_ms"]["stage2_embedding_generation"] += dur_ms
-                            return emb
-                        break
-                    except Exception as exc:
-                        retries += 1
-                        cls._metrics["retry_attempts"] += 1
-                        logger.warning(f"[ASYNC_EMBEDDING] Attempt {retries} failed for text snippet: {exc}")
-                        await asyncio.sleep(backoff)
-                        backoff *= 2.0
+        started = time.perf_counter()
+        try:
+            batch = await asyncio.to_thread(
+                EmbeddingService.generate_batch_embeddings,
+                [text for _, text, _ in uncached],
+                settings.EMBEDDING_MODEL,
+            )
+        except Exception as exc:
+            logger.warning(f"[ASYNC_EMBEDDING] Serialized batch failed: {type(exc).__name__}")
+            return results
 
-                return None
+        duration_ms = (time.perf_counter() - started) * 1000.0
+        generated = 0
+        for batch_index, (result_index, _, cache_key) in enumerate(uncached):
+            embedding = batch.get(str(batch_index))
+            if embedding:
+                results[result_index] = embedding
+                cls.set_multilevel_cache(cache_key, embedding)
+                generated += 1
 
-        tasks = [_worker(t) for t in texts]
-        results = await asyncio.gather(*tasks)
-        return list(results)
+        cls._metrics["total_embeddings_generated"] += generated
+        cls._metrics["stage_timings_ms"]["stage2_embedding_generation"] += duration_ms
+        return results
 
     @classmethod
     def record_stage_timing(cls, stage_name: str, duration_ms: float) -> None:

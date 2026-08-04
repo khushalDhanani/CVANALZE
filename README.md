@@ -217,13 +217,29 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint; Compose defaults to `host.docker.internal`. |
 | `OLLAMA_MODEL` | `qwen3:4b` | Generation model. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model. |
-| `OLLAMA_REQUEST_TIMEOUT` | `90` | Timeout applied to every Ollama request. |
-| `OLLAMA_MAX_RETRIES` | `1` | Retries after the initial request. |
+| `OLLAMA_REQUEST_TIMEOUT` | `60` | Compatibility timeout used by the shared client. |
+| `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout for every Ollama operation. |
+| `OLLAMA_TAGS_TIMEOUT_SECONDS` | `3` | Total tags/health deadline. |
+| `OLLAMA_GENERATE_TIMEOUT_SECONDS` | `60` | Total structured-generation deadline. |
+| `OLLAMA_EMBED_TIMEOUT_SECONDS` | `30` | Total deadline for a complete embedding batch, including chunks. |
+| `OLLAMA_UNLOAD_TIMEOUT_SECONDS` | `10` | Deadline for the mandatory unload request. |
+| `OLLAMA_MAX_RETRIES` | `0` | Retries after the initial request; local defaults avoid multiplying load. |
 | `OLLAMA_RETRY_BACKOFF_SECONDS` | `0.5` | Base exponential backoff. |
-| `OLLAMA_KEEP_ALIVE` | `30m` | Model lifecycle value sent to Ollama. |
-| `OLLAMA_UNLOAD_ON_SHUTDOWN` | `false` | Requests generation-model unload at process shutdown. |
-| `OLLAMA_MAX_CONNECTIONS` | `20` | Shared transport maximum connections. |
-| `OLLAMA_MAX_KEEPALIVE_CONNECTIONS` | `10` | Shared transport idle keep-alive connections. |
+| `OLLAMA_KEEP_ALIVE` | `1m` | Keeps one model resident only inside a bounded logical operation; explicit unload follows. |
+| `OLLAMA_UNLOAD_ON_SHUTDOWN` | `true` | Unloads configured generation and embedding models during shutdown as a final safeguard. |
+| `OLLAMA_MAX_CONNECTIONS` | `1` | Shared transport maximum connections. |
+| `OLLAMA_MAX_KEEPALIVE_CONNECTIONS` | `1` | Shared transport idle keep-alive connections. |
+| `OLLAMA_MAX_RESPONSE_BYTES` | `4194304` | Maximum streamed JSON response size. |
+| `OLLAMA_LOCK_FILE` | `uploads/.locks/ollama.lock` | Cross-process lock shared by the API and RQ worker. |
+| `OLLAMA_LOCK_TIMEOUT_SECONDS` | `65` | Maximum wait for the local Ollama operation lock. |
+| `OLLAMA_EMBED_BATCH_SIZE` | `10` | Bounded inputs per `/api/embed` chunk inside one model scope. |
+| `OLLAMA_EMBED_MIN_SPLIT_SIZE` | `2` | Smallest batch eligible for bounded schema-failure splitting. |
+| `OLLAMA_EMBEDDING_EXPECTED_DIMENSION` | `768` | Required vector dimension for the current pgvector/cache contract. |
+| `OLLAMA_EMBEDDING_MAX_DIMENSION` | `4096` | Defensive maximum vector dimension. |
+| `OLLAMA_LIVE_TESTS_ENABLED` | `false` | Explicit opt-in required by manual/live Ollama tests. |
+| `OLLAMA_GENERATION_NUM_CTX` | `4096` | Local-friendly generation context window. |
+| `OLLAMA_GENERATION_NUM_PREDICT` | `1024` | Output-token limit for profile and compatibility generation. |
+| `OLLAMA_OPTIMIZED_NUM_PREDICT` | `2048` | Output-token limit for optimized matching. |
 
 `backend/app/core/config.py` also defines scoring, matching, extraction-version, batch, recommendation, and retrieval tuning. Treat changes to parser, schema, prompt,
 model, vacancy, and matching versions as cache-invalidating changes.
@@ -301,7 +317,8 @@ The override limits the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1
 It disables startup warmup, LLM generation, embeddings, Torch compilation, and Docling's table-structure model by default. Text-rich PDFs and DOCX files use the
 existing native extractors without loading Torch; sparse/scanned PDFs still fall through to Docling/OCR. The profile also caps Docling, OpenMP, BLAS, and LLM
 concurrency; recycles the RQ worker after ten jobs; persists downloaded Docling models in a named cache volume; and omits the unused MSSQL ODBC driver. The Linux
-image resolves Torch and torchvision from PyTorch's CPU-only index, so it does not download CUDA libraries.
+image resolves Torch and torchvision from PyTorch's CPU-only index, so it does not download CUDA libraries. Ollama calls are serialized across the API and worker,
+responses are bounded and validated, and every generation or embedding batch unloads its model and closes the HTTP client in `finally`.
 
 Deterministic extraction and scoring remain available. To opt into host Ollama features, start with one feature and a small installed model:
 
@@ -309,9 +326,10 @@ Deterministic extraction and scoring remain available. To opt into host Ollama f
 LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker
 ```
 
-Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. Local AI still consumes host unified memory outside the container limits, so avoid running
-generation and embeddings together when memory pressure is high. The base `docker-compose.yml` remains the production-oriented configuration and retains MSSQL
-ODBC support.
+Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. The local profile uses `qwen3:1.7b`, keeps `nomic-embed-text` for the existing 768-dimensional
+vector contract, and never pulls models automatically. Configure the host Ollama process with `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, and a zero or short
+server keep-alive. Restart Ollama after changing its host environment. Local AI consumes unified memory outside Docker limits, but application serialization prevents
+the generation and embedding models from intentionally running in parallel. The base `docker-compose.yml` remains production-oriented and retains MSSQL ODBC support.
 
 ## Verification commands
 

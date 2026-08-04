@@ -18,12 +18,14 @@ No public API path or existing response field was removed.
 The transport applies the following behavior to tags, generation, embeddings, and unload operations:
 
 1. Build the operation payload from centralized helpers.
-2. Reuse the pooled client and configured connection limits.
-3. Apply `OLLAMA_REQUEST_TIMEOUT` to every HTTP operation.
-4. Retry retryable connection, timeout, HTTP, invalid-JSON, and schema failures up to `OLLAMA_MAX_RETRIES` times after the initial attempt.
+2. Acquire the in-process and shared file lock so API and RQ processes cannot overlap Ollama work.
+3. Reuse one pooled client inside the logical operation and close it when the scope exits.
+4. Apply operation-specific total deadlines; retries cannot reset or multiply the deadline.
 5. Wait `OLLAMA_RETRY_BACKOFF_SECONDS * 2^(attempt-1)` before each retry.
 6. Map failures to typed Ollama errors and log operation, attempt, outcome, duration, and error type.
-7. Record aggregate and per-operation request, success, failure, retry, timeout, and duration metrics.
+7. Bound streamed response bytes, validate typed envelopes and returned model identity, and reject HTTP-200 error objects before use.
+8. Unload every model touched by generation or embedding in `finally`, including failure paths.
+9. Record aggregate and per-operation request, success, failure, retry, timeout, lock-wait, response-size, load, inference, unload, and duration metrics.
 
 HTTP 404 responses for model-scoped requests become `OllamaModelUnavailableError` and are not retried. HTTP 408, 429, and 5xx responses are retryable. Generation
 callers continue to return their existing `None` fallback after transport exhaustion, and embedding failures remain non-fatal to the matching pipeline.
@@ -46,19 +48,20 @@ the prior contract and returns the method-specific fallback without consulting t
 
 ## Embeddings
 
-Both single and batch embedding requests use the shared transport, timeout, retry policy, response schema, keep-alive policy, and pooled client. The prior local
-30-second and 60-second clients are removed. Existing content/model cache keys and the short model-failure throttle remain unchanged.
+Both single and batch embedding requests use the shared transport, total deadline, response schema, lifecycle scope, and pooled client. Inputs are deduplicated,
+bounded chunks reuse one model scope, every vector is finite/nonzero with the configured dimension, and invalid batches never fan out into uncontrolled per-item calls.
+Existing content/model cache keys and the short model-failure throttle remain unchanged.
 
 ## Model lifecycle
 
-Generation and embedding payloads set the configured `OLLAMA_KEEP_ALIVE` value. CV processing no longer unloads the generation model after each candidate, so
-concurrent and sequential jobs can reuse model state. At application shutdown the shared HTTP pool is always closed. An explicit unload is sent first only when
-`OLLAMA_UNLOAD_ON_SHUTDOWN=true`.
+Generation and embedding payloads set a short configured `OLLAMA_KEEP_ALIVE` value only while one serialized logical operation is active. The operation unloads every
+distinct model in `finally`, then closes the HTTP pool. Embedding chunks reuse the model before the single final unload, avoiding load/unload cycles inside loops.
+Application shutdown unloads both configured model names when enabled and always closes any remaining client.
 
-`OllamaLLMService.unload_model` remains available for compatibility and controlled lifecycle use; normal CV processing does not call it.
+`OllamaLLMService.unload_model` remains available for compatibility and controlled lifecycle use.
 
-An Ollama model is shared by every API/worker process using that server. In multi-process deployments, leave `OLLAMA_UNLOAD_ON_SHUTDOWN=false` unless shutdown is
-coordinated across all Ollama consumers; unloading from one process can evict a model another worker is using.
+An Ollama model is shared by every API/worker process using that server. The shared file lock coordinates this repository's API and worker consumers. External Ollama
+consumers must use equivalent coordination if they share the same host server.
 
 ## Metrics
 
@@ -68,13 +71,23 @@ Transport metrics are exposed additively under `system_stats.ollama_transport` i
 
 | Setting | Default | Purpose |
 | --- | ---: | --- |
-| `OLLAMA_REQUEST_TIMEOUT` | `90` | Timeout applied uniformly to every Ollama operation |
-| `OLLAMA_MAX_RETRIES` | `1` | Retries after the initial attempt |
+| `OLLAMA_REQUEST_TIMEOUT` | `60` | Compatibility timeout for the shared client |
+| `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout |
+| `OLLAMA_TAGS_TIMEOUT_SECONDS` | `3` | Tags total deadline |
+| `OLLAMA_GENERATE_TIMEOUT_SECONDS` | `60` | Generation total deadline |
+| `OLLAMA_EMBED_TIMEOUT_SECONDS` | `30` | Complete embedding-batch deadline |
+| `OLLAMA_UNLOAD_TIMEOUT_SECONDS` | `10` | Unload deadline |
+| `OLLAMA_MAX_RETRIES` | `0` | Retries after the initial attempt |
 | `OLLAMA_RETRY_BACKOFF_SECONDS` | `0.5` | Base exponential retry delay |
-| `OLLAMA_KEEP_ALIVE` | `30m` | Model lifetime sent with generation and embedding requests |
-| `OLLAMA_UNLOAD_ON_SHUTDOWN` | `false` | Explicitly unload the configured generation model during shutdown |
-| `OLLAMA_MAX_CONNECTIONS` | `20` | Pooled-client maximum connections |
-| `OLLAMA_MAX_KEEPALIVE_CONNECTIONS` | `10` | Pooled-client idle keep-alive connections |
+| `OLLAMA_KEEP_ALIVE` | `1m` | Maximum intra-operation residency before explicit unload |
+| `OLLAMA_UNLOAD_ON_SHUTDOWN` | `true` | Unload configured generation and embedding models during shutdown |
+| `OLLAMA_MAX_CONNECTIONS` | `1` | Pooled-client maximum connections |
+| `OLLAMA_MAX_KEEPALIVE_CONNECTIONS` | `1` | Pooled-client idle keep-alive connections |
+| `OLLAMA_MAX_RESPONSE_BYTES` | `4194304` | Maximum response body |
+| `OLLAMA_LOCK_FILE` | `uploads/.locks/ollama.lock` | API/worker cross-process lock |
+| `OLLAMA_LOCK_TIMEOUT_SECONDS` | `65` | Lock acquisition timeout |
+| `OLLAMA_EMBED_BATCH_SIZE` | `10` | Inputs per bounded embedding chunk |
+| `OLLAMA_EMBEDDING_EXPECTED_DIMENSION` | `768` | Required vector dimension |
 
 Docker Compose forwards these settings to both the API and RQ worker, using the documented defaults when deployment environment values are absent.
 

@@ -61,6 +61,7 @@ class CandidateSearchService:
         search_mode = "keyword"
         query_embedding: list[float] | None = None
         vector_scores: dict[str, float] = {}
+        fallback_scores: dict[str, float] = {}
 
         if request.query and request.query.strip() and settings.EMBEDDING_ENABLED:
             query_str = request.query.strip()
@@ -71,6 +72,33 @@ class CandidateSearchService:
                     vector_scores = cls._vector_search_pg(query_embedding, top_k=200)
             except Exception as exc:
                 logger.warning(f"[CANDIDATE_SEARCH] Query embedding generation failed: {exc}")
+
+        if search_mode == "semantic" and query_embedding:
+            pending_candidates: list[tuple[str, str]] = []
+            for result in results:
+                if not result or not isinstance(result, dict):
+                    continue
+                cv_key = str(result.get("id") or result.get("filename") or "").removesuffix(".json")
+                if not cv_key or cv_key in vector_scores:
+                    continue
+                candidate_embedding = get_candidate_embedding(cv_key)
+                if candidate_embedding is not None:
+                    fallback_scores[cv_key] = round(EmbeddingService.cosine_similarity(query_embedding, candidate_embedding), 4)
+                    continue
+                markdown_text = str(result.get("markdown") or result.get("text") or "")
+                if markdown_text:
+                    pending_candidates.append((cv_key, markdown_text[:3000]))
+
+            if pending_candidates:
+                generated = EmbeddingService.generate_batch_embeddings(
+                    [text for _, text in pending_candidates],
+                    model_version=settings.EMBEDDING_MODEL,
+                    identifiers=[cv_key for cv_key, _ in pending_candidates],
+                )
+                for index, (cv_key, _) in enumerate(pending_candidates):
+                    candidate_embedding = generated.get(str(index))
+                    if candidate_embedding:
+                        fallback_scores[cv_key] = round(EmbeddingService.cosine_similarity(query_embedding, candidate_embedding), 4)
 
         items: list[CandidateSearchResultItem] = []
 
@@ -99,22 +127,8 @@ class CandidateSearchService:
             if search_mode == "semantic" and query_embedding:
                 if cv_key in vector_scores:
                     sim_score = vector_scores[cv_key]
-                else:
-                    # Fallback lookup from cache/DB or on-the-fly similarity
-                    cand_emb = get_candidate_embedding(cv_key)
-                    if cand_emb is not None:
-                        sim_score = round(
-                            EmbeddingService.cosine_similarity(query_embedding, cand_emb),
-                            4,
-                        )
-                    elif markdown_text:
-                        # Generate candidate embedding dynamically
-                        gen_emb = EmbeddingService.generate_embedding(markdown_text[:3000], identifier=cv_key)
-                        if gen_emb:
-                            sim_score = round(
-                                EmbeddingService.cosine_similarity(query_embedding, gen_emb),
-                                4,
-                            )
+                elif cv_key in fallback_scores:
+                    sim_score = fallback_scores[cv_key]
 
             # Keyword Search Filter (if search_mode == "keyword" and query is provided)
             if search_mode == "keyword" and request.query and request.query.strip():

@@ -66,9 +66,10 @@ class EmbeddingSyncService:
 
         if uncached:
             uncached_texts = [item[2] for item in uncached]
-            embeddings = _es._call_ollama_batch_embed(model, uncached_texts)
-            if embeddings is not None and len(embeddings) == len(uncached):
-                for (vac_id_int, job, _, content_hash), emb in zip(uncached, embeddings):
+            embeddings = _es.generate_batch_embeddings(uncached_texts, model_version=model)
+            if len(embeddings) == len(uncached):
+                for index, (vac_id_int, job, _, content_hash) in enumerate(uncached):
+                    emb = embeddings.get(str(index))
                     if emb:
                         _ecm.set(f"{model}:vac:{content_hash}", emb)
                         if vac_id_int > 0:

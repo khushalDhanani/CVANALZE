@@ -276,8 +276,11 @@ class DynamicTaxonomyService:
 
         # Vectorize designation & synonyms in pgvector
         terms_to_embed = [clean_desig] + (synonyms or [])
-        for term in terms_to_embed:
-            DomainEmbeddingService.get_or_generate_domain_embedding(term=term, category="job_titles", allow_live_generation=True)
+        DomainEmbeddingService.get_or_generate_domain_embeddings(
+            terms=terms_to_embed,
+            category="job_titles",
+            allow_live_generation=True,
+        )
 
         logger.info(f"[DYNAMIC_TAXONOMY] Successfully added designation '{clean_desig}'.")
         return True
