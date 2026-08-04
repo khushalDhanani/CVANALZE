@@ -194,19 +194,8 @@ class ResumeNormalizer:
 
     @classmethod
     def _normalize_interval(cls, raw_value: str | None) -> NormalizedDateInterval:
-        if not raw_value:
-            return NormalizedDateInterval()
-        start, end = ExperienceCalculator._extract_date_range(raw_value)
-        is_current = bool(re.search(r"\b(present|current|now|till date|to date)\b", raw_value, re.IGNORECASE))
-        return NormalizedDateInterval(
-            raw_value=raw_value,
-            start_date=cls._date_string(start),
-            end_date=None if is_current else cls._date_string(end),
-            is_current=is_current,
-            duration_months=ExperienceCalculator.interval_duration_months(start, end) if start and end else None,
-            confidence=0.95 if start and end else (0.5 if start else 0.0),
-            evidence=[raw_value],
-        )
+        from app.services.date_interval_parser import DateIntervalParser
+        return DateIntervalParser.parse_interval(raw_value)
 
     @staticmethod
     def _experience_summary(

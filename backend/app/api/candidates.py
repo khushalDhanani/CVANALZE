@@ -88,16 +88,17 @@ def get_candidate_detail(candidate_id: str):
     if not result:
         raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
 
-    if "similar_candidates" not in result or result.get("similar_candidates") is None:
-        from app.services.embedding_service import get_candidate_embedding
-        from app.services.similar_candidate_service import SimilarCandidateService
+    if "experience_years" not in result or result.get("experience_years") is None:
+        from app.services.experience_calculator import ExperienceCalculator
 
+        resume_json = result.get("resume_json") or {}
+        cv_text = result.get("markdown") or result.get("text") or ""
         stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
-        cand_emb = get_candidate_embedding(stem)
-        if cand_emb:
-            result["similar_candidates"] = SimilarCandidateService.detect_similar_candidates(stem, cand_emb)
-        else:
-            result["similar_candidates"] = []
+        canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, cv_text, candidate_id=stem)
+        result["experience_years"] = canonical_exp["experience_years"]
+        result["seniority"] = canonical_exp["seniority"]
+        result["experience_summary"] = canonical_exp
+        result["work_experience"] = canonical_exp["normalized_employment"]
 
     return result
 

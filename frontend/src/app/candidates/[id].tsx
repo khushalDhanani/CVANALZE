@@ -765,6 +765,12 @@ export default function CandidateDetailScreen() {
                 />
               </View>
             ) : null}
+            {data?.experience_years != null ? (
+              <View className="items-center px-3 py-1 bg-background border border-border rounded">
+                <Text className="text-[10px] text-text-muted uppercase font-sans-bold">Experience</Text>
+                <Text className="text-xs font-sans-bold text-text-primary">{data.experience_years} Yrs • {data.seniority || 'Assessed'}</Text>
+              </View>
+            ) : null}
             {bestMatch?.overall_score != null ? (
               <View className="items-center px-3 py-1 bg-background border border-border rounded">
                 <Text className="text-[10px] text-text-muted uppercase font-sans-bold">AI Match</Text>

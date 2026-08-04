@@ -311,7 +311,7 @@ class ResumeFieldExtractor:
                     current["company"] = company
                 continue
             if date_match:
-                if current.get("dates") or current.get("job_title") or current.get("company"):
+                if current.get("dates") or (current.get("responsibilities") and len(current.get("responsibilities", [])) > 1):
                     commit()
                 current["dates"] = date_match.group(0)
                 possible_title = cls._DATE_RANGE.sub("", line).strip(" ()-|–—")

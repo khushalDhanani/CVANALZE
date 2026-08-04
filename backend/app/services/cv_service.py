@@ -256,7 +256,8 @@ async def process_cv_file(
 
             from app.services.experience_calculator import ExperienceCalculator
 
-            calculated_exp = ExperienceCalculator.calculate_total_experience(resume_json, markdown_text)
+            canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, markdown_text, candidate_id=cv_key)
+            calculated_exp = float(canonical_exp["experience_years"])
             quality_metrics["experience_years"] = calculated_exp
 
             stage_durations_ms["resume_extraction_ms"] = round((asyncio.get_event_loop().time() - t_ext_start) * 1000.0, 2)
@@ -399,6 +400,10 @@ async def process_cv_file(
                 "stage_metrics": getattr(extraction, "stage_metrics", {}),
                 "docling_duration_ms": docling_duration_ms,
                 "stage_durations_ms": stage_durations_ms,
+                "experience_years": calculated_exp,
+                "seniority": canonical_exp["seniority"],
+                "experience_summary": canonical_exp,
+                "work_experience": canonical_exp["normalized_employment"],
                 "quality_metrics": quality_metrics,
                 "resume_json": resume_json,
                 "normalized_resume": normalized_resume.model_dump(mode="json"),

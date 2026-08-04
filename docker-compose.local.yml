@@ -61,6 +61,8 @@ services:
         INSTALL_MSSQL_ODBC: "true"
     environment:
       <<: *local-backend-environment
+    volumes:
+      - ./backend/uploads:/app/uploads
     mem_limit: 768m
     cpus: 0.75
     pids_limit: 128
@@ -76,6 +78,7 @@ services:
     environment:
       <<: *local-backend-environment
     volumes:
+      - ./backend/uploads:/app/uploads
       - docling_cache:/root/.cache/docling
     mem_limit: 2g
     cpus: 1.25

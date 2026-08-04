@@ -234,15 +234,45 @@ class ResultRepository:
 
     @classmethod
     def list_all_results(cls) -> list[dict[str, Any]]:
-        items: list[dict[str, Any]] = []
+        results_by_id: dict[str, dict[str, Any]] = {}
+
+        # 1. Read from Redis if available
+        if _REDIS_CLIENT:
+            try:
+                cursor = 0
+                pattern = "cv_result:*.json"
+                while True:
+                    cursor, keys = _REDIS_CLIENT.scan(cursor=cursor, match=pattern, count=100)
+                    for key in keys:
+                        try:
+                            val = _REDIS_CLIENT.get(key)
+                            if val:
+                                data = json.loads(val)
+                                if isinstance(data, dict):
+                                    item_id = str(data.get("id") or data.get("scan_id") or key).lower()
+                                    results_by_id[item_id] = data
+                        except Exception:
+                            continue
+                    if cursor == 0:
+                        break
+            except Exception as exc:
+                logger.warning(f"Redis scan failed in list_all_results: {exc}")
+
+        # 2. Read from disk files
         if settings.RESULTS_DIR.exists():
             for p in sorted(settings.RESULTS_DIR.glob("*.json"), reverse=True):
                 if p.name.endswith(".tmp"):
                     continue
                 try:
                     data = json.loads(p.read_text(encoding="utf-8"))
-                    items.append(data)
+                    if isinstance(data, dict):
+                        item_id = str(data.get("id") or data.get("scan_id") or p.stem).lower()
+                        # Disk content merges and updates candidate entry
+                        if item_id not in results_by_id or (data.get("parsed_at") or "") >= (results_by_id[item_id].get("parsed_at") or ""):
+                            results_by_id[item_id] = data
                 except Exception:
                     pass
-        items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+
+        items = list(results_by_id.values())
+        items.sort(key=lambda x: str(x.get("created_at") or x.get("parsed_at") or ""), reverse=True)
         return items

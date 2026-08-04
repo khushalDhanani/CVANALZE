@@ -196,8 +196,11 @@ class CandidateSearchService:
 
             # Status Filter
             if request.status:
-                cand_status = str(r.get("status") or "complete").lower()
-                if request.status.strip().lower() != cand_status:
+                req_st = request.status.strip().lower()
+                cand_status = str(r.get("status") or "completed").lower()
+                if req_st in ("complete", "completed") and cand_status in ("complete", "completed"):
+                    pass
+                elif req_st != cand_status:
                     continue
 
             location_val = r.get("location") or contact_info.get("location")

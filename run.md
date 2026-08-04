@@ -1,36 +1,13 @@
 # CV Analyzer - How to Run
 
-This document outlines the steps required to run the CV Analyzer pipeline, including the FastAPI backend, the asynchronous RQ workers, the CLI batch processor, and the new React Native frontend.
+This document outlines the steps required to run the CV Analyzer pipeline using either **Docker Compose (Containerized)** or **Local Development Services (FastAPI, RQ Worker, Expo)**.
 
-## 1. Prerequisites
+---
 
-Before starting the application, ensure the following services are running:
+## 1. Prerequisites & Environment Setup
 
-- **Redis Server**: Used for the task queue and PubSub event streaming.
-  - Option 1 (macOS Homebrew Service - Recommended):
-    ```bash
-    brew services start redis
-    # Or restart if already running:
-    brew services restart redis
-    ```
-  - Option 2 (Foreground Process):
-    ```bash
-    redis-server
-    ```
-  - Verify Connection:
-    ```bash
-    redis-cli ping
-    # Expected output: PONG
-    ```
+Ensure your `.env` file is present in the project root directory (and/or `backend/`). It should contain:
 
-- **Ollama**: Used for local LLM semantic matching. Ensure the required model is pulled.
-  ```bash
-  ollama serve
-  ```
-
-## 2. Environment Setup
-
-Ensure your `.env` file is present in the `backend` directory. It should contain:
 ```ini
 DB_SERVER=172.25.1.160
 DB_PORT=1433
@@ -40,63 +17,102 @@ DB_PASSWORD=your_password
 REDIS_URL=redis://localhost:6379/0
 ```
 
-> **macOS Note**: Due to `PyTorch` (used by `docling`) fork-safety issues on macOS, you **MUST** prefix commands that spawn workers or run ML models with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`.
+> **macOS Note**: Due to `PyTorch` (used by `docling`) fork-safety issues on macOS when running locally outside Docker, you **MUST** prefix commands that spawn workers or run ML models with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`.
 
-## 3. Starting the Backend
+---
 
-The backend code is located in the `backend/` directory. You should run these commands in separate terminal tabs, making sure to `cd backend` in each one.
+## 2. Running via Docker Compose (Recommended)
 
-### A. Start the RQ Workers (Background Processing)
-The background worker processes the heavy CV extraction and LLM matching tasks. On an 8 GB Apple Silicon Mac, run exactly one worker:
+Docker Compose manages the full stack including `pgvector`, `redis`, `api`, and `worker` with MS ODBC SQL drivers pre-installed.
+
+### A. Start Full Stack
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+```
+
+### B. Updating Docker Containers After Backend Code Changes
+Because backend source code is compiled into the container image, run `--build` whenever backend `.py` files are modified:
+
+```bash
+# Rebuild & restart backend API and Worker containers:
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build api worker
+
+# Or rebuild the entire stack:
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+### C. Container Logs & Status
+```bash
+# View live logs for API and Worker:
+docker compose -f docker-compose.yml -f docker-compose.local.yml logs -f api worker
+
+# Stop all containers:
+docker compose -f docker-compose.yml -f docker-compose.local.yml down
+```
+
+---
+
+## 3. Running Locally (Without Docker)
+
+Before starting local services, ensure Redis and Ollama are running on your host machine:
+
+- **Redis Server**:
+  ```bash
+  brew services start redis
+  redis-cli ping   # Expected output: PONG
+  ```
+
+- **Ollama**:
+  ```bash
+  ollama serve
+  ```
+
+### A. Start the RQ Worker (Background Processing)
+The background worker processes heavy CV extraction and LLM matching tasks. On an Apple Silicon Mac, run exactly one worker:
 
 ```bash
 cd backend
 OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run python start_worker.py
 ```
-Additional workers are intended only for larger environments. Ollama model calls remain serialized by the shared lock even when more than one process is running.
-
-For lightweight local Ollama, use `qwen3:1.7b`, keep `OLLAMA_MAX_LOADED_MODELS=1` and `OLLAMA_NUM_PARALLEL=1` in the host Ollama environment, and leave live AI disabled
-unless the current task needs it. The backend unloads each model after a logical generation or embedding batch.
 
 ### B. Start the FastAPI Server (Web API & WebSockets)
-The FastAPI server exposes the REST endpoints and the real-time WebSocket progress endpoint.
-
 ```bash
 cd backend
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-*(If you get `[Errno 48] address already in use` on port 8000, free port 8000 with: `kill -9 $(lsof -t -i:8000)`)*
-
-*(The API documentation will be available at http://localhost:8000/docs)*
-*(Cache Analytics can be viewed at http://localhost:8000/api/analytics/cache)*
+*(If port 8000 is busy: `kill -9 $(lsof -t -i:8000)`)*  
+*(Interactive OpenAPI Docs: http://localhost:8000/docs)*  
+*(Cache Analytics: http://localhost:8000/api/analytics/cache)*
 
 ### C. Run the CLI Batch Processor (Testing)
-If you want to manually trigger a batch scan of the `uploads/` directory from the terminal (instead of calling the FastAPI endpoint), run:
-
 ```bash
 cd backend
 OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run python main.py
 ```
 
-Because of our recent PubSub optimization, this command will instantly print real-time progress events as the background workers complete each CV, and then exit automatically once the batch is fully processed.
+---
 
-## 4. Testing the WebSocket (Optional)
-If you want to verify that real-time events are being broadcasted to connected clients, you can run the test script while a batch is processing:
+## 4. Testing WebSockets (Optional)
+
+To verify real-time PubSub progress event broadcasting:
 
 ```bash
 cd backend
 uv run python test_ws.py
 ```
 
-## 5. Starting the Frontend (React Native)
+---
+
+## 5. Starting the Frontend (React Native / Expo)
 
 The UI code is located in the `frontend/` directory.
 
-To start the React Native development server (Expo):
+To start the Expo development server:
 
 ```bash
 cd frontend
 npm start
 ```
-From here, you can press `w` to open it in a web browser, `i` to open an iOS simulator, or `a` for Android.
+
+Press `w` to open in a web browser, `i` for iOS Simulator, or `a` for Android.

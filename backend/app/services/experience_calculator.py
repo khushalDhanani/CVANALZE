@@ -40,115 +40,164 @@ class ExperienceCalculator:
 
     @classmethod
     def _parse_date(cls, date_str: str, is_end_date: bool = False) -> datetime | None:
-        if not date_str:
-            return None
-
-        date_str = date_str.strip().lower()
-
-        # Check for Present/Current
-        if re.search(r"\b(present|current|now|till date|to date|onwards|till now|currently|presently)\b", date_str):
-            return datetime.now()
-
-        # 1. Full dates: YYYY-MM-DD or DD/MM/YYYY or Mon DD, YYYY
-        m = re.search(r"\b(19\d{2}|20\d{2})[/\.\-](0?[1-9]|1[0-2])[/\.\-](0?[1-9]|[12]\d|3[01])\b", date_str)
-        if m:
-            return datetime(year=int(m.group(1)), month=int(m.group(2)), day=int(m.group(3)))
-
-        m = re.search(r"\b(0?[1-9]|[12]\d|3[01])[/\.\-](0?[1-9]|1[0-2])[/\.\-](19\d{2}|20\d{2})\b", date_str)
-        if m:
-            return datetime(year=int(m.group(3)), month=int(m.group(2)), day=1)
-
-        # 2. MM/YYYY, MM-YYYY, MM.YYYY
-        m = re.search(r"\b(0?[1-9]|1[0-2])[/\.\-](19\d{2}|20\d{2})\b", date_str)
-        if m:
-            return datetime(year=int(m.group(2)), month=int(m.group(1)), day=1)
-
-        # 3. YYYY-MM, YYYY/MM, YYYY.MM
-        m = re.search(r"\b(19\d{2}|20\d{2})[/\.\-](0?[1-9]|1[0-2])\b", date_str)
-        if m:
-            return datetime(year=int(m.group(1)), month=int(m.group(2)), day=1)
-
-        # 4. Mon YYYY or Month YYYY
-        m = re.search(r"\b([a-z]{3,9})\.?\s+(19\d{2}|20\d{2})\b", date_str)
-        if m:
-            month_str = m.group(1).rstrip(".")
-            year = int(m.group(2))
-            if month_str in cls.MONTH_MAP:
-                return datetime(year=year, month=cls.MONTH_MAP[month_str], day=1)
-
-        # 5. Q1-Q4 YYYY or Seasons
-        m = re.search(r"\b(q[1-4]|summer|winter|spring|fall)\s+(19\d{2}|20\d{2})\b", date_str)
-        if m:
-            q_or_season = m.group(1)
-            year = int(m.group(2))
-            month_mapping = {
-                "q1": 1, "spring": 3,
-                "q2": 4, "summer": 6,
-                "q3": 7, "fall": 9,
-                "q4": 10, "winter": 12,
-            }
-            month = month_mapping.get(q_or_season, 1)
-            return datetime(year=year, month=month, day=1)
-
-        # 6. YYYY (4-digit year)
-        m = re.search(r"\b(19\d{2}|20\d{2})\b", date_str)
-        if m:
-            year = int(m.group(1))
-            month = 12 if is_end_date else 1
-            return datetime(year=year, month=month, day=1)
-
-        # 7. 2-digit short year for end date (e.g. "21" in "2018 - 21")
-        m = re.search(r"\b(\d{2})\b", date_str)
-        if m and is_end_date:
-            yr_2digit = int(m.group(1))
-            if 0 <= yr_2digit <= 35:
-                year = 2000 + yr_2digit
-            else:
-                year = 1900 + yr_2digit
-            return datetime(year=year, month=12, day=1)
-
-        return None
+        from app.services.date_interval_parser import DateIntervalParser
+        dt, _ = DateIntervalParser.parse_date_point(date_str, is_end_date=is_end_date)
+        return dt
 
     @classmethod
     def _extract_date_range(cls, dates_str: str) -> tuple[datetime | None, datetime | None]:
-        if not dates_str:
-            return None, None
+        from app.services.date_interval_parser import DateIntervalParser
+        interval = DateIntervalParser.parse_interval(dates_str)
+        start = datetime.fromisoformat(interval.start_date) if interval.start_date else None
+        end = datetime.fromisoformat(interval.end_date) if interval.end_date else (datetime.now() if interval.is_current else None)
+        return start, end
 
-        cleaned = dates_str.lower().strip()
+    @classmethod
+    def calculate_canonical_experience(
+        cls,
+        resume_json: dict[str, Any],
+        cv_text: str = "",
+        candidate_id: str = "",
+    ) -> dict[str, Any]:
+        """
+        One single canonical, authoritative experience calculator.
+        Guarantees deterministic calculation, date interval merging, present role handling,
+        unparsed date logging, and non-zero fallback for documented roles.
+        """
+        work_exp = (
+            resume_json.get("work_experience")
+            or resume_json.get("experience")
+            or (resume_json.get("normalized") or {}).get("employment")
+            or []
+        )
 
-        # Check for range separators: - , – , — , ~ , -> , to , till , until
-        # Don't split ISO dates (YYYY-MM or MM/YYYY) unless separator is clearly a range divider.
-        # Match range pattern: <part1> <separator> <part2>
-        sep_pattern = r"(?:\s*(?:[–—~]|->|\bto\b|\btill\b|\buntil\b)\s*|\s+-\s+|\s*/\s*|(?<=\d{4})-(?=\d{2,4}))"
-        parts = re.split(sep_pattern, cleaned, maxsplit=1)
+        valid_intervals: list[tuple[datetime, datetime]] = []
+        unparsed_dates: list[dict[str, Any]] = []
+        normalized_employment: list[dict[str, Any]] = []
 
-        if len(parts) >= 2 and parts[0] != parts[1]:
-            start_date = cls._parse_date(parts[0], is_end_date=False)
-            end_date = cls._parse_date(parts[1], is_end_date=True)
-            if start_date or end_date:
-                return start_date, end_date
+        for idx, job in enumerate(work_exp, start=1):
+            raw_dates = None
+            job_title = None
+            company = None
+            responsibilities = []
 
-        start_date = cls._parse_date(cleaned, is_end_date=False)
-        end_date = cls._parse_date(cleaned, is_end_date=True)
-        return start_date, end_date
+            if isinstance(job, dict):
+                raw_dates = job.get("dates") or (job.get("interval") or {}).get("raw_value")
+                job_title = job.get("job_title") or (job.get("job_title") or {}).get("normalized_value")
+                company = job.get("company") or (job.get("company") or {}).get("normalized_value") or job.get("company_name")
+                responsibilities = job.get("responsibilities") or []
+            elif isinstance(job, str):
+                job_title = job
+
+            start_date, end_date = None, None
+            if raw_dates and isinstance(raw_dates, str):
+                start_date, end_date = cls._extract_date_range(raw_dates)
+
+            # Fallback inline search in title/company/description if raw_dates was missing
+            if not start_date and isinstance(job, dict):
+                for field in (job.get("job_title"), job.get("company"), job.get("description")):
+                    if field and isinstance(field, str) and re.search(r"\b(19\d{2}|20\d{2}|present|current|now)\b", field, re.IGNORECASE):
+                        s_d, e_d = cls._extract_date_range(field)
+                        if s_d:
+                            start_date, end_date = s_d, e_d
+                            raw_dates = field
+                            break
+
+            # Handle present/current roles
+            is_current = False
+            if raw_dates and re.search(r"\b(present|current|now|till date|onwards|till now|currently|presently)\b", str(raw_dates), re.IGNORECASE):
+                is_current = True
+                end_date = datetime.now()
+            elif start_date and not end_date:
+                is_current = True
+                end_date = datetime.now()
+
+            if raw_dates and not start_date:
+                logger.warning(
+                    f"[EXPERIENCE_DATE_PARSE_UNSUPPORTED] Candidate '{candidate_id or 'unknown'}', Role #{idx} ('{job_title or company or 'Role'}'): Unable to parse raw date string '{raw_dates}'"
+                )
+                unparsed_dates.append({"role_index": idx, "raw_dates": raw_dates, "job_title": job_title})
+
+            duration_months = None
+            if start_date and end_date:
+                end_date = max(end_date, start_date)
+                end_date = min(end_date, datetime.now())
+                valid_intervals.append((start_date, end_date))
+                duration_months = cls.interval_duration_months(start_date, end_date)
+
+            normalized_employment.append(
+                {
+                    "job_title": job_title or "Position",
+                    "company": company or "Organization",
+                    "dates": raw_dates or "N/A",
+                    "start_date": start_date.date().isoformat() if start_date else None,
+                    "end_date": end_date.date().isoformat() if end_date and not is_current else None,
+                    "is_current": is_current,
+                    "duration_months": duration_months,
+                }
+            )
+
+        merged_intervals = cls._merge_intervals(valid_intervals)
+        total_days = sum((end - start).days for start, end in merged_intervals)
+        deterministic_years = round(total_days / 365.25, 1) if merged_intervals else None
+
+        stated_years = cls._extract_explicit_experience(cv_text)
+
+        # Resolution hierarchy:
+        if deterministic_years is not None and deterministic_years > 0:
+            authoritative_years = deterministic_years
+            status = "corroborated" if stated_years and abs(deterministic_years - stated_years) <= 1.5 else "date_only"
+        elif stated_years is not None and stated_years > 0:
+            authoritative_years = stated_years
+            status = "stated_fallback"
+        elif work_exp:
+            authoritative_years = round(max(1.0, float(len(work_exp))), 1)
+            status = "role_heuristic"
+        else:
+            authoritative_years = 0.0
+            status = "no_history"
+
+        # Seniority calculation
+        if authoritative_years >= 12.0:
+            seniority = "Executive / Director"
+        elif authoritative_years >= 8.0:
+            seniority = "Lead / Principal"
+        elif authoritative_years >= 5.0:
+            seniority = "Senior"
+        elif authoritative_years >= 2.0:
+            seniority = "Mid-Level"
+        elif authoritative_years >= 0.5 or work_exp:
+            seniority = "Junior / Associate"
+        else:
+            seniority = "Entry Level"
+
+        if authoritative_years > 0:
+            experience_assessment = f"Assessed as {seniority} level with {authoritative_years:.1f} years of verified experience."
+        elif work_exp:
+            experience_assessment = f"Assessed as {seniority} level based on {len(work_exp)} documented employment role(s)."
+        else:
+            experience_assessment = "Assessed as Entry Level (No employment history documented)."
+
+        return {
+            "experience_years": authoritative_years,
+            "deterministic_years": deterministic_years,
+            "stated_years": stated_years,
+            "authoritative_years": authoritative_years,
+            "seniority": seniority,
+            "experience_assessment": experience_assessment,
+            "validation_status": status,
+            "merged_intervals_count": len(merged_intervals),
+            "unparsed_dates": unparsed_dates,
+            "normalized_employment": normalized_employment,
+        }
 
     @classmethod
     def calculate_total_experience(cls, resume_json: dict[str, Any], cv_text: str = "") -> float:
         """
-        Calculates total experience by extracting dates, merging overlapping periods,
-        and validating against any explicitly stated experience.
+        Calculates total experience using the canonical calculator.
         """
-        intervals = cls.extract_intervals(resume_json)
-        merged_intervals = cls._merge_intervals(intervals)
-        calculated_years = round(sum((end - start).days for start, end in merged_intervals) / 365.25, 1)
-        explicit_years = cls._extract_explicit_experience(cv_text)
-
-        if explicit_years is not None:
-            diff = abs(calculated_years - explicit_years)
-            level = "Significant mismatch" if diff > 1.5 else "Validation match"
-            logger.info(f"[EXPERIENCE] {level}: calculated={calculated_years} years, stated={explicit_years} years. Keeping date-derived value authoritative.")
-
-        return calculated_years
+        summary = cls.calculate_canonical_experience(resume_json, cv_text)
+        return float(summary["experience_years"])
 
     @classmethod
     def extract_intervals(cls, resume_json: dict[str, Any]) -> list[tuple[datetime, datetime]]:
