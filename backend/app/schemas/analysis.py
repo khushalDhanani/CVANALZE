@@ -142,7 +142,11 @@ class EnrichedCandidateAnalysis(BaseModel):
         description="Independent AI analysis of candidate profile, strengths, department, and suitable roles",
     )
     best_match: EnrichedJobMatchResult = Field(..., description="Top matching job opening")
-    suitable_openings: list[EnrichedJobMatchResult] = Field(..., description="All evaluated job openings ranked by match score")
+    suitable_openings: list[EnrichedJobMatchResult] = Field(..., description="Job openings classified as HIGH or MEDIUM, ranked by match score")
+    unsuitable_openings: list[EnrichedJobMatchResult] = Field(
+        default_factory=list,
+        description="Job openings classified as LOW, retained for HR manual review but not suitable matches",
+    )
     rejection_policy_note: str = Field(
         default="Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
         description="Policy enforcement note regarding LOW score candidate retention",

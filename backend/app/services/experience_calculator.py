@@ -46,51 +46,90 @@ class ExperienceCalculator:
         date_str = date_str.strip().lower()
 
         # Check for Present/Current
-        if re.search(r"\b(present|current|now|till date|to date)\b", date_str):
+        if re.search(r"\b(present|current|now|till date|to date|onwards|till now|currently|presently)\b", date_str):
             return datetime.now()
 
-        # Common formats:
-        # 1. MM/YYYY or MM-YYYY
-        m = re.search(r"\b(0?[1-9]|1[0-2])[/\-](\d{4})\b", date_str)
+        # 1. Full dates: YYYY-MM-DD or DD/MM/YYYY or Mon DD, YYYY
+        m = re.search(r"\b(19\d{2}|20\d{2})[/\.\-](0?[1-9]|1[0-2])[/\.\-](0?[1-9]|[12]\d|3[01])\b", date_str)
+        if m:
+            return datetime(year=int(m.group(1)), month=int(m.group(2)), day=int(m.group(3)))
+
+        m = re.search(r"\b(0?[1-9]|[12]\d|3[01])[/\.\-](0?[1-9]|1[0-2])[/\.\-](19\d{2}|20\d{2})\b", date_str)
+        if m:
+            return datetime(year=int(m.group(3)), month=int(m.group(2)), day=1)
+
+        # 2. MM/YYYY, MM-YYYY, MM.YYYY
+        m = re.search(r"\b(0?[1-9]|1[0-2])[/\.\-](19\d{2}|20\d{2})\b", date_str)
         if m:
             return datetime(year=int(m.group(2)), month=int(m.group(1)), day=1)
 
-        # 2. YYYY-MM
-        m = re.search(r"\b(\d{4})[/\-](0?[1-9]|1[0-2])\b", date_str)
+        # 3. YYYY-MM, YYYY/MM, YYYY.MM
+        m = re.search(r"\b(19\d{2}|20\d{2})[/\.\-](0?[1-9]|1[0-2])\b", date_str)
         if m:
             return datetime(year=int(m.group(1)), month=int(m.group(2)), day=1)
 
-        # 3. Mon YYYY or Month YYYY
-        m = re.search(r"\b([a-z]{3,9})\s+(\d{4})\b", date_str)
+        # 4. Mon YYYY or Month YYYY
+        m = re.search(r"\b([a-z]{3,9})\.?\s+(19\d{2}|20\d{2})\b", date_str)
         if m:
-            month_str = m.group(1)
+            month_str = m.group(1).rstrip(".")
             year = int(m.group(2))
             if month_str in cls.MONTH_MAP:
                 return datetime(year=year, month=cls.MONTH_MAP[month_str], day=1)
 
-        # 4. YYYY (Only year provided)
-        m = re.search(r"\b(\d{4})\b", date_str)
+        # 5. Q1-Q4 YYYY or Seasons
+        m = re.search(r"\b(q[1-4]|summer|winter|spring|fall)\s+(19\d{2}|20\d{2})\b", date_str)
+        if m:
+            q_or_season = m.group(1)
+            year = int(m.group(2))
+            month_mapping = {
+                "q1": 1, "spring": 3,
+                "q2": 4, "summer": 6,
+                "q3": 7, "fall": 9,
+                "q4": 10, "winter": 12,
+            }
+            month = month_mapping.get(q_or_season, 1)
+            return datetime(year=year, month=month, day=1)
+
+        # 6. YYYY (4-digit year)
+        m = re.search(r"\b(19\d{2}|20\d{2})\b", date_str)
         if m:
             year = int(m.group(1))
-            # If start date, assume Jan 1. If end date, assume Dec 1 to give full year credit.
             month = 12 if is_end_date else 1
             return datetime(year=year, month=month, day=1)
+
+        # 7. 2-digit short year for end date (e.g. "21" in "2018 - 21")
+        m = re.search(r"\b(\d{2})\b", date_str)
+        if m and is_end_date:
+            yr_2digit = int(m.group(1))
+            if 0 <= yr_2digit <= 35:
+                year = 2000 + yr_2digit
+            else:
+                year = 1900 + yr_2digit
+            return datetime(year=year, month=12, day=1)
 
         return None
 
     @classmethod
     def _extract_date_range(cls, dates_str: str) -> tuple[datetime | None, datetime | None]:
-        # Require a range delimiter boundary so ISO-like values such as 2021-01 stay intact.
-        parts = re.split(r"(?:\s+(?:-|to)\s+|\s*[–—]\s*)", dates_str.lower().strip(), maxsplit=1)
+        if not dates_str:
+            return None, None
 
-        if len(parts) >= 2:
+        cleaned = dates_str.lower().strip()
+
+        # Check for range separators: - , – , — , ~ , -> , to , till , until
+        # Don't split ISO dates (YYYY-MM or MM/YYYY) unless separator is clearly a range divider.
+        # Match range pattern: <part1> <separator> <part2>
+        sep_pattern = r"(?:\s*(?:[–—~]|->|\bto\b|\btill\b|\buntil\b)\s*|\s+-\s+|\s*/\s*|(?<=\d{4})-(?=\d{2,4}))"
+        parts = re.split(sep_pattern, cleaned, maxsplit=1)
+
+        if len(parts) >= 2 and parts[0] != parts[1]:
             start_date = cls._parse_date(parts[0], is_end_date=False)
-            end_date = cls._parse_date(parts[-1], is_end_date=True)
-            return start_date, end_date
+            end_date = cls._parse_date(parts[1], is_end_date=True)
+            if start_date or end_date:
+                return start_date, end_date
 
-        # If no separator found, it might just be a single date (e.g. year)
-        start_date = cls._parse_date(dates_str, is_end_date=False)
-        end_date = cls._parse_date(dates_str, is_end_date=True)
+        start_date = cls._parse_date(cleaned, is_end_date=False)
+        end_date = cls._parse_date(cleaned, is_end_date=True)
         return start_date, end_date
 
     @classmethod
@@ -163,10 +202,10 @@ class ExperienceCalculator:
 
     @staticmethod
     def interval_duration_months(start_date: datetime, end_date: datetime) -> int:
-        return max(
-            0,
-            (end_date.year - start_date.year) * 12 + end_date.month - start_date.month,
-        )
+        if end_date < start_date:
+            return 0
+        months = (end_date.year - start_date.year) * 12 + end_date.month - start_date.month
+        return max(1, months)
 
     @classmethod
     def _merge_intervals(cls, intervals: list[tuple[datetime, datetime]]) -> list[tuple[datetime, datetime]]:

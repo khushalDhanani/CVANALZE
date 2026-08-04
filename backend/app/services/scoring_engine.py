@@ -407,8 +407,13 @@ class ScoringEngine:
             )
         )
 
+        # Split evaluated matches into suitable (HIGH/MEDIUM) vs unsuitable (LOW)
+        suitable_matches = [m for m in evaluated_matches if m.classification in ("HIGH", "MEDIUM")]
+        unsuitable_matches = [m for m in evaluated_matches if m.classification not in ("HIGH", "MEDIUM")]
+
         return CandidateMatchAnalysis(
             primary_department=best_match.department,
             best_match=best_match,
-            suitable_openings=evaluated_matches,
+            suitable_openings=suitable_matches,
+            unsuitable_openings=unsuitable_matches,
         )

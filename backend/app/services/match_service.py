@@ -373,6 +373,10 @@ class MatchService:
 
         logger.info(f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}', has_genuine_match={has_genuine_match}")
 
+        # Split evaluated matches into suitable (HIGH/MEDIUM) vs unsuitable (LOW)
+        suitable_matches = [m for m in evaluated_matches if m.classification in ("HIGH", "MEDIUM")]
+        unsuitable_matches = [m for m in evaluated_matches if m.classification not in ("HIGH", "MEDIUM")]
+
         result = EnrichedCandidateAnalysis(
             primary_department=recommended_dept,
             recommended_department=recommended_dept,
@@ -383,7 +387,8 @@ class MatchService:
             active_vacancy_summary=active_vacancy_summary,
             ai_career_summary=ai_career_summary,
             best_match=best_match,
-            suitable_openings=evaluated_matches,
+            suitable_openings=suitable_matches,
+            unsuitable_openings=unsuitable_matches,
             llm_skipped=llm_skipped,
             normalized_resume=normalized_resume,
         )

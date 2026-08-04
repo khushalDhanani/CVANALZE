@@ -20,10 +20,29 @@ class ResumeFieldExtractor:
         r"^(?:#+|\*\*)\s*(SUMMARY|PROFILE SUMMARY|PROFILE|WORK EXPERIENCE|EXPERIENCE|EMPLOYMENT|EDUCATION|SKILLS|TECHNICAL SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|HOBBIES|CONTACT)\b",
         re.IGNORECASE,
     )
+    _DATE_PART = (
+        r"(?:"
+        r"(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?(?:\d{1,2}[,\s]+)?"
+        r"(?:19|20)\d{2}"
+        r"|(?:0?[1-9]|1[0-2])[/\.\-](?:19|20)\d{2}"
+        r"|(?:19|20)\d{2}[/\.\-](?:0?[1-9]|1[0-2])"
+        r"|(?:Q[1-4]|Summer|Winter|Spring|Fall)\s+(?:19|20)\d{2}"
+        r"|(?:19|20)\d{2}"
+        r")"
+    )
+    _END_PART = (
+        r"(?:"
+        + _DATE_PART
+        + r"|\b\d{2}\b"
+        + r"|\b(?:present|current|now|till date|to date|onwards|till now|currently|presently)\b"
+        r")"
+    )
     _DATE_RANGE = re.compile(
-        r"\b(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2}|(?:0?[1-9]|1[0-2])[/\-](?:19|20)\d{2}|(?:19|20)\d{2}[/\-](?:0?[1-9]|1[0-2]))"
-        r"\s*(?:-|–|—|to)\s*"
-        r"(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2}|(?:0?[1-9]|1[0-2])[/\-](?:19|20)\d{2}|(?:19|20)\d{2}[/\-](?:0?[1-9]|1[0-2])|present|current|now)\b",
+        r"(?:\b|_|\()"
+        + _DATE_PART
+        + r"\s*(?:[\-–—~/]|->|\bto\b|\btill\b|\buntil\b)\s*"
+        + _END_PART
+        + r"(?:\b|_|\))",
         re.IGNORECASE,
     )
 
@@ -292,6 +311,8 @@ class ResumeFieldExtractor:
                     current["company"] = company
                 continue
             if date_match:
+                if current.get("dates") or current.get("job_title") or current.get("company"):
+                    commit()
                 current["dates"] = date_match.group(0)
                 possible_title = cls._DATE_RANGE.sub("", line).strip(" ()-|–—")
                 title_company_match = re.match(r"(.+?)\s+at\s+(.+)$", possible_title, re.IGNORECASE)

@@ -268,18 +268,50 @@ class RecommendationService:
             if "Mandatory" in qual.get("requirement", "") or "Critical" in qual.get("impact", ""):
                 risk_flags.append(qual.get("requirement"))
 
-        exp_years = (r.get("quality_metrics") or {}).get("experience_years") or 0.0
+        # Multi-tier experience years resolution:
+        quality_metrics = r.get("quality_metrics") or {}
+        norm_resume = r.get("normalized_resume") or {}
+        norm_exp = norm_resume.get("experience") or {}
+        raw_work_exp = resume_json.get("work_experience") or norm_resume.get("employment") or []
+
+        resolved_exp = (
+            quality_metrics.get("experience_years")
+            if quality_metrics.get("experience_years") is not None
+            else (
+                norm_exp.get("deterministic_years")
+                if norm_exp.get("deterministic_years") is not None
+                else norm_exp.get("stated_years")
+            )
+        )
+
+        if resolved_exp is None:
+            from app.services.experience_calculator import ExperienceCalculator
+
+            calc_exp = ExperienceCalculator.calculate_total_experience(
+                resume_json, r.get("text") or r.get("markdown") or ""
+            )
+            resolved_exp = calc_exp if calc_exp > 0 else 0.0
+        else:
+            resolved_exp = float(resolved_exp)
+
+        exp_years = resolved_exp
         exp_tier = "Junior"
         for tier, threshold in sorted(settings.EXPERIENCE_BANDS.items(), key=lambda x: x[1], reverse=True):
             if exp_years >= threshold:
                 exp_tier = tier
                 break
 
-        if exp_years < 1.0:
+        if exp_years < 1.0 and not raw_work_exp:
             risk_flags.append("Limited professional experience verified in profile.")
 
         # Experience & Seniority Assessment
-        experience_assessment = f"Assessed as {exp_tier} level with approximately {exp_years} years of relevant domain experience."
+        if exp_years > 0:
+            experience_assessment = f"Assessed as {exp_tier} level with approximately {exp_years:.1f} years of verified experience."
+        elif raw_work_exp:
+            roles_count = len(raw_work_exp)
+            experience_assessment = f"Assessed as {exp_tier} level based on {roles_count} documented employment role(s)."
+        else:
+            experience_assessment = "Assessed as Entry / Junior level (No dated employment history verified)."
 
         # Technical vs Functional Fit
         tech_vs_func = "Balanced technical and functional foundation."
