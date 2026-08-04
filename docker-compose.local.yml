@@ -6,6 +6,15 @@ x-local-backend-environment: &local-backend-environment
   AUTH_ENABLED: "false"
   INITIALIZE_DATABASE_ON_STARTUP: "false"
   STARTUP_CACHE_WARMUP_ENABLED: "false"
+  DB_SERVER: '${DB_SERVER}'
+  DB_PORT: '${DB_PORT:-1433}'
+  DB_NAME: '${DB_NAME}'
+  DB_USER: '${DB_USER}'
+  DB_PASSWORD: '${DB_PASSWORD}'
+  DB_ENCRYPT: '${DB_ENCRYPT:-true}'
+  DB_TRUST_CERT: '${DB_TRUST_CERT:-false}'
+  PG_DB_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
+  REDIS_URL: 'redis://redis:6379/0'
   LLM_ENABLED: '${LLM_ENABLED:-false}'
   EMBEDDING_ENABLED: '${EMBEDDING_ENABLED:-false}'
   OLLAMA_MODEL: '${OLLAMA_MODEL:-qwen3:1.7b}'
@@ -49,7 +58,7 @@ services:
     build:
       context: ./backend
       args:
-        INSTALL_MSSQL_ODBC: "false"
+        INSTALL_MSSQL_ODBC: "true"
     environment:
       <<: *local-backend-environment
     mem_limit: 768m
@@ -62,7 +71,7 @@ services:
     build:
       context: ./backend
       args:
-        INSTALL_MSSQL_ODBC: "false"
+        INSTALL_MSSQL_ODBC: "true"
     command: ["rq", "worker", "--max-jobs", "${RQ_WORKER_MAX_JOBS:-10}", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
     environment:
       <<: *local-backend-environment
