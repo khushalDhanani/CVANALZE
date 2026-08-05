@@ -258,8 +258,8 @@ def test_cv_upload_background_task_returns_processing_status(tmp_path, monkeypat
     dummy_record = Mock(
         job_id="1", 
         cv_key="dummy_key", 
-        state=Mock(value="QUEUED"), 
-        execution_mode=Mock(value="PENDING"), 
+        state="QUEUED", 
+        execution_mode="PENDING", 
         message="Enqueued", 
         progress=0, 
         attempt=0,
@@ -1097,8 +1097,8 @@ def test_docx_upload_full_pipeline(tmp_path, monkeypatch):
     dummy_record = Mock(
         job_id="1", 
         cv_key="dummy_key", 
-        state=Mock(value="QUEUED"), 
-        execution_mode=Mock(value="PENDING"), 
+        state="QUEUED", 
+        execution_mode="PENDING", 
         message="Enqueued", 
         progress=0, 
         attempt=0,

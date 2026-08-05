@@ -11,12 +11,81 @@ def _seed_repo(*, db_factory=None, seed_path=None, seed_loader=None):
     )
     
     def _mock_db_load():
-        if seed_loader and seed_path:
-            records = seed_loader(seed_path)
-        elif seed_loader:
-            records = seed_loader(repo._seed_path)
+        if seed_loader:
+            records = seed_loader(None)
         else:
-            records = json.loads(repo._seed_path.read_text(encoding="utf-8")).get("domains", [])
+            records = [
+                {
+                    "id": 1,
+                    "department_id": 9,
+                    "department_name": "CIS Team",
+                    "domain_name": "Information Technology & Software",
+                    "keywords": ["developer", "flutter", "dotnet", "full stack", "ui/ux"],
+                    "default_roles": ["Software Developer"],
+                    "priority": 1,
+                    "is_active": True
+                },
+                {
+                    "id": 2,
+                    "department_id": 8,
+                    "department_name": "Finance Team",
+                    "domain_name": "Finance & Accounting",
+                    "keywords": ["finance", "tally", "ledger", "valuation"],
+                    "default_roles": ["Finance Executive"],
+                    "priority": 2,
+                    "is_active": True
+                },
+                {
+                    "id": 3,
+                    "department_id": 7,
+                    "department_name": "Engineering Team",
+                    "domain_name": "Engineering",
+                    "keywords": ["civil", "mechanical"],
+                    "default_roles": ["Engineer"],
+                    "priority": 3,
+                    "is_active": True
+                },
+                {
+                    "id": 4,
+                    "domain_name": "Sales",
+                    "keywords": ["sales"],
+                    "default_roles": [],
+                    "priority": 4,
+                    "is_active": True
+                },
+                {
+                    "id": 5,
+                    "domain_name": "HR",
+                    "keywords": ["hr"],
+                    "default_roles": [],
+                    "priority": 5,
+                    "is_active": True
+                },
+                {
+                    "id": 6,
+                    "domain_name": "Operations",
+                    "keywords": ["operations"],
+                    "default_roles": [],
+                    "priority": 6,
+                    "is_active": True
+                },
+                {
+                    "id": 7,
+                    "domain_name": "Legal",
+                    "keywords": ["legal"],
+                    "default_roles": [],
+                    "priority": 7,
+                    "is_active": True
+                },
+                {
+                    "id": 8,
+                    "domain_name": "Other",
+                    "keywords": ["other"],
+                    "default_roles": [],
+                    "priority": 8,
+                    "is_active": True
+                }
+            ]
             
         from app.schemas.domain import DepartmentDomain
         mock_domains = []
@@ -169,9 +238,23 @@ def test_extract_candidate_domain_profile_generic_fallback(monkeypatch):
 
 
 def test_new_department_works_without_code_change(monkeypatch):
-    loader = lambda path: (
-        json.loads(path.read_text(encoding="utf-8"))["domains"]
-        + [
+    def loader(path):
+        base = _seed_repo().get_all_domains()
+        # Convert objects to dicts for mock to consume again
+        base_dicts = [
+            {
+                "id": d.id,
+                "department_id": d.department_id,
+                "department_name": d.department_name,
+                "domain_name": d.domain_name,
+                "keywords": d.keywords,
+                "default_roles": d.default_roles,
+                "priority": d.priority,
+                "is_active": d.is_active,
+            }
+            for d in base
+        ]
+        return base_dicts + [
             {
                 "department_name": "Data & Analytics",
                 "domain_name": "Data Science & Analytics",
@@ -191,7 +274,6 @@ def test_new_department_works_without_code_change(monkeypatch):
                 "is_active": True,
             }
         ]
-    )
     repo = _seed_repo(seed_loader=loader)
     assert len(repo.get_all_domains()) == 9
     monkeypatch.setattr(ScoringEngine, "domain_repository", repo)

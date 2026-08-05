@@ -404,8 +404,8 @@ def test_taxonomy_classifier_roles_and_metrics():
 
     # 7. Fire & Safety
     domain, families = TaxonomyClassifier.classify_candidate("Safety officer handling hazard prevention and fire drill management.")
-    assert domain == "EHS & Environment"
-    assert "Fire & Safety" in families
+    assert domain == "Environmental Health & Safety (EHS)"
+    assert "Fire, Safety & EHS" in families
 
     # 8. Vacancy DTO & Vacancy Classification
     vac_dto = VacancyDTO(
