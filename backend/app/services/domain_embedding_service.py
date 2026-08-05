@@ -90,11 +90,11 @@ class DomainEmbeddingService:
     @staticmethod
     def _load_domain_embedding(clean_term: str, category: str) -> list[float] | None:
         try:
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import DomainEmbedding
 
-            if pg_SessionLocal is not None:
-                with pg_SessionLocal() as session:
+            if PostgresAppSession is not None:
+                with PostgresAppSession() as session:
                     stmt = select(DomainEmbedding.embedding).where(
                         DomainEmbedding.category == category,
                         DomainEmbedding.term == clean_term,
@@ -109,13 +109,13 @@ class DomainEmbeddingService:
     @staticmethod
     def _save_domain_embedding(clean_term: str, category: str, embedding: list[float], model_version: str) -> None:
         try:
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import DomainEmbedding
 
-            if pg_SessionLocal is None:
+            if PostgresAppSession is None:
                 return
             content_hash = hashlib.sha256(clean_term.encode("utf-8")).hexdigest()
-            with pg_SessionLocal() as session:
+            with PostgresAppSession() as session:
                 rec = DomainEmbedding(
                     category=category,
                     term=clean_term,
@@ -173,11 +173,11 @@ class DomainEmbeddingService:
         target_emb = cls.get_or_generate_domain_embedding(clean_term, cat, allow_live_generation=allow_live_generation)
         if target_emb:
             try:
-                from app.core.database import pg_SessionLocal
+                from app.core.database import PostgresAppSession
                 from app.models.pg import DomainEmbedding
 
-                if pg_SessionLocal is not None:
-                    with pg_SessionLocal() as session:
+                if PostgresAppSession is not None:
+                    with PostgresAppSession() as session:
                         stmt = (
                             select(
                                 DomainEmbedding.term,

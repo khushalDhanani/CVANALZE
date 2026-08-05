@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_mssql_read_db
 from app.core.logging import logger
 from app.models.recruit import RecruitCandidateMst
 from app.services.match_service import MatchService
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/batch", tags=["Batch Processing"])
 
 
 @router.post("/match-candidates")
-async def match_candidates_against_vacancies(limit: int = 10, db: Session = Depends(get_db)):
+async def match_candidates_against_vacancies(limit: int = 10, db: Session = Depends(get_mssql_read_db)):
     """
     Fetch active vacancies and un-evaluated candidates, parse CVs, and match them.
     Cap maximum candidate processing count via MAX_BATCH_LIMIT to prevent API timeouts.

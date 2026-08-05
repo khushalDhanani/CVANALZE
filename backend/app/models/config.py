@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, String
 
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class SystemConfig(Base):
+class SystemConfig(PostgresAppBase):
     """
     DEPRECATED: Use RuleConfigProfile (in app.models.rules) for all business rules, thresholds, and weights.
     This legacy key-value table will be removed in Phase 3.

@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.taxonomy import DomainMaster, JobFamilyMaster, DesignationAbbreviation
 
@@ -49,10 +49,10 @@ class TaxonomyService:
         """Loads all domains and families from the database into in-memory cache."""
         close_session = False
         if db is None:
-            if SessionLocal is None:
+            if PostgresAppSession is None:
                 logger.warning("[TAXONOMY] No DB session available to reload cache.")
                 return
-            db = SessionLocal()
+            db = PostgresAppSession()
             close_session = True
 
         try:

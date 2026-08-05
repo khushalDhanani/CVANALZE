@@ -136,7 +136,7 @@ def test_graceful_fallback_when_pg_unavailable():
     """
     Verifies get_migration_status and search operations fall back gracefully when PostgreSQL is disconnected.
     """
-    with patch("app.core.database.pg_SessionLocal", None):
+    with patch("app.core.database.PostgresAppSession", None):
         status = VectorDatabaseMigrationService.get_migration_status()
         assert status["pg_database_connected"] is False
         assert status["candidate_embeddings_count"] == 0

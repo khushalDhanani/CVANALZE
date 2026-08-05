@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import settings
-from app.core.database import pg_SessionLocal
+from app.core.database import PostgresAppSession
 from app.models.pg import VacancyEmbedding
 from app.services.embedding_service import get_embedding
 
@@ -45,8 +45,8 @@ def embed_vacancy(vacancy_id: int | str, job_dict: dict[str, Any] | None = None)
     RQ job / function to fetch a vacancy from MSSQL, compute its canonical text hash,
     and embed/upsert it into Postgres if it's new or changed.
     """
-    if pg_SessionLocal is None:
-        logger.error("embed_vacancy: pg_SessionLocal is None")
+    if PostgresAppSession is None:
+        logger.error("embed_vacancy: PostgresAppSession is None")
         return "PG DB not configured"
 
     vid_int = int(vacancy_id)
@@ -62,7 +62,7 @@ def embed_vacancy(vacancy_id: int | str, job_dict: dict[str, Any] | None = None)
     canonical_text = generate_canonical_text(job_dict)
     content_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
 
-    pg_db = pg_SessionLocal()
+    pg_db = PostgresAppSession()
     try:
         existing = pg_db.query(VacancyEmbedding).filter(VacancyEmbedding.vacancy_id == vid_int).first()
         if existing and existing.content_hash == content_hash and existing.embedding is not None:

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_postgres_app_db
 from app.core.logging import logger
 from app.repositories.config import ConfigRepository
 from app.repositories.config import ConfigRepository
@@ -26,7 +26,7 @@ async def create_rule_config_version(
     description: str | None = None,
     created_by: str | None = None,
     audit_reason: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_postgres_app_db),
 ):
     """Create a new unified rule configuration version."""
     try:
@@ -49,7 +49,7 @@ async def create_rule_config_version(
 async def activate_rule_config_version(
     version_tag: str,
     payload: ActivateProfileRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_postgres_app_db),
 ):
     """Activate a specific rule configuration version."""
     try:
@@ -67,7 +67,7 @@ async def activate_rule_config_version(
 @router.get("/active")
 async def get_active_rule_config(
     tenant_id: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_postgres_app_db),
 ):
     """Retrieve the currently active unified rule configuration for a tenant."""
     try:

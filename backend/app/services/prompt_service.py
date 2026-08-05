@@ -3,7 +3,7 @@ from typing import Any, Optional, Set
 from sqlalchemy.orm import Session
 
 from app.core.cache import config_cache_manager
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.models.prompts import PromptTemplateMaster
 from app.core.config import settings
 from app.core.error_handlers import PromptError
@@ -52,7 +52,7 @@ class PromptService:
         language: str,
         environment: str
     ) -> Optional[str]:
-        with SessionLocal() as db:
+        with PostgresAppSession() as db:
             query = db.query(PromptTemplateMaster).filter(
                 PromptTemplateMaster.prompt_name == prompt_name,
                 PromptTemplateMaster.is_active == True,

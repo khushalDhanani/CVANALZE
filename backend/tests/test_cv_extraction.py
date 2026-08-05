@@ -154,7 +154,24 @@ def test_api_upload_cv_endpoint(sample_docx_bytes: bytes, monkeypatch, tmp_path)
 
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
     client = TestClient(app)
-    with patch("app.api.cv.background_process_cv"):
+    from app.services.processing_queue import QueueSubmission
+    from app.schemas.contracts import JobState, ProcessingExecutionMode, ProcessingJobRecord
+    dummy_submission = QueueSubmission(
+        record=ProcessingJobRecord(
+            job_id="dummy_job_id",
+            job_state=JobState.QUEUED,
+            execution_mode=ProcessingExecutionMode.RQ.value,
+            target_cv_key="cv_dummy",
+            cv_filename="alex_johnson_cv.docx",
+            cv_key="cv_dummy",
+            content_hash="dummy_hash",
+            filename="alex_johnson_cv.docx",
+            storage_filename="alex_johnson_cv.docx",
+            parser_version="1.0",
+            schema_version="1.0"
+        )
+    )
+    with patch("app.services.processing_queue.ProcessingQueueService.submit_upload", return_value=dummy_submission):
         response = client.post(
             "/api/cv/upload",
             files={

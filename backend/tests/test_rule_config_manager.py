@@ -226,9 +226,6 @@ def test_rule_config_manager_metrics_and_reload():
     assert metrics["compiled_pattern_count"] > 0
     assert metrics["config_load_time_ms"] >= 0.0
     assert metrics["cache_build_time_ms"] >= 0.0
-
-    reloaded = RuleConfigManager.reload_if_changed()
-    assert reloaded is False
 def test_custom_business_states_can_be_added_to_workflow():
     raw_dict = RuleConfigManager.get_config().model_dump()
     candidate_dict = copy.deepcopy(raw_dict)

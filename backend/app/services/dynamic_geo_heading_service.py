@@ -1,7 +1,7 @@
 # backend/app/services/dynamic_geo_heading_service.py
 import logging
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading
 
@@ -43,9 +43,9 @@ class DynamicGeoAndHeadingService:
         headings: set[str] = set()
 
         # 1. Load from MSSQL if available
-        if SessionLocal is not None:
+        if PostgresAppSession is not None:
             try:
-                with SessionLocal() as session:
+                with PostgresAppSession() as session:
                     db_cities = session.query(GeoLocation.city_name).filter(GeoLocation.is_active == True).all()
                     cities.update(c[0].strip().lower() for c in db_cities if c[0])
 

@@ -132,11 +132,11 @@ class VectorDatabaseMigrationService:
         vacancy_count = 0
 
         try:
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import CandidateEmbedding, VacancyEmbedding
 
-            if pg_SessionLocal is not None:
-                with pg_SessionLocal() as session:
+            if PostgresAppSession is not None:
+                with PostgresAppSession() as session:
                     candidate_count = session.scalar(select(func.count(CandidateEmbedding.cv_key))) or 0
                     vacancy_count = session.scalar(select(func.count(VacancyEmbedding.vacancy_id))) or 0
                     pg_healthy = True

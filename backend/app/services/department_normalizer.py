@@ -2,7 +2,7 @@ import json
 import logging
 from typing import List, Optional
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.domain import DepartmentDomainMaster
 
@@ -37,11 +37,11 @@ class DepartmentNormalizer:
                 ...
             }
         """
-        if SessionLocal is None:
+        if PostgresAppSession is None:
             logger.warning("[DepartmentNormalizer] No DB session available; cannot load mappings.")
             return
         try:
-            with SessionLocal() as session:
+            with PostgresAppSession() as session:
                 rows = session.query(DepartmentDomainMaster).all()
                 for row in rows:
                     # Use the Keywords column (comma‑separated) to map possible internal names to the domain label

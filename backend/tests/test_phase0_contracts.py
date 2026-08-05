@@ -90,6 +90,8 @@ def test_success_response_field_snapshots_are_stable():
         "scoring_profile_version",
         "ai_career_suggestions",
         "unsuitable_openings",
+        "config_version",
+        "prompt_version",
     }
     assert set(CVUploadResponse.model_fields) == {
         "id",

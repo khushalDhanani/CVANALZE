@@ -28,7 +28,7 @@ async def test_candidate_side_embedding_end_to_end_with_external_systems_mocked(
     embedding_cache_manager.clear()
     with (
         patch.object(settings, "RESULTS_DIR", tmp_path),
-        patch("app.core.database.pg_SessionLocal", None),
+        patch("app.core.database.PostgresAppSession", None),
         patch(
             "app.services.cv_service.MarkdownGenerator.generate_with_timeout",
             return_value=MarkdownResult(markdown, page_count=1, is_scanned=False, ocr_applied=False),

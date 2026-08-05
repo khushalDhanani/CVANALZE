@@ -11,10 +11,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class DomainMaster(Base):
+class DomainMaster(PostgresAppBase):
     __tablename__ = "domains"
     __table_args__ = {"schema": "cvai"}
 
@@ -29,7 +29,7 @@ class DomainMaster(Base):
     families = relationship("JobFamilyMaster", back_populates="domain", cascade="all, delete-orphan")
 
 
-class JobFamilyMaster(Base):
+class JobFamilyMaster(PostgresAppBase):
     __tablename__ = "job_families"
     __table_args__ = {"schema": "cvai"}
 
@@ -50,7 +50,7 @@ class JobFamilyMaster(Base):
     designations = relationship("DesignationMaster", back_populates="family", cascade="all, delete-orphan")
 
 
-class DesignationMaster(Base):
+class DesignationMaster(PostgresAppBase):
     __tablename__ = "designations"
     __table_args__ = {"schema": "cvai"}
 
@@ -73,7 +73,7 @@ class DesignationMaster(Base):
     skills = relationship("DesignationSkill", back_populates="designation", cascade="all, delete-orphan")
 
 
-class DesignationSynonym(Base):
+class DesignationSynonym(PostgresAppBase):
     __tablename__ = "designation_synonyms"
     __table_args__ = {"schema": "cvai"}
 
@@ -90,7 +90,7 @@ class DesignationSynonym(Base):
     designation = relationship("DesignationMaster", back_populates="synonyms")
 
 
-class DesignationAbbreviation(Base):
+class DesignationAbbreviation(PostgresAppBase):
     __tablename__ = "designation_abbreviations"
     __table_args__ = {"schema": "cvai"}
 
@@ -100,7 +100,7 @@ class DesignationAbbreviation(Base):
     is_active = Column(Boolean, default=True)
 
 
-class SkillMaster(Base):
+class SkillMaster(PostgresAppBase):
     __tablename__ = "skills"
     __table_args__ = {"schema": "cvai"}
 
@@ -112,7 +112,7 @@ class SkillMaster(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
-class DesignationSkill(Base):
+class DesignationSkill(PostgresAppBase):
     __tablename__ = "designation_skills"
     __table_args__ = {"schema": "cvai"}
 

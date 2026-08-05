@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from sqlalchemy import Column, DateTime, Integer, String, Text
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class HRFeedback(Base):
+class HRFeedback(PostgresAppBase):
     __tablename__ = "hr_feedback"
     __table_args__ = {"schema": "cvai"}
 

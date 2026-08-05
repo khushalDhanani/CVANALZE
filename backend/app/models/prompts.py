@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, UniqueConstraint
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class PromptTemplateMaster(Base):
+class PromptTemplateMaster(PostgresAppBase):
     __tablename__ = "prompt_templates"
     __table_args__ = (
         UniqueConstraint(

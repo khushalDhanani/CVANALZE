@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.cache import config_cache_manager
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.config import SystemConfig
 
@@ -20,9 +20,9 @@ class ConfigRepository:
             return cached
 
         close_session = False
-        if db is None and SessionLocal is not None:
+        if db is None and PostgresAppSession is not None:
             try:
-                db = SessionLocal()
+                db = PostgresAppSession()
                 close_session = True
             except Exception as exc:
                 logger.warning(f"Could not create DB session: {exc}")
@@ -58,8 +58,8 @@ class ConfigRepository:
         val_str = json.dumps(value)
 
         close_session = False
-        if db is None and SessionLocal is not None:
-            db = SessionLocal()
+        if db is None and PostgresAppSession is not None:
+            db = PostgresAppSession()
             close_session = True
 
         if db is not None:

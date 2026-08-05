@@ -17,7 +17,7 @@ from app.api.recommendations import router as recommendations_router
 from app.api.talent_graph import router as talent_graph_router
 from app.api.vector_db import router as vector_db_router
 from app.core.config import settings
-from app.core.database import engine, pg_engine
+from app.core.database import mssql_read_engine, postgres_app_engine
 from app.core.error_handlers import register_exception_handlers
 from app.core.lifecycle import application_lifespan
 from app.core.logging import logger
@@ -107,8 +107,8 @@ async def root() -> dict[str, str]:
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    db_status = _database_health(engine, "MSSQL")
-    pg_status = _database_health(pg_engine, "PostgreSQL")
+    db_status = _database_health(mssql_read_engine, "MSSQL")
+    pg_status = _database_health(postgres_app_engine, "PostgreSQL")
     ollama_status = "disabled"
     if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         from app.services.llm_service import OllamaLLMService

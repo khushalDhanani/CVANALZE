@@ -1,10 +1,10 @@
 from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Numeric, String
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from app.core.database import MssqlReadBase
 
 
-class RecruitVacancyRequest(Base):
+class RecruitVacancyRequest(MssqlReadBase):
     __tablename__ = "RecruitVacancyRequest"
 
     VacancyRequestID = Column(BigInteger, primary_key=True)
@@ -35,7 +35,7 @@ class RecruitVacancyRequest(Base):
     designation = relationship("OrgDesignationMst")
 
 
-class RecruitCandidateMst(Base):
+class RecruitCandidateMst(MssqlReadBase):
     __tablename__ = "RecruitCandidateMst"
 
     CandidateID = Column(BigInteger, primary_key=True)
@@ -54,7 +54,7 @@ class RecruitCandidateMst(Base):
     job_profile = relationship("OrgJobProfileMst")
 
 
-class RecruitSkillMst(Base):
+class RecruitSkillMst(MssqlReadBase):
     __tablename__ = "RecruitSkillMst"
 
     SkillID = Column(BigInteger, primary_key=True)

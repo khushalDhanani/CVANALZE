@@ -20,11 +20,11 @@ class SimilarCandidateService:
     def _vector_search_pg(cls, target_cv_key: str, cv_embedding: list[float], limit: int) -> dict[str, float]:
         scores: dict[str, float] = {}
         try:
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import CandidateEmbedding
 
-            if pg_SessionLocal is not None:
-                with pg_SessionLocal() as session:
+            if PostgresAppSession is not None:
+                with PostgresAppSession() as session:
                     stmt = (
                         select(
                             CandidateEmbedding.cv_key,

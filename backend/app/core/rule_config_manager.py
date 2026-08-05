@@ -321,11 +321,8 @@ class RuleConfigManager:
 
     _lock = threading.RLock()
     _active_configs: dict[str, UnifiedRuleConfig] = {}
-    _config_path: Path = DEFAULT_CONFIG_PATH
     _load_counter: int = 0
     _caches: dict[str, MappingProxyType] = {}
-    _config_mtime: float | None = None
-    _config_hash: str | None = None
     _metrics: MappingProxyType = MappingProxyType({})
 
     @classmethod
@@ -344,10 +341,10 @@ class RuleConfigManager:
 
         if config_source is None:
             try:
-                from app.core.database import SessionLocal
+                from app.core.database import PostgresAppSession
                 from app.models.rules import RuleConfigProfile
                 
-                with SessionLocal() as db:
+                with PostgresAppSession() as db:
                     query = db.query(RuleConfigProfile).filter(RuleConfigProfile.is_active == True)
                     if tenant_id:
                         query = query.filter(RuleConfigProfile.tenant_id == tenant_id)
@@ -384,30 +381,14 @@ class RuleConfigManager:
                 logger.info(f"[RULE_CONFIG] Loading active profile from cache (v{path_hash})")
 
         if raw_data is None:
-            if config_source is None:
-                from app.core.config import settings
-                if settings.IS_PRODUCTION:
-                    from app.core.error_handlers import SystemConfigurationError
-                    raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
-                config_source = cls._config_path
-
-            if isinstance(config_source, (str, Path)):
-                path = Path(config_source)
-                if not path.is_absolute():
-                    path = Path(__file__).parent / path
-                with open(path, "rb") as f:
-                    content = f.read()
-                raw_data = json.loads(content.decode("utf-8"))
-                path_mtime = path.stat().st_mtime if path.exists() else None
-                path_hash = hashlib.sha256(content).hexdigest()
-                config_size_bytes = len(content)
-            elif isinstance(config_source, dict):
+            if isinstance(config_source, dict):
                 raw_data = config_source
                 encoded = json.dumps(raw_data).encode("utf-8")
                 path_hash = hashlib.sha256(encoded).hexdigest()
                 config_size_bytes = len(encoded)
             else:
-                raise TypeError(f"Invalid config_source type: {type(config_source)}")
+                from app.core.error_handlers import SystemConfigurationError
+                raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
 
         # 1. Pydantic Model & Safety Invariants Validation
         candidate_config = UnifiedRuleConfig.model_validate(raw_data)
@@ -426,8 +407,6 @@ class RuleConfigManager:
             tenant_key = tenant_id or 'GLOBAL'
             cls._active_configs[tenant_key] = candidate_config
             cls._caches[tenant_key] = candidate_cache
-            cls._config_mtime = path_mtime
-            cls._config_hash = path_hash
             cls._load_counter += 1
             cls._metrics = MappingProxyType(
                 {
@@ -438,7 +417,6 @@ class RuleConfigManager:
                     "compiled_pattern_count": compiled_pattern_count,
                     "configuration_size_bytes": config_size_bytes,
                     "last_loaded_timestamp": datetime.now(UTC).isoformat(),
-                    "last_modified_timestamp": str(path_mtime) if path_mtime else None,
                     "file_hash": path_hash,
                 }
             )
@@ -542,24 +520,6 @@ class RuleConfigManager:
         return cache_dict, pattern_count
 
     @classmethod
-    def reload_if_changed(cls) -> bool:
-        """
-        Hot reload helper: Checks file modification time / SHA256 hash.
-        Reloads configuration atomically if changed. Returns True if reloaded.
-        """
-        with cls._lock:
-            path = cls._config_path
-            if not path.is_absolute():
-                path = Path(__file__).parent / path
-            if not path.exists():
-                return False
-            mtime = path.stat().st_mtime
-            if cls._config_mtime is not None and mtime == cls._config_mtime:
-                return False
-            cls.load_config(path)
-            return True
-
-    @classmethod
     def get_metrics(cls) -> dict[str, Any]:
         """Exposes lightweight diagnostics and telemetry metrics."""
         with cls._lock:
@@ -596,22 +556,14 @@ class RuleConfigManager:
     def get_confidence_tier(cls, field_name: str, score: float | None) -> str:
         if score is None or score <= 0.0:
             return "LOW"
-        try:
-            field_cfg = cls.get_field_config(field_name)
-            tier_t = field_cfg.tier_thresholds
-            if score >= tier_t.high_min:
-                return "HIGH"
-            elif score >= tier_t.medium_min:
-                return "MEDIUM"
-            else:
-                return "LOW"
-        except (KeyError, AttributeError, ValueError):
-            if score >= 0.80:
-                return "HIGH"
-            elif score >= 0.50:
-                return "MEDIUM"
-            else:
-                return "LOW"
+        field_cfg = cls.get_field_config(field_name)
+        tier_t = field_cfg.tier_thresholds
+        if score >= tier_t.high_min:
+            return "HIGH"
+        elif score >= tier_t.medium_min:
+            return "MEDIUM"
+        else:
+            return "LOW"
 
     # ------------------------------------------------------------------
     # Scoring rules (externalized hardcoded business rules)
@@ -683,11 +635,11 @@ class RuleConfigManager:
     def _run_synthetic_smoke_tests(cls, candidate_config: UnifiedRuleConfig) -> None:
         """Execute in-memory synthetic smoke tests against candidate config before activation."""
         try:
-            from app.core.database import SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.rules import RuleValidationTestCase
             import json
             
-            with SessionLocal() as db:
+            with PostgresAppSession() as db:
                 tests = db.query(RuleValidationTestCase).filter(RuleValidationTestCase.is_active == True).all()
                 if not tests:
                     return

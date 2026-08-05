@@ -4,7 +4,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.cache import master_data_cache_manager
-from app.core.database import SessionLocal
+from app.core.database import MssqlReadSession, PostgresAppSession
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.org import OrgCompanyMst, OrgDepartmentMst, OrgJobProfileMst
@@ -13,8 +13,8 @@ from app.repositories.job import JobRepository
 
 def _get_db() -> Session | None:
     try:
-        if SessionLocal is not None:
-            return SessionLocal()
+        if MssqlReadSession is not None:
+            return MssqlReadSession()
     except Exception as exc:
         logger.warning(f"cache_warmer: Could not create DB session: {exc}")
     return None
@@ -122,7 +122,7 @@ def warm_skills() -> list[dict[str, Any]]:
 
 
 def warm_department_domains() -> int:
-    if SessionLocal is None:
+    if PostgresAppSession is None:
         logger.warning("cache_warmer.warm_department_domains: No DB session.")
         return 0
     try:

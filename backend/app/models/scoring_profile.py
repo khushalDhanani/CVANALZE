@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class StopWord(Base):
+class StopWord(PostgresAppBase):
     __tablename__ = "stop_words"
     __table_args__ = {"schema": "cvai"}
 
@@ -17,7 +17,7 @@ class StopWord(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
-class ScoringProfileMaster(Base):
+class ScoringProfileMaster(PostgresAppBase):
     __tablename__ = "scoring_profiles"
     __table_args__ = {"schema": "cvai"}
 

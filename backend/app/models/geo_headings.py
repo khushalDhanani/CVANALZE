@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class GeoLocation(Base):
+class GeoLocation(PostgresAppBase):
     __tablename__ = "geo_locations"
     __table_args__ = {"schema": "cvai"}
 
@@ -17,7 +17,7 @@ class GeoLocation(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
-class SectionHeading(Base):
+class SectionHeading(PostgresAppBase):
     __tablename__ = "section_headings"
     __table_args__ = {"schema": "cvai"}
 
@@ -29,7 +29,7 @@ class SectionHeading(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
-class NameDenylist(Base):
+class NameDenylist(PostgresAppBase):
     __tablename__ = "name_denylists"
     __table_args__ = {"schema": "cvai"}
 

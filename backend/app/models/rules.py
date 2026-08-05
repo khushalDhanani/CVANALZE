@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, UniqueConstraint
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class RuleValidationTestCase(Base):
+class RuleValidationTestCase(PostgresAppBase):
     """
     Stores synthetic smoke test payloads for rule configuration validations.
     """
@@ -19,7 +19,7 @@ class RuleValidationTestCase(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
-class RuleConfigProfile(Base):
+class RuleConfigProfile(PostgresAppBase):
     """
     Stores the unified rule configuration JSON in the database, allowing admins to edit
     rules dynamically without modifying the codebase.

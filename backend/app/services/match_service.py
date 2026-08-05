@@ -319,7 +319,7 @@ class MatchService:
         suitable_roles = cand_profile.get("suitable_job_roles", [])
 
         has_genuine_match = False
-        if evaluated_matches and evaluated_matches[0].score >= settings.MATCH_MEDIUM_THRESHOLD:
+        if evaluated_matches and evaluated_matches[0].score >= RuleConfigManager.get_match_rules().scoring_parameters.match_medium_threshold:
             top_m = evaluated_matches[0]
             has_domain_mismatch = any(f.requirement_id == "req_domain_mismatch" for f in top_m.mandatory_failures)
             if not has_domain_mismatch:

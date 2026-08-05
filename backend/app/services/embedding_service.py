@@ -260,12 +260,12 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
     """
     Upsert candidate embedding into PostgreSQL candidate_embeddings table keyed by cv_key.
     """
-    from app.core.database import pg_SessionLocal
+    from app.core.database import PostgresAppSession
 
-    if pg_SessionLocal is None:
+    if PostgresAppSession is None:
         return False
 
-    pg_db = pg_SessionLocal()
+    pg_db = PostgresAppSession()
     try:
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert
@@ -309,10 +309,10 @@ def get_candidate_embedding(cv_key: str) -> list[float] | None:
     """
     Retrieve candidate vector embedding by cv_key from PostgreSQL or cache.
     """
-    from app.core.database import pg_SessionLocal
+    from app.core.database import PostgresAppSession
 
-    if pg_SessionLocal is not None:
-        pg_db = pg_SessionLocal()
+    if PostgresAppSession is not None:
+        pg_db = PostgresAppSession()
         try:
             from app.models.pg import CandidateEmbedding
 
@@ -392,7 +392,7 @@ def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash
     Upsert vacancy embedding into PostgreSQL vacancy_embeddings table keyed by vacancy_id.
     Also caches in embedding_cache_manager.
     """
-    from app.core.database import pg_SessionLocal
+    from app.core.database import PostgresAppSession
 
     cache_key_id = f"{settings.EMBEDDING_MODEL}:vac_id:{vacancy_id}"
     embedding_cache_manager.set(cache_key_id, embedding)
@@ -400,10 +400,10 @@ def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash
         cache_key_hash = f"{settings.EMBEDDING_MODEL}:vac:{content_hash}"
         embedding_cache_manager.set(cache_key_hash, embedding)
 
-    if pg_SessionLocal is None:
+    if PostgresAppSession is None:
         return False
 
-    pg_db = pg_SessionLocal()
+    pg_db = PostgresAppSession()
     try:
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert
@@ -441,10 +441,10 @@ def get_vacancy_embedding(vacancy_id: int) -> tuple[list[float] | None, str | No
     """
     Retrieve vacancy vector embedding and content hash by vacancy_id from PostgreSQL or cache.
     """
-    from app.core.database import pg_SessionLocal
+    from app.core.database import PostgresAppSession
 
-    if pg_SessionLocal is not None:
-        pg_db = pg_SessionLocal()
+    if PostgresAppSession is not None:
+        pg_db = PostgresAppSession()
         try:
             from app.models.pg import VacancyEmbedding
 

@@ -2,10 +2,10 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, DateTime, Index, Integer, String
 from sqlalchemy.sql import func
 
-from app.core.database import pg_Base
+from app.core.database import PostgresAppBase
 
 
-class VacancyEmbedding(pg_Base):
+class VacancyEmbedding(PostgresAppBase):
     __tablename__ = "vacancy_embeddings"
 
     vacancy_id = Column(Integer, primary_key=True)
@@ -26,7 +26,7 @@ class VacancyEmbedding(pg_Base):
     )
 
 
-class CandidateEmbedding(pg_Base):
+class CandidateEmbedding(PostgresAppBase):
     __tablename__ = "candidate_embeddings"
 
     cv_key = Column(String, primary_key=True)
@@ -46,7 +46,7 @@ class CandidateEmbedding(pg_Base):
     )
 
 
-class DomainEmbedding(pg_Base):
+class DomainEmbedding(PostgresAppBase):
     __tablename__ = "domain_embeddings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -66,7 +66,7 @@ class DomainEmbedding(pg_Base):
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
-class DepartmentAliasMapping(pg_Base):
+class DepartmentAliasMapping(PostgresAppBase):
     """Mapping from internal department/designation names to industry‑standard labels.
 
     Used by DepartmentNormalizer to translate internal taxonomy identifiers to

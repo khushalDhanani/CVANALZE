@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
 from app.models.scoring_profile import ScoringProfileMaster, StopWord
 
@@ -40,9 +40,9 @@ class DynamicScoringAndPrefilterService:
         stop_words: set[str] = set()
 
         # 1. Load from MSSQL if available
-        if SessionLocal is not None:
+        if PostgresAppSession is not None:
             try:
-                with SessionLocal() as session:
+                with PostgresAppSession() as session:
                     db_words = session.query(StopWord.word).filter(StopWord.is_active == True).all()
                     stop_words.update(w[0].strip().lower() for w in db_words if w[0])
 
@@ -83,9 +83,9 @@ class DynamicScoringAndPrefilterService:
         if profile_code == "DEFAULT" and cls._default_profile_cache:
             return cls._default_profile_cache
 
-        if SessionLocal is not None:
+        if PostgresAppSession is not None:
             try:
-                with SessionLocal() as session:
+                with PostgresAppSession() as session:
                     prof = (
                         session.query(ScoringProfileMaster)
                         .filter(

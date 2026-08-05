@@ -150,17 +150,11 @@ class Settings(BaseSettings):
     # Training Data Configuration
     TRAINING_DATA_DIR: Path = Path("uploads/training_data")
 
-    # Database Configuration (MSSQL)
-    DB_SERVER: str = "localhost"
-    DB_PORT: int = 1433
-    DB_NAME: str = ""
-    DB_USER: str = ""
-    DB_PASSWORD: str = ""
-    DB_ENCRYPT: bool = True
-    DB_TRUST_CERT: bool = True
+    # Database Configuration (MSSQL Read-Only)
+    MSSQL_READ_ONLY_URL: str = ""
 
-    # Database Configuration (Postgres)
-    PG_DB_URL: str = ""
+    # Database Configuration (Postgres App Data)
+    POSTGRES_APP_URL: str = ""
 
     # Migration Configuration
     AUTO_MIGRATE: bool = False
@@ -177,25 +171,17 @@ class Settings(BaseSettings):
     def TRUSTED_ORIGINS(self) -> list[str]:
         return [origin.strip().rstrip("/") for origin in self.ALLOWED_ORIGINS if origin.strip() and origin.strip() != "*"]
 
-    @property
-    def DB_URL(self) -> str:
-        if not self.DB_NAME:
-            return ""
-        # Using pyodbc and mssql+pyodbc dialect with ODBC Driver 18
-        import urllib.parse
 
-        encoded_password = urllib.parse.quote_plus(self.DB_PASSWORD)
-        enc = "yes" if self.DB_ENCRYPT else "no"
-        trust = "yes" if self.DB_TRUST_CERT else "no"
-        return f"mssql+pyodbc://{self.DB_USER}:{encoded_password}@{self.DB_SERVER}:{self.DB_PORT}/{self.DB_NAME}?driver=ODBC+Driver+18+for+SQL+Server&Encrypt={enc}&TrustServerCertificate={trust}"
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> "Settings":
         if self.IS_PRODUCTION:
             if not self.REDIS_URL:
                 raise ValueError("REDIS_URL must be configured in production environments.")
-            if not self.DB_NAME and not self.PG_DB_URL:
-                raise ValueError("Either MSSQL or Postgres database URL must be configured in production.")
+            if not self.MSSQL_READ_ONLY_URL:
+                raise ValueError("MSSQL_READ_ONLY_URL is required for enterprise source data.")
+            if not self.POSTGRES_APP_URL:
+                raise ValueError("POSTGRES_APP_URL is required for CV Analyzer application data.")
         return self
 
 

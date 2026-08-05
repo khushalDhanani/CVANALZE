@@ -35,7 +35,6 @@ def test_concrete_paths_resolve_characterized_access_tiers():
     assert resolve_access_tier("GET", "/api/candidates/candidate-123") == AccessTier.RECRUITER
     assert resolve_access_tier("POST", "/api/candidates/candidate-123/reprocess") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("POST", "/api/match/hr-review") == AccessTier.RECRUITER
-    assert resolve_access_tier("PUT", "/api/config/match") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("POST", "/api/master-data/warm") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("POST", "/api/vector-db/sync") == AccessTier.ADMINISTRATOR
 

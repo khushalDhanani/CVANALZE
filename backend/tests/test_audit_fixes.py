@@ -1021,7 +1021,7 @@ def test_cache_warmer_warm_all_handles_no_db():
     """Test that warm_all gracefully handles missing DB."""
     from app.services.cache_warmer import warm_all
 
-    with patch("app.services.cache_warmer.SessionLocal", None):
+    with patch("app.services.cache_warmer.MssqlReadSession", None):
         counts = warm_all()
         assert isinstance(counts, dict)
         db_backed = {k: v for k, v in counts.items() if k != "rule_config"}
@@ -1034,7 +1034,7 @@ def test_cache_warmer_warm_vacancies_handles_no_db():
     """Test that warm_vacancies gracefully handles missing DB."""
     from app.services.cache_warmer import warm_vacancies
 
-    with patch("app.services.cache_warmer.SessionLocal", None):
+    with patch("app.services.cache_warmer.MssqlReadSession", None):
         count = warm_vacancies()
         assert count == 0
 
@@ -1043,7 +1043,7 @@ def test_background_warmup_fails_gracefully():
     """Test that the background warmup function handles errors without raising."""
     from app.core.lifecycle import _run_cache_warmup
 
-    with patch("app.services.cache_warmer.SessionLocal", None):
+    with patch("app.services.cache_warmer.MssqlReadSession", None):
         _run_cache_warmup()
 
 
@@ -1052,7 +1052,7 @@ def test_cli_warmup_does_not_raise():
     from app.core.cache import master_data_cache_manager
 
     master_data_cache_manager.clear()
-    with patch("app.services.cache_warmer.SessionLocal", None):
+    with patch("app.services.cache_warmer.MssqlReadSession", None):
         from app.services.cache_warmer import warm_all
 
         counts = warm_all()

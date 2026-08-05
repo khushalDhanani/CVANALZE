@@ -87,12 +87,12 @@ class PgVectorQueryCache:
         try:
             from sqlalchemy import select
 
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import VacancyEmbedding
 
-            if pg_SessionLocal is not None:
+            if PostgresAppSession is not None:
                 embedding_list = list(embedding_tuple)
-                with pg_SessionLocal() as session:
+                with PostgresAppSession() as session:
                     dist_col = VacancyEmbedding.embedding.cosine_distance(embedding_list)
                     stmt = select(VacancyEmbedding.vacancy_id, dist_col).order_by(dist_col).limit(top_limit)
                     rows = session.execute(stmt).all()

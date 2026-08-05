@@ -4,7 +4,7 @@ import logging
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.core.database import SessionLocal, pg_SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.pg import DomainEmbedding
 from app.models.taxonomy import (
@@ -167,9 +167,9 @@ class DynamicTaxonomyService:
             return False
 
         dom_name = RuleConfigManager.get_taxonomy_rules().default_domain
-        if SessionLocal is not None:
+        if PostgresAppSession is not None:
             try:
-                with SessionLocal() as session:
+                with PostgresAppSession() as session:
                     fam = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name == family_name).first()
                     if fam and fam.domain:
                         dom_name = fam.domain.domain_name
@@ -184,9 +184,9 @@ class DynamicTaxonomyService:
                 dom_name,
             )
 
-        if SessionLocal is not None:
+        if PostgresAppSession is not None:
             try:
-                with SessionLocal() as session:
+                with PostgresAppSession() as session:
                     fam = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name == family_name).first()
                     if fam:
                         code = clean_desig.upper().replace(" ", "_")
@@ -290,10 +290,10 @@ class DynamicTaxonomyService:
                 ],
             )
 
-        if SessionLocal is None:
+        if PostgresAppSession is None:
             return None
         try:
-            with SessionLocal() as session:
+            with PostgresAppSession() as session:
                 syn = session.query(DesignationSynonym).filter(DesignationSynonym.synonym_text == clean_term).first()
                 if not syn:
                     # Try partial case-insensitive match
@@ -330,14 +330,14 @@ class DynamicTaxonomyService:
 
     @classmethod
     def _try_vector_semantic_match(cls, query_text: str, threshold: float = 0.70) -> NormalizedClassification | None:
-        if pg_SessionLocal is None:
+        if PostgresAppSession is None:
             return None
         try:
             query_vector = EmbeddingService.generate_embedding(query_text, identifier=f"dynamic_tax:{query_text}")
             if not query_vector:
                 return None
 
-            with pg_SessionLocal() as pg_session:
+            with PostgresAppSession() as pg_session:
                 stmt = (
                     select(
                         DomainEmbedding.term,

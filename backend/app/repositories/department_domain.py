@@ -9,10 +9,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession, MssqlReadSession
 from app.core.logging import logger
 from app.models.domain import DepartmentDomainMaster
-from app.models.org import OrgDepartmentMst
 from app.schemas.domain import DepartmentDomain
 
 
@@ -46,10 +45,9 @@ class DepartmentDomainRepository:
     """
     Repository over DepartmentDomainMaster with a thread-safe in-memory cache.
 
-    Loading strategy (mirrors ConfigRepository/JobRepository degradation):
+    Loading strategy:
     1. Query active rows from MSSQL (joined to OrgDepartmentMst for dept names).
-    2. If the DB is unavailable or returns no rows, fall back to the bundled
-       seed file so offline/test behavior stays identical to the legacy map.
+    2. If the DB returns no rows, it logs a warning.
 
     The cache is loaded lazily on first access, reused across all requests, and
     can be reloaded via refresh_cache() (exposed through cache_warmer.warm_all).
@@ -59,12 +57,8 @@ class DepartmentDomainRepository:
         self,
         *,
         db_factory: Callable[[], Session | None] | None = None,
-        seed_path: str | Path | None = None,
-        seed_loader: Callable[[Path], list[dict[str, Any]]] | None = None,
     ) -> None:
         self._db_factory = db_factory
-        self._seed_path = Path(seed_path) if seed_path else None
-        self._seed_loader = seed_loader
         self._lock = threading.RLock()
         self._domains: list[DepartmentDomain] | None = None
         self._matchers: list[DomainMatcher] | None = None
@@ -112,10 +106,10 @@ class DepartmentDomainRepository:
             except Exception as exc:
                 logger.warning(f"[DEPARTMENT_DOMAIN] DB session factory failed: {exc}")
                 return None
-        if SessionLocal is None:
+        if PostgresAppSession is None:
             return None
         try:
-            return SessionLocal()
+            return PostgresAppSession()
         except Exception as exc:
             logger.warning(f"[DEPARTMENT_DOMAIN] Could not create DB session: {exc}")
             return None
@@ -126,32 +120,28 @@ class DepartmentDomainRepository:
             return None
         try:
             stmt = (
-                select(DepartmentDomainMaster, OrgDepartmentMst.DeptName)
-                .outerjoin(
-                    OrgDepartmentMst,
-                    OrgDepartmentMst.DeptID == DepartmentDomainMaster.DepartmentId,
-                )
+                select(DepartmentDomainMaster)
                 .where(DepartmentDomainMaster.IsActive == True)
                 .order_by(
                     DepartmentDomainMaster.Priority.asc(),
                     DepartmentDomainMaster.Id.asc(),
                 )
             )
-            rows = session.execute(stmt).all()
+            rows = session.execute(stmt).scalars().all()
             if not rows:
                 return []
             return [
                 DepartmentDomain(
                     id=int(row.Id),
                     department_id=(int(row.DepartmentId) if row.DepartmentId is not None else None),
-                    department_name=(dept_name or row.DomainName) if dept_name else row.DomainName,
+                    department_name=(row.DepartmentNameSnapshot or row.DomainName),
                     domain_name=row.DomainName,
                     keywords=json.loads(row.Keywords) if row.Keywords else [],
                     default_roles=json.loads(row.DefaultRoles) if row.DefaultRoles else [],
                     priority=int(row.Priority or 0),
                     is_active=bool(row.IsActive),
                 )
-                for row, dept_name in rows
+                for row in rows
             ]
         except Exception as exc:
             logger.warning(f"[DEPARTMENT_DOMAIN] DB load failed: {exc}")

@@ -1,15 +1,32 @@
 import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
 import app.models.org
 import app.models.recruit
 from app.models.prompts import PromptTemplateMaster
 from app.services.prompt_service import PromptService
 from app.core.error_handlers import PromptError
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppBase
 
-@pytest.fixture(scope="module")
-def db_session():
-    with SessionLocal() as session:
+engine = create_engine("sqlite:///:memory:")
+
+@event.listens_for(engine, "connect")
+def do_connect(dbapi_connection, connection_record):
+    dbapi_connection.execute("ATTACH DATABASE ':memory:' AS cvai")
+
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+@pytest.fixture(scope="function")
+def db_session(monkeypatch):
+    PostgresAppBase.metadata.create_all(bind=engine)
+    
+    import app.services.prompt_service
+    monkeypatch.setattr(app.services.prompt_service, "PostgresAppSession", TestingSessionLocal)
+    
+    with TestingSessionLocal() as session:
         yield session
+        
+    PostgresAppBase.metadata.drop_all(bind=engine)
 
 @pytest.fixture(autouse=True)
 def cleanup(db_session):

@@ -1,10 +1,10 @@
 from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, String
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from app.core.database import MssqlReadBase
 
 
-class OrgBusinessGroupMst(Base):
+class OrgBusinessGroupMst(MssqlReadBase):
     __tablename__ = "OrgBusinessGroupMst"
     BusinessGrpID = Column(BigInteger, primary_key=True)
     BusinessGrpName = Column(String)
@@ -13,7 +13,7 @@ class OrgBusinessGroupMst(Base):
     companies = relationship("OrgCompanyMst", back_populates="business_group")
 
 
-class OrgCompanyMst(Base):
+class OrgCompanyMst(MssqlReadBase):
     __tablename__ = "OrgCompanyMst"
     CompID = Column(BigInteger, primary_key=True)
     BusinessGrpID = Column(BigInteger, ForeignKey("OrgBusinessGroupMst.BusinessGrpID"))
@@ -25,7 +25,7 @@ class OrgCompanyMst(Base):
     locations = relationship("OrgLocationMst", back_populates="company")
 
 
-class OrgDepartmentMst(Base):
+class OrgDepartmentMst(MssqlReadBase):
     __tablename__ = "OrgDepartmentMst"
     DeptID = Column(BigInteger, primary_key=True)
     CompID = Column(BigInteger, ForeignKey("OrgCompanyMst.CompID"))
@@ -35,7 +35,7 @@ class OrgDepartmentMst(Base):
     company = relationship("OrgCompanyMst", back_populates="departments")
 
 
-class OrgLocationMst(Base):
+class OrgLocationMst(MssqlReadBase):
     __tablename__ = "OrgLocationMst"
     LocID = Column(BigInteger, primary_key=True)
     CompID = Column(BigInteger, ForeignKey("OrgCompanyMst.CompID"))
@@ -46,7 +46,7 @@ class OrgLocationMst(Base):
     company = relationship("OrgCompanyMst", back_populates="locations")
 
 
-class OrgDesignationMst(Base):
+class OrgDesignationMst(MssqlReadBase):
     __tablename__ = "OrgDesignationMst"
     DesigID = Column(BigInteger, primary_key=True)
     CompID = Column(BigInteger, ForeignKey("OrgCompanyMst.CompID"))
@@ -55,7 +55,7 @@ class OrgDesignationMst(Base):
     DesigIsActive = Column(Boolean)
 
 
-class OrgJobProfileMst(Base):
+class OrgJobProfileMst(MssqlReadBase):
     __tablename__ = "OrgJobProfileMst"
     JobProfileID = Column(BigInteger, primary_key=True)
     JobProfileName = Column(String)

@@ -27,18 +27,6 @@ def seed_taxonomy_and_vectors():
 
     config = RuleConfigManager.get_config()
     taxonomy_rules = config.scoring.taxonomy
-    
-    # Read raw compatibility map from JSON file since it was removed from runtime schema
-    import json
-    raw_compat_map = {}
-    json_path = Path(__file__).resolve().parent.parent / "app" / "core" / "rule_config.json"
-    if json_path.exists():
-        try:
-            with open(json_path) as f:
-                raw_data = json.load(f)
-                raw_compat_map = raw_data.get("scoring", {}).get("taxonomy", {}).get("compatibility_map", {})
-        except Exception as e:
-            logger.warning(f"Could not load raw compatibility map from JSON: {e}")
 
     if SessionLocal is None:
         logger.warning("MSSQL SessionLocal is None. Cannot seed MSSQL. Seeding pgvector directly...")
@@ -85,20 +73,11 @@ def seed_taxonomy_and_vectors():
 
         # 2. Seed Canonical Families
         logger.info("Seeding Job Families...")
-        # Map known families to domains
-        family_to_domain_mapping = {
-            "Software Engineering & Development": "IT & Software Services",
-            "IT Infrastructure, Networking & AV Systems": "IT & Software Services",
-            "Plant Electrical & Utility Maintenance": "Plant Operations & Maintenance",
-            "Control & Instrumentation (C&I)": "Plant Operations & Maintenance",
-            "Quality Control (QC) & Laboratory": "Quality Assurance & QC Laboratory",
-            "Quality Assurance (QA)": "Quality Assurance & QC Laboratory",
-            "Fire, Safety & EHS": "Environmental Health & Safety (EHS)",
-            "Environment & ETP Operations": "Environmental Health & Safety (EHS)",
-            "Process & Project Engineering": "Process & Project Engineering",
-            "Finance & Administration": "Finance & Administration",
-            "General Professional": "General Operations",
-        }
+        # Map known families to domains dynamically from vacancy rules
+        family_to_domain_mapping = {}
+        for rule in taxonomy_rules.vacancy_rules:
+            if rule.family not in family_to_domain_mapping:
+                family_to_domain_mapping[rule.family] = rule.domain
 
         for fam_name in taxonomy_rules.canonical_families:
             dom_name = family_to_domain_mapping.get(fam_name, taxonomy_rules.default_domain)
@@ -206,38 +185,6 @@ def seed_taxonomy_and_vectors():
             for syn in synonyms:
                 if syn and len(syn) > 1:
                     designations_to_vectorize.append((syn, "job_titles"))
-
-        # 4. Seed Family Compatibilities
-        logger.info("Seeding Family Compatibility Matrix...")
-        if db:
-            for (
-                source_fam_name,
-                target_fams,
-            ) in raw_compat_map.items():
-                src_fam = family_map.get(source_fam_name)
-                if not src_fam:
-                    continue
-                for tgt_fam_name in target_fams:
-                    tgt_fam = family_map.get(tgt_fam_name)
-                    if not tgt_fam:
-                        continue
-                    compat = (
-                        db.query(FamilyCompatibility)
-                        .filter(
-                            FamilyCompatibility.source_family_id == src_fam.family_id,
-                            FamilyCompatibility.target_family_id == tgt_fam.family_id,
-                        )
-                        .first()
-                    )
-                    if not compat:
-                        db.add(
-                            FamilyCompatibility(
-                                source_family_id=src_fam.family_id,
-                                target_family_id=tgt_fam.family_id,
-                                compatibility_score=1.0,
-                                is_allowed=True,
-                            )
-                        )
 
         if db:
             db.commit()
