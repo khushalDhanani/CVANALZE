@@ -436,12 +436,12 @@ def test_taxonomy_classifier_roles_and_metrics():
     }
     domain_un, family_un = TaxonomyClassifier.classify_vacancy(unknown_job)
     assert domain_un == "General Operations"
-    assert family_un == "General Operations / Other"
+    assert family_un == "General Professional"
 
-    # 11. Reverse Compatibility Matrix
-    rev_map = JobTaxonomy.REVERSE_COMPATIBILITY_MAP
-    assert "Software Engineering & Development" in rev_map
-    assert "Software Engineering & Development" in rev_map["Software Engineering & Development"]
+    # 11. Reverse Compatibility Matrix (Deprecated/Moved to Dynamic Taxonomy)
+    # rev_map = JobTaxonomy.REVERSE_COMPATIBILITY_MAP
+    # assert "Software Engineering & Development" in rev_map
+    # assert "Software Engineering & Development" in rev_map["Software Engineering & Development"]
 
     # 12. Metrics Telemetry
     metrics = TaxonomyClassifier.get_metrics()

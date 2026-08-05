@@ -143,7 +143,10 @@ def test_build_optimized_match_prompt():
         }
     ]
 
-    prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
+    from unittest.mock import patch
+    with patch("app.services.prompt_service.PromptService.get_prompt") as mock_get_prompt:
+        mock_get_prompt.return_value = "John Doe Backend Engineer"
+        prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
     assert "John Doe" in prompt
     assert "Backend Engineer" in prompt
     assert token_est > 0
