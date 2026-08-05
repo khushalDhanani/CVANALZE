@@ -41,9 +41,14 @@ class RuleConfigProfile(Base):
     scoring_rules_json = Column(Text, nullable=False)
     
     is_active = Column(Boolean, default=False)
+    status = Column(String(50), default="DRAFT")
     
     # Audit fields
     created_by = Column(String(100), nullable=True)
+    activated_by = Column(String(100), nullable=True)
+    activated_at = Column(DateTime, nullable=True)
+    activation_reason = Column(String(500), nullable=True)
+    previous_version_tag = Column(String(50), nullable=True)
     audit_reason = Column(String(500), nullable=True)
     
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))

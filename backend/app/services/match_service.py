@@ -7,6 +7,7 @@ from app.core.cache import CacheIndex, CacheKey, match_result_cache_manager
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
+from app.core.rule_config_manager import RuleConfigManager
 from app.prompts.optimized_match import build_optimized_match_prompt
 from app.repositories.config import ConfigRepository
 from app.repositories.job import JobRepository
@@ -403,6 +404,8 @@ class MatchService:
             active_vacancy_summary=active_vacancy_summary,
             scoring_profile_code=scoring_config.profile_code,
             scoring_profile_version=scoring_config.profile_version,
+            config_version=RuleConfigManager.get_config().version,
+            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
             ai_career_summary=ai_career_summary,
             best_match=best_match,
             suitable_openings=suitable_matches,
@@ -478,6 +481,8 @@ class MatchService:
             active_vacancy_summary="No suitable active vacancy found.",
             scoring_profile_code=scoring_config.profile_code if 'scoring_config' in locals() else None,
             scoring_profile_version=scoring_config.profile_version if 'scoring_config' in locals() else None,
+            config_version=RuleConfigManager.get_config().version,
+            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
             ai_career_summary=(
                 f"Candidate Profile Analysis:\n"
                 f"• Recommended Department: {rec_dept}\n"

@@ -692,12 +692,36 @@ class RuleConfigManager:
                 if not tests:
                     return
                 
+                config_dict = candidate_config.model_dump()
                 for test in tests:
-                    payload = json.loads(test.payload_json)
-                    expected = json.loads(test.expected_result_json)
-                    # Future expansion: dynamically map test.target_component to specific evaluations
-                    # e.g., if target_component == "job_title", check candidate_config.fields["job_title"]
+                    try:
+                        expected = json.loads(test.expected_result_json)
+                        
+                        # Dynamically map test.target_component to specific evaluations
+                        # e.g., if target_component == "fields.job_title", check candidate_config.fields["job_title"]
+                        parts = test.target_component.split('.')
+                        current = config_dict
+                        for p in parts:
+                            if isinstance(current, dict) and p in current:
+                                current = current[p]
+                            else:
+                                current = None
+                                break
+                        
+                        if current is not None and isinstance(current, dict):
+                            # Compare expected subset against current configuration
+                            for k, v in expected.items():
+                                if current.get(k) != v:
+                                    raise ValueError(f"Mismatch on '{k}': expected {v}, got {current.get(k)}")
+                        elif current is None and expected:
+                            raise ValueError(f"Target component '{test.target_component}' not found in configuration")
+                    except Exception as test_e:
+                        raise ValueError(f"Smoke test '{test.test_name}' failed: {test_e}")
+                        
+        except ValueError as ve:
+            logger.error(f"[RULE_CONFIG] Validation test failure: {ve}")
+            raise ve
         except Exception as e:
-            logger.warning(f"[RULE_CONFIG] Failed to execute DB smoke tests: {e}")
+            logger.warning(f"[RULE_CONFIG] Failed to execute DB smoke tests (DB error): {e}")
 
 

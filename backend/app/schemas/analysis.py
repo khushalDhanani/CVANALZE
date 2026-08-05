@@ -140,6 +140,8 @@ class EnrichedCandidateAnalysis(BaseModel):
     )
     scoring_profile_code: str | None = Field(default=None, description="Scoring profile code used for evaluation")
     scoring_profile_version: str | None = Field(default=None, description="Scoring profile version/timestamp used")
+    config_version: str | None = Field(default=None, description="Configuration Governance profile version tag")
+    prompt_version: str | None = Field(default=None, description="Prompt Template version tag")
     ai_career_summary: str = Field(
         default="",
         description="Independent AI analysis of candidate profile, strengths, department, and suitable roles",

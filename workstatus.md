@@ -12,6 +12,12 @@
 - **Implemented deduplication and policy filtering logic**: Added `WorkExperiencePostProcessor` that deterministically filters records based on employment type (e.g. dropping internships if requested) and deduplicates OCR records based on a weighted fuzzy match on Job Title, Company, and dates.
 - **Exposed REST API endpoint**: Added `POST /api/v1/cv/extract-experience` supporting comprehensive requests (reference_date, config policies) returning human-review warnings and complete unique experience summaries.
 - **Test suite (100% pass)**: Implemented extensive pytest cases (`tests/services/test_work_experience_post_processor.py`, `tests/services/test_work_experience_calculation_service.py`, `tests/services/test_work_experience_extraction_service.py`, `tests/api/test_experience_extraction_api.py`) covering leap years, ordinals, human review logic, overlap math, missing dates, etc.
+## Work Completed — Phase 2: Configuration Governance
+- **Real Database Validation Tests**: Implemented `_run_synthetic_smoke_tests` in `RuleConfigManager` to perform JSON traversal and evaluate dynamically generated configs against test payloads defined in the database.
+- **Audit & Workflow History Tracking**: Added `status`, `activated_by`, `activated_at`, `activation_reason`, and `previous_version_tag` to `RuleConfigProfile` model.
+- **Approval & Rollback Workflows**: Added `request_approval` and `rollback_profile` to `ConfigurationService`. Modified `activate_profile` to track metadata and properly capture `previous_version_tag`.
+- **Tenant Profile Enforcement**: Built strict backend constraints in `activate_profile` that deactivates all other configs upon activation to ensure exactly one active profile per tenant.
+- **Result Output Injection**: Updated `EnrichedCandidateAnalysis` and `MatchService.analyze_single_cv` to inject `config_version` and `prompt_version` into the root of every CV matching payload.
 
 ## Work Completed
 - Diagnosed the root cause of the UI only displaying 5 vacancies. The application was failing to connect to the MSSQL database and was returning a fallback mock list.
@@ -51,6 +57,11 @@
   - Added log monitoring and container management commands.
 
 ## Files Changed
+- `backend/app/models/rules.py` — added workflow and audit fields to `RuleConfigProfile`
+- `backend/app/services/configuration_service.py` — added `request_approval` and `rollback_profile`, updated `activate_profile`
+- `backend/app/core/rule_config_manager.py` — implemented real JSON traversal tests in `_run_synthetic_smoke_tests`
+- `backend/app/schemas/analysis.py` — added `config_version` and `prompt_version` to `EnrichedCandidateAnalysis`
+- `backend/app/services/match_service.py` — injected version fields into match result payload
 - `docker-compose.yml`
 - `docker-compose.local.yml` — added `./backend/uploads:/app/uploads` volume mounts for `api` and `worker`
 - `run.md` — updated with Docker Compose commands, container rebuild steps, and log monitoring
