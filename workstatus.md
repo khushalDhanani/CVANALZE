@@ -275,3 +275,16 @@
 - `backend/scripts/backfill_cvai_cache.py`
 - `backend/scripts/seed_taxonomy_from_json.py`
 - `backend/tests/conftest.py`
+
+---
+
+## Work Completed — PR 4: Implement complete MSSQL repositories
+- **Added Org Schema Extensions:** Declared missing read-only schemas in `backend/app/models/org.py` including `OrgQualificationMst`, `OrgDomainMst`, `OrgJobProfileQualification`, and `OrgJobProfileDomain`. Established SQLAlchemy relationships natively on `OrgJobProfileMst`.
+- **Added Recruit Schema Extensions:** Declared missing read-only schemas in `backend/app/models/recruit.py` including `RecruitWorkflowMst`, `RecruitCandidateQualification`, `RecruitCandidateDomain`, `RecruitVacancyQualification`, `RecruitVacancyDomain`, and `RecruitWorkflowState`. Bound them securely to `RecruitCandidateMst` and `RecruitVacancyRequest`.
+- **Implemented Entity Aggregation Repository:** Created `backend/app/repositories/mssql_aggregates.py` to house the requested data access layer. Implemented `get_candidate_aggregate`, `get_vacancy_aggregate`, and `get_job_profile_aggregate` utilizing SQLAlchemy `joinedload` queries to deeply load and map complex relational graphs into easily serializable dicts in a single round-trip.
+- **Architectural Validation:** Re-ran `backend/tests/test_database_architecture.py` to definitively confirm that all newly declared MSSQL models accurately inherited from `MssqlReadBase` and thus retained robust query immutability (DML locks intact).
+
+## Files Changed
+- `backend/app/models/org.py`
+- `backend/app/models/recruit.py`
+- `backend/app/repositories/mssql_aggregates.py`

@@ -64,3 +64,39 @@ class OrgJobProfileMst(MssqlReadBase):
     DeptID = Column(BigInteger, ForeignKey("OrgDepartmentMst.DeptID"))
     DesigID = Column(BigInteger, ForeignKey("OrgDesignationMst.DesigID"))
     JobProfileIsActive = Column(Boolean)
+
+    qualifications = relationship("OrgJobProfileQualification")
+    domains = relationship("OrgJobProfileDomain")
+
+class OrgQualificationMst(MssqlReadBase):
+    __tablename__ = "OrgQualificationMst"
+    QualID = Column(BigInteger, primary_key=True)
+    QualName = Column(String)
+    QualIsActive = Column(Boolean)
+
+
+class OrgDomainMst(MssqlReadBase):
+    __tablename__ = "OrgDomainMst"
+    DomainID = Column(BigInteger, primary_key=True)
+    DomainName = Column(String)
+    DomainIsActive = Column(Boolean)
+
+
+class OrgJobProfileQualification(MssqlReadBase):
+    __tablename__ = "OrgJobProfileQualification"
+    JobProfileQualID = Column(BigInteger, primary_key=True)
+    JobProfileID = Column(BigInteger, ForeignKey("OrgJobProfileMst.JobProfileID"))
+    QualID = Column(BigInteger, ForeignKey("OrgQualificationMst.QualID"))
+    IsMandatory = Column(Boolean, default=True)
+    
+    qualification = relationship("OrgQualificationMst")
+
+
+class OrgJobProfileDomain(MssqlReadBase):
+    __tablename__ = "OrgJobProfileDomain"
+    JobProfileDomainID = Column(BigInteger, primary_key=True)
+    JobProfileID = Column(BigInteger, ForeignKey("OrgJobProfileMst.JobProfileID"))
+    DomainID = Column(BigInteger, ForeignKey("OrgDomainMst.DomainID"))
+    IsMandatory = Column(Boolean, default=True)
+    
+    domain = relationship("OrgDomainMst")

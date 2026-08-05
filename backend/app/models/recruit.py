@@ -34,6 +34,9 @@ class RecruitVacancyRequest(MssqlReadBase):
     location = relationship("OrgLocationMst")
     designation = relationship("OrgDesignationMst")
 
+    qualifications = relationship("RecruitVacancyQualification")
+    domains = relationship("RecruitVacancyDomain")
+
 
 class RecruitCandidateMst(MssqlReadBase):
     __tablename__ = "RecruitCandidateMst"
@@ -53,6 +56,10 @@ class RecruitCandidateMst(MssqlReadBase):
 
     job_profile = relationship("OrgJobProfileMst")
 
+    qualifications = relationship("RecruitCandidateQualification")
+    domains = relationship("RecruitCandidateDomain")
+    workflow_states = relationship("RecruitWorkflowState")
+
 
 class RecruitSkillMst(MssqlReadBase):
     __tablename__ = "RecruitSkillMst"
@@ -62,3 +69,47 @@ class RecruitSkillMst(MssqlReadBase):
     SkillName = Column(String(255), nullable=False)
     SkillDesc = Column(String(500), nullable=True)
     SkillIsActive = Column(Boolean, default=True)
+
+
+class RecruitWorkflowMst(MssqlReadBase):
+    __tablename__ = "RecruitWorkflowMst"
+    WorkflowID = Column(BigInteger, primary_key=True)
+    WorkflowName = Column(String)
+
+
+class RecruitCandidateQualification(MssqlReadBase):
+    __tablename__ = "RecruitCandidateQualification"
+    CandQualID = Column(BigInteger, primary_key=True)
+    CandidateID = Column(BigInteger, ForeignKey("RecruitCandidateMst.CandidateID"))
+    QualID = Column(BigInteger, ForeignKey("OrgQualificationMst.QualID"))
+
+
+class RecruitCandidateDomain(MssqlReadBase):
+    __tablename__ = "RecruitCandidateDomain"
+    CandDomainID = Column(BigInteger, primary_key=True)
+    CandidateID = Column(BigInteger, ForeignKey("RecruitCandidateMst.CandidateID"))
+    DomainID = Column(BigInteger, ForeignKey("OrgDomainMst.DomainID"))
+
+
+class RecruitVacancyQualification(MssqlReadBase):
+    __tablename__ = "RecruitVacancyQualification"
+    VacancyQualID = Column(BigInteger, primary_key=True)
+    VacancyRequestID = Column(BigInteger, ForeignKey("RecruitVacancyRequest.VacancyRequestID"))
+    QualID = Column(BigInteger, ForeignKey("OrgQualificationMst.QualID"))
+
+
+class RecruitVacancyDomain(MssqlReadBase):
+    __tablename__ = "RecruitVacancyDomain"
+    VacancyDomainID = Column(BigInteger, primary_key=True)
+    VacancyRequestID = Column(BigInteger, ForeignKey("RecruitVacancyRequest.VacancyRequestID"))
+    DomainID = Column(BigInteger, ForeignKey("OrgDomainMst.DomainID"))
+
+
+class RecruitWorkflowState(MssqlReadBase):
+    __tablename__ = "RecruitWorkflowState"
+    StateID = Column(BigInteger, primary_key=True)
+    CandidateID = Column(BigInteger, ForeignKey("RecruitCandidateMst.CandidateID"))
+    VacancyRequestID = Column(BigInteger, ForeignKey("RecruitVacancyRequest.VacancyRequestID"))
+    WorkflowID = Column(BigInteger, ForeignKey("RecruitWorkflowMst.WorkflowID"))
+    CurrentState = Column(String)
+
