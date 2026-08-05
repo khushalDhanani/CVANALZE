@@ -246,3 +246,31 @@ def test_custom_business_states_can_be_added_to_workflow():
     assert "AWAITING_APPROVAL" in new_config.workflow.allowed_job_states
     assert "AWAITING_APPROVAL" in new_config.workflow.job_state_transitions["COMPLETED"]
     assert new_config.workflow.job_state_transitions["AWAITING_APPROVAL"] == ["ARCHIVED"]
+
+def test_tenant_isolation_in_active_configs():
+    raw_dict = RuleConfigManager.get_config().model_dump()
+    tenant_a_dict = copy.deepcopy(raw_dict)
+    tenant_b_dict = copy.deepcopy(raw_dict)
+
+    tenant_a_dict["version"] = "1.0.0-tenant-a"
+    tenant_b_dict["version"] = "1.0.0-tenant-b"
+
+    RuleConfigManager.load_config(tenant_a_dict, tenant_id="tenant_a")
+    RuleConfigManager.load_config(tenant_b_dict, tenant_id="tenant_b")
+
+    config_a = RuleConfigManager.get_config(tenant_id="tenant_a")
+    config_b = RuleConfigManager.get_config(tenant_id="tenant_b")
+
+    assert config_a.version == "1.0.0-tenant-a"
+    assert config_b.version == "1.0.0-tenant-b"
+
+    # Reset globals
+    RuleConfigManager.load_config()
+
+def test_cache_fallback_handles_missing_db():
+    # If DB throws an exception, it should fall back to cache or file
+    # This verifies that load_config doesn't crash when DB isn't available for a tenant
+    config = RuleConfigManager.load_config(tenant_id="missing_tenant")
+    assert config is not None
+    assert config.version is not None
+
