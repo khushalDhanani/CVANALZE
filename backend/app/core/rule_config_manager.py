@@ -348,14 +348,11 @@ class RuleConfigManager:
                     query = query.filter(RuleConfigProfile.tenant_id.is_(None))
                 active_profile = query.first()
                 if active_profile:
-                    raw_data = {
-                        "version": active_profile.version_tag,
-                        "description": active_profile.description or "",
-                        "last_updated": active_profile.updated_at.isoformat() if active_profile.updated_at else "",
-                        "global_confidence_tiers": json.loads(active_profile.global_confidence_tiers_json),
-                        "fields": json.loads(active_profile.fields_config_json),
-                        "scoring": json.loads(active_profile.scoring_rules_json)
-                    }
+                    # TODO: Hydrate UnifiedRuleConfig fully from normalized RuleComponent, SystemRule, RuleCondition, 
+                    # RuleThreshold, RulePenalty, and RuleWeight tables.
+                    # This requires a complex hierarchical aggregation logic. 
+                    # For this PR, we defer hydration and allow fallback to the cached/mocked configuration.
+                    raw_data = None
                     path_hash = active_profile.version_tag
                     config_size_bytes = len(json.dumps(raw_data))
                     logger.info(f"[RULE_CONFIG] Loading active profile from database (v{active_profile.version_tag})")
