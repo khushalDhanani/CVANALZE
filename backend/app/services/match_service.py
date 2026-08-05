@@ -141,30 +141,8 @@ class MatchService:
         filtered_vacancies = [job.raw_job for job in filtered_job_contexts]
         profiler.metrics.vacancies_after_filtering = len(filtered_job_contexts)
 
-        # Fetch configuration thresholds once for all jobs to avoid redundant lookups
-        def _safe_float_config(key: str, default: float) -> float:
-            val = ConfigRepository.get_setting(key, default)
-            try:
-                return float(val) if val is not None else default
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid config value for {key}: {val}. Using default {default}.")
-                return default
-
-        scoring_config = {
-            "MANDATORY_FAILURE_PENALTY_PER_ITEM": _safe_float_config(
-                "MANDATORY_FAILURE_PENALTY_PER_ITEM",
-                settings.MANDATORY_FAILURE_PENALTY_PER_ITEM,
-            ),
-            "MAX_SCORE_ON_MANDATORY_FAILURE": _safe_float_config(
-                "MAX_SCORE_ON_MANDATORY_FAILURE",
-                settings.MAX_SCORE_ON_MANDATORY_FAILURE,
-            ),
-            "LLM_SEMANTIC_WEIGHT": _safe_float_config("LLM_SEMANTIC_WEIGHT", settings.LLM_SEMANTIC_WEIGHT),
-            "MAX_LLM_BOOST": _safe_float_config("MAX_LLM_BOOST", settings.MAX_LLM_BOOST),
-            "MATCH_HIGH_THRESHOLD": _safe_float_config("MATCH_HIGH_THRESHOLD", settings.MATCH_HIGH_THRESHOLD),
-            "MATCH_MEDIUM_THRESHOLD": _safe_float_config("MATCH_MEDIUM_THRESHOLD", settings.MATCH_MEDIUM_THRESHOLD),
-            "MATCH_COMPONENT_WEIGHTS": ConfigRepository.get_setting("MATCH_COMPONENT_WEIGHTS", None),
-        }
+        from app.schemas.scoring_config import ScoringConfig
+        scoring_config = ScoringConfig.load()
 
         # CONFIDENCE GATE CHECK (Phase 3)
         llm_skipped = False
@@ -423,6 +401,8 @@ class MatchService:
             suitable_job_roles=suitable_roles,
             has_genuine_match=has_genuine_match,
             active_vacancy_summary=active_vacancy_summary,
+            scoring_profile_code=scoring_config.profile_code,
+            scoring_profile_version=scoring_config.profile_version,
             ai_career_summary=ai_career_summary,
             best_match=best_match,
             suitable_openings=suitable_matches,
@@ -496,6 +476,8 @@ class MatchService:
             suitable_job_roles=roles,
             has_genuine_match=False,
             active_vacancy_summary="No suitable active vacancy found.",
+            scoring_profile_code=scoring_config.profile_code if 'scoring_config' in locals() else None,
+            scoring_profile_version=scoring_config.profile_version if 'scoring_config' in locals() else None,
             ai_career_summary=(
                 f"Candidate Profile Analysis:\n"
                 f"• Recommended Department: {rec_dept}\n"

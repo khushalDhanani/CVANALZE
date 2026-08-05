@@ -483,7 +483,7 @@ class ComponentScoreEvaluator:
         max_exp = job_ctx.max_experience_years
         experience_score = None
         if min_exp is not None or max_exp is not None:
-            experience_score = 100.0
+            experience_score = typed_config.perfect_component_score
             if min_exp is not None and context.candidate_experience is not None and context.candidate_experience < min_exp:
                 if min_exp > 0:
                     experience_score = (context.candidate_experience / min_exp) * params.below_min_exp_multiplier
@@ -491,13 +491,13 @@ class ComponentScoreEvaluator:
                     experience_score = 0.0
             if max_exp is not None and context.candidate_experience is not None and context.candidate_experience > max_exp:
                 experience_score -= params.overqualification_penalty
-            experience_score = max(0.0, min(100.0, experience_score))
+            experience_score = max(0.0, min(typed_config.perfect_component_score, experience_score))
 
         # 4. Education Score
         education_req = job_ctx.education_requirements
         education_score = None
         if education_req:
-            education_score = 100.0
+            education_score = typed_config.perfect_component_score
             edu_matched, _ = extract_term_matches_fn(context.norm_text, [str(education_req)])
             if not edu_matched and not (context.optimized_profile and context.optimized_profile.education_domains):
                 education_score = 0.0
@@ -506,7 +506,7 @@ class ComponentScoreEvaluator:
         certification_req = job_ctx.certifications
         certification_score = None
         if certification_req:
-            certification_score = 100.0
+            certification_score = typed_config.perfect_component_score
             cert_matched, _ = extract_term_matches_fn(context.norm_text, [str(certification_req)])
             if not cert_matched and not (context.optimized_profile and context.optimized_profile.certifications):
                 certification_score = 0.0
@@ -519,21 +519,21 @@ class ComponentScoreEvaluator:
             if job_ctx.dept_term_patterns:
                 matched_dept_terms = [p.pattern for p in job_ctx.dept_term_patterns if p.search(context.domain_candidate_text)]
                 if matched_dept_terms:
-                    domain_score = 100.0
+                    domain_score = typed_config.perfect_component_score
 
         # 7. Technology Score
         technology_score = None
         tech_reqs = job_ctx.technologies
         if tech_reqs:
             tech_matched, _ = extract_term_matches_fn(context.norm_text, tech_reqs)
-            technology_score = (len(tech_matched) / len(tech_reqs)) * 100.0
+            technology_score = (len(tech_matched) / len(tech_reqs)) * typed_config.perfect_component_score
 
         # 8. Responsibilities Score
         responsibilities_score = None
         resp_reqs = job_ctx.responsibilities
         if resp_reqs:
             resp_matched, _ = extract_term_matches_fn(context.norm_text, resp_reqs)
-            responsibilities_score = (len(resp_matched) / len(resp_reqs)) * 100.0
+            responsibilities_score = (len(resp_matched) / len(resp_reqs)) * typed_config.perfect_component_score
 
         # Calculate Overall Raw Score (Weighted)
         weights = typed_config.component_weights

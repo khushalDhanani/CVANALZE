@@ -15,13 +15,7 @@ from app.models.domain import DepartmentDomainMaster
 from app.models.org import OrgDepartmentMst
 from app.schemas.domain import DepartmentDomain
 
-_SEED_PATH = Path(__file__).resolve().parent.parent / "data" / "department_domains_seed.json"
 
-
-def _default_seed_loader(path: Path) -> list[dict[str, Any]]:
-    with path.open("r", encoding="utf-8") as fh:
-        payload = json.load(fh)
-    return list(payload.get("domains", []))
 
 
 @dataclass(frozen=True)
@@ -69,8 +63,8 @@ class DepartmentDomainRepository:
         seed_loader: Callable[[Path], list[dict[str, Any]]] | None = None,
     ) -> None:
         self._db_factory = db_factory
-        self._seed_path = Path(seed_path) if seed_path else _SEED_PATH
-        self._seed_loader = seed_loader or _default_seed_loader
+        self._seed_path = Path(seed_path) if seed_path else None
+        self._seed_loader = seed_loader
         self._lock = threading.RLock()
         self._domains: list[DepartmentDomain] | None = None
         self._matchers: list[DomainMatcher] | None = None
@@ -104,8 +98,8 @@ class DepartmentDomainRepository:
         domains = self._load_from_db()
         source = "db"
         if not domains:
-            domains = self._load_from_seed()
-            source = "seed"
+            logger.warning("[DEPARTMENT_DOMAIN] DB returned 0 domains. Application requires initialized taxonomy in Database!")
+            domains = []
         self._domains = domains
         self._matchers = self._build_matchers(domains)
         logger.info(f"[DEPARTMENT_DOMAIN] Loaded {len(domains)} active domain(s) from {source}.")
@@ -165,30 +159,7 @@ class DepartmentDomainRepository:
         finally:
             session.close()
 
-    def _load_from_seed(self) -> list[DepartmentDomain]:
-        try:
-            records = self._seed_loader(self._seed_path)
-        except Exception as exc:
-            logger.warning(f"[DEPARTMENT_DOMAIN] Seed load failed: {exc}")
-            return []
-        domains: list[DepartmentDomain] = []
-        for record in records:
-            if record.get("is_active", True) is False:
-                continue
-            domain_name = record.get("domain_name") or ""
-            domains.append(
-                DepartmentDomain(
-                    id=record.get("id"),
-                    department_id=record.get("department_id"),
-                    department_name=record.get("department_name") or domain_name,
-                    domain_name=domain_name,
-                    keywords=list(record.get("keywords") or []),
-                    default_roles=list(record.get("default_roles") or []),
-                    priority=int(record.get("priority") or 0),
-                    is_active=True,
-                )
-            )
-        return domains
+
 
     @staticmethod
     def _build_matchers(domains: list[DepartmentDomain]) -> list[DomainMatcher]:

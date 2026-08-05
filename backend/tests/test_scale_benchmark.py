@@ -131,6 +131,6 @@ def test_scale_benchmark_throughput_and_memory(vacancy_count: int):
 
     assert analysis.best_match is not None
     assert analysis.best_match.score > 0.0
-    assert len(analysis.suitable_openings) == len(filtered_job_contexts)
+    assert len(analysis.suitable_openings) + len(analysis.unsuitable_openings) == len(filtered_job_contexts)
     # Ensure Stage-0 taxonomy pre-filter pruned non-IT vacancies (Finance, HR, Maintenance, etc.)
     assert prune_ratio_pct >= 60.0

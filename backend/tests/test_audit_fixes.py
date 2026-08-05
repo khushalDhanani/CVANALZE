@@ -254,7 +254,20 @@ def test_cv_upload_background_task_returns_processing_status(tmp_path, monkeypat
     pdf_content = doc.tobytes()
     doc.close()
 
-    with patch("app.api.cv.background_process_cv"):
+    from unittest.mock import Mock
+    dummy_record = Mock(
+        job_id="1", 
+        cv_key="dummy_key", 
+        state=Mock(value="QUEUED"), 
+        execution_mode=Mock(value="PENDING"), 
+        message="Enqueued", 
+        progress=0, 
+        attempt=0,
+        stage="UPLOADED"
+    )
+    dummy_submission = Mock(record=dummy_record)
+
+    with patch("app.api.cv.ProcessingQueueService.submit_upload", return_value=dummy_submission):
         response = client.post(
             "/api/cv/upload",
             files={"file": ("test_background.pdf", pdf_content, "application/pdf")},
@@ -1080,8 +1093,21 @@ def test_docx_upload_full_pipeline(tmp_path, monkeypatch):
     assert "Jane Smith" in result.markdown or "Python Developer" in result.markdown
     assert result.page_count >= 1
 
+    from unittest.mock import Mock
+    dummy_record = Mock(
+        job_id="1", 
+        cv_key="dummy_key", 
+        state=Mock(value="QUEUED"), 
+        execution_mode=Mock(value="PENDING"), 
+        message="Enqueued", 
+        progress=0, 
+        attempt=0,
+        stage="UPLOADED"
+    )
+    dummy_submission = Mock(record=dummy_record)
+
     # Verify endpoint handles .docx upload
-    with patch("app.api.cv.background_process_cv"):
+    with patch("app.api.cv.ProcessingQueueService.submit_upload", return_value=dummy_submission):
         response = client.post(
             "/api/cv/upload",
             files={

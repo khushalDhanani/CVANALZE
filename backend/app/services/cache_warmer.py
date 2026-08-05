@@ -106,8 +106,11 @@ def warm_skills() -> list[dict[str, Any]]:
     if db is None:
         return []
     try:
-        result = db.execute(text("SELECT SkillID, SkillTypeID, SkillName, SkillDesc FROM RecruitSkillMst WHERE SkillIsActive = 1"))
-        skills = [{"id": row[0], "type_id": row[1], "name": row[2], "description": row[3]} for row in result.fetchall()]
+        from app.models.recruit import RecruitSkillMst
+        
+        stmt = select(RecruitSkillMst).where(RecruitSkillMst.SkillIsActive == True)
+        rows = db.execute(stmt).scalars().all()
+        skills = [{"id": r.SkillID, "type_id": r.SkillTypeID, "name": r.SkillName, "description": r.SkillDesc} for r in rows]
         master_data_cache_manager.set("skills", skills)
         logger.info(f"[WARM] Skills cached: {len(skills)}")
         return skills

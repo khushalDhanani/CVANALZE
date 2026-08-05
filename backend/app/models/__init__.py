@@ -2,6 +2,9 @@ from app.models.config import SystemConfig
 from app.models.domain import DepartmentDomainMaster
 from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading
 from app.models.pg import CandidateEmbedding, DomainEmbedding, VacancyEmbedding
+from app.models.prompts import PromptTemplateMaster
+from app.models.recruit import RecruitCandidateMst
+from app.models.rules import RuleConfigProfile, RuleValidationTestCase
 from app.models.scoring_profile import ScoringProfileMaster, StopWord
 from app.models.taxonomy import (
     DesignationMaster,
@@ -12,6 +15,7 @@ from app.models.taxonomy import (
     JobFamilyMaster,
     SkillMaster,
 )
+from app.models.training import HRFeedback
 
 __all__ = [
     "CandidateEmbedding",
@@ -23,8 +27,12 @@ __all__ = [
     "DomainMaster",
     "FamilyCompatibility",
     "GeoLocation",
+    "HRFeedback",
     "JobFamilyMaster",
     "NameDenylist",
+    "PromptTemplateMaster",
+    "RuleConfigProfile",
+    "RuleValidationTestCase",
     "ScoringProfileMaster",
     "SectionHeading",
     "SkillMaster",

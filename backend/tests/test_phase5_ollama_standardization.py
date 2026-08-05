@@ -306,9 +306,19 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
 
 def test_embedding_rejects_non_finite_values_and_still_unloads(monkeypatch):
     monkeypatch.setattr(settings, "OLLAMA_EMBEDDING_EXPECTED_DIMENSION", 0)
+    
+    mock_resp = httpx.Response(
+        200,
+        text='{"model": "nomic-embed-text", "embeddings": [[NaN, 0.2]]}',
+        request=httpx.Request("POST", "http://ollama.test/api"),
+    )
+    context = MagicMock()
+    context.__enter__.return_value = mock_resp
+    context.__exit__.return_value = False
+
     client = _install_client(
         monkeypatch,
-        _response({"model": "nomic-embed-text", "embeddings": [[float("nan"), 0.2]]}),
+        context,
     )
 
     with pytest.raises(OllamaSchemaValidationError):

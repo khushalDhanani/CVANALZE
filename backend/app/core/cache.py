@@ -738,13 +738,13 @@ _processing_job_file_cache = FileCache(settings.RESULTS_DIR / ".processing_jobs"
 llm_cache_manager = CacheManager(
     namespace="llm_cache",
     providers=[_memory_cache, _redis_cache, _llm_file_cache],
-    default_ttl=2592000,
+    default_ttl=settings.CACHE_TTL_LLM_SECONDS,
 )
 
 cv_result_cache_manager = CacheManager(
     namespace="cv_result",
     providers=[_memory_cache, _redis_cache, _cv_file_cache],
-    default_ttl=604800,
+    default_ttl=settings.CACHE_TTL_MATCH_RESULT_SECONDS,
 )
 
 processing_job_cache_manager = CacheManager(
@@ -757,35 +757,35 @@ processing_job_cache_manager = CacheManager(
 doc_cache_manager = CacheManager(
     namespace="doc_cache",
     providers=[_memory_cache, _redis_cache, _doc_cache_file_cache],
-    default_ttl=2592000,
+    default_ttl=settings.CACHE_TTL_DOC_SECONDS,
 )
 
 config_cache_manager = CacheManager(
     namespace="config",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=3600,
+    default_ttl=settings.CACHE_TTL_CONFIG_SECONDS,
 )
 
 embedding_cache_manager = CacheManager(
     namespace="embed",
     providers=[_memory_cache, _redis_cache, _embedding_file_cache],
-    default_ttl=2592000,
+    default_ttl=settings.CACHE_TTL_EMBEDDING_SECONDS,
 )
 
 match_result_cache_manager = CacheManager(
     namespace="match_result",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=604800,
+    default_ttl=settings.CACHE_TTL_MATCH_RESULT_SECONDS,
 )
 
 vacancy_cache_manager = CacheManager(
     namespace="vacancy",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=3600,
+    default_ttl=settings.CACHE_TTL_VACANCY_SECONDS,
 )
 
 master_data_cache_manager = CacheManager(
     namespace="mst",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=3600,
+    default_ttl=settings.CACHE_TTL_MASTER_DATA_SECONDS,
 )

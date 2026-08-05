@@ -19,7 +19,6 @@ from app.services.match_service import MatchService
 from app.services.processing_queue import (
     ProcessingQueueService,
     ProcessingQueueUnavailableError,
-    run_processing_job_fallback,
 )
 from app.services.upload_service import UploadService, UploadValidationError
 
@@ -62,10 +61,6 @@ async def analyze_cv_text(payload: CVMatchRequest):
         raise HTTPException(status_code=500, detail="An internal error occurred during CV analysis.") from exc
 
 
-def background_upload_and_analyze(job_id: str) -> None:
-    run_processing_job_fallback(job_id)
-
-
 @router.post("/upload", response_model=CVProcessingResponse)
 async def upload_and_analyze(
     background_tasks: BackgroundTasks,
@@ -86,8 +81,7 @@ async def upload_and_analyze(
                 content_type=accepted.detected_content_type,
                 storage_filename=accepted.storage_filename,
             )
-            if submission.schedule_development_fallback:
-                background_tasks.add_task(background_upload_and_analyze, submission.record.job_id)
+
         except Exception:
             if not accepted.was_already_stored:
                 UploadService.remove_stored_upload(accepted.storage_filename)
@@ -100,7 +94,7 @@ async def upload_and_analyze(
             progress=submission.record.progress,
             stage=submission.record.stage,
             job_id=submission.record.job_id,
-            job_state=submission.record.state.value,
+            job_state=submission.record.state,
             execution_mode=submission.record.execution_mode.value,
             retry_count=submission.record.attempt,
         )

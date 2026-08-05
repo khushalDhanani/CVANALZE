@@ -7,7 +7,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.rule_config_manager import PrefilterRules
+from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.services.dynamic_scoring_prefilter_service import (
@@ -212,7 +212,7 @@ class VacancyPreFilter:
         # STAGE 0: Job Taxonomy Search Space Filtering
         t0 = time.perf_counter()
         stage0_jobs = job_contexts
-        if cand_ctx.cand_families and cand_ctx.cand_families != [JobTaxonomy.FAMILY_OTHER]:
+        if cand_ctx.cand_families and cand_ctx.cand_families != [RuleConfigManager.get_taxonomy_rules().default_family]:
             compatible_jobs = [j for j in job_contexts if TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) or j.vac_tax_domain == cand_ctx.cand_domain]
             if compatible_jobs:
                 stage0_jobs = compatible_jobs

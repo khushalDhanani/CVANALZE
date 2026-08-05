@@ -10,15 +10,10 @@ from app.schemas.match import CandidateMatchAnalysis
 from app.services.processing_queue import (
     ProcessingQueueService,
     ProcessingQueueUnavailableError,
-    run_processing_job_fallback,
 )
 from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/cv", tags=["CV"])
-
-
-def background_process_cv(job_id: str) -> None:
-    run_processing_job_fallback(job_id)
 
 
 @router.post("/upload", response_model=CVProcessingResponse)
@@ -44,8 +39,7 @@ async def upload_cv(
                 cv_id=cv_id,
                 storage_filename=accepted.storage_filename,
             )
-            if submission.schedule_development_fallback:
-                background_tasks.add_task(background_process_cv, submission.record.job_id)
+
         except Exception:
             if not accepted.was_already_stored:
                 UploadService.remove_stored_upload(accepted.storage_filename)
@@ -58,7 +52,7 @@ async def upload_cv(
             progress=submission.record.progress,
             stage=submission.record.stage,
             job_id=submission.record.job_id,
-            job_state=submission.record.state.value,
+            job_state=submission.record.state,
             execution_mode=submission.record.execution_mode.value,
             retry_count=submission.record.attempt,
         )

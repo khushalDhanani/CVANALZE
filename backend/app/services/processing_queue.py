@@ -162,7 +162,7 @@ class ProcessingQueueService:
             "failed_step": record.stage if record.state == JobState.FAILED else None,
             "error_details": None,
             "job_id": record.job_id,
-            "job_state": record.state.value,
+            "job_state": record.state,
             "execution_mode": record.execution_mode.value,
             "retry_count": record.attempt,
         }
@@ -265,7 +265,7 @@ def process_cv_job(job_id: str) -> dict[str, Any]:
         if record is None:
             raise LookupError(f"Processing job '{job_id}' was not found.")
         if record.state == JobState.COMPLETED and ResultRepository.resolve_result(record.cv_key):
-            return {"job_id": job_id, "status": JobState.COMPLETED.value}
+            return {"job_id": job_id, "status": JobState.COMPLETED}
 
         attempt = record.attempt + 1
         ProcessingJobRepository.transition(

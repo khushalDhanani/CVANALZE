@@ -49,7 +49,10 @@ class EnterprisePerformanceService:
     """
 
     # L1 In-Memory Cache
-    _l1_cache = LRUMemoryCache(maxsize=5000, default_ttl=3600.0)
+    _l1_cache = LRUMemoryCache(
+        maxsize=settings.PERFORMANCE_L1_CACHE_MAX_SIZE, 
+        default_ttl=settings.PERFORMANCE_L1_CACHE_TTL_SECONDS
+    )
 
     # Telemetry metrics storage
     _metrics = {

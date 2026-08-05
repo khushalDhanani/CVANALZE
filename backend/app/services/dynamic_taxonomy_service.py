@@ -127,7 +127,8 @@ class DynamicTaxonomyService:
                 logger.warning(f"[DYNAMIC_TAXONOMY] Family compatibility DB query failed: {exc}")
 
         # Static fallback compatibility check
-        compat_map = RuleConfigManager.get_taxonomy_rules().compatibility_map
+        from app.services.taxonomy_service import TaxonomyService
+        compat_map = TaxonomyService.get_compatibility_map()
         allowed_list = compat_map.get(candidate_family_name, [])
         if vacancy_family_name in allowed_list:
             return True, 1.0

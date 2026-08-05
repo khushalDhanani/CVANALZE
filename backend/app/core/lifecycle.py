@@ -17,6 +17,19 @@ async def application_lifespan(_app: FastAPI) -> AsyncIterator[None]:
     verify_runtime_security()
     await asyncio.to_thread(verify_redis)
     await asyncio.to_thread(verify_ollama_models)
+    # Pre-parse and validate rule_config.json
+    from app.core.rule_config_manager import RuleConfigManager
+    try:
+        RuleConfigManager.load_config(tenant_id=None)
+        logger.info("[STARTUP] rule_config.json parsed and validated successfully.")
+    except Exception as exc:
+        logger.error(f"[STARTUP] Invalid rule_config.json: {exc}")
+        raise RuntimeError("Application cannot start with invalid rule_config.json") from exc
+        
+    # Start the pub/sub listener for hot-reloads
+    from app.core.config_listener import start_config_invalidation_listener
+    start_config_invalidation_listener()
+    
     start_cache_warmup()
     try:
         yield
@@ -52,8 +65,13 @@ def verify_redis() -> None:
             logger.info("[STARTUP] Active Redis instance verified successfully.")
             return
         except Exception as exc:
+            if settings.IS_PRODUCTION:
+                logger.error(f"[STARTUP] Redis ping failed ({type(exc).__name__}) in production.")
+                raise RuntimeError("Redis is required in production environment but is unreachable.") from exc
             logger.warning(f"[STARTUP] Redis ping failed ({type(exc).__name__}). Operating with L1 memory and file caching fallback.")
             return
+    if settings.IS_PRODUCTION:
+        raise RuntimeError("Redis is required in production environment but is not configured.")
     logger.warning("[STARTUP] Redis is not active or reachable. Operating with L1 memory and file caching fallback.")
 
 
@@ -65,6 +83,8 @@ def verify_ollama_models() -> None:
 
         models = OllamaLLMService.get_available_models()
         if not models:
+            if settings.IS_PRODUCTION:
+                raise RuntimeError("Ollama returned no models or is unreachable in production environment.")
             logger.warning("[STARTUP] Ollama returned no models or is unreachable. LLM operations may fail.")
             return
         configured_models: list[tuple[str, str]] = []
@@ -76,8 +96,12 @@ def verify_ollama_models() -> None:
             if any(model in available for available in models):
                 logger.info(f"[STARTUP] Ollama {purpose} model '{model}' verified successfully.")
             else:
+                if settings.IS_PRODUCTION:
+                    raise RuntimeError(f"Configured {purpose} model '{model}' is unavailable in production.")
                 logger.error(f"[STARTUP] Configured {purpose} model '{model}' is unavailable. Run: ollama pull {model}")
     except Exception as exc:
+        if settings.IS_PRODUCTION and not isinstance(exc, RuntimeError):
+            raise RuntimeError(f"Could not verify Ollama status in production: {type(exc).__name__}") from exc
         logger.warning(f"[STARTUP] Could not verify Ollama status: {type(exc).__name__}")
 
 

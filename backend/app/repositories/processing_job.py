@@ -6,6 +6,7 @@ from typing import Any
 from app.core.cache import processing_job_cache_manager
 from app.core.config import settings
 from app.schemas.contracts import JobState, ProcessingJobRecord
+from app.core.rule_config_manager import RuleConfigManager
 
 
 class ProcessingJobRepository:
@@ -51,7 +52,7 @@ class ProcessingJobRepository:
     def transition(
         cls,
         job_id: str,
-        state: JobState,
+        state: str,
         **updates: Any,
     ) -> ProcessingJobRecord:
         with cls._lock:
@@ -76,28 +77,8 @@ class ProcessingJobRepository:
             return None
 
     @staticmethod
-    def _assert_transition(current: JobState, target: JobState) -> None:
-        allowed = {
-            JobState.QUEUED: {
-                JobState.QUEUED,
-                JobState.PROCESSING,
-                JobState.RETRYING,
-                JobState.FAILED,
-            },
-            JobState.PROCESSING: {
-                JobState.PROCESSING,
-                JobState.RETRYING,
-                JobState.COMPLETED,
-                JobState.FAILED,
-            },
-            JobState.RETRYING: {
-                JobState.RETRYING,
-                JobState.PROCESSING,
-                JobState.FAILED,
-            },
-            JobState.COMPLETED: {JobState.COMPLETED, JobState.QUEUED},
-            JobState.FAILED: {JobState.FAILED, JobState.QUEUED},
-            JobState.UNKNOWN: {JobState.QUEUED, JobState.FAILED},
-        }
-        if target not in allowed[current]:
-            raise ValueError(f"Invalid processing-job transition: {current.value} -> {target.value}")
+    def _assert_transition(current: str, target: str) -> None:
+        allowed = RuleConfigManager.get_config().workflow.job_state_transitions
+        valid_targets = allowed.get(current, [])
+        if target not in valid_targets:
+            raise ValueError(f"Invalid processing-job transition: {current} -> {target}")

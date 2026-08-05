@@ -12,6 +12,7 @@ from app.api.domain_knowledge import router as domain_knowledge_router
 from app.api.jobs import router as jobs_router
 from app.api.master_data import router as master_data_router
 from app.api.performance import router as performance_router
+from app.api.experience_extraction import router as experience_extraction_router
 from app.api.recommendations import router as recommendations_router
 from app.api.talent_graph import router as talent_graph_router
 from app.api.vector_db import router as vector_db_router
@@ -92,6 +93,7 @@ for router in (
     app.include_router(router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")
 app.include_router(candidates_router, prefix="/api/v1")
+app.include_router(experience_extraction_router, prefix="/api/v1")
 
 
 @app.get("/")

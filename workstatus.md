@@ -1,5 +1,13 @@
 # Work Status
 
+## Work Completed — CV Work Experience Extraction Engine
+- **Implemented decoupled extraction architecture**: Created `WorkExperienceExtractionEngine` to orchestrate LLM evidence extraction separately from deterministic date calculation, policy filtering, and deduplication.
+- **Added Ollama standardized LLM schema integration**: Extended `OllamaLLMService` with `extract_work_experience()` method which wraps `_execute_structured_generation`, using strict Pydantic JSON schema matching (`LLMWorkExperienceExtraction`).
+- **Implemented dynamic date/overlap calculation engine**: Added `WorkExperienceCalculationService` that merges overlapping and adjacent work experience intervals properly according to config, tracks gross vs unique days, handles leap years/month-end boundaries natively via `dateutil`.
+- **Implemented deduplication and policy filtering logic**: Added `WorkExperiencePostProcessor` that deterministically filters records based on employment type (e.g. dropping internships if requested) and deduplicates OCR records based on a weighted fuzzy match on Job Title, Company, and dates.
+- **Exposed REST API endpoint**: Added `POST /api/v1/cv/extract-experience` supporting comprehensive requests (reference_date, config policies) returning human-review warnings and complete unique experience summaries.
+- **Test suite (100% pass)**: Implemented extensive pytest cases (`tests/services/test_work_experience_post_processor.py`, `tests/services/test_work_experience_calculation_service.py`, `tests/services/test_work_experience_extraction_service.py`, `tests/api/test_experience_extraction_api.py`) covering leap years, ordinals, human review logic, overlap math, missing dates, etc.
+
 ## Work Completed
 - Diagnosed the root cause of the UI only displaying 5 vacancies. The application was failing to connect to the MSSQL database and was returning a fallback mock list.
 - Identified that the failure was due to missing `pyodbc` Microsoft drivers (`msodbcsql18`) in the Docker image and missing `DB_*` environment variables in `docker-compose.yml`.
@@ -64,6 +72,33 @@
 
 ## Important Decisions
 - **Redis + Disk Result Merging**: `ResultRepository.list_all_results()` now scans Redis keys `cv_result:*.json` in addition to disk files, so candidates saved in Redis cache immediately show up in the candidate list UI even if saved prior to volume mounting.
+- **Taxonomy Source of Truth**: `TaxonomyService` is now the single source of truth for the `compatibility_map`, completely deprecating the static JSON file and decoupling `RuleConfigManager` from taxonomy rules.
+
+---
+
+## Work Completed — Phase 3: Database-Driven Taxonomy and Rules (Backend Audit Report)
+
+### Bug Fixes & Refactoring
+- **`app/services/taxonomy_service.py`**: Updated to load `FamilyCompatibility` from the database and cache it in memory, exposing `get_compatibility_map()`.
+- **`app/services/job_taxonomy.py`**: Switched from using static JSON rules to dynamically fetching `COMPATIBILITY_MAP` via `TaxonomyService`.
+- **`app/core/rule_config_manager.py`**: Removed `compatibility_map` field from the `TaxonomyRules` Pydantic model and deleted associated validation gates in `validate_taxonomy_config`.
+- **`scripts/seed_taxonomy_from_json.py`**: Updated script to handle the removal of the compatibility map from the runtime schema by directly reading the JSON during DB seeding.
+
+### Test Fixes
+- **`tests/test_audit_fixes.py`**: 
+  - Fixed `test_docx_upload_full_pipeline` and `test_cv_upload_background_task_returns_processing_status` by properly mocking `QueueSubmission` in `ProcessingQueueService` instead of the legacy `background_process_cv`.
+  - Fixed `test_vacancy_cache_compute_hash` by aligning the ID-hashing logic with `compute_matching_vacancy_version` so data changes invalidate the cache properly.
+- **`tests/test_taxonomy_integration.py`**: Rewired tests to mock the database instead of the JSON config via `TaxonomyService`.
+
+## Files Changed
+- `backend/app/services/taxonomy_service.py`
+- `backend/app/services/job_taxonomy.py`
+- `backend/app/core/rule_config_manager.py`
+- `backend/app/repositories/job.py`
+- `backend/scripts/seed_taxonomy_from_json.py`
+- `backend/tests/test_rule_config_manager.py`
+- `backend/tests/test_taxonomy_integration.py`
+- `backend/tests/test_audit_fixes.py`
 
 ---
 

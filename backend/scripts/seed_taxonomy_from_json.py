@@ -25,8 +25,20 @@ def seed_taxonomy_and_vectors():
     logger.info("Initializing DB tables if not existing...")
     init_db()
 
-    config = RuleConfigManager.load_config()
+    config = RuleConfigManager.get_config()
     taxonomy_rules = config.scoring.taxonomy
+    
+    # Read raw compatibility map from JSON file since it was removed from runtime schema
+    import json
+    raw_compat_map = {}
+    json_path = Path(__file__).resolve().parent.parent / "app" / "core" / "rule_config.json"
+    if json_path.exists():
+        try:
+            with open(json_path) as f:
+                raw_data = json.load(f)
+                raw_compat_map = raw_data.get("scoring", {}).get("taxonomy", {}).get("compatibility_map", {})
+        except Exception as e:
+            logger.warning(f"Could not load raw compatibility map from JSON: {e}")
 
     if SessionLocal is None:
         logger.warning("MSSQL SessionLocal is None. Cannot seed MSSQL. Seeding pgvector directly...")
@@ -201,7 +213,7 @@ def seed_taxonomy_and_vectors():
             for (
                 source_fam_name,
                 target_fams,
-            ) in taxonomy_rules.compatibility_map.items():
+            ) in raw_compat_map.items():
                 src_fam = family_map.get(source_fam_name)
                 if not src_fam:
                     continue

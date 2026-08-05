@@ -85,6 +85,11 @@ def test_success_response_field_snapshots_are_stable():
         "rejection_policy_note",
         "llm_skipped",
         "normalized_resume",
+        "classification",
+        "scoring_profile_code",
+        "scoring_profile_version",
+        "ai_career_suggestions",
+        "unsuitable_openings",
     }
     assert set(CVUploadResponse.model_fields) == {
         "id",

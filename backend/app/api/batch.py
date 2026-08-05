@@ -56,10 +56,26 @@ async def match_candidates_against_vacancies(limit: int = 10, db: Session = Depe
         if cv_path.exists() and cv_path.is_file():
             try:
                 cv_text = cv_path.read_text(errors="ignore")
-            except Exception:
-                cv_text = f"Candidate {candidate.CandidateFirstName} {candidate.CandidateLastName} CV Placeholder Text."
+            except Exception as e:
+                logger.error(f"Failed to read CV for candidate {candidate.CandidateID}: {e}")
+                results.append(
+                    {
+                        "candidate_id": candidate.CandidateID,
+                        "candidate_name": f"{candidate.CandidateFirstName} {candidate.CandidateLastName}",
+                        "error": "CV file unreadable",
+                    }
+                )
+                continue
         else:
-            cv_text = f"Mock CV text for {candidate.CandidateFirstName} {candidate.CandidateLastName} with {candidate.CandidateTotExperience} years of experience."
+            logger.warning(f"CV file not found for candidate {candidate.CandidateID} at {cv_path}")
+            results.append(
+                {
+                    "candidate_id": candidate.CandidateID,
+                    "candidate_name": f"{candidate.CandidateFirstName} {candidate.CandidateLastName}",
+                    "error": "CV file missing",
+                }
+            )
+            continue
 
         # Pass metadata to MatchService
         analysis = await MatchService.analyze_single_cv(

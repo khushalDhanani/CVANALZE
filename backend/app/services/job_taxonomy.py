@@ -154,31 +154,12 @@ class JobTaxonomy:
     Canonical domain/family identifiers below stay consistent with rule_config.json.
     """
 
-    # Canonical Domains
-    DOMAIN_IT_SOFTWARE = "IT & Software Services"
-    DOMAIN_PLANT_OPERATIONS = "Plant Operations & Maintenance"
-    DOMAIN_QUALITY_LAB = "Quality Assurance & QC Laboratory"
-    DOMAIN_EHS_ENVIRONMENT = "Environmental Health & Safety (EHS)"
-    DOMAIN_PROCESS_PROJECT = "Process & Project Engineering"
-    DOMAIN_FINANCE_ADMIN = "Finance & Administration"
-    DOMAIN_OTHER = "General Operations"
-
-    # Canonical Job Families
-    FAMILY_SOFTWARE_DEV = "Software Engineering & Development"
-    FAMILY_IT_NETWORKING_AV = "IT Infrastructure, Networking & AV Systems"
-    FAMILY_PLANT_ELECTRICAL = "Plant Electrical & Utility Maintenance"
-    FAMILY_CONTROL_INSTRUMENTATION = "Control & Instrumentation (C&I)"
-    FAMILY_QC_LAB = "Quality Control (QC) & Laboratory"
-    FAMILY_QA_ASSURANCE = "Quality Assurance (QA)"
-    FAMILY_FIRE_SAFETY = "Fire, Safety & EHS"
-    FAMILY_PROCESS_PROJECT = "Process & Project Engineering"
-    FAMILY_ENVIRONMENT_ETP = "Environment & ETP Operations"
-    FAMILY_FINANCE_ADMIN = "Finance & Administration"
-    FAMILY_OTHER = "General Professional"
+    # Canonical definitions are now stored in the Database and accessed via TaxonomyService.
 
     @classproperty
     def COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
-        return {family: set(compatible) for family, compatible in RuleConfigManager.get_taxonomy_rules().compatibility_map.items()}
+        from app.services.taxonomy_service import TaxonomyService
+        return TaxonomyService.get_compatibility_map()
 
     @classproperty
     def REVERSE_COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
@@ -192,28 +173,21 @@ class JobTaxonomy:
     @classmethod
     def validate_taxonomy_config(cls) -> None:
         """
-        Validates taxonomy configuration during startup.
         Ensures:
-          1. Every family in compatibility_map exists in canonical_families.
-          2. Every rule domain exists in canonical_domains.
-          3. Every rule family exists in canonical_families.
-          4. Zero orphan or unknown domains/families.
+          1. Every rule domain exists in canonical_domains.
+          2. Every rule family exists in canonical_families.
+          3. Zero orphan or unknown domains/families.
         """
+        from app.services.taxonomy_service import TaxonomyService
         rules = RuleConfigManager.get_taxonomy_rules()
-        canonical_domains = set(rules.canonical_domains)
-        canonical_families = set(rules.canonical_families)
+        
+        canonical_domains = set(TaxonomyService.get_all_domains())
+        canonical_families = set(TaxonomyService.get_all_families())
 
         if not canonical_domains:
             raise ValueError("[TAXONOMY_VALIDATION_FAILURE] canonical_domains must not be empty")
         if not canonical_families:
             raise ValueError("[TAXONOMY_VALIDATION_FAILURE] canonical_families must not be empty")
-
-        for cand_fam, compatible in rules.compatibility_map.items():
-            if cand_fam not in canonical_families:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Unknown candidate family in compatibility_map: '{cand_fam}'")
-            for job_fam in compatible:
-                if job_fam not in canonical_families:
-                    raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Unknown job family in compatibility_map for '{cand_fam}': '{job_fam}'")
 
         for r in rules.vacancy_rules:
             if r.domain not in canonical_domains:

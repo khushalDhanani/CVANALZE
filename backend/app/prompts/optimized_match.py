@@ -61,21 +61,36 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
     canonical_domains = taxonomy.canonical_domains
     domain_list_str = ", ".join(f'"{d}"' for d in canonical_domains)
 
-    # Gather valid department names from the seed data as an extra grounding signal
+    # Gather valid department names from the repository as an extra grounding signal
     try:
-        import json as _json, os as _os
-        _seed_path = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "data", "department_domains_seed.json")
-        with open(_seed_path, "r", encoding="utf-8") as _f:
-            _seed = _json.load(_f)
-        dept_names = [d.get("industry_label") or d.get("department_name") for d in _seed.get("domains", []) if d.get("is_active")]
-        dept_names = [d for d in dept_names if d]
+        from app.repositories.department_domain import department_domain_repository
+
+        domains = department_domain_repository.get_all_domains()
+        dept_names = [d.department_name for d in domains if d.is_active and d.department_name]
     except Exception:
         dept_names = []
     dept_list_str = ", ".join(f'"{d}"' for d in dept_names) if dept_names else "(see canonical_domains list)"
 
     input_json = json.dumps(structured_input, separators=(",", ":"), ensure_ascii=False)
 
-    prompt = f"""/think
+    # Try to load prompt template from database
+    db_prompt_template = None
+    try:
+        from app.core.database import SessionLocal
+        from app.models.prompts import PromptTemplateMaster
+        with SessionLocal() as db:
+            active_prompt = db.query(PromptTemplateMaster).filter(
+                PromptTemplateMaster.prompt_name == "optimized_match",
+                PromptTemplateMaster.is_active == True
+            ).first()
+            if active_prompt:
+                db_prompt_template = active_prompt.system_instruction
+    except Exception:
+        pass
+
+    # Fallback to hardcoded template if DB fetch fails or is empty
+    if not db_prompt_template:
+        db_prompt_template = """/think
 {input_json}
 
 EVIDENCE-BASED REASONING RULES:
@@ -144,6 +159,13 @@ Expected JSON Schema:
   ]
 }}
 """
+
+    prompt = db_prompt_template.format(
+        input_json=input_json,
+        domain_list_str=domain_list_str,
+        dept_list_str=dept_list_str
+    )
+
     char_count = len(prompt)
     token_estimate = max(1, char_count // 4)
 

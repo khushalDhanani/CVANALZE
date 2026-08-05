@@ -100,8 +100,7 @@ class JobRepository:
 
     @classmethod
     def _compute_vacancy_hash(cls, job_dicts: list[dict[str, Any]]) -> str:
-        identity_pairs = sorted(f"{j.get('vacancy_id') or j.get('id')}:{j.get('title', '')}" for j in job_dicts)
-        return hashlib.sha256(json.dumps(identity_pairs).encode()).hexdigest()
+        return cls.compute_matching_vacancy_version(job_dicts)
 
     @classmethod
     def compute_matching_vacancy_version(cls, job_dicts: list[dict[str, Any]]) -> str:
@@ -230,21 +229,23 @@ class JobRepository:
             return False
 
         try:
-            from sqlalchemy import text
+            from sqlalchemy import select
+            from app.models.recruit import RecruitVacancyRequest
 
-            query = text("""
-                SELECT VacancyRequestID, ISNULL(VacancyRequestTitle, '')
-                FROM RecruitVacancyRequest
-                WHERE (VacancyRequestIsActive = 1 OR VacancyRequestIsActive IS NULL)
-                  AND (VacancyRequestIsDeleted = 0 OR VacancyRequestIsDeleted IS NULL)
-                  AND (VacancyRequestClose = 0 OR VacancyRequestClose IS NULL)
-                ORDER BY VacancyRequestID
-            """)
-            rows = db.execute(query).fetchall()
+            stmt = select(RecruitVacancyRequest.VacancyRequestID).where(
+                (RecruitVacancyRequest.VacancyRequestIsActive == True) | (RecruitVacancyRequest.VacancyRequestIsActive.is_(None)),
+                (RecruitVacancyRequest.VacancyRequestIsDeleted == False) | (RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None)),
+                (RecruitVacancyRequest.VacancyRequestClose == False) | (RecruitVacancyRequest.VacancyRequestClose.is_(None)),
+                (RecruitVacancyRequest.VacancyRequestIsForceClosed == False) | (RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None))
+            ).order_by(RecruitVacancyRequest.VacancyRequestID)
+            
+            rows = db.execute(stmt).scalars().all()
             if rows:
-                db_pairs = sorted(f"{r[0]}:{r[1]}" for r in rows)
+                db_pairs = sorted(str(r) for r in rows)
                 db_version = hashlib.sha256(json.dumps(db_pairs).encode()).hexdigest()
-                is_stale_result = db_version != stored_version
+                stored_ids = sorted(str(j.get("vacancy_id") or j.get("id")) for j in stored_jobs)
+                stored_ids_version = hashlib.sha256(json.dumps(stored_ids).encode()).hexdigest()
+                is_stale_result = db_version != stored_ids_version
             else:
                 is_stale_result = False
 

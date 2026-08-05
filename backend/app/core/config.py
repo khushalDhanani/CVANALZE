@@ -2,15 +2,16 @@ from datetime import datetime
 from pathlib import Path
 
 from typing import List, Set, Dict, Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     PROJECT_NAME: str = "CV Analyzer"
     VERSION: str = "0.1.0"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:8081"]
+    ALLOWED_ORIGINS: List[str] = []
     CORS_ALLOW_CREDENTIALS: bool = False
     APP_ENVIRONMENT: str = "development"
     AUTH_ENABLED: bool = False
@@ -25,7 +26,7 @@ class Settings(BaseSettings):
     MAX_HR_FEEDBACK_LENGTH_CHARS: int = 10_000
     INITIALIZE_DATABASE_ON_STARTUP: bool = True
     STARTUP_CACHE_WARMUP_ENABLED: bool = True
-    REDIS_URL: Optional[str] = "redis://localhost:6379/0"
+    REDIS_URL: Optional[str] = None
     RQ_QUEUE_NAME: str = "cv-processing"
     RQ_JOB_TIMEOUT_SECONDS: int = 900
     RQ_RESULT_TTL_SECONDS: int = 604800
@@ -34,6 +35,8 @@ class Settings(BaseSettings):
     RQ_DEVELOPMENT_FALLBACK_ENABLED: bool = True
     PROCESSING_JOB_TTL_SECONDS: int = 604800
     PROCESSING_JOB_LOCK_TIMEOUT_SECONDS: int = 1200
+    REDIS_LOCK_TIMEOUT_SECONDS: int = 120
+    REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS: int = 10
     JOB_NOT_FOUND_COMPATIBILITY_UNTIL: Optional[datetime] = None
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
     UPLOAD_READ_CHUNK_SIZE_BYTES: int = 1024 * 1024
@@ -85,6 +88,15 @@ class Settings(BaseSettings):
     MAX_BATCH_LIMIT: int = 50
     MAX_CONCURRENT_WORKERS: int = 1
     THROTTLE_DELAY_SECONDS: float = 1.0
+    CACHE_TTL_DOC_SECONDS: int = 2592000
+    CACHE_TTL_LLM_SECONDS: int = 2592000
+    CACHE_TTL_CONFIG_SECONDS: int = 3600
+    CACHE_TTL_EMBEDDING_SECONDS: int = 2592000
+    CACHE_TTL_MATCH_RESULT_SECONDS: int = 604800
+    CACHE_TTL_VACANCY_SECONDS: int = 3600
+    CACHE_TTL_MASTER_DATA_SECONDS: int = 3600
+    PERFORMANCE_L1_CACHE_MAX_SIZE: int = 5000
+    PERFORMANCE_L1_CACHE_TTL_SECONDS: float = 3600.0
     EXTRACTION_TIMEOUT_SECONDS: float = 300.0
     EXTRACTION_PARSER_VERSION: str = "1.0.0"
     EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
@@ -95,7 +107,7 @@ class Settings(BaseSettings):
 
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_BASE_URL: str = ""
     OLLAMA_MODEL: str = "qwen3:4b"  # or qwen2.5:3b etc based on what's available
     OLLAMA_REQUEST_TIMEOUT: float = 60.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
@@ -167,7 +179,7 @@ class Settings(BaseSettings):
     DB_TRUST_CERT: bool = True
 
     # Database Configuration (Postgres)
-    PG_DB_URL: str = "postgresql://postgres:postgres@localhost:5432/cv_analyzer"
+    PG_DB_URL: str = ""
 
     # Migration Configuration
     AUTO_MIGRATE: bool = False
@@ -195,6 +207,15 @@ class Settings(BaseSettings):
         enc = "yes" if self.DB_ENCRYPT else "no"
         trust = "yes" if self.DB_TRUST_CERT else "no"
         return f"mssql+pyodbc://{self.DB_USER}:{encoded_password}@{self.DB_SERVER}:{self.DB_PORT}/{self.DB_NAME}?driver=ODBC+Driver+18+for+SQL+Server&Encrypt={enc}&TrustServerCertificate={trust}"
+
+    @model_validator(mode="after")
+    def validate_production_requirements(self) -> "Settings":
+        if self.IS_PRODUCTION:
+            if not self.REDIS_URL:
+                raise ValueError("REDIS_URL must be configured in production environments.")
+            if not self.DB_NAME and not self.PG_DB_URL:
+                raise ValueError("Either MSSQL or Postgres database URL must be configured in production.")
+        return self
 
 
 settings = Settings()

@@ -6,6 +6,10 @@ from app.core.database import Base
 
 
 class SystemConfig(Base):
+    """
+    DEPRECATED: Use RuleConfigProfile (in app.models.rules) for all business rules, thresholds, and weights.
+    This legacy key-value table will be removed in Phase 3.
+    """
     __tablename__ = "system_config"
 
     setting_key = Column(String(100), primary_key=True, index=True)

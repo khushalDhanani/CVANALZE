@@ -44,7 +44,11 @@ async def get_cv_lock(cv_key: str):
     if _REDIS_CLIENT:
         try:
             lock_key = f"lock:cv:{cv_key}"
-            redis_lock = _REDIS_CLIENT.lock(lock_key, timeout=120, blocking_timeout=10)
+            redis_lock = _REDIS_CLIENT.lock(
+                lock_key, 
+                timeout=settings.REDIS_LOCK_TIMEOUT_SECONDS, 
+                blocking_timeout=settings.REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS
+            )
             acquired = redis_lock.acquire(blocking=True)
             if not acquired:
                 redis_lock = None

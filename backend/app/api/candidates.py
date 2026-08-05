@@ -115,7 +115,6 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     from app.services.processing_queue import (
         ProcessingQueueService,
         ProcessingQueueUnavailableError,
-        run_processing_job_fallback,
     )
     from app.services.upload_service import UploadService, UploadValidationError
 
@@ -210,8 +209,6 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         )
     except ProcessingQueueUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    if submission.schedule_development_fallback:
-        background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
 
     return {
         "message": submission.record.message,

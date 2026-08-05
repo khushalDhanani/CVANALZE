@@ -17,6 +17,7 @@ from app.schemas.analysis import (
     QwenCVAnalysis,
 )
 from app.schemas.profile import DynamicCandidateProfile
+from app.schemas.work_experience_llm import LLMWorkExperienceExtraction
 from app.services.ollama_transport import (
     OllamaError,
     OllamaGenerateEnvelope,
@@ -149,6 +150,32 @@ class OllamaLLMService:
             },
             profiler=profiler,
         )
+
+    @classmethod
+    async def extract_work_experience(
+        cls,
+        prompt: str,
+        prompt_version: str,
+        cache_key: str,
+    ) -> LLMWorkExperienceExtraction:
+        import asyncio
+        result = await asyncio.to_thread(
+            cls._execute_structured_generation,
+            operation="work_experience_extraction",
+            prompt=prompt,
+            prompt_version=prompt_version,
+            cache_key=cache_key,
+            response_model=LLMWorkExperienceExtraction,
+            think=False,
+            options={
+                "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
+                "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
+                "temperature": 0.0,
+            },
+        )
+        if result is None:
+            raise OllamaError("Failed to generate work experience extraction")
+        return result
 
     @classmethod
     def _execute_structured_generation(

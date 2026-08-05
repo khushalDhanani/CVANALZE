@@ -1,0 +1,91 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0 -- /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2, Faker-40.36.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_phase3_structured_processing.py::test_normalized_resume_retains_raw_values_confidence_and_evidence FAILED [100%]
+
+=================================== FAILURES ===================================
+______ test_normalized_resume_retains_raw_values_confidence_and_evidence _______
+
+    def test_normalized_resume_retains_raw_values_confidence_and_evidence():
+        resume_json = ResumeJsonExtractor.extract(_structured_resume_text())
+        normalized = NormalizedResume.model_validate(resume_json["normalized"])
+    
+        assert resume_json["contact_info"]["email"] == "Alex.Smith@Example.COM"
+        assert normalized.contact.email.raw_value == "Alex.Smith@Example.COM"
+        assert normalized.contact.email.normalized_value == "alex.smith@example.com"
+        assert normalized.contact.email.confidence == 1.0
+        assert normalized.contact.email.evidence == ["Alex.Smith@Example.COM"]
+    
+        assert normalized.contact.phone.raw_value == "+1 555 010 9999"
+        assert normalized.contact.phone.normalized_value == "+15550109999"
+        assert any(skill.normalized_value == "JavaScript" for skill in normalized.skills)
+        assert normalized.education[0].degree.normalized_value == "B.Tech"
+        assert normalized.education[0].domain.normalized_value == "Computer Science & IT"
+        assert normalized.education[0].institution.normalized_value == "University of Technology"
+        assert normalized.employment[0].interval.start_date == "2020-01-01"
+        assert normalized.employment[0].interval.end_date == "2021-12-31"
+>       assert normalized.employment[0].interval.duration_months == 24
+E       AssertionError: assert 23 == 24
+E        +  where 23 = NormalizedDateInterval(raw_value='(Jan 2020 - Dec 2021', start_date='2020-01-01', end_date='2021-12-31', is_current=False, duration_months=23, confidence=0.95, evidence=['(Jan 2020 - Dec 2021']).duration_months
+E        +    where NormalizedDateInterval(raw_value='(Jan 2020 - Dec 2021', start_date='2020-01-01', end_date='2021-12-31', is_current=False, duration_months=23, confidence=0.95, evidence=['(Jan 2020 - Dec 2021']) = NormalizedEmployment(job_title=NormalizedStringField(raw_value='Senior Developer', normalized_value='Senior Developer', confidence=0.9, evidence=['Senior Developer']), company=NormalizedStringField(raw_value='Example Corp', normalized_value='Example Corp', confidence=0.9, evidence=['Example Corp']), interval=NormalizedDateInterval(raw_value='(Jan 2020 - Dec 2021', start_date='2020-01-01', end_date='2021-12-31', is_current=False, duration_months=23, confidence=0.95, evidence=['(Jan 2020 - Dec 2021']), responsibilities=['Built Python and JavaScript APIs.'], evidence=['Senior Developer', 'Example Corp', '(Jan 2020 - Dec 2021', 'Built Python and JavaScript APIs.']).interval
+
+tests/test_phase3_structured_processing.py:69: AssertionError
+----------------------------- Captured stdout call -----------------------------
+[2026-08-05 13:31:12] [WARNING] [cv_analyzer]: [RULE_CONFIG] Failed to load config from database: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_config_profiles'. (208) (SQLExecDirectW)")
+[SQL: SELECT TOP 1 cvai.rule_config_profiles.profile_id AS cvai_rule_config_profiles_profile_id, cvai.rule_config_profiles.tenant_id AS cvai_rule_config_profiles_tenant_id, cvai.rule_config_profiles.version_tag AS cvai_rule_config_profiles_version_tag, cvai.rule_config_profiles.description AS cvai_rule_config_profiles_description, cvai.rule_config_profiles.global_confidence_tiers_json AS cvai_rule_config_profiles_global_confidence_tiers_json, cvai.rule_config_profiles.fields_config_json AS cvai_rule_config_profiles_fields_config_json, cvai.rule_config_profiles.scoring_rules_json AS cvai_rule_config_profiles_scoring_rules_json, cvai.rule_config_profiles.is_active AS cvai_rule_config_profiles_is_active, cvai.rule_config_profiles.created_by AS cvai_rule_config_profiles_created_by, cvai.rule_config_profiles.audit_reason AS cvai_rule_config_profiles_audit_reason, cvai.rule_config_profiles.created_at AS cvai_rule_config_profiles_created_at, cvai.rule_config_profiles.updated_at AS cvai_rule_config_profiles_updated_at 
+FROM cvai.rule_config_profiles 
+WHERE cvai.rule_config_profiles.is_active = 1 AND cvai.rule_config_profiles.tenant_id IS NULL]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+[2026-08-05 13:31:12] [WARNING] [cv_analyzer]: [RULE_CONFIG] Failed to execute DB smoke tests: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_validation_tests'. (208) (SQLExecDirectW)")
+[SQL: SELECT cvai.rule_validation_tests.test_id AS cvai_rule_validation_tests_test_id, cvai.rule_validation_tests.test_name AS cvai_rule_validation_tests_test_name, cvai.rule_validation_tests.target_component AS cvai_rule_validation_tests_target_component, cvai.rule_validation_tests.payload_json AS cvai_rule_validation_tests_payload_json, cvai.rule_validation_tests.expected_result_json AS cvai_rule_validation_tests_expected_result_json, cvai.rule_validation_tests.is_active AS cvai_rule_validation_tests_is_active, cvai.rule_validation_tests.created_at AS cvai_rule_validation_tests_created_at 
+FROM cvai.rule_validation_tests 
+WHERE cvai.rule_validation_tests.is_active = 1]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+[2026-08-05 13:31:12] [INFO] [cv_analyzer]: [RULE_CONFIG] Successfully loaded and activated rule_config v1.1.0 (4 fields configured) | LoadTime=256.64ms, CacheTime=1.41ms, CompiledPatterns=65
+[2026-08-05 13:31:12] [WARNING] [cv_analyzer]: [RULE_CONFIG] Failed to load config from database: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_config_profiles'. (208) (SQLExecDirectW)")
+[SQL: SELECT TOP 1 cvai.rule_config_profiles.profile_id AS cvai_rule_config_profiles_profile_id, cvai.rule_config_profiles.tenant_id AS cvai_rule_config_profiles_tenant_id, cvai.rule_config_profiles.version_tag AS cvai_rule_config_profiles_version_tag, cvai.rule_config_profiles.description AS cvai_rule_config_profiles_description, cvai.rule_config_profiles.global_confidence_tiers_json AS cvai_rule_config_profiles_global_confidence_tiers_json, cvai.rule_config_profiles.fields_config_json AS cvai_rule_config_profiles_fields_config_json, cvai.rule_config_profiles.scoring_rules_json AS cvai_rule_config_profiles_scoring_rules_json, cvai.rule_config_profiles.is_active AS cvai_rule_config_profiles_is_active, cvai.rule_config_profiles.created_by AS cvai_rule_config_profiles_created_by, cvai.rule_config_profiles.audit_reason AS cvai_rule_config_profiles_audit_reason, cvai.rule_config_profiles.created_at AS cvai_rule_config_profiles_created_at, cvai.rule_config_profiles.updated_at AS cvai_rule_config_profiles_updated_at 
+FROM cvai.rule_config_profiles 
+WHERE cvai.rule_config_profiles.is_active = 1 AND cvai.rule_config_profiles.tenant_id IS NULL]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+[2026-08-05 13:31:12] [WARNING] [cv_analyzer]: [RULE_CONFIG] Failed to execute DB smoke tests: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_validation_tests'. (208) (SQLExecDirectW)")
+[SQL: SELECT cvai.rule_validation_tests.test_id AS cvai_rule_validation_tests_test_id, cvai.rule_validation_tests.test_name AS cvai_rule_validation_tests_test_name, cvai.rule_validation_tests.target_component AS cvai_rule_validation_tests_target_component, cvai.rule_validation_tests.payload_json AS cvai_rule_validation_tests_payload_json, cvai.rule_validation_tests.expected_result_json AS cvai_rule_validation_tests_expected_result_json, cvai.rule_validation_tests.is_active AS cvai_rule_validation_tests_is_active, cvai.rule_validation_tests.created_at AS cvai_rule_validation_tests_created_at 
+FROM cvai.rule_validation_tests 
+WHERE cvai.rule_validation_tests.is_active = 1]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+[2026-08-05 13:31:12] [INFO] [cv_analyzer]: [RULE_CONFIG] Successfully loaded and activated rule_config v1.1.0 (4 fields configured) | LoadTime=29.22ms, CacheTime=0.12ms, CompiledPatterns=65
+[2026-08-05 13:31:12] [INFO] [cv_analyzer]: [DYNAMIC_GEO_HEADING] Cache refreshed: 76 gazetteer cities, 116 name denylists, 31 section headings.
+[2026-08-05 13:31:12] [INFO] [cv_analyzer]: [NAME_EXTRACTION] Extracted 'Alex Smith' (confidence=0.95, level='HIGH', source='header_email_validated')
+------------------------------ Captured log call -------------------------------
+WARNING  cv_analyzer:rule_config_manager.py:376 [RULE_CONFIG] Failed to load config from database: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_config_profiles'. (208) (SQLExecDirectW)")
+[SQL: SELECT TOP 1 cvai.rule_config_profiles.profile_id AS cvai_rule_config_profiles_profile_id, cvai.rule_config_profiles.tenant_id AS cvai_rule_config_profiles_tenant_id, cvai.rule_config_profiles.version_tag AS cvai_rule_config_profiles_version_tag, cvai.rule_config_profiles.description AS cvai_rule_config_profiles_description, cvai.rule_config_profiles.global_confidence_tiers_json AS cvai_rule_config_profiles_global_confidence_tiers_json, cvai.rule_config_profiles.fields_config_json AS cvai_rule_config_profiles_fields_config_json, cvai.rule_config_profiles.scoring_rules_json AS cvai_rule_config_profiles_scoring_rules_json, cvai.rule_config_profiles.is_active AS cvai_rule_config_profiles_is_active, cvai.rule_config_profiles.created_by AS cvai_rule_config_profiles_created_by, cvai.rule_config_profiles.audit_reason AS cvai_rule_config_profiles_audit_reason, cvai.rule_config_profiles.created_at AS cvai_rule_config_profiles_created_at, cvai.rule_config_profiles.updated_at AS cvai_rule_config_profiles_updated_at 
+FROM cvai.rule_config_profiles 
+WHERE cvai.rule_config_profiles.is_active = 1 AND cvai.rule_config_profiles.tenant_id IS NULL]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+WARNING  cv_analyzer:rule_config_manager.py:689 [RULE_CONFIG] Failed to execute DB smoke tests: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_validation_tests'. (208) (SQLExecDirectW)")
+[SQL: SELECT cvai.rule_validation_tests.test_id AS cvai_rule_validation_tests_test_id, cvai.rule_validation_tests.test_name AS cvai_rule_validation_tests_test_name, cvai.rule_validation_tests.target_component AS cvai_rule_validation_tests_target_component, cvai.rule_validation_tests.payload_json AS cvai_rule_validation_tests_payload_json, cvai.rule_validation_tests.expected_result_json AS cvai_rule_validation_tests_expected_result_json, cvai.rule_validation_tests.is_active AS cvai_rule_validation_tests_is_active, cvai.rule_validation_tests.created_at AS cvai_rule_validation_tests_created_at 
+FROM cvai.rule_validation_tests 
+WHERE cvai.rule_validation_tests.is_active = 1]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+INFO     cv_analyzer:rule_config_manager.py:434 [RULE_CONFIG] Successfully loaded and activated rule_config v1.1.0 (4 fields configured) | LoadTime=256.64ms, CacheTime=1.41ms, CompiledPatterns=65
+WARNING  cv_analyzer:rule_config_manager.py:376 [RULE_CONFIG] Failed to load config from database: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_config_profiles'. (208) (SQLExecDirectW)")
+[SQL: SELECT TOP 1 cvai.rule_config_profiles.profile_id AS cvai_rule_config_profiles_profile_id, cvai.rule_config_profiles.tenant_id AS cvai_rule_config_profiles_tenant_id, cvai.rule_config_profiles.version_tag AS cvai_rule_config_profiles_version_tag, cvai.rule_config_profiles.description AS cvai_rule_config_profiles_description, cvai.rule_config_profiles.global_confidence_tiers_json AS cvai_rule_config_profiles_global_confidence_tiers_json, cvai.rule_config_profiles.fields_config_json AS cvai_rule_config_profiles_fields_config_json, cvai.rule_config_profiles.scoring_rules_json AS cvai_rule_config_profiles_scoring_rules_json, cvai.rule_config_profiles.is_active AS cvai_rule_config_profiles_is_active, cvai.rule_config_profiles.created_by AS cvai_rule_config_profiles_created_by, cvai.rule_config_profiles.audit_reason AS cvai_rule_config_profiles_audit_reason, cvai.rule_config_profiles.created_at AS cvai_rule_config_profiles_created_at, cvai.rule_config_profiles.updated_at AS cvai_rule_config_profiles_updated_at 
+FROM cvai.rule_config_profiles 
+WHERE cvai.rule_config_profiles.is_active = 1 AND cvai.rule_config_profiles.tenant_id IS NULL]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+WARNING  cv_analyzer:rule_config_manager.py:689 [RULE_CONFIG] Failed to execute DB smoke tests: (pyodbc.ProgrammingError) ('42S02', "[42S02] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Invalid object name 'cvai.rule_validation_tests'. (208) (SQLExecDirectW)")
+[SQL: SELECT cvai.rule_validation_tests.test_id AS cvai_rule_validation_tests_test_id, cvai.rule_validation_tests.test_name AS cvai_rule_validation_tests_test_name, cvai.rule_validation_tests.target_component AS cvai_rule_validation_tests_target_component, cvai.rule_validation_tests.payload_json AS cvai_rule_validation_tests_payload_json, cvai.rule_validation_tests.expected_result_json AS cvai_rule_validation_tests_expected_result_json, cvai.rule_validation_tests.is_active AS cvai_rule_validation_tests_is_active, cvai.rule_validation_tests.created_at AS cvai_rule_validation_tests_created_at 
+FROM cvai.rule_validation_tests 
+WHERE cvai.rule_validation_tests.is_active = 1]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+INFO     cv_analyzer:rule_config_manager.py:434 [RULE_CONFIG] Successfully loaded and activated rule_config v1.1.0 (4 fields configured) | LoadTime=29.22ms, CacheTime=0.12ms, CompiledPatterns=65
+INFO     cv_analyzer:dynamic_geo_heading_service.py:81 [DYNAMIC_GEO_HEADING] Cache refreshed: 76 gazetteer cities, 116 name denylists, 31 section headings.
+INFO     cv_analyzer:resume_field_extractor.py:230 [NAME_EXTRACTION] Extracted 'Alex Smith' (confidence=0.95, level='HIGH', source='header_email_validated')
+=========================== short test summary info ============================
+FAILED tests/test_phase3_structured_processing.py::test_normalized_resume_retains_raw_values_confidence_and_evidence
+============================== 1 failed in 6.70s ===============================

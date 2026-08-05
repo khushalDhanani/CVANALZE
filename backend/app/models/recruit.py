@@ -52,3 +52,13 @@ class RecruitCandidateMst(Base):
     CandidateStatusID = Column(BigInteger)
 
     job_profile = relationship("OrgJobProfileMst")
+
+
+class RecruitSkillMst(Base):
+    __tablename__ = "RecruitSkillMst"
+
+    SkillID = Column(BigInteger, primary_key=True)
+    SkillTypeID = Column(BigInteger)
+    SkillName = Column(String(255), nullable=False)
+    SkillDesc = Column(String(500), nullable=True)
+    SkillIsActive = Column(Boolean, default=True)

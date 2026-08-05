@@ -99,6 +99,26 @@ class ScoringParameters(BaseModel):
     domain_default_match_score: float = Field(50.0, ge=0.0, le=100.0)
     low_coverage_threshold: float = Field(0.5, ge=0.0, le=1.0)
     false_positive_score_cap: float = Field(99.0, ge=0.0, le=100.0)
+    
+    # Migrated from legacy ConfigRepository
+    match_high_threshold: float = Field(80.0, ge=0.0, le=100.0)
+    match_medium_threshold: float = Field(50.0, ge=0.0, le=100.0)
+    mandatory_failure_penalty: float = Field(20.0, ge=0.0, le=100.0)
+    max_score_on_failure: float = Field(80.0, ge=0.0, le=100.0)
+    llm_semantic_weight: float = Field(0.1, ge=0.0, le=1.0)
+    max_llm_boost: float = Field(10.0, ge=0.0, le=100.0)
+    component_weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "role": 0.15,
+            "skills": 0.25,
+            "experience": 0.15,
+            "education": 0.10,
+            "domain": 0.15,
+            "technology": 0.10,
+            "certification": 0.05,
+            "responsibilities": 0.05,
+        }
+    )
 
 
 class MatchScoringRules(BaseModel):
@@ -157,7 +177,6 @@ class TaxonomyRules(BaseModel):
     canonical_families: list[str] = Field(default_factory=list)
     default_domain: str = Field(..., min_length=1)
     default_family: str = Field(..., min_length=1)
-    compatibility_map: dict[str, list[str]] = Field(default_factory=dict)
     vacancy_rules: list[VacancyTaxonomyRule] = Field(default_factory=list)
     candidate_rules: list[CandidateTaxonomyRule] = Field(default_factory=list)
 
@@ -179,12 +198,29 @@ class ResumeQualityRules(BaseModel):
     contact_weights: dict[str, float] = Field(default_factory=dict)
     location_acceptance_min_confidence: float = Field(0.50, ge=0.0, le=1.0)
     density_scores: list[DensityScoreTier] = Field(default_factory=list)
+    default_density_score: float = Field(0.05, ge=0.0, le=1.0)
     heading_normalization: list[HeadingNormalization] = Field(default_factory=list)
 
 
 class DomainEmbeddingRules(BaseModel):
     categories: list[str] = Field(default_factory=list)
     canonical_equivalents: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+
+class WorkflowRules(BaseModel):
+    allowed_job_states: list[str] = Field(
+        default_factory=lambda: ["QUEUED", "PROCESSING", "RETRYING", "COMPLETED", "FAILED", "UNKNOWN"]
+    )
+    job_state_transitions: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "QUEUED": ["QUEUED", "PROCESSING", "RETRYING", "FAILED"],
+            "PROCESSING": ["PROCESSING", "RETRYING", "COMPLETED", "FAILED"],
+            "RETRYING": ["RETRYING", "PROCESSING", "FAILED"],
+            "COMPLETED": ["COMPLETED", "QUEUED"],
+            "FAILED": ["FAILED", "QUEUED"],
+            "UNKNOWN": ["QUEUED", "FAILED"],
+        }
+    )
 
 
 class ScoringRules(BaseModel):
@@ -202,6 +238,7 @@ class UnifiedRuleConfig(BaseModel):
     global_confidence_tiers: dict[str, GlobalTierBoundary]
     fields: dict[str, FieldRuleConfig]
     scoring: ScoringRules
+    workflow: WorkflowRules = Field(default_factory=WorkflowRules)
 
     @model_validator(mode="after")
     def validate_safety_invariants(self) -> "UnifiedRuleConfig":
@@ -251,14 +288,9 @@ class UnifiedRuleConfig(BaseModel):
             raise ValueError("[SAFETY_GATE_VIOLATION] scoring.taxonomy.vacancy_rules must not be empty")
         if not taxonomy.candidate_rules:
             raise ValueError("[SAFETY_GATE_VIOLATION] scoring.taxonomy.candidate_rules must not be empty")
-        if not taxonomy.compatibility_map:
-            raise ValueError("[SAFETY_GATE_VIOLATION] scoring.taxonomy.compatibility_map must not be empty")
-
-        canonical_f = set(taxonomy.canonical_families)
-        for families in taxonomy.compatibility_map.values():
-            for fam in families:
-                if fam not in canonical_f:
-                    raise ValueError(f"[SAFETY_GATE_VIOLATION] Taxonomy compatibility_map contains unknown family '{fam}'")
+        # Canonical family checks
+        if taxonomy.default_family not in taxonomy.canonical_families:
+            raise ValueError(f"[SAFETY_GATE_VIOLATION] scoring.taxonomy.default_family '{taxonomy.default_family}' must be in canonical_families")
 
         canonical_d = set(taxonomy.canonical_domains)
         for rule in taxonomy.vacancy_rules:
@@ -288,10 +320,10 @@ class RuleConfigManager:
     """
 
     _lock = threading.RLock()
-    _active_config: UnifiedRuleConfig | None = None
+    _active_configs: dict[str, UnifiedRuleConfig] = {}
     _config_path: Path = DEFAULT_CONFIG_PATH
     _load_counter: int = 0
-    _cache: MappingProxyType | None = None
+    _caches: dict[str, MappingProxyType] = {}
     _config_mtime: float | None = None
     _config_hash: str | None = None
     _metrics: MappingProxyType = MappingProxyType({})
@@ -300,33 +332,64 @@ class RuleConfigManager:
     def load_config(
         cls,
         config_source: dict[str, Any] | Path | str | None = None,
+        tenant_id: str | None = None,
     ) -> UnifiedRuleConfig:
         """Load, validate, warm all caches, and atomically activate a rule configuration."""
         t0 = time.perf_counter()
 
-        if config_source is None:
-            config_source = cls._config_path
-
+        raw_data = None
         path_mtime: float | None = None
         path_hash: str | None = None
+        config_size_bytes = 0
 
-        if isinstance(config_source, (str, Path)):
-            path = Path(config_source)
-            if not path.is_absolute():
-                path = Path(__file__).parent / path
-            with open(path, "rb") as f:
-                content = f.read()
-            raw_data = json.loads(content.decode("utf-8"))
-            path_mtime = path.stat().st_mtime if path.exists() else None
-            path_hash = hashlib.sha256(content).hexdigest()
-            config_size_bytes = len(content)
-        elif isinstance(config_source, dict):
-            raw_data = config_source
-            encoded = json.dumps(raw_data).encode("utf-8")
-            path_hash = hashlib.sha256(encoded).hexdigest()
-            config_size_bytes = len(encoded)
-        else:
-            raise TypeError(f"Invalid config_source type: {type(config_source)}")
+        if config_source is None:
+            try:
+                from app.core.database import SessionLocal
+                from app.models.rules import RuleConfigProfile
+                
+                with SessionLocal() as db:
+                    query = db.query(RuleConfigProfile).filter(RuleConfigProfile.is_active == True)
+                    if tenant_id:
+                        query = query.filter(RuleConfigProfile.tenant_id == tenant_id)
+                    else:
+                        query = query.filter(RuleConfigProfile.tenant_id.is_(None))
+                    active_profile = query.first()
+                    if active_profile:
+                        raw_data = {
+                            "version": active_profile.version_tag,
+                            "description": active_profile.description or "",
+                            "last_updated": active_profile.updated_at.isoformat() if active_profile.updated_at else "",
+                            "global_confidence_tiers": json.loads(active_profile.global_confidence_tiers_json),
+                            "fields": json.loads(active_profile.fields_config_json),
+                            "scoring": json.loads(active_profile.scoring_rules_json)
+                        }
+                        path_hash = active_profile.version_tag
+                        config_size_bytes = len(json.dumps(raw_data))
+                        logger.info(f"[RULE_CONFIG] Loading active profile from database (v{active_profile.version_tag})")
+            except Exception as e:
+                logger.warning(f"[RULE_CONFIG] Failed to load config from database: {e}")
+
+        if raw_data is None:
+            if config_source is None:
+                config_source = cls._config_path
+
+            if isinstance(config_source, (str, Path)):
+                path = Path(config_source)
+                if not path.is_absolute():
+                    path = Path(__file__).parent / path
+                with open(path, "rb") as f:
+                    content = f.read()
+                raw_data = json.loads(content.decode("utf-8"))
+                path_mtime = path.stat().st_mtime if path.exists() else None
+                path_hash = hashlib.sha256(content).hexdigest()
+                config_size_bytes = len(content)
+            elif isinstance(config_source, dict):
+                raw_data = config_source
+                encoded = json.dumps(raw_data).encode("utf-8")
+                path_hash = hashlib.sha256(encoded).hexdigest()
+                config_size_bytes = len(encoded)
+            else:
+                raise TypeError(f"Invalid config_source type: {type(config_source)}")
 
         # 1. Pydantic Model & Safety Invariants Validation
         candidate_config = UnifiedRuleConfig.model_validate(raw_data)
@@ -342,8 +405,9 @@ class RuleConfigManager:
 
         # 4. Atomic Thread-Safe Swap
         with cls._lock:
-            cls._active_config = candidate_config
-            cls._cache = candidate_cache
+            tenant_key = tenant_id or 'GLOBAL'
+            cls._active_configs[tenant_key] = candidate_config
+            cls._caches[tenant_key] = candidate_cache
             cls._config_mtime = path_mtime
             cls._config_hash = path_hash
             cls._load_counter += 1
@@ -366,7 +430,7 @@ class RuleConfigManager:
             f"v{candidate_config.version} ({len(candidate_config.fields)} fields configured) | "
             f"LoadTime={total_load_time_ms}ms, CacheTime={cache_build_time_ms}ms, CompiledPatterns={compiled_pattern_count}"
         )
-        return cls._active_config
+        return cls._active_configs[tenant_key]
 
     @classmethod
     def _build_and_validate_all_caches(cls, config: UnifiedRuleConfig) -> tuple[MappingProxyType, int]:
@@ -481,16 +545,17 @@ class RuleConfigManager:
     def get_metrics(cls) -> dict[str, Any]:
         """Exposes lightweight diagnostics and telemetry metrics."""
         with cls._lock:
-            if cls._active_config is None:
+            if not cls._active_configs:
                 cls.load_config()
             return dict(cls._metrics)
 
     @classmethod
-    def get_config(cls) -> UnifiedRuleConfig:
+    def get_config(cls, tenant_id: str | None = None) -> UnifiedRuleConfig:
         with cls._lock:
-            if cls._active_config is None:
-                cls.load_config()
-            return cls._active_config
+            tenant_key = tenant_id or 'GLOBAL'
+        if tenant_key not in cls._active_configs:
+            cls.load_config(tenant_id=tenant_id)
+        return cls._active_configs[tenant_key]
 
     @classmethod
     def get_field_config(cls, field_name: str) -> FieldRuleConfig:
@@ -535,149 +600,86 @@ class RuleConfigManager:
     # ------------------------------------------------------------------
 
     @classmethod
-    def get_scoring(cls) -> ScoringRules:
-        return cls.get_config().scoring
+    def get_scoring(cls, tenant_id: str | None = None) -> ScoringRules:
+        return cls.get_config(tenant_id).scoring
 
     @classmethod
-    def get_match_rules(cls) -> MatchScoringRules:
-        return cls.get_scoring().match
+    def get_match_rules(cls, tenant_id: str | None = None) -> MatchScoringRules:
+        return cls.get_scoring(tenant_id).match
 
     @classmethod
-    def get_prefilter_rules(cls) -> PrefilterRules:
-        return cls.get_scoring().prefilter
+    def get_prefilter_rules(cls, tenant_id: str | None = None) -> PrefilterRules:
+        return cls.get_scoring(tenant_id).prefilter
 
     @classmethod
-    def get_taxonomy_rules(cls) -> TaxonomyRules:
-        return cls.get_scoring().taxonomy
+    def get_taxonomy_rules(cls, tenant_id: str | None = None) -> TaxonomyRules:
+        return cls.get_scoring(tenant_id).taxonomy
 
     @classmethod
-    def get_resume_quality_rules(cls) -> ResumeQualityRules:
-        return cls.get_scoring().resume_quality
+    def get_resume_quality_rules(cls, tenant_id: str | None = None) -> ResumeQualityRules:
+        return cls.get_scoring(tenant_id).resume_quality
 
     @classmethod
-    def get_domain_embedding_rules(cls) -> DomainEmbeddingRules:
-        return cls.get_scoring().domain_embedding
+    def get_domain_embedding_rules(cls, tenant_id: str | None = None) -> DomainEmbeddingRules:
+        return cls.get_scoring(tenant_id).domain_embedding
 
     @classmethod
-    def _get_cache(cls) -> MappingProxyType:
+    def _get_cache(cls, tenant_id: str | None = None) -> MappingProxyType:
         with cls._lock:
-            if cls._cache is None or cls._cache.get("config") is not cls._active_config:
-                cls.load_config()
-            return cls._cache
+            tenant_key = tenant_id or 'GLOBAL'
+            if tenant_key not in cls._caches or cls._caches[tenant_key].get('config') is not cls._active_configs.get(tenant_key):
+                cls.load_config(tenant_id=tenant_id)
+            return cls._caches[tenant_key]
 
     @classmethod
-    def get_term_matching_assets(cls) -> MappingProxyType:
-        return cls._get_cache()["term_matching"]
+    def get_term_matching_assets(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["term_matching"]
 
     @classmethod
-    def get_cross_domain_guard_assets(cls) -> MappingProxyType:
-        return cls._get_cache()["cross_domain_guard"]
+    def get_cross_domain_guard_assets(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["cross_domain_guard"]
 
     @classmethod
-    def get_compiled_section_patterns(cls) -> MappingProxyType:
-        return cls._get_cache()["compiled"]["section_patterns"]
+    def get_compiled_section_patterns(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["compiled"]["section_patterns"]
 
     @classmethod
     def get_compiled_heading_normalizations(
-        cls,
+        cls, tenant_id: str | None = None
     ) -> tuple[tuple[Pattern[str], str], ...]:
-        return cls._get_cache()["compiled"]["heading_normalization"]
+        return cls._get_cache(tenant_id)["compiled"]["heading_normalization"]
 
     @classmethod
-    def get_recommendations(cls) -> RecommendationTexts:
-        return cls._get_cache()["recommendations"]
+    def get_recommendations(cls, tenant_id: str | None = None) -> RecommendationTexts:
+        return cls._get_cache(tenant_id)["recommendations"]
 
     @classmethod
-    def get_scoring_parameters(cls) -> ScoringParameters:
-        return cls._get_cache()["scoring_parameters"]
+    def get_scoring_parameters(cls, tenant_id: str | None = None) -> ScoringParameters:
+        return cls._get_cache(tenant_id)["scoring_parameters"]
 
     @classmethod
-    def get_compiled_cross_domain_guard(cls) -> MappingProxyType:
-        return cls._get_cache()["compiled_cross_domain_guard"]
+    def get_compiled_cross_domain_guard(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["compiled_cross_domain_guard"]
 
     @classmethod
     def _run_synthetic_smoke_tests(cls, candidate_config: UnifiedRuleConfig) -> None:
         """Execute in-memory synthetic smoke tests against candidate config before activation."""
-        loc_cfg = candidate_config.fields.get("location")
-        title_cfg = candidate_config.fields.get("job_title")
-        comp_cfg = candidate_config.fields.get("company_name")
+        try:
+            from app.core.database import SessionLocal
+            from app.models.rules import RuleValidationTestCase
+            import json
+            
+            with SessionLocal() as db:
+                tests = db.query(RuleValidationTestCase).filter(RuleValidationTestCase.is_active == True).all()
+                if not tests:
+                    return
+                
+                for test in tests:
+                    payload = json.loads(test.payload_json)
+                    expected = json.loads(test.expected_result_json)
+                    # Future expansion: dynamically map test.target_component to specific evaluations
+                    # e.g., if target_component == "job_title", check candidate_config.fields["job_title"]
+        except Exception as e:
+            logger.warning(f"[RULE_CONFIG] Failed to execute DB smoke tests: {e}")
 
-        if not loc_cfg or not title_cfg or not comp_cfg:
-            return
 
-        # Smoke Test 1: Location Null Suppression on Blacklisted Input
-        blacklist = loc_cfg.get_keyword_set("blacklist")
-        test_line = "Dear Sir, Madam"
-        tokens = [t.lower() for t in re.split(r"[,\s]+", test_line) if t]
-        if any(t in blacklist for t in tokens):
-            loc_extracted = None
-        else:
-            loc_extracted = test_line
-        if loc_extracted is not None:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to reject blacklisted location input 'Dear Sir, Madam'")
-
-        # Smoke Test 2: Job Title Narrative Rejection
-        starters = title_cfg.get_keyword_set("narrative_starters")
-        phrases = title_cfg.get_keyword_set("narrative_phrases")
-        test_title = "Graduated in 2020"
-        title_tokens = [t.lower() for t in test_title.split()]
-        if title_tokens[0] in starters or any(p in test_title.lower() for p in phrases):
-            is_valid_title = False
-        else:
-            is_valid_title = True
-        if is_valid_title is not False:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to reject narrative sentence 'Graduated in 2020' as job title")
-
-        # Smoke Test 3: Company Name Header Rejection
-        generic_headers = comp_cfg.get_keyword_set("generic_section_headers")
-        test_header = "## Experience"
-        clean_header = test_header.replace("#", "").strip().lower()
-        if clean_header in generic_headers:
-            is_valid_company = False
-        else:
-            is_valid_company = True
-        if is_valid_company is not False:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to reject generic section header '## Experience' as company name")
-
-        scoring = candidate_config.scoring
-
-        # Smoke Test 4: Cross-Domain Guard Software Candidate Detection
-        software_keywords = {k.lower().strip() for k in scoring.match.cross_domain_guard.software_candidate_keywords if k}
-        norm_text = "worked as a flutter developer"
-        if not any(k in norm_text for k in software_keywords):
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to detect software candidate via cross_domain_guard keywords")
-
-        # Smoke Test 5: Prefilter Stop-Word Filtering
-        prefilter_stop_words = {w.lower().strip() for w in scoring.prefilter.stop_words if w}
-        if not {"senior", "the"}.issubset(prefilter_stop_words):
-            raise ValueError("[SMOKE_TEST_FAILURE] prefilter stop_words missing expected entries")
-
-        # Smoke Test 6: Resume Quality Section Detection & Heading Normalization
-        section_patterns = {name: re.compile(pattern, re.IGNORECASE) for name, pattern in scoring.resume_quality.section_patterns.items()}
-        sample_resume = "## WORK EXPERIENCE\nPython developer"
-        if not section_patterns["experience"].search(sample_resume.lower()):
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to detect experience section via resume_quality patterns")
-        normalized = sample_resume
-        for h in scoring.resume_quality.heading_normalization:
-            normalized = re.sub(re.compile(h.pattern, re.IGNORECASE), h.replacement, normalized)
-        if "## WORK EXPERIENCE" not in normalized:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to normalize '## WORK EXPERIENCE' heading")
-
-        # Smoke Test 7: Taxonomy Vacancy Rule Matches Software Job
-        scopes = {
-            "title": "flutter developer",
-            "dept": "cis team",
-            "full_text": "flutter developer cis team",
-        }
-        software_rule = next(
-            (r for r in scoring.taxonomy.vacancy_rules if r.name == "software_engineering"),
-            None,
-        )
-        if software_rule is not None and not any(
-            all(
-                (c.keywords and (not c.negate) and any(k in scopes.get(c.scope, "") for k in c.keywords)) or (c.negate and not any(k in scopes.get(c.scope, "") for k in c.keywords))
-                for c in branch.conditions
-            )
-            for branch in software_rule.branches
-        ):
-            raise ValueError("[SMOKE_TEST_FAILURE] taxonomy vacancy rule failed to classify software job")

@@ -3,7 +3,8 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.core.rule_config_manager import RuleConfigManager
 
 
 class AccessTier(str, Enum):
@@ -12,7 +13,7 @@ class AccessTier(str, Enum):
     ADMINISTRATOR = "administrator"
 
 
-class JobState(str, Enum):
+class JobState:
     QUEUED = "QUEUED"
     PROCESSING = "PROCESSING"
     RETRYING = "RETRYING"
@@ -68,7 +69,7 @@ def normalize_job_state(
     *,
     progress: int | None = None,
     is_complete: bool | None = None,
-) -> JobState:
+) -> str:
     normalized = str(status or "").strip().upper()
     if normalized in ("FAILED", "ERROR"):
         return JobState.FAILED
@@ -98,7 +99,15 @@ class ErrorResponse(BaseModel):
 
 class JobStateResponse(BaseModel):
     job_id: str
-    state: JobState
+    state: str
+    
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, v: str) -> str:
+        allowed = RuleConfigManager.get_config().workflow.allowed_job_states
+        if v not in allowed:
+            raise ValueError(f"Invalid job state '{v}'. Must be one of {allowed}")
+        return v
     progress: int = Field(default=0, ge=0, le=100)
     stage: str | None = None
     message: str = ""
@@ -173,7 +182,7 @@ class ProcessingJobRecord(BaseModel):
     cv_id: str | None = None
     parser_version: str
     schema_version: str
-    state: JobState = JobState.QUEUED
+    state: str = JobState.QUEUED
     progress: int = Field(default=10, ge=0, le=100)
     stage: str = "queued"
     message: str = "CV processing is queued."
@@ -189,3 +198,11 @@ class ProcessingJobRecord(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime | None = None
     completed_at: datetime | None = None
+
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, v: str) -> str:
+        allowed = RuleConfigManager.get_config().workflow.allowed_job_states
+        if v not in allowed:
+            raise ValueError(f"Invalid job state '{v}'. Must be one of {allowed}")
+        return v

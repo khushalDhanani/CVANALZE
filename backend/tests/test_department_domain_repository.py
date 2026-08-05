@@ -6,22 +6,36 @@ from app.services.scoring_engine import ScoringEngine
 
 
 def _seed_repo(*, db_factory=None, seed_path=None, seed_loader=None):
-    return DepartmentDomainRepository(
+    repo = DepartmentDomainRepository(
         db_factory=db_factory or (lambda: None),
-        seed_path=seed_path,
-        seed_loader=seed_loader,
     )
-
-
-def test_falls_back_to_seed_when_db_unavailable():
-    repo = _seed_repo(db_factory=lambda: None)
-    domains = repo.get_all_domains()
-    assert len(domains) == 8
-    assert all(d.is_active for d in domains)
-    assert domains[0].domain_name == "Information Technology & Software"
-    assert domains[0].department_id == 9
-    assert domains[0].department_name == "CIS Team"
-    assert domains[0].priority == 1
+    
+    def _mock_db_load():
+        if seed_loader and seed_path:
+            records = seed_loader(seed_path)
+        elif seed_loader:
+            records = seed_loader(repo._seed_path)
+        else:
+            records = json.loads(repo._seed_path.read_text(encoding="utf-8")).get("domains", [])
+            
+        from app.schemas.domain import DepartmentDomain
+        mock_domains = []
+        for r in records:
+            d_name = r.get("domain_name", "")
+            mock_domains.append(DepartmentDomain(
+                id=r.get("id"),
+                department_id=r.get("department_id"),
+                department_name=r.get("department_name") or d_name,
+                domain_name=d_name,
+                keywords=r.get("keywords", []),
+                default_roles=r.get("default_roles", []),
+                priority=r.get("priority", 0),
+                is_active=r.get("is_active", True)
+            ))
+        return mock_domains
+        
+    repo._load_from_db = _mock_db_load
+    return repo
 
 
 def test_seed_matches_legacy_map_values():

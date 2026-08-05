@@ -138,6 +138,8 @@ class EnrichedCandidateAnalysis(BaseModel):
         default="No suitable active vacancy found.",
         description="Summary of active vacancy match or fallback message",
     )
+    scoring_profile_code: str | None = Field(default=None, description="Scoring profile code used for evaluation")
+    scoring_profile_version: str | None = Field(default=None, description="Scoring profile version/timestamp used")
     ai_career_summary: str = Field(
         default="",
         description="Independent AI analysis of candidate profile, strengths, department, and suitable roles",

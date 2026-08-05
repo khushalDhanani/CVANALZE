@@ -12,8 +12,8 @@ def test_resolve_exact_or_fallback():
         skills=["Python", "FastAPI", "PostgreSQL"],
     )
     assert isinstance(res, NormalizedClassification)
-    assert res.domain_name is not None
-    assert res.family_name is not None
+    assert res.db_department_name is not None
+    assert res.db_designation_name is not None
 
 
 def test_add_dynamic_designation():
@@ -32,4 +32,4 @@ def test_add_dynamic_designation():
         skills=["Prompting", "LLMs"],
     )
     assert isinstance(resolved, NormalizedClassification)
-    assert resolved.family_name == "Software Engineering & Development"
+    assert resolved.db_department_name == "Software Engineering & Development"

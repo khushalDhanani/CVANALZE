@@ -117,7 +117,6 @@ def test_scoring_accessors_expose_data_driven_rules():
     taxonomy = RuleConfigManager.get_taxonomy_rules()
     assert taxonomy.default_domain == "General Operations"
     assert taxonomy.default_family == "General Professional"
-    assert "Software Engineering & Development" in taxonomy.compatibility_map
     assert len(taxonomy.vacancy_rules) == 14
     assert len(taxonomy.candidate_rules) == 8
     assert any(rule.name == "finance_administration" for rule in taxonomy.candidate_rules)
@@ -193,17 +192,6 @@ def test_cache_invalidation_on_config_reload():
     RuleConfigManager.load_config()
 
 
-def test_taxonomy_invariant_rejects_unknown_compatibility_family():
-    raw_dict = RuleConfigManager.get_config().model_dump()
-    candidate_dict = copy.deepcopy(raw_dict)
-    candidate_dict["scoring"]["taxonomy"]["compatibility_map"]["Software Engineering & Development"] = ["Not A Real Family"]
-
-    with pytest.raises(ValueError, match=r"SAFETY_GATE_VIOLATION.*unknown family"):
-        RuleConfigManager.load_config(candidate_dict)
-
-    RuleConfigManager.load_config()
-
-
 def test_taxonomy_invariant_rejects_unknown_rule_domain():
     raw_dict = RuleConfigManager.get_config().model_dump()
     candidate_dict = copy.deepcopy(raw_dict)
@@ -241,3 +229,20 @@ def test_rule_config_manager_metrics_and_reload():
 
     reloaded = RuleConfigManager.reload_if_changed()
     assert reloaded is False
+def test_custom_business_states_can_be_added_to_workflow():
+    raw_dict = RuleConfigManager.get_config().model_dump()
+    candidate_dict = copy.deepcopy(raw_dict)
+
+    # Add custom state to workflow
+    workflow = candidate_dict["workflow"]
+    workflow["allowed_job_states"].append("AWAITING_APPROVAL")
+    workflow["job_state_transitions"]["COMPLETED"] = ["AWAITING_APPROVAL"]
+    workflow["job_state_transitions"]["AWAITING_APPROVAL"] = ["ARCHIVED"]
+
+    # Load modified config via parsing
+    from app.core.rule_config_manager import UnifiedRuleConfig
+    new_config = UnifiedRuleConfig.model_validate(candidate_dict)
+    
+    assert "AWAITING_APPROVAL" in new_config.workflow.allowed_job_states
+    assert "AWAITING_APPROVAL" in new_config.workflow.job_state_transitions["COMPLETED"]
+    assert new_config.workflow.job_state_transitions["AWAITING_APPROVAL"] == ["ARCHIVED"]
