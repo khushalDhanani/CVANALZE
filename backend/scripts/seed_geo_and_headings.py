@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.database import SessionLocal, init_db
+from app.core.database import PostgresAppSession, init_db
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading
 
@@ -19,11 +19,11 @@ def seed_geo_and_headings():
 
     config = RuleConfigManager.load_config()
 
-    if SessionLocal is None:
-        logger.warning("MSSQL SessionLocal is None. Cannot seed MSSQL.")
+    if PostgresAppSession is None:
+        logger.warning("PostgresAppSession is None. Cannot seed database.")
         return
 
-    db = SessionLocal()
+    db = PostgresAppSession()
     try:
         # 1. Seed Geo Locations (Gazetteer)
         gazetteer = config.fields.get("location", None)

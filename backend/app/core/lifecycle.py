@@ -18,14 +18,14 @@ async def application_lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await asyncio.to_thread(verify_mssql_readonly)
     await asyncio.to_thread(verify_redis)
     await asyncio.to_thread(verify_ollama_models)
-    # Pre-parse and validate rule_config.json
+    # Load and validate dynamic database rule configuration
     from app.core.rule_config_manager import RuleConfigManager
     try:
         RuleConfigManager.load_config(tenant_id=None)
-        logger.info("[STARTUP] rule_config.json parsed and validated successfully.")
+        logger.info("[STARTUP] Database rule configuration loaded and validated successfully.")
     except Exception as exc:
-        logger.error(f"[STARTUP] Invalid rule_config.json: {exc}")
-        raise RuntimeError("Application cannot start with invalid rule_config.json") from exc
+        logger.error(f"[STARTUP] Could not load active PostgreSQL rule configuration: {exc}")
+        raise RuntimeError("Application cannot start without an active PostgreSQL rule configuration") from exc
         
     # Start the pub/sub listener for hot-reloads
     from app.core.config_listener import start_config_invalidation_listener

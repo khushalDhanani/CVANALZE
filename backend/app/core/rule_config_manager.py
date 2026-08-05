@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger("cv_analyzer")
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "rule_config.json"
 
 
 class GlobalTierBoundary(BaseModel):
@@ -328,49 +327,46 @@ class RuleConfigManager:
     @classmethod
     def load_config(
         cls,
-        config_source: dict[str, Any] | Path | str | None = None,
         tenant_id: str | None = None,
     ) -> UnifiedRuleConfig:
-        """Load, validate, warm all caches, and atomically activate a rule configuration."""
+        """Load, validate, warm all caches, and atomically activate a rule configuration from PostgreSQL."""
         t0 = time.perf_counter()
 
         raw_data = None
-        path_mtime: float | None = None
         path_hash: str | None = None
         config_size_bytes = 0
 
-        if config_source is None:
-            try:
-                from app.core.database import PostgresAppSession
-                from app.models.rules import RuleConfigProfile
-                
-                with PostgresAppSession() as db:
-                    query = db.query(RuleConfigProfile).filter(RuleConfigProfile.is_active == True)
-                    if tenant_id:
-                        query = query.filter(RuleConfigProfile.tenant_id == tenant_id)
-                    else:
-                        query = query.filter(RuleConfigProfile.tenant_id.is_(None))
-                    active_profile = query.first()
-                    if active_profile:
-                        raw_data = {
-                            "version": active_profile.version_tag,
-                            "description": active_profile.description or "",
-                            "last_updated": active_profile.updated_at.isoformat() if active_profile.updated_at else "",
-                            "global_confidence_tiers": json.loads(active_profile.global_confidence_tiers_json),
-                            "fields": json.loads(active_profile.fields_config_json),
-                            "scoring": json.loads(active_profile.scoring_rules_json)
-                        }
-                        path_hash = active_profile.version_tag
-                        config_size_bytes = len(json.dumps(raw_data))
-                        logger.info(f"[RULE_CONFIG] Loading active profile from database (v{active_profile.version_tag})")
-                        
-                        from app.core.cache import config_cache_manager
-                        cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
-                        config_cache_manager.set(cache_key, raw_data)
-            except Exception as e:
-                logger.warning(f"[RULE_CONFIG] Failed to load config from database: {e}")
+        try:
+            from app.core.database import PostgresAppSession
+            from app.models.rules import RuleConfigProfile
+            
+            with PostgresAppSession() as db:
+                query = db.query(RuleConfigProfile).filter(RuleConfigProfile.is_active == True)
+                if tenant_id:
+                    query = query.filter(RuleConfigProfile.tenant_id == tenant_id)
+                else:
+                    query = query.filter(RuleConfigProfile.tenant_id.is_(None))
+                active_profile = query.first()
+                if active_profile:
+                    raw_data = {
+                        "version": active_profile.version_tag,
+                        "description": active_profile.description or "",
+                        "last_updated": active_profile.updated_at.isoformat() if active_profile.updated_at else "",
+                        "global_confidence_tiers": json.loads(active_profile.global_confidence_tiers_json),
+                        "fields": json.loads(active_profile.fields_config_json),
+                        "scoring": json.loads(active_profile.scoring_rules_json)
+                    }
+                    path_hash = active_profile.version_tag
+                    config_size_bytes = len(json.dumps(raw_data))
+                    logger.info(f"[RULE_CONFIG] Loading active profile from database (v{active_profile.version_tag})")
+                    
+                    from app.core.cache import config_cache_manager
+                    cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
+                    config_cache_manager.set(cache_key, raw_data)
+        except Exception as e:
+            logger.warning(f"[RULE_CONFIG] Failed to load config from database: {e}")
 
-        if raw_data is None and config_source is None:
+        if raw_data is None:
             from app.core.cache import config_cache_manager
             cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
             cached_data = config_cache_manager.get(cache_key)
@@ -381,14 +377,8 @@ class RuleConfigManager:
                 logger.info(f"[RULE_CONFIG] Loading active profile from cache (v{path_hash})")
 
         if raw_data is None:
-            if isinstance(config_source, dict):
-                raw_data = config_source
-                encoded = json.dumps(raw_data).encode("utf-8")
-                path_hash = hashlib.sha256(encoded).hexdigest()
-                config_size_bytes = len(encoded)
-            else:
-                from app.core.error_handlers import SystemConfigurationError
-                raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
+            from app.core.error_handlers import SystemConfigurationError
+            raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
 
         # 1. Pydantic Model & Safety Invariants Validation
         candidate_config = UnifiedRuleConfig.model_validate(raw_data)

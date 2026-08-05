@@ -255,3 +255,23 @@
 - `backend/app/core/database.py`
 - `backend/app/core/lifecycle.py`
 - `backend/tests/test_database_architecture.py`
+
+---
+
+## Work Completed — PR 3: Repair configuration loading
+- **Removed JSON-file Fallback:** Removed `DEFAULT_CONFIG_PATH` and the legacy JSON loading logic in `backend/app/core/rule_config_manager.py`. It now enforces configuration loading exclusively from PostgreSQL and cache.
+- **Fail Startup on Missing Configuration:** Modified `load_config` in `RuleConfigManager` to explicitly raise `SystemConfigurationError("CONFIGURATION_UNAVAILABLE")` when no active database configuration is found.
+- **Removed Misleading Messages:** Updated `backend/app/core/lifecycle.py` to correctly reflect database configuration startup, replacing misleading output referencing the legacy `rule_config.json`.
+- **Replaced Nonexistent SessionLocal:** Safely migrated all remaining inventory and seeding scripts (`migrate_phase1_inventory.py`, `seed_scoring_profiles_and_stopwords.py`, `seed_geo_and_headings.py`, `seed_prompts.py`, `backfill_cvai_cache.py`, `seed_taxonomy_from_json.py`) to explicitly consume `PostgresAppSession` instead of the non-existent `SessionLocal` artifact. 
+- **Tests Configured:** Updated `backend/tests/conftest.py` to gracefully inject mocked database JSON payload directly into the fast memory cache to enable local tests to run without passing `config_source` parameters.
+
+## Files Changed
+- `backend/app/core/rule_config_manager.py`
+- `backend/app/core/lifecycle.py`
+- `backend/scripts/migrate_phase1_inventory.py`
+- `backend/scripts/seed_scoring_profiles_and_stopwords.py`
+- `backend/scripts/seed_geo_and_headings.py`
+- `backend/scripts/seed_prompts.py`
+- `backend/scripts/backfill_cvai_cache.py`
+- `backend/scripts/seed_taxonomy_from_json.py`
+- `backend/tests/conftest.py`

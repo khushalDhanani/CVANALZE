@@ -6,7 +6,7 @@ from pathlib import Path
 # Add backend directory to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.database import SessionLocal, init_db
+from app.core.database import PostgresAppSession, init_db
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.taxonomy import (
     DesignationMaster,
@@ -28,11 +28,11 @@ def seed_taxonomy_and_vectors():
     config = RuleConfigManager.get_config()
     taxonomy_rules = config.scoring.taxonomy
 
-    if SessionLocal is None:
-        logger.warning("MSSQL SessionLocal is None. Cannot seed MSSQL. Seeding pgvector directly...")
+    if PostgresAppSession is None:
+        logger.warning("PostgresAppSession is None. Cannot seed database. Seeding pgvector directly...")
         db = None
     else:
-        db = SessionLocal()
+        db = PostgresAppSession()
 
     try:
         domain_map: dict[str, DomainMaster] = {}

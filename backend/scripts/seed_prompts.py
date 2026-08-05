@@ -5,7 +5,7 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.models.prompts import PromptTemplateMaster
 
 DYNAMIC_MAPPING = """/think
@@ -250,7 +250,7 @@ def seed_prompts():
         },
     ]
 
-    with SessionLocal() as db:
+    with PostgresAppSession() as db:
         for t in templates:
             existing = db.query(PromptTemplateMaster).filter(
                 PromptTemplateMaster.prompt_name == t["prompt_name"],

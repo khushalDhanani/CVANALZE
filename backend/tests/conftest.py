@@ -30,14 +30,15 @@ def mock_rule_config_manager(monkeypatch):
     
     original_load_config = RuleConfigManager.load_config
     
-    def mocked_load_config(cls, config_source=None, tenant_id=None):
-        if config_source is None:
-            rule_config_path = Path(__file__).resolve().parent.parent / "app" / "core" / "rule_config.json"
-            if rule_config_path.exists():
-                with open(rule_config_path, "rb") as f:
-                    raw_data = json.loads(f.read().decode("utf-8"))
-                return original_load_config(config_source=raw_data, tenant_id=tenant_id)
-        return original_load_config(config_source=config_source, tenant_id=tenant_id)
+    def mocked_load_config(cls, tenant_id=None):
+        rule_config_path = Path(__file__).resolve().parent.parent / "app" / "core" / "rule_config.json"
+        if rule_config_path.exists():
+            with open(rule_config_path, "rb") as f:
+                raw_data = json.loads(f.read().decode("utf-8"))
+            from app.core.cache import config_cache_manager
+            cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
+            config_cache_manager.set(cache_key, raw_data)
+        return original_load_config(tenant_id=tenant_id)
 
     monkeypatch.setattr(RuleConfigManager, "load_config", classmethod(mocked_load_config))
     

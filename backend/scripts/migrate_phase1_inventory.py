@@ -6,7 +6,7 @@ from pathlib import Path
 # Add backend directory to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.database import SessionLocal, init_db
+from app.core.database import PostgresAppSession, init_db
 from app.models.rules import RuleConfigProfile
 from app.models.domain import DepartmentDomainMaster
 from app.models import org, recruit  # Import to register models
@@ -18,11 +18,11 @@ def migrate():
     logger.info("Initializing DB tables if not existing...")
     init_db()
 
-    if SessionLocal is None:
-        logger.error("SessionLocal is None. Cannot seed database.")
+    if PostgresAppSession is None:
+        logger.error("PostgresAppSession is None. Cannot seed database.")
         return
     
-    db = SessionLocal()
+    db = PostgresAppSession()
     try:
         # 1. Process rule_config.json
         rule_config_path = Path(__file__).resolve().parent.parent / "app" / "core" / "rule_config.json"
