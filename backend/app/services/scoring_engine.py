@@ -395,8 +395,8 @@ class ScoringEngine:
             if evaluated_matches
             else JobMatchResult(
                 job_id="general",
-                job_title="General Role",
-                department="General",
+                job_title="",
+                department="",
                 score=0.0,
                 classification="LOW",
                 recommendation="HR review required.",

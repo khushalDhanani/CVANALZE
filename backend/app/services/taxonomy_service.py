@@ -15,8 +15,7 @@ DEFAULT_DOMAINS = [
     "Quality Assurance & QC Laboratory",
     "Environmental Health & Safety (EHS)",
     "Process & Project Engineering",
-    "Finance & Administration",
-    "General Operations"
+    "Finance & Administration"
 ]
 
 DEFAULT_FAMILIES = [
@@ -29,8 +28,7 @@ DEFAULT_FAMILIES = [
     ("Fire, Safety & EHS", "Environmental Health & Safety (EHS)"),
     ("Process & Project Engineering", "Process & Project Engineering"),
     ("Environment & ETP Operations", "Environmental Health & Safety (EHS)"),
-    ("Finance & Administration", "Finance & Administration"),
-    ("General Professional", "General Operations")
+    ("Finance & Administration", "Finance & Administration")
 ]
 
 class TaxonomyService:

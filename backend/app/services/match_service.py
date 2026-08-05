@@ -313,8 +313,8 @@ class MatchService:
         profiler.log_summary()
 
         cand_profile = candidate_context.cand_domain_profile
-        recommended_dept = cand_profile.get("recommended_department", "General")
-        professional_domain = cand_profile.get("professional_domain", "General Operations")
+        recommended_dept = cand_profile.get("recommended_department", "")
+        professional_domain = cand_profile.get("professional_domain", "")
         strengths = cand_profile.get("strengths", [])
         suitable_roles = cand_profile.get("suitable_job_roles", [])
 
@@ -338,7 +338,7 @@ class MatchService:
             active_vacancy_summary = f"No suitable active vacancy found matching candidate domain/taxonomy profile (Primary Domain: {professional_domain}). Manual HR review recommended."
             best_match = evaluated_matches[0] if evaluated_matches else MatchService._empty_job_match()
 
-        roles_str = ", ".join(suitable_roles) if suitable_roles else "General Roles"
+        roles_str = ", ".join(suitable_roles) if suitable_roles else ""
         strengths_str = "; ".join(strengths) if strengths else "Solid technical and professional baseline."
 
         if optimized_response and optimized_response.ai_career_summary:
@@ -393,8 +393,14 @@ class MatchService:
                 )
                 for role in suitable_roles[:3]
             ]
+            
+        top_level_match_status = "DB_MATCH" if has_genuine_match or (cand_classification and cand_classification.match_status == "DB_MATCH") else "NO_MATCH"
+        
+        if cand_classification and cand_classification.match_status == "NO_SUITABLE_MATCH":
+            cand_classification = None
 
         result = EnrichedCandidateAnalysis(
+            match_status=top_level_match_status,
             primary_department=recommended_dept,
             recommended_department=recommended_dept,
             professional_domain=professional_domain,
@@ -429,13 +435,13 @@ class MatchService:
     def _empty_job_match() -> EnrichedJobMatchResult:
         return EnrichedJobMatchResult(
             job_id="general",
-            job_title="General Role",
-            department="General",
+            job_title="",
+            department="",
             vacancy_id=None,
             job_profile_id=None,
             company_id=None,
             department_id=None,
-            department_name="General",
+            department_name="",
             location_id=None,
             score=0.0,
             overall_score=0.0,
@@ -465,8 +471,8 @@ class MatchService:
         normalized_resume: NormalizedResume | None = None,
     ) -> EnrichedCandidateAnalysis:
         cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
-        rec_dept = cand_profile.get("recommended_department", "General")
-        prof_domain = cand_profile.get("professional_domain", "General Operations")
+        rec_dept = cand_profile.get("recommended_department", "")
+        prof_domain = cand_profile.get("professional_domain", "")
         strengths = cand_profile.get("strengths", ["General technical background"])
         roles = cand_profile.get("suitable_job_roles", ["Operations Associate"])
         best_match = MatchService._empty_job_match()

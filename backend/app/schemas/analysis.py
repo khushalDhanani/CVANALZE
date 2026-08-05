@@ -172,6 +172,10 @@ class EnrichedCandidateAnalysis(BaseModel):
         default_factory=list,
         description="AI career suggestions when no DB match found — clearly separated from verified DB matches",
     )
+    match_status: str = Field(
+        default="NO_MATCH",
+        description="Top level match status indicating if this candidate matches an active vacancy or DB profile",
+    )
 
 
 class HRReviewRequest(BaseModel):

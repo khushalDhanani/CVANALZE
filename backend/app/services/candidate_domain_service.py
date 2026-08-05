@@ -94,7 +94,7 @@ class CandidateDomainService:
 
         if dyn_res.match_source != "legacy_fallback":
             industry_dept = dyn_res.industry_department or dyn_res.industry_domain or dyn_res.db_department_name
-            prof_domain = dyn_res.industry_domain or dyn_res.db_department_name or "General Operations"
+            prof_domain = dyn_res.industry_domain or dyn_res.db_department_name or ""
             recommended_dept = industry_dept or prof_domain
             suitable_roles = [dyn_res.db_department_name] if dyn_res.db_department_name else []
         else:
