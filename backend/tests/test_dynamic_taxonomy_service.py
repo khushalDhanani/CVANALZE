@@ -1,6 +1,6 @@
 # backend/tests/test_dynamic_taxonomy_service.py
 from app.services.dynamic_taxonomy_service import (
-    DynamicTaxonomyResult,
+    NormalizedClassification,
     DynamicTaxonomyService,
 )
 
@@ -11,7 +11,7 @@ def test_resolve_exact_or_fallback():
         role_or_summary="Software Developer",
         skills=["Python", "FastAPI", "PostgreSQL"],
     )
-    assert isinstance(res, DynamicTaxonomyResult)
+    assert isinstance(res, NormalizedClassification)
     assert res.domain_name is not None
     assert res.family_name is not None
 
@@ -31,5 +31,5 @@ def test_add_dynamic_designation():
         role_or_summary="AI Prompt Developer",
         skills=["Prompting", "LLMs"],
     )
-    assert isinstance(resolved, DynamicTaxonomyResult)
+    assert isinstance(resolved, NormalizedClassification)
     assert resolved.family_name == "Software Engineering & Development"

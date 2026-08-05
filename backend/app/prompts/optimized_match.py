@@ -57,8 +57,21 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
 
     from app.core.rule_config_manager import RuleConfigManager
 
-    canonical_domains = RuleConfigManager.get_taxonomy_rules().canonical_domains
+    taxonomy = RuleConfigManager.get_taxonomy_rules()
+    canonical_domains = taxonomy.canonical_domains
     domain_list_str = ", ".join(f'"{d}"' for d in canonical_domains)
+
+    # Gather valid department names from the seed data as an extra grounding signal
+    try:
+        import json as _json, os as _os
+        _seed_path = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "data", "department_domains_seed.json")
+        with open(_seed_path, "r", encoding="utf-8") as _f:
+            _seed = _json.load(_f)
+        dept_names = [d.get("industry_label") or d.get("department_name") for d in _seed.get("domains", []) if d.get("is_active")]
+        dept_names = [d for d in dept_names if d]
+    except Exception:
+        dept_names = []
+    dept_list_str = ", ".join(f'"{d}"' for d in dept_names) if dept_names else "(see canonical_domains list)"
 
     input_json = json.dumps(structured_input, separators=(",", ":"), ensure_ascii=False)
 
@@ -75,7 +88,12 @@ EVIDENCE-BASED REASONING RULES:
 7. Never increase semantic_fit_score based on assumptions — score only on verified evidence.
 8. If there is no genuine match with any active vacancy, set active_vacancy_summary to "No suitable active vacancy found.".
 9. IMPORTANT (EXPERIENCE): Calculate `relevant_experience_years` strictly by summing the total duration of the chronological work history. E.g., "2014 to 2015" (1 yr) + "2023 to present" (~3 yrs) = 4.0 years. Do NOT default to 0.0 if dates are present.
-10. IMPORTANT (DOMAIN): `professional_domain` MUST be strictly selected from this list: [{domain_list_str}]. Do NOT invent domains like "Information Technology" for Plant Operators, Technicians, or blue-collar roles. Select "Plant Operations & Maintenance" or "General Operations" instead.
+10. IMPORTANT (DOMAIN): `professional_domain` MUST be strictly selected from this list: [{domain_list_str}]. Do NOT invent domains.
+    If NONE of the listed domains genuinely fits the candidate, set `professional_domain` to "NO_SUITABLE_MATCH" and set `professional_domains` to ["NO_SUITABLE_MATCH"].
+11. IMPORTANT (DEPARTMENT): `recommended_department` MUST be selected from this list: [{dept_list_str}]. Do NOT invent department names.
+    If no department fits, set `recommended_department` to "NO_SUITABLE_MATCH".
+12. EVIDENCE CITATION: Every field in `candidate_profile` (skills, domain, department, strengths, roles) must be justified by specific text from the CV.
+    For each field include only what is directly evidenced — do not infer beyond the stated facts.
 
 INSTRUCTIONS:
 Return ONLY valid JSON matching the exact schema below without markdown wrapper, thinking tokens, or extra commentary.

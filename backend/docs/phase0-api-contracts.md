@@ -55,7 +55,7 @@ All API routers are mounted below `/api`. Candidate routes are also mounted belo
 | GET | `/api/domain-knowledge/categories` | `list[str]` | recruiter |
 | POST | `/api/domain-knowledge/equivalents` | `DomainEquivalentResponse` | recruiter |
 | POST | `/api/domain-knowledge/designations` | `{status, message, designation_name, family_name}` | administrator |
-| POST | `/api/domain-knowledge/resolve-role` | `DynamicTaxonomyResult` | recruiter |
+| POST | `/api/domain-knowledge/resolve-role` | `NormalizedClassification` | recruiter |
 | GET | `/api/talent-graph/candidate/{candidate_id}` | Candidate graph object | recruiter |
 | GET | `/api/talent-graph/vacancy/{vacancy_id}` | Vacancy graph object | recruiter |
 | GET | `/api/talent-graph/skill/{skill_name}` | Skill graph object | recruiter |

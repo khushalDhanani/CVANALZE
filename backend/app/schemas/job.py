@@ -32,3 +32,7 @@ class JobOpening(BaseModel):
     # Taxonomy Metadata
     domain: str | None = Field(None, description="Taxonomy Domain")
     job_family: str | None = Field(None, description="Taxonomy Job Family")
+
+    # Normalized industry labels (from DepartmentNormalizer)
+    industry_title: str | None = Field(None, description="Normalized industry-standard job title")
+    industry_department: str | None = Field(None, description="Normalized industry-standard department label")

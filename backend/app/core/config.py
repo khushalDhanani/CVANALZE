@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
+from typing import List, Set, Dict, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "CV Analyzer"
     VERSION: str = "0.1.0"
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:8081"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:8081"]
     CORS_ALLOW_CREDENTIALS: bool = False
     APP_ENVIRONMENT: str = "development"
     AUTH_ENABLED: bool = False
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     MAX_HR_FEEDBACK_LENGTH_CHARS: int = 10_000
     INITIALIZE_DATABASE_ON_STARTUP: bool = True
     STARTUP_CACHE_WARMUP_ENABLED: bool = True
-    REDIS_URL: str | None = "redis://localhost:6379/0"
+    REDIS_URL: Optional[str] = "redis://localhost:6379/0"
     RQ_QUEUE_NAME: str = "cv-processing"
     RQ_JOB_TIMEOUT_SECONDS: int = 900
     RQ_RESULT_TTL_SECONDS: int = 604800
@@ -33,12 +34,12 @@ class Settings(BaseSettings):
     RQ_DEVELOPMENT_FALLBACK_ENABLED: bool = True
     PROCESSING_JOB_TTL_SECONDS: int = 604800
     PROCESSING_JOB_LOCK_TIMEOUT_SECONDS: int = 1200
-    JOB_NOT_FOUND_COMPATIBILITY_UNTIL: datetime | None = None
+    JOB_NOT_FOUND_COMPATIBILITY_UNTIL: Optional[datetime] = None
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
     UPLOAD_READ_CHUNK_SIZE_BYTES: int = 1024 * 1024
     UPLOAD_FILENAME_MAX_CHARS: int = 120
-    ALLOWED_EXTENSIONS: set[str] = {"pdf", "docx"}
-    ALLOWED_MIME_TYPES: dict[str, list[str]] = {
+    ALLOWED_EXTENSIONS: Set[str] = {"pdf", "docx"}
+    ALLOWED_MIME_TYPES: Dict[str, List[str]] = {
         "pdf": ["application/pdf", "application/x-pdf", "application/octet-stream"],
         "docx": [
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -68,7 +69,7 @@ class Settings(BaseSettings):
     MANDATORY_FAILURE_PENALTY_PER_ITEM: float = 20.0
     MAX_SCORE_ON_MANDATORY_FAILURE: float = 65.0
 
-    MATCH_COMPONENT_WEIGHTS: dict[str, float] = {
+    MATCH_COMPONENT_WEIGHTS: Dict[str, float] = {
         "role": 0.15,
         "skills": 0.25,
         "experience": 0.15,
@@ -147,7 +148,7 @@ class Settings(BaseSettings):
     MAX_RECOMMENDED_CERTS: int = 4
     MAX_MISSING_QUALS: int = 3
     MAX_CAREER_TRANSITIONS: int = 3
-    EXPERIENCE_BANDS: dict[str, float] = {
+    EXPERIENCE_BANDS: Dict[str, float] = {
         "Senior": 5.0,
         "Mid-Level": 2.0,
         "Junior": 0.0,

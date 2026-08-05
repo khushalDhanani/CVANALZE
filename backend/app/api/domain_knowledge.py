@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 
 from app.services.domain_embedding_service import DomainEmbeddingService
 from app.services.dynamic_taxonomy_service import (
-    DynamicTaxonomyResult,
     DynamicTaxonomyService,
 )
+from app.schemas.classification_types import NormalizedClassification
 
 router = APIRouter(prefix="/domain-knowledge", tags=["Domain Knowledge"])
 
@@ -105,8 +105,8 @@ def add_new_designation(request: AddDesignationRequest) -> dict[str, Any]:
     }
 
 
-@router.post("/resolve-role", response_model=DynamicTaxonomyResult)
-def resolve_role_dynamically(request: ResolveRoleRequest) -> DynamicTaxonomyResult:
+@router.post("/resolve-role", response_model=NormalizedClassification)
+def resolve_role_dynamically(request: ResolveRoleRequest) -> NormalizedClassification:
     """
     Dynamically resolve role, domain, and job family using vector similarity and MSSQL taxonomy.
     """

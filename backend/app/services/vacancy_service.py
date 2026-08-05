@@ -13,6 +13,7 @@ from app.models.org import (
 )
 from app.models.recruit import RecruitVacancyRequest
 from app.schemas.job import JobOpening
+from app.services.department_normalizer import DepartmentNormalizer
 
 
 class VacancyService:
@@ -138,6 +139,9 @@ class VacancyService:
 
         job_desc = vacancy.job_profile.JobProfileDesc if vacancy.job_profile and vacancy.job_profile.JobProfileDesc else None
 
+        industry_dept_result = DepartmentNormalizer.normalize_department(dept_name)
+        industry_title_result = DepartmentNormalizer.normalize_designation(title)
+
         return JobOpening(
             id=str(vacancy.VacancyRequestID),
             title=title,
@@ -159,4 +163,6 @@ class VacancyService:
             department_id=dept_id,
             department_name=dept_name,
             location_id=vacancy.RequestForLocationID,
+            industry_title=industry_title_result.get("industry_designation"),
+            industry_department=industry_dept_result.get("industry_department"),
         )

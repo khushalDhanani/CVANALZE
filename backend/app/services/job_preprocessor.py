@@ -2,6 +2,7 @@
 import re
 from typing import Any
 
+from app.services.department_normalizer import DepartmentNormalizer
 from app.services.job_taxonomy import TaxonomyClassifier
 
 
@@ -9,12 +10,12 @@ class JobPreprocessor:
     """
     Dedicated service for pre-processing raw job dictionaries.
     Populates taxonomy classification metadata, title terms, department terms,
-    and normalized skill sets once during data ingestion/caching.
+    normalized skill sets, and industry-normalized labels once during data ingestion/caching.
     """
 
     @classmethod
     def preprocess_job(cls, job: dict[str, Any]) -> dict[str, Any]:
-        """Precomputes and caches tokens & taxonomy metadata on a job dictionary."""
+        """Precomputes and caches tokens, taxonomy metadata, and industry labels on a job dictionary."""
         stop_words = {
             "and",
             "team",
@@ -51,6 +52,14 @@ class JobPreprocessor:
         job["job_family"] = job_family
         job["_precomputed_domain"] = domain
         job["_precomputed_job_family"] = job_family
+
+        # 6. Populate Industry-Normalized Labels (from DepartmentNormalizer)
+        raw_dept = job.get("department_name") or job.get("department") or ""
+        raw_title = job.get("title") or ""
+        dept_norm = DepartmentNormalizer.normalize_department(raw_dept)
+        title_norm = DepartmentNormalizer.normalize_designation(raw_title)
+        job["_precomputed_industry_dept"] = dept_norm.get("industry_department")
+        job["_precomputed_industry_title"] = title_norm.get("industry_designation")
 
         return job
 

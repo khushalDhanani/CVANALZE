@@ -385,13 +385,16 @@ class TaxonomyClassifier:
         if dyn_res.match_source != "legacy_fallback":
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
+            matched_kw = dyn_res.evidence[0].matched_term if dyn_res.evidence else ""
+            domain = dyn_res.industry_domain or RuleConfigManager.get_taxonomy_rules().default_domain
+            family = dyn_res.db_department_name or RuleConfigManager.get_taxonomy_rules().default_family
             return TaxonomyClassification(
-                domain=dyn_res.domain_name,
-                job_family=dyn_res.family_name,
-                compatible_families=tuple(JobTaxonomy.REVERSE_COMPATIBILITY_MAP.get(dyn_res.family_name, {dyn_res.family_name})),
+                domain=domain,
+                job_family=family,
+                compatible_families=tuple(JobTaxonomy.REVERSE_COMPATIBILITY_MAP.get(family, {family})),
                 matched_rule=f"dynamic:{dyn_res.match_source}",
                 matched_branch=0,
-                matched_keywords=(dyn_res.matched_term,) if dyn_res.matched_term else (),
+                matched_keywords=(matched_kw,) if matched_kw else (),
             )
 
         # 2. Fallback to static rule classification
@@ -441,10 +444,13 @@ class TaxonomyClassifier:
         if dyn_res.match_source != "legacy_fallback":
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
+            matched_kw = dyn_res.evidence[0].matched_term if dyn_res.evidence else ""
+            domain = dyn_res.industry_domain or RuleConfigManager.get_taxonomy_rules().default_domain
+            family = dyn_res.db_department_name or RuleConfigManager.get_taxonomy_rules().default_family
             return TaxonomyClassification(
-                domain=dyn_res.domain_name,
-                job_family=dyn_res.family_name,
-                compatible_families=(dyn_res.family_name,),
+                domain=domain,
+                job_family=family,
+                compatible_families=(family,),
                 matched_rule=f"dynamic:{dyn_res.match_source}",
             )
 

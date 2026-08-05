@@ -93,9 +93,10 @@ class CandidateDomainService:
         )
 
         if dyn_res.match_source != "legacy_fallback":
-            recommended_dept = f"{dyn_res.domain_name} Department"
-            prof_domain = dyn_res.domain_name
-            suitable_roles = [dyn_res.family_name] if dyn_res.family_name else []
+            industry_dept = dyn_res.industry_department or dyn_res.industry_domain or dyn_res.db_department_name
+            prof_domain = dyn_res.industry_domain or dyn_res.db_department_name or "General Operations"
+            recommended_dept = industry_dept or prof_domain
+            suitable_roles = [dyn_res.db_department_name] if dyn_res.db_department_name else []
         else:
             dept_scores: list[tuple[int, DepartmentDomain]] = []
             for matcher in repo.get_domain_matchers():

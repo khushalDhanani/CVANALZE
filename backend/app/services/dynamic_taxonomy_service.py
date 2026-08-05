@@ -15,20 +15,13 @@ from app.models.taxonomy import (
 )
 from app.services.domain_embedding_service import DomainEmbeddingService
 from app.services.embedding_service import EmbeddingService
+from app.schemas.classification_types import NormalizedClassification, ClassificationEvidence
+from app.services.department_normalizer import DepartmentNormalizer
 
 logger = logging.getLogger("cv_analyzer")
 
 
-class DynamicTaxonomyResult(BaseModel):
-    domain_id: int | None = None
-    domain_name: str
-    family_id: int | None = None
-    family_name: str
-    designation_id: int | None = None
-    designation_name: str | None = None
-    matched_term: str | None = None
-    similarity_score: float = 1.0
-    match_source: str = "database_exact"  # "database_exact", "vector_semantic", "legacy_fallback"
+# Deprecated model retained for backward compatibility; new services use NormalizedClassification.
 
 
 class DynamicTaxonomyService:
@@ -47,7 +40,7 @@ class DynamicTaxonomyService:
         role_or_summary: str,
         skills: list[str] | None = None,
         threshold: float = 0.70,
-    ) -> DynamicTaxonomyResult:
+    ) -> NormalizedClassification:
         """
         Resolves candidate's domain, job family, and designation dynamically without hardcoded keyword lists.
         """
@@ -79,7 +72,7 @@ class DynamicTaxonomyService:
         description: str = "",
         required_skills: list[str] | None = None,
         threshold: float = 0.70,
-    ) -> DynamicTaxonomyResult:
+    ) -> NormalizedClassification:
         """
         Resolves vacancy's domain and job family dynamically using vector similarity & MSSQL taxonomy hierarchy.
         """
@@ -286,7 +279,7 @@ class DynamicTaxonomyService:
         return True
 
     @classmethod
-    def _try_exact_mssql_match(cls, term: str) -> DynamicTaxonomyResult | None:
+    def _try_exact_mssql_match(cls, term: str) -> NormalizedClassification | None:
         cls._ensure_initialized()
         clean_term = term.strip().lower()
 
@@ -298,13 +291,25 @@ class DynamicTaxonomyService:
 
         if matches:
             best_key, (desig_name, fam_name, dom_name) = max(matches, key=lambda item: len(item[0]))
-            return DynamicTaxonomyResult(
-                domain_name=dom_name,
-                family_name=fam_name,
-                designation_name=desig_name,
-                matched_term=best_key,
-                similarity_score=1.0,
-                match_source="database_exact",
+            return NormalizedClassification(
+                db_department_id=None,
+                db_department_name=fam_name,
+                db_designation_id=None,
+                db_designation_name=desig_name,
+                industry_department=DepartmentNormalizer.normalize_department(fam_name)["industry_department"],
+                industry_designation=DepartmentNormalizer.normalize_designation(desig_name)["industry_designation"],
+                industry_domain=dom_name,
+                match_status="DB_MATCH",
+                confidence=1.0,
+                match_source="mssql_exact",
+                evidence=[
+                    ClassificationEvidence(
+                        source="mssql_exact",
+                        matched_term=best_key,
+                        matched_against=desig_name,
+                        confidence=1.0,
+                    )
+                ],
             )
 
         if SessionLocal is None:
@@ -321,23 +326,32 @@ class DynamicTaxonomyService:
                     fam = desig.family
                     dom = fam.domain if fam else None
 
-                    return DynamicTaxonomyResult(
-                        domain_id=dom.domain_id if dom else None,
-                        domain_name=dom.domain_name if dom else RuleConfigManager.get_taxonomy_rules().default_domain,
-                        family_id=fam.family_id if fam else None,
-                        family_name=fam.family_name if fam else RuleConfigManager.get_taxonomy_rules().default_family,
-                        designation_id=desig.designation_id,
-                        designation_name=desig.designation_name,
-                        matched_term=syn.synonym_text,
-                        similarity_score=1.0,
-                        match_source="database_exact",
+                    return NormalizedClassification(
+                        db_department_id=fam.family_id if fam else None,
+                        db_department_name=fam.family_name if fam else RuleConfigManager.get_taxonomy_rules().default_family,
+                        db_designation_id=desig.designation_id,
+                        db_designation_name=desig.designation_name,
+                        industry_department=DepartmentNormalizer.normalize_department(fam.family_name if fam else RuleConfigManager.get_taxonomy_rules().default_family)["industry_department"],
+                        industry_designation=DepartmentNormalizer.normalize_designation(desig.designation_name)["industry_designation"],
+                        industry_domain=dom.domain_name if dom else RuleConfigManager.get_taxonomy_rules().default_domain,
+                        match_status="DB_MATCH",
+                        confidence=1.0,
+                        match_source="mssql_exact",
+                        evidence=[
+                            ClassificationEvidence(
+                                source="mssql_exact",
+                                matched_term=syn.synonym_text,
+                                matched_against=desig.designation_name,
+                                confidence=1.0,
+                            )
+                        ],
                     )
         except Exception as exc:
             logger.warning(f"[DYNAMIC_TAXONOMY] MSSQL exact lookup failed for '{term}': {exc}")
         return None
 
     @classmethod
-    def _try_vector_semantic_match(cls, query_text: str, threshold: float = 0.70) -> DynamicTaxonomyResult | None:
+    def _try_vector_semantic_match(cls, query_text: str, threshold: float = 0.70) -> NormalizedClassification | None:
         if pg_SessionLocal is None:
             return None
         try:
@@ -363,30 +377,72 @@ class DynamicTaxonomyService:
                         # Attempt to resolve matched term to MSSQL designation
                         mssql_res = cls._try_exact_mssql_match(matched_term)
                         if mssql_res:
-                            mssql_res.similarity_score = round(sim_score, 4)
-                            mssql_res.match_source = "vector_semantic"
-                            return mssql_res
-                        else:
-                            return DynamicTaxonomyResult(
-                                domain_name=RuleConfigManager.get_taxonomy_rules().default_domain,
-                                family_name=RuleConfigManager.get_taxonomy_rules().default_family,
-                                designation_name=matched_term,
-                                matched_term=matched_term,
-                                similarity_score=round(sim_score, 4),
+                            # mssql_res is already a NormalizedClassification — enrich with vector evidence
+                            return NormalizedClassification(
+                                db_department_id=mssql_res.db_department_id,
+                                db_department_name=mssql_res.db_department_name,
+                                db_designation_id=mssql_res.db_designation_id,
+                                db_designation_name=mssql_res.db_designation_name,
+                                industry_department=mssql_res.industry_department,
+                                industry_designation=mssql_res.industry_designation,
+                                industry_domain=mssql_res.industry_domain,
+                                match_status="DB_MATCH",
+                                confidence=round(sim_score, 4),
                                 match_source="vector_semantic",
+                                evidence=[
+                                    ClassificationEvidence(
+                                        source="vector_semantic",
+                                        matched_term=matched_term,
+                                        matched_against=mssql_res.db_designation_name or matched_term,
+                                        confidence=round(sim_score, 4),
+                                    )
+                                ],
+                            )
+                        else:
+                            return NormalizedClassification(
+                                db_department_id=None,
+                                db_department_name=None,
+                                db_designation_id=None,
+                                db_designation_name=None,
+                                industry_department=None,
+                                industry_designation=matched_term,
+                                industry_domain=RuleConfigManager.get_taxonomy_rules().default_domain,
+                                match_status="NO_SUITABLE_MATCH",
+                                confidence=round(sim_score, 4),
+                                match_source="vector_semantic",
+                                evidence=[
+                                    ClassificationEvidence(
+                                        source="vector_semantic",
+                                        matched_term=matched_term,
+                                        matched_against=None,
+                                        confidence=round(sim_score, 4),
+                                    )
+                                ],
                             )
         except Exception as exc:
             logger.warning(f"[DYNAMIC_TAXONOMY] Vector semantic lookup failed for '{query_text}': {exc}")
         return None
 
     @classmethod
-    def _get_default_fallback(cls, matched_term: str | None = None) -> DynamicTaxonomyResult:
+    def _get_default_fallback(cls, matched_term: str | None = None) -> NormalizedClassification:
         tax_rules = RuleConfigManager.get_taxonomy_rules()
-        return DynamicTaxonomyResult(
-            domain_name=tax_rules.default_domain,
-            family_name=tax_rules.default_family,
-            designation_name=matched_term,
-            matched_term=matched_term,
-            similarity_score=0.5,
+        return NormalizedClassification(
+            db_department_id=None,
+            db_department_name=None,
+            db_designation_id=None,
+            db_designation_name=None,
+            industry_department=None,
+            industry_designation=matched_term,
+            industry_domain=tax_rules.default_domain,
+            match_status="NO_SUITABLE_MATCH",
+            confidence=0.0,
             match_source="legacy_fallback",
+            evidence=[
+                ClassificationEvidence(
+                    source="fallback",
+                    matched_term=matched_term,
+                    matched_against=None,
+                    confidence=0.0,
+                )
+            ],
         )

@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.schemas.classification_types import AISuggestion, NormalizedClassification
 from app.schemas.match import JobMatchResult
 from app.schemas.normalized_resume import NormalizedResume
 
@@ -158,6 +159,14 @@ class EnrichedCandidateAnalysis(BaseModel):
     normalized_resume: NormalizedResume | None = Field(
         default=None,
         description="Additive typed resume data with raw/normalized values, confidence, and evidence",
+    )
+    classification: NormalizedClassification | None = Field(
+        default=None,
+        description="Structured taxonomy classification with DB identifiers, industry labels, confidence, and evidence",
+    )
+    ai_career_suggestions: list[AISuggestion] = Field(
+        default_factory=list,
+        description="AI career suggestions when no DB match found — clearly separated from verified DB matches",
     )
 
 

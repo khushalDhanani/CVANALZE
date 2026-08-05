@@ -3,6 +3,7 @@
     {
       "department_id": 9,
       "department_name": "CIS Team",
+      "industry_label": "Information Technology",
       "domain_name": "Information Technology & Software",
       "keywords": [
         "developer",
@@ -21,8 +22,6 @@
         "dart",
         "c#",
         "dotnet",
-        "sql",
-        "api",
         "mobile",
         "ios",
         "android",
@@ -32,11 +31,7 @@
         "azure",
         "docker",
         "kubernetes",
-        "database",
-        "ui/ux",
-        "web",
-        "coding",
-        "code"
+        "ui/ux"
       ],
       "default_roles": [
         "Software Developer",
@@ -50,6 +45,7 @@
     {
       "department_id": 8,
       "department_name": "Finance Team",
+      "industry_label": "Finance & Accounting",
       "domain_name": "Finance & Accounting",
       "keywords": [
         "finance",
@@ -82,6 +78,7 @@
     {
       "department_id": 10,
       "department_name": "HR & IR Team",
+      "industry_label": "Human Resources",
       "domain_name": "Human Resources",
       "keywords": [
         "hr",
@@ -108,6 +105,7 @@
     {
       "department_id": 23,
       "department_name": "Maintenance Team - 1 (Ramesh Maurya)",
+      "industry_label": "Plant & Maintenance Engineering",
       "domain_name": "Plant & Maintenance Engineering",
       "keywords": [
         "plant",
@@ -138,6 +136,7 @@
     {
       "department_id": 16,
       "department_name": "Sales Team",
+      "industry_label": "Sales & Marketing",
       "domain_name": "Sales & Marketing",
       "keywords": [
         "sales",
@@ -166,6 +165,7 @@
     {
       "department_id": 6,
       "department_name": "EHS Team",
+      "industry_label": "Quality & EHS",
       "domain_name": "Quality & EHS",
       "keywords": [
         "quality assurance",
@@ -192,6 +192,7 @@
     {
       "department_id": 11,
       "department_name": "Procurement Team",
+      "industry_label": "Supply Chain & Operations",
       "domain_name": "Supply Chain & Operations",
       "keywords": [
         "supply chain",
@@ -217,6 +218,7 @@
     {
       "department_id": null,
       "department_name": "Healthcare & Clinical",
+      "industry_label": "Healthcare & Clinical",
       "domain_name": "Healthcare & Clinical",
       "keywords": [
         "clinical",

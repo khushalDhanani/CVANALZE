@@ -64,3 +64,62 @@
 
 ## Important Decisions
 - **Redis + Disk Result Merging**: `ResultRepository.list_all_results()` now scans Redis keys `cv_result:*.json` in addition to disk files, so candidates saved in Redis cache immediately show up in the candidate list UI even if saved prior to volume mounting.
+
+---
+
+## Work Completed — Designation Classification Overhaul (2026-08-05)
+
+### Bug Fixes (Runtime-Breaking `AttributeError` crashes)
+- **`dynamic_taxonomy_service.py`**: Removed duplicate `DepartmentNormalizer` import; fixed `_try_vector_semantic_match` to use correct `NormalizedClassification` field names (`db_department_id`, `db_department_name`, `db_designation_id`, `db_designation_name`, `industry_department`, `industry_designation`, `industry_domain`) instead of old model fields (`family_id`, `family_name`, `designation_name`, `domain_name`). Lowered `_get_default_fallback` confidence from `0.5` → `0.0`.
+- **`job_taxonomy.py`**: Fixed `classify_vacancy_dto()` and `classify_candidate_dto()` — both accessed `dyn_res.domain_name`, `dyn_res.family_name`, `dyn_res.matched_term` which do not exist on `NormalizedClassification`. Replaced with `dyn_res.industry_domain`, `dyn_res.db_department_name`, `dyn_res.evidence[0].matched_term`.
+- **`dynamic_taxonomy_service.py`**: Fixed both `normalize_designation()` call sites — changed wrong key `["industry_department"]` to `["industry_designation"]`.
+
+### Component 1 — Normalization Layer
+- **`department_normalizer.py`**: `normalize_designation()` now has real logic — checks alias cache, strips parenthetical suffixes, expands `Sr.`/`Jr.`/`Mgr.` abbreviations, and returns `{"industry_designation": ...}` with the correct key.
+
+### Component 2 — Remove Hardcoded Rules
+- **`department_domains_seed.json`**: Added `industry_label` field to all 8 active entries. Removed broad cross-domain keywords (`sql`, `api`, `code`, `coding`, `web`, `database`) from CIS Team that caused non-IT candidates to be mis-classified as IT.
+- **`candidate_domain_service.py`**: Fixed `dyn_res.domain_name`/`dyn_res.family_name` field access to use correct `NormalizedClassification` fields.
+
+### Component 3 — LLM Response Validation
+- **`candidate_context.py`**: Both `create()` and `apply_optimized_profile()` now validate LLM `professional_domains[0]` against DB canonical domains before applying. If invalid → logs warning and preserves deterministic classification.
+- **`optimized_match.py`**: Prompt now injects valid DB department names from seed, requires `NO_SUITABLE_MATCH` when no domain fits, and requires per-field CV evidence citation.
+
+### Component 4 — Cross-Domain Guard
+- **`candidate_context.py`**: `is_software_cand` detection now uses `DynamicTaxonomyService.check_family_compatibility()` instead of hardcoded `software_candidate_patterns` keyword list.
+
+### Component 5 — Evidence-Based Match Outputs
+- **`analysis.py`**: Added `classification: NormalizedClassification | None` and `ai_career_suggestions: list[AISuggestion]` to `EnrichedCandidateAnalysis`. Backward compatible — both optional/default-empty.
+- **`match_service.py`**: Imports `DynamicTaxonomyService`, builds `NormalizedClassification` per-candidate, populates `classification` and `ai_career_suggestions` on `EnrichedCandidateAnalysis`. When no genuine match, builds `AISuggestion` per suitable role.
+- **`recommendation_service.py`**: Uses `classification.industry_department` for display labels when available; falls back to raw department string.
+
+### Component 6 — Vacancy Service Normalization
+- **`job.py`**: Added `industry_title: str | None` and `industry_department: str | None` to `JobOpening`.
+- **`vacancy_service.py`**: Calls `DepartmentNormalizer.normalize_department()` and `normalize_designation()` to populate `industry_department` and `industry_title` on every `JobOpening`.
+- **`job_preprocessor.py`**: Calls `DepartmentNormalizer` to populate `_precomputed_industry_dept` and `_precomputed_industry_title` on preprocessed job dicts.
+
+### Tests Created
+- `backend/tests/test_classification_normalization.py` — NormalizedClassification schema, DepartmentNormalizer, seed integrity
+- `backend/tests/test_dynamic_taxonomy_evidence.py` — DynamicTaxonomyService fallback, evidence fields, no AttributeError
+- `backend/tests/test_cross_domain_guard_db_driven.py` — DB-driven guard, no hardcoded patterns
+- `backend/tests/test_llm_domain_validation.py` — LLM domain validation gate, prompt NO_SUITABLE_MATCH, evidence citation
+
+## Files Changed (Overhaul)
+- `backend/app/services/dynamic_taxonomy_service.py`
+- `backend/app/services/job_taxonomy.py`
+- `backend/app/services/department_normalizer.py`
+- `backend/app/services/candidate_domain_service.py`
+- `backend/app/services/vacancy_service.py`
+- `backend/app/services/job_preprocessor.py`
+- `backend/app/services/match_service.py`
+- `backend/app/services/recommendation_service.py`
+- `backend/app/schemas/candidate_context.py`
+- `backend/app/schemas/analysis.py`
+- `backend/app/schemas/job.py`
+- `backend/app/schemas/classification_types.py` (existing, no changes needed)
+- `backend/app/prompts/optimized_match.py`
+- `backend/app/data/department_domains_seed.json`
+- `backend/tests/test_classification_normalization.py` — NEW
+- `backend/tests/test_dynamic_taxonomy_evidence.py` — NEW
+- `backend/tests/test_cross_domain_guard_db_driven.py` — NEW
+- `backend/tests/test_llm_domain_validation.py` — NEW

@@ -7,6 +7,7 @@ from app.schemas.analysis import OptimizedCandidateProfile
 from app.schemas.normalized_resume import NormalizedResume
 from app.schemas.profile import DynamicCandidateProfile
 from app.services.candidate_domain_service import CandidateDomainService
+from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.job_taxonomy import TaxonomyClassifier
 
 
@@ -122,22 +123,29 @@ class CandidateAnalysisContext:
         cand_tax_domain, cand_families_list = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
         cand_families = list(cand_families_list)
 
-        # Override with LLM classification if available
+        # Override with LLM classification only if domain is validated against DB canonicals
         if optimized_profile and optimized_profile.professional_domains:
-            cand_tax_domain = optimized_profile.professional_domains[0]
-            # Map canonical domain back to compatible families using taxonomy rules
-            llm_families = []
-            taxonomy = RuleConfigManager.get_taxonomy_rules()
-            for r in taxonomy.candidate_rules:
-                if r.domain == cand_tax_domain:
-                    llm_families.extend(r.families)
-
-            seen = set()
-            mapped_families = [f for f in llm_families if not (f in seen or seen.add(f))]
-            if mapped_families:
-                cand_families = mapped_families
+            llm_domain = optimized_profile.professional_domains[0]
+            canonical_domains = set(RuleConfigManager.get_taxonomy_rules().canonical_domains)
+            if llm_domain in canonical_domains:
+                cand_tax_domain = llm_domain
+                # Map canonical domain back to compatible families using taxonomy rules
+                llm_families = []
+                taxonomy = RuleConfigManager.get_taxonomy_rules()
+                for r in taxonomy.candidate_rules:
+                    if r.domain == cand_tax_domain:
+                        llm_families.extend(r.families)
+                seen = set()
+                mapped_families = [f for f in llm_families if not (f in seen or seen.add(f))]
+                if mapped_families:
+                    cand_families = mapped_families
+                else:
+                    cand_families = [cand_tax_domain]
             else:
-                cand_families = [cand_tax_domain]
+                import logging as _log
+                _log.getLogger("cv_analyzer").warning(
+                    f"[CANDIDATE_CONTEXT] LLM domain '{llm_domain}' not in DB canonicals — keeping deterministic classification '{cand_tax_domain}'."
+                )
 
         cand_primary_family = cand_families[0] if cand_families else None
 
@@ -163,10 +171,15 @@ class CandidateAnalysisContext:
             domain_repository=domain_repository,
         )
 
-        # 5. Software Candidate Guard Flag
-        compiled_guard = RuleConfigManager.get_compiled_cross_domain_guard()
-        sw_patterns = compiled_guard["software_candidate_patterns"]
-        is_software_cand = "Information Technology" in cand_domain or "Software" in cand_domain or any(p.search(norm_text) for p in sw_patterns)
+        # 5. Software Candidate Guard Flag — use DB family compatibility instead of hardcoded patterns
+        it_software_family = "Software Engineering & Development"
+        is_software_cand = False
+        if cand_primary_family:
+            is_compat, score = DynamicTaxonomyService.check_family_compatibility(cand_primary_family, it_software_family)
+            if is_compat and score >= 0.4:
+                is_software_cand = True
+        if not is_software_cand:
+            is_software_cand = "Information Technology" in cand_tax_domain or "Software" in cand_tax_domain
 
         return cls(
             cv_text=cv_text,
@@ -219,13 +232,21 @@ class CandidateAnalysisContext:
         self.norm_text = re.sub(r"\s+", " ", self.norm_text).strip()
 
         if optimized_profile.professional_domains:
-            self.cand_tax_domain = optimized_profile.professional_domains[0]
-            mapped_families: list[str] = []
-            for rule in RuleConfigManager.get_taxonomy_rules().candidate_rules:
-                if rule.domain == self.cand_tax_domain:
-                    mapped_families.extend(rule.families)
-            self.cand_families = list(dict.fromkeys(mapped_families)) or [self.cand_tax_domain]
-            self.cand_primary_family = self.cand_families[0]
+            llm_domain = optimized_profile.professional_domains[0]
+            canonical_domains = set(RuleConfigManager.get_taxonomy_rules().canonical_domains)
+            if llm_domain in canonical_domains:
+                self.cand_tax_domain = llm_domain
+                mapped_families: list[str] = []
+                for rule in RuleConfigManager.get_taxonomy_rules().candidate_rules:
+                    if rule.domain == self.cand_tax_domain:
+                        mapped_families.extend(rule.families)
+                self.cand_families = list(dict.fromkeys(mapped_families)) or [self.cand_tax_domain]
+                self.cand_primary_family = self.cand_families[0]
+            else:
+                import logging as _log
+                _log.getLogger("cv_analyzer").warning(
+                    f"[CANDIDATE_CONTEXT] apply_optimized_profile: LLM domain '{llm_domain}' not in DB canonicals — keeping deterministic '{self.cand_tax_domain}'."
+                )
 
         self.cand_domain_profile = CandidateDomainService.extract_candidate_domain_profile(
             cv_text=self.cv_text,
@@ -243,6 +264,13 @@ class CandidateAnalysisContext:
             domain_repository=domain_repository,
         )
         guard = RuleConfigManager.get_compiled_cross_domain_guard()
-        self.is_software_cand = (
-            "Information Technology" in self.cand_domain or "Software" in self.cand_domain or any(pattern.search(self.norm_text) for pattern in guard["software_candidate_patterns"])
-        )
+        # Replace hardcoded patterns with DB family compatibility check
+        it_software_family = "Software Engineering & Development"
+        self.is_software_cand = False
+        if self.cand_primary_family:
+            is_compat, score = DynamicTaxonomyService.check_family_compatibility(self.cand_primary_family, it_software_family)
+            if is_compat and score >= 0.4:
+                self.is_software_cand = True
+        if not self.is_software_cand:
+            self.is_software_cand = "Information Technology" in self.cand_domain or "Software" in self.cand_domain
+        _ = guard  # retained for backward compat; patterns no longer used for is_software_cand

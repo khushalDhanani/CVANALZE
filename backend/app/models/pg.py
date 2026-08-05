@@ -66,3 +66,21 @@ class DomainEmbedding(pg_Base):
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
+class DepartmentAliasMapping(pg_Base):
+    """Mapping from internal department/designation names to industry‑standard labels.
+
+    Used by DepartmentNormalizer to translate internal taxonomy identifiers to
+    normalized industry labels. Optional ``department_id`` can be linked to a
+    Department master table when needed.
+    """
+    __tablename__ = "department_alias_mappings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    internal_name = Column(String, nullable=False, unique=True)
+    industry_label = Column(String, nullable=False)
+    department_id = Column(Integer, nullable=True)
+
+    __table_args__ = (
+        Index("ix_department_alias_internal_name", "internal_name"),
+    )
+

@@ -14,9 +14,11 @@ from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
 from app.schemas.candidate_context import CandidateAnalysisContext
+from app.schemas.classification_types import AISuggestion, ClassificationEvidence, NormalizedClassification
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import ResumeJsonExtractor
+from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.llm_service import OllamaLLMService
 from app.services.resume_normalizer import ResumeNormalizer
 from app.services.scoring_engine import ScoringEngine
@@ -377,6 +379,42 @@ class MatchService:
         suitable_matches = [m for m in evaluated_matches if m.classification in ("HIGH", "MEDIUM")]
         unsuitable_matches = [m for m in evaluated_matches if m.classification not in ("HIGH", "MEDIUM")]
 
+        # Build NormalizedClassification for the candidate from their resolved context
+        cand_classification: NormalizedClassification | None = None
+        ai_career_suggestions: list[AISuggestion] = []
+        try:
+            cand_classification = DynamicTaxonomyService.resolve_candidate_role_and_domain(
+                role_or_summary=candidate_context.current_role or professional_domain,
+                skills=list(candidate_context.cand_families),
+            )
+            # Populate industry labels if not already set
+            if cand_classification and not cand_classification.industry_department:
+                cand_classification = cand_classification.model_copy(update={
+                    "industry_department": recommended_dept,
+                    "industry_domain": professional_domain,
+                })
+        except Exception as _cls_err:
+            logger.warning(f"[MATCH_SERVICE] Could not build NormalizedClassification: {_cls_err}")
+
+        if not has_genuine_match and suitable_roles:
+            ai_career_suggestions = [
+                AISuggestion(
+                    suggested_role=role,
+                    suggested_domain=professional_domain,
+                    confidence=0.5,
+                    evidence=[
+                        ClassificationEvidence(
+                            source="candidate_domain_profile",
+                            matched_term=professional_domain,
+                            matched_against=role,
+                            confidence=0.5,
+                        )
+                    ],
+                    missing_requirements=["No active vacancy matches this domain profile"],
+                )
+                for role in suitable_roles[:3]
+            ]
+
         result = EnrichedCandidateAnalysis(
             primary_department=recommended_dept,
             recommended_department=recommended_dept,
@@ -391,6 +429,8 @@ class MatchService:
             unsuitable_openings=unsuitable_matches,
             llm_skipped=llm_skipped,
             normalized_resume=normalized_resume,
+            classification=cand_classification,
+            ai_career_suggestions=ai_career_suggestions,
         )
 
         # Cache the match result for instant repeat searches

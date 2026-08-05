@@ -70,7 +70,14 @@ class RecommendationService:
             if dept_counts:
                 fallback_dept = max(dept_counts, key=dept_counts.get)
 
-        primary_dept = (match_analysis.get("primary_department") or match_analysis.get("recommended_department") or best_match.get("department") or fallback_dept).title()
+        # Use industry_department from NormalizedClassification when available for normalized display labels
+        classification_data = match_analysis.get("classification") or {}
+        industry_dept = None
+        if isinstance(classification_data, dict):
+            industry_dept = classification_data.get("industry_department")
+
+        raw_dept = (match_analysis.get("primary_department") or match_analysis.get("recommended_department") or best_match.get("department") or fallback_dept)
+        primary_dept = (industry_dept or raw_dept).title()
 
         prof_domain = match_analysis.get("professional_domain") or fallback_dept
 
