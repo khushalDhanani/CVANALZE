@@ -14,7 +14,7 @@ from app.services.work_experience_post_processor import WorkExperiencePostProces
 from app.services.work_experience_calculation_service import WorkExperienceCalculationService
 from app.prompts.work_experience_extraction_v1 import (
     WORK_EXPERIENCE_PROMPT_VERSION,
-    WORK_EXPERIENCE_EXTRACTION_PROMPT,
+    build_work_experience_prompt,
 )
 from app.core.config import settings
 from app.services.ollama_transport import OllamaError
@@ -32,7 +32,7 @@ class WorkExperienceExtractionEngine:
         # Text truncation
         safe_text = request.ocr_text[: request.config.max_ocr_text_length] if hasattr(request.config, "max_ocr_text_length") else request.ocr_text[:100000]
 
-        prompt = WORK_EXPERIENCE_EXTRACTION_PROMPT.format(
+        prompt = build_work_experience_prompt(
             candidate_id=request.candidate_id,
             ocr_text=safe_text,
         )

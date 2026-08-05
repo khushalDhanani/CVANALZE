@@ -46,23 +46,9 @@ def build_dynamic_mapping_prompt(cv_text: str, active_vacancies: list[dict[str, 
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)
 
-    prompt = f"""/think
-{input_json}
-
-Provide your analysis in the EXACT JSON format below.
-DO NOT include any markdown formatting like ```json or ```.
-DO NOT include any thinking tokens or explanations outside the JSON object.
-Return ONLY valid JSON.
-
-Expected JSON Schema:
-{{
-  "matched_vacancies": [
-    {{
-      "vacancy_id": 1334,
-      "semantic_reason": "Candidate's experience and skills directly correspond to the requirements of the vacancy record.",
-      "inferred_skills": ["relevant_skill_1", "relevant_skill_2"]
-    }}
-  ]
-}}
-"""
+    from app.services.prompt_service import PromptService
+    prompt = PromptService.get_prompt(
+        prompt_name="dynamic_mapping",
+        placeholders={"input_json": input_json}
+    )
     return prompt

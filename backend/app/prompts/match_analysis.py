@@ -30,20 +30,9 @@ def build_cv_job_prompt(cv_text: str, job: dict[str, Any]) -> str:
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)
 
-    prompt = f"""/think
-{input_json}
-
-Provide your analysis in the EXACT JSON format below.
-DO NOT include any markdown formatting like ```json or ```.
-DO NOT include any thinking tokens or explanations outside the JSON object.
-Return ONLY valid JSON.
-
-Expected JSON Schema:
-{{
-  "skill_matches": ["skill1", "skill2"],
-  "inferred_skills": ["inferred1", "inferred2"],
-  "missing_critical": ["missing1"],
-  "semantic_reason": "A brief explanation of why the candidate fits or lacks fit"
-}}
-"""
+    from app.services.prompt_service import PromptService
+    prompt = PromptService.get_prompt(
+        prompt_name="match_analysis",
+        placeholders={"input_json": input_json}
+    )
     return prompt

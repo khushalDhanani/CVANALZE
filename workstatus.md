@@ -172,5 +172,27 @@
 - `backend/app/data/department_domains_seed.json`
 - `backend/tests/test_classification_normalization.py` — NEW
 - `backend/tests/test_dynamic_taxonomy_evidence.py` — NEW
-- `backend/tests/test_cross_domain_guard_db_driven.py` — NEW
 - `backend/tests/test_llm_domain_validation.py` — NEW
+
+---
+
+## Work Completed — Phase 3: Complete Prompt Migration
+- **Decoupled Prompt Templates**: Extracted all hardcoded prompt texts from Python codebase into `scripts/seed_prompts.py` for database seeding.
+- **Multi-Dimensional Compatibility**: Added `tenant_id`, `model`, `target_schema`, `language`, and `environment` compatibility dimensions to `PromptTemplateMaster` schema in `app/models/prompts.py`.
+- **Database-Driven Prompt Engine**: Built `PromptService` in `app/services/prompt_service.py` to handle dynamic prompt template lookup, hierarchical fallback (tenant -> model -> generic), formatting, and caching.
+- **Placeholder Validation**: Added `string.Formatter` validation to `PromptService.activate_prompt()` to ensure required placeholders (e.g. `{input_json}`, `{dept_list_str}`) are verified before making templates active.
+- **Cache Invalidation**: Linked prompt template fetch to `config_cache_manager` with explicit Redis invalidation hooks upon prompt activation.
+- **Module Refactoring**: Updated `dynamic_mapping.py`, `match_analysis.py`, `optimized_match.py`, `profile_extraction.py`, and `work_experience_extraction_v1.py` to seamlessly query `PromptService`.
+- **Tests Created**: Added `tests/test_prompt_service.py` verifying fallback chains, placeholder extraction, activation validation, and missing placeholder errors.
+
+## Files Changed
+- `backend/app/models/prompts.py`
+- `backend/app/services/prompt_service.py` (NEW)
+- `backend/app/prompts/dynamic_mapping.py`
+- `backend/app/prompts/match_analysis.py`
+- `backend/app/prompts/optimized_match.py`
+- `backend/app/prompts/profile_extraction.py`
+- `backend/app/prompts/work_experience_extraction_v1.py`
+- `backend/app/services/work_experience_extraction_service.py`
+- `backend/scripts/seed_prompts.py` (NEW)
+- `backend/tests/test_prompt_service.py` (NEW)

@@ -30,41 +30,9 @@ def build_profile_extraction_prompt(cv_text: str) -> str:
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)
 
-    prompt = f"""/no_think
-{input_json}
-
-Provide your analysis in the EXACT JSON format below.
-DO NOT include any markdown formatting like ```json or ```.
-DO NOT include any thinking tokens or explanations outside the JSON object.
-Return ONLY valid JSON that conforms to this schema:
-
-{{
-  "education_domains": ["List of extracted education domains, e.g. Computer Science"],
-  "professional_domains": ["List of extracted professional domains, e.g. Software Engineering"],
-  "current_domain": "The most recent and primary professional domain",
-  "current_role": "The most recent job title or role",
-  "previous_roles": ["List of previous job titles"],
-  "career_transitions": [
-    {{
-      "from_role": "Previous role or domain",
-      "to_role": "New role or domain",
-      "reason_inferred": "Inferred reason for transition based on CV",
-      "evidence": "Evidence from CV supporting this transition"
-    }}
-  ],
-  "core_skills": ["List of core technical and soft skills demonstrated"],
-  "relevant_experience_years": 5.5,
-  "timeline": [
-    {{
-      "title": "Job Title or Degree",
-      "organization": "Company or University",
-      "start_date": "YYYY-MM",
-      "end_date": "YYYY-MM or null if present",
-      "description": "Brief description of responsibilities or achievements"
-    }}
-  ],
-  "confidence": "HIGH, MEDIUM, LOW, or UNCERTAIN",
-  "evidence_notes": "Explanation of inferences and any conflicting evidence"
-}}
-"""
+    from app.services.prompt_service import PromptService
+    prompt = PromptService.get_prompt(
+        prompt_name="profile_extraction",
+        placeholders={"input_json": input_json}
+    )
     return prompt
