@@ -173,10 +173,8 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PG_DB_URL` | local PostgreSQL URL | PostgreSQL/pgvector connection string. |
-| `DB_SERVER`, `DB_PORT`, `DB_NAME` | local/empty | Optional MSSQL location and database. Empty `DB_NAME` disables the MSSQL engine. |
-| `DB_USER`, `DB_PASSWORD` | empty | MSSQL credentials. |
-| `DB_ENCRYPT`, `DB_TRUST_CERT` | `true`; template trust is `false` | ODBC encryption and certificate trust policy. |
+| `POSTGRES_APP_URL` | local PostgreSQL URL | PostgreSQL/pgvector connection string. |
+| `MSSQL_READ_ONLY_URL` | empty | MSSQL connection string. Required for enterprise data. |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for RQ, locks, processing records, and cache. |
 | `RQ_QUEUE_NAME` | `cv-processing` | Queue consumed by the API and worker. |
 | `RQ_JOB_TIMEOUT_SECONDS` | `900` | Worker execution timeout. |

@@ -38,23 +38,17 @@ def detect_dialect(override: str | None = None) -> tuple[str, str]:
     if override:
         dialect = override.lower()
         if dialect == "mssql":
-            if not settings.DB_URL:
-                raise ValueError("MSSQL requested but DB_URL is not configured in settings.")
-            return "mssql", settings.DB_URL
+            if not settings.MSSQL_READ_ONLY_URL:
+                raise ValueError("MSSQL requested but MSSQL_READ_ONLY_URL is not configured in settings.")
+            return "mssql", settings.MSSQL_READ_ONLY_URL
         elif dialect in ("postgres", "postgresql"):
-            if not settings.PG_DB_URL:
-                raise ValueError("PostgreSQL requested but PG_DB_URL is not configured in settings.")
-            return "postgres", settings.PG_DB_URL
+            if not settings.POSTGRES_APP_URL:
+                raise ValueError("PostgreSQL requested but POSTGRES_APP_URL is not configured in settings.")
+            return "postgres", settings.POSTGRES_APP_URL
         else:
             raise ValueError(f"Unsupported dialect override: {override}")
 
-    # Auto-detection logic: prefer MSSQL if DB_NAME is set, else PostgreSQL
-    if settings.DB_NAME and settings.DB_URL:
-        return "mssql", settings.DB_URL
-    elif settings.PG_DB_URL:
-        return "postgres", settings.PG_DB_URL
-    else:
-        raise ValueError("No database URL configured. Set DB_NAME/DB_URL or PG_DB_URL in environment.")
+    raise ValueError("No database dialect specified. Please run with --dialect postgres or --dialect mssql.")
 
 
 def ensure_migrations_table(conn, dialect: str):

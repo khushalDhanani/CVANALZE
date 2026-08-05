@@ -221,3 +221,20 @@
 - `backend/app/services/department_normalizer.py`
 - `backend/app/models/__init__.py`
 - `backend/tests/test_config.py` (Deleted)
+
+---
+
+## Work Completed — PR 1: Fix database contract
+- **Added Explicit Database URL Settings:** `POSTGRES_APP_URL` and `MSSQL_READ_ONLY_URL` placeholders were introduced into `backend/.env.example`.
+- **Removed Deprecated Variables:** Safely scrubbed conflicting, obsolete `DB_*` (e.g. `DB_URL`, `PG_DB_URL`, `DB_SERVER`, `DB_NAME`) from environment templates, `README.md`, and docker-compose files.
+- **Updated Docker Containers:** Modified `docker-compose.yml` and `docker-compose.local.yml` to supply `POSTGRES_APP_URL` and map `MSSQL_READ_ONLY_URL` explicitly.
+- **Updated Migration Runner:** Revised `backend/scripts/run_migrations.py` to enforce `--dialect` targeting via the new respective environment URL parameters (`settings.MSSQL_READ_ONLY_URL` and `settings.POSTGRES_APP_URL`).
+- **Cleaned Up Job Repository:** Updated a legacy check in `backend/app/repositories/job.py` referring to the deprecated `DB_NAME`.
+
+## Files Changed
+- `backend/.env.example`
+- `docker-compose.yml`
+- `docker-compose.local.yml`
+- `README.md`
+- `backend/scripts/run_migrations.py`
+- `backend/app/repositories/job.py`

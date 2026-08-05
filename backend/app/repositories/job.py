@@ -167,10 +167,10 @@ class JobRepository:
             except Exception as exc:
                 logger.error(f"JobRepository.get_all_jobs error querying DB: {exc}")
                 # Do not raise; fall back to default job openings when DB is unavailable.
-                # Previously we raised RuntimeError if settings.DB_NAME was set, which caused test failures.
+                # Previously we raised RuntimeError if settings.MSSQL_READ_ONLY_URL was set, which caused test failures.
                 # The repository should gracefully handle DB failures and use the static DEFAULT_JOB_OPENINGS.
                 # Continue without raising to allow fallback.
-                # if settings.DB_NAME:
+                # if settings.MSSQL_READ_ONLY_URL:
                 #     raise RuntimeError(f"Failed to query active vacancies from configured MSSQL DB: {exc}") from exc
             finally:
                 if close_session:
