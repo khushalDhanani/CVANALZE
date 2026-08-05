@@ -502,7 +502,7 @@ def process_cv_task_sync(file_path: str) -> dict[str, Any]:
     filename = path.name
     content = path.read_bytes()
 
-    redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
+    redis_url = settings.REDIS_URL
     conn = Redis.from_url(redis_url)
 
     try:
@@ -554,7 +554,7 @@ async def scan_uploads_directory(
 
     logger.info(f"Found {len(files)} CV file(s) in '{uploads_dir}'. Enqueueing to RQ...")
 
-    redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
+    redis_url = settings.REDIS_URL
     conn = Redis.from_url(redis_url)
     q = Queue(settings.RQ_QUEUE_NAME, connection=conn)
 

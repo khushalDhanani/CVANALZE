@@ -1,0 +1,10 @@
+{
+  "markdown": "# Jane Doe\nSoftware Engineer with Python skills.",
+  "page_count": 1,
+  "is_scanned": false,
+  "ocr_applied": false,
+  "pdf_type": "NON_PDF",
+  "parser_used": "docling_fast",
+  "ocr_decision": "SKIPPED_TEXT_PRESENT",
+  "stage_metrics": {}
+}

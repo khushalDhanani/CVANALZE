@@ -366,11 +366,29 @@ class RuleConfigManager:
                         path_hash = active_profile.version_tag
                         config_size_bytes = len(json.dumps(raw_data))
                         logger.info(f"[RULE_CONFIG] Loading active profile from database (v{active_profile.version_tag})")
+                        
+                        from app.core.cache import config_cache_manager
+                        cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
+                        config_cache_manager.set(cache_key, raw_data)
             except Exception as e:
                 logger.warning(f"[RULE_CONFIG] Failed to load config from database: {e}")
 
+        if raw_data is None and config_source is None:
+            from app.core.cache import config_cache_manager
+            cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
+            cached_data = config_cache_manager.get(cache_key)
+            if cached_data:
+                raw_data = cached_data
+                path_hash = cached_data.get("version", "cached")
+                config_size_bytes = len(json.dumps(raw_data))
+                logger.info(f"[RULE_CONFIG] Loading active profile from cache (v{path_hash})")
+
         if raw_data is None:
             if config_source is None:
+                from app.core.config import settings
+                if settings.IS_PRODUCTION:
+                    from app.core.error_handlers import SystemConfigurationError
+                    raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
                 config_source = cls._config_path
 
             if isinstance(config_source, (str, Path)):

@@ -103,7 +103,7 @@ async def match_candidates_against_vacancies(limit: int = 10, db: Session = Depe
 @router.websocket("/ws/progress")
 async def websocket_progress_endpoint(websocket: WebSocket):
     await websocket.accept()
-    redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
+    redis_url = settings.REDIS_URL
 
     redis_client = aioredis.from_url(redis_url, decode_responses=True)
     pubsub = redis_client.pubsub()

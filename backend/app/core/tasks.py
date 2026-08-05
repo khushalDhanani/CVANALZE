@@ -119,7 +119,7 @@ def sync_all_vacancies() -> str:
         from redis import Redis
         from rq import Queue
 
-        redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
+        redis_url = settings.REDIS_URL
         conn = Redis.from_url(redis_url)
         q = Queue(settings.RQ_QUEUE_NAME, connection=conn)
         q.enqueue("app.core.tasks.embed_vacancies_batch", valid_jobs)

@@ -6,6 +6,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+class SystemConfigurationError(Exception):
+    """Raised when critical configuration cannot be loaded."""
+    pass
+
+
+class PromptError(Exception):
+    """Raised when critical LLM prompts cannot be loaded."""
+    pass
+
 from app.core.logging import logger
 from app.schemas.contracts import CanonicalError, ErrorCode, ErrorResponse
 
@@ -20,6 +29,11 @@ _STATUS_CODES: dict[int, ErrorCode] = {
     422: ErrorCode.VALIDATION_ERROR,
     429: ErrorCode.RATE_LIMITED,
     503: ErrorCode.DEPENDENCY_UNAVAILABLE,
+}
+
+_EXCEPTION_CODES: dict[type[Exception], tuple[int, ErrorCode]] = {
+    SystemConfigurationError: (503, ErrorCode.CONFIGURATION_UNAVAILABLE),
+    PromptError: (503, ErrorCode.PROMPT_UNAVAILABLE),
 }
 
 
@@ -77,6 +91,8 @@ def error_response(
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)
     app.add_exception_handler(RequestValidationError, _validation_exception_handler)
+    app.add_exception_handler(SystemConfigurationError, _custom_exception_handler)
+    app.add_exception_handler(PromptError, _custom_exception_handler)
     app.add_exception_handler(Exception, _unhandled_exception_handler)
 
 
@@ -132,6 +148,22 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
         status_code=500,
         code=ErrorCode.INTERNAL_ERROR,
         message="An internal error occurred.",
+    )
+
+
+async def _custom_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    status_code, code = _EXCEPTION_CODES.get(type(exc), (500, ErrorCode.INTERNAL_ERROR))
+    request_id, correlation_id = request_identifiers(request.scope)
+    logger.error(
+        f"[CUSTOM_ERROR] request_id={request_id} correlation_id={correlation_id} method={request.method} path={request.url.path} error={type(exc).__name__}",
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    return error_response(
+        request.scope,
+        status_code=status_code,
+        code=code,
+        message=str(exc) or "A required service is temporarily unavailable.",
+        retryable=True,
     )
 
 

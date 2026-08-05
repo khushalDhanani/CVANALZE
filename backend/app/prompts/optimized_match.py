@@ -85,11 +85,22 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
             ).first()
             if active_prompt:
                 db_prompt_template = active_prompt.system_instruction
+                from app.core.cache import config_cache_manager
+                config_cache_manager.set("prompt_template_optimized_match", db_prompt_template)
     except Exception:
         pass
 
+    if not db_prompt_template:
+        from app.core.cache import config_cache_manager
+        cached_prompt = config_cache_manager.get("prompt_template_optimized_match")
+        if cached_prompt:
+            db_prompt_template = cached_prompt
+
     # Fallback to hardcoded template if DB fetch fails or is empty
     if not db_prompt_template:
+        if settings.IS_PRODUCTION:
+            from app.core.error_handlers import PromptError
+            raise PromptError("PROMPT_UNAVAILABLE")
         db_prompt_template = """/think
 {input_json}
 
