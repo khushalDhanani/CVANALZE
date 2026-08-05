@@ -154,21 +154,7 @@ class JobTaxonomy:
     Canonical domain/family identifiers below stay consistent with rule_config.json.
     """
 
-    # Canonical definitions are now stored in the Database and accessed via TaxonomyService.
 
-    @classproperty
-    def COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
-        from app.services.taxonomy_service import TaxonomyService
-        return TaxonomyService.get_compatibility_map()
-
-    @classproperty
-    def REVERSE_COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
-        """Precomputed reverse compatibility map: job_family -> set of compatible candidate_families."""
-        reverse_map: dict[str, set[str]] = {}
-        for cand_fam, job_fams in cls.COMPATIBILITY_MAP.items():
-            for job_fam in job_fams:
-                reverse_map.setdefault(job_fam, set()).add(cand_fam)
-        return reverse_map
 
     @classmethod
     def validate_taxonomy_config(cls) -> None:
@@ -365,7 +351,7 @@ class TaxonomyClassifier:
             return TaxonomyClassification(
                 domain=domain,
                 job_family=family,
-                compatible_families=tuple(JobTaxonomy.REVERSE_COMPATIBILITY_MAP.get(family, {family})),
+                compatible_families=(family,),
                 matched_rule=f"dynamic:{dyn_res.match_source}",
                 matched_branch=0,
                 matched_keywords=(matched_kw,) if matched_kw else (),
@@ -386,7 +372,7 @@ class TaxonomyClassifier:
         return TaxonomyClassification(
             domain=domain,
             job_family=family,
-            compatible_families=tuple(JobTaxonomy.REVERSE_COMPATIBILITY_MAP.get(family, {family})),
+            compatible_families=(family,),
             matched_rule=rule_name,
             matched_branch=branch_idx,
             matched_keywords=kws,

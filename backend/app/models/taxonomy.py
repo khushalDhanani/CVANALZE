@@ -90,6 +90,16 @@ class DesignationSynonym(Base):
     designation = relationship("DesignationMaster", back_populates="synonyms")
 
 
+class DesignationAbbreviation(Base):
+    __tablename__ = "designation_abbreviations"
+    __table_args__ = {"schema": "cvai"}
+
+    abbreviation_id = Column(Integer, primary_key=True, autoincrement=True)
+    abbreviation = Column(String(50), nullable=False, unique=True, index=True)
+    expansion = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True)
+
+
 class SkillMaster(Base):
     __tablename__ = "skills"
     __table_args__ = {"schema": "cvai"}
@@ -121,13 +131,3 @@ class DesignationSkill(Base):
 
     designation = relationship("DesignationMaster", back_populates="skills")
     skill = relationship("SkillMaster")
-
-
-class FamilyCompatibility(Base):
-    __tablename__ = "family_compatibilities"
-    __table_args__ = {"schema": "cvai"}
-
-    source_family_id = Column(Integer, ForeignKey("cvai.job_families.family_id"), primary_key=True)
-    target_family_id = Column(Integer, ForeignKey("cvai.job_families.family_id"), primary_key=True)
-    compatibility_score = Column(Float, nullable=False, default=1.0)
-    is_allowed = Column(Boolean, default=True)

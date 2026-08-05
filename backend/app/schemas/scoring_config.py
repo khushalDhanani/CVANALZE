@@ -90,16 +90,12 @@ class ScoringConfig:
                 component_weights=final_weights,
             )
 
-        except Exception:
+        except Exception as e:
+            import logging
+            logger = logging.getLogger("cv_analyzer")
+            logger.warning(f"Failed to load dynamic scoring config: {e}. Using defaults.")
             # Fallback to defaults if the manager is not initialized
             return cls(
                 profile_code="FALLBACK",
                 profile_version="v0",
-                penalty_per_item=float(settings.MANDATORY_FAILURE_PENALTY_PER_ITEM),
-                max_score_on_failure=float(settings.MAX_SCORE_ON_MANDATORY_FAILURE),
-                llm_semantic_weight=float(settings.LLM_SEMANTIC_WEIGHT),
-                max_llm_boost=float(settings.MAX_LLM_BOOST),
-                match_high_threshold=float(settings.MATCH_HIGH_THRESHOLD),
-                match_medium_threshold=float(settings.MATCH_MEDIUM_THRESHOLD),
-                component_weights=default_weights,
             )

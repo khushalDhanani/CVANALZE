@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.core.logging import logger
-from app.models.taxonomy import DomainMaster, JobFamilyMaster, FamilyCompatibility
+from app.models.taxonomy import DomainMaster, JobFamilyMaster, DesignationAbbreviation
 
 # Predefined defaults for fallback and bootstrapping
 DEFAULT_DOMAINS = [
@@ -42,7 +42,7 @@ class TaxonomyService:
     _domains_cache: dict[str, DomainMaster] | None = None
     _families_cache: dict[str, JobFamilyMaster] | None = None
     _family_to_domain_map: dict[str, str] | None = None
-    _compatibility_map: dict[str, set[str]] | None = None
+    _abbreviations_cache: dict[str, str] | None = None
 
     @classmethod
     def reload_cache(cls, db: Session | None = None) -> None:
@@ -78,21 +78,15 @@ class TaxonomyService:
                     for f in families
                 }
                 
-                # Load compatibility map
-                compatibilities = db.execute(select(FamilyCompatibility).where(FamilyCompatibility.is_allowed == True)).scalars().all()
-                compat_map: dict[str, set[str]] = {}
-                for comp in compatibilities:
-                    src_name = family_id_to_name.get(comp.source_family_id)
-                    tgt_name = family_id_to_name.get(comp.target_family_id)
-                    if src_name and tgt_name:
-                        compat_map.setdefault(src_name, set()).add(tgt_name)
-                        # Add self-compatibility inherently
-                        compat_map.setdefault(src_name, set()).add(src_name)
-                        compat_map.setdefault(tgt_name, set()).add(tgt_name)
+                # Load abbreviations gracefully (table might not exist in tests or prior to migration)
+                try:
+                    abbreviations = db.execute(select(DesignationAbbreviation).where(DesignationAbbreviation.is_active == True)).scalars().all()
+                    cls._abbreviations_cache = {abbr.abbreviation.lower(): abbr.expansion for abbr in abbreviations}
+                except Exception as db_exc:
+                    logger.warning(f"[TAXONOMY] Could not load abbreviations: {db_exc}")
+                    cls._abbreviations_cache = {}
                 
-                cls._compatibility_map = compat_map
-                
-                logger.info(f"[TAXONOMY] Loaded {len(domains)} domains and {len(families)} families into cache.")
+                logger.info(f"[TAXONOMY] Loaded {len(domains)} domains, {len(families)} families, and {len(cls._abbreviations_cache)} abbreviations into cache.")
         except Exception as e:
             logger.error(f"[TAXONOMY] Failed to reload cache: {e}")
         finally:
@@ -125,6 +119,22 @@ class TaxonomyService:
                     is_active=True
                 )
                 db.add(fam)
+        db.commit()
+
+        # Bootstrap basic abbreviations
+        default_abbrs = {
+            "sr.": "Senior",
+            "sr": "Senior",
+            "jr.": "Junior",
+            "jr": "Junior",
+            "mgr.": "Manager",
+            "mgr": "Manager",
+            "asst.": "Assistant",
+            "asst": "Assistant"
+        }
+        for abbr, exp in default_abbrs.items():
+            db.add(DesignationAbbreviation(abbreviation=abbr, expansion=exp, is_active=True))
+        db.commit()
 
     @classmethod
     def get_domain_by_name(cls, name: str) -> Optional[DomainMaster]:
@@ -162,9 +172,21 @@ class TaxonomyService:
             return cls._family_to_domain_map.get(family_name, "Unknown") if cls._family_to_domain_map else "Unknown"
 
     @classmethod
-    def get_compatibility_map(cls) -> dict[str, set[str]]:
+    def get_abbreviations(cls) -> dict[str, str]:
         with cls._lock:
-            if cls._compatibility_map is None:
+            if cls._abbreviations_cache is None:
                 cls.reload_cache()
-            return cls._compatibility_map or {}
+            if not cls._abbreviations_cache:
+                # Provide hardcoded fallbacks if DB load fails or table is empty
+                return {
+                    "sr.": "Senior",
+                    "sr": "Senior",
+                    "jr.": "Junior",
+                    "jr": "Junior",
+                    "mgr.": "Manager",
+                    "mgr": "Manager",
+                    "asst.": "Assistant",
+                    "asst": "Assistant"
+                }
+            return cls._abbreviations_cache or {}
 

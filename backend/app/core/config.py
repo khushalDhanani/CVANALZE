@@ -66,23 +66,6 @@ class Settings(BaseSettings):
     RESULTS_DIR: Path = Path("uploads/results")
 
     # Match Engine Configuration
-    MATCH_HIGH_THRESHOLD: float = 70.0
-    MATCH_MEDIUM_THRESHOLD: float = 40.0
-    LLM_SEMANTIC_WEIGHT: float = 0.10
-    MANDATORY_FAILURE_PENALTY_PER_ITEM: float = 20.0
-    MAX_SCORE_ON_MANDATORY_FAILURE: float = 65.0
-
-    MATCH_COMPONENT_WEIGHTS: Dict[str, float] = {
-        "role": 0.15,
-        "skills": 0.25,
-        "experience": 0.15,
-        "education": 0.10,
-        "domain": 0.15,
-        "technology": 0.10,
-        "certification": 0.05,
-        "responsibilities": 0.05,
-    }
-
     # Resource Optimization & Batch Processing Configuration
     BATCH_SIZE: int = 2
     MAX_BATCH_LIMIT: int = 50
@@ -132,8 +115,6 @@ class Settings(BaseSettings):
     OLLAMA_GENERATION_NUM_CTX: int = 4096
     OLLAMA_GENERATION_NUM_PREDICT: int = 1024
     OLLAMA_OPTIMIZED_NUM_PREDICT: int = 2048
-    LLM_BOOST_WEIGHT: float = 0.10
-    MAX_LLM_BOOST: float = 10.0
     PREFILTER_TOP_K: int = 5
     OPTIMIZED_PROMPT_VERSION: str = "3.5"
     MAX_CONCURRENT_LLM_WORKERS: int = 1

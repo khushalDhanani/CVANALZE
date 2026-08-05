@@ -10,7 +10,6 @@ from app.models.pg import DomainEmbedding
 from app.models.taxonomy import (
     DesignationMaster,
     DesignationSynonym,
-    FamilyCompatibility,
     JobFamilyMaster,
 )
 from app.services.domain_embedding_service import DomainEmbeddingService
@@ -107,30 +106,8 @@ class DynamicTaxonomyService:
         if candidate_family_name.lower().strip() == vacancy_family_name.lower().strip():
             return True, 1.0
 
-        if SessionLocal is not None:
-            try:
-                with SessionLocal() as session:
-                    src = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name == candidate_family_name).first()
-                    tgt = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name == vacancy_family_name).first()
-                    if src and tgt:
-                        compat = (
-                            session.query(FamilyCompatibility)
-                            .filter(
-                                FamilyCompatibility.source_family_id == src.family_id,
-                                FamilyCompatibility.target_family_id == tgt.family_id,
-                            )
-                            .first()
-                        )
-                        if compat:
-                            return compat.is_allowed, compat.compatibility_score
-            except Exception as exc:
-                logger.warning(f"[DYNAMIC_TAXONOMY] Family compatibility DB query failed: {exc}")
-
-        # Static fallback compatibility check
-        from app.services.taxonomy_service import TaxonomyService
-        compat_map = TaxonomyService.get_compatibility_map()
-        allowed_list = compat_map.get(candidate_family_name, [])
-        if vacancy_family_name in allowed_list:
+        # Strict equality check
+        if candidate_family_name == vacancy_family_name:
             return True, 1.0
         return False, 0.3
 

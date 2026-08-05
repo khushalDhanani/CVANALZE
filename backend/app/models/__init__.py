@@ -11,7 +11,6 @@ from app.models.taxonomy import (
     DesignationSkill,
     DesignationSynonym,
     DomainMaster,
-    FamilyCompatibility,
     JobFamilyMaster,
     SkillMaster,
 )
@@ -25,7 +24,7 @@ __all__ = [
     "DesignationSynonym",
     "DomainEmbedding",
     "DomainMaster",
-    "FamilyCompatibility",
+    "DesignationAbbreviation",
     "GeoLocation",
     "HRFeedback",
     "JobFamilyMaster",

@@ -108,9 +108,18 @@ class DepartmentNormalizer:
         # Heuristic: strip parenthetical suffixes, normalise abbreviations, title-case
         import re as _re
         clean = _re.sub(r"\s*\(.*?\)", "", internal_name).strip()
-        # Expand common abbreviations
-        clean = _re.sub(r"(?i)\bsr\b\.?", "Senior", clean)
-        clean = _re.sub(r"(?i)\bjr\b\.?", "Junior", clean)
-        clean = _re.sub(r"(?i)\bmgr\b\.?", "Manager", clean)
-        clean = _re.sub(r"\s+", " ", clean).strip().title()
+        
+        # Expand common abbreviations from DB
+        from app.services.taxonomy_service import TaxonomyService
+        abbr_map = TaxonomyService.get_abbreviations()
+        
+        # We need to replace whole words case-insensitively
+        # We can split the text and replace
+        parts = clean.split()
+        for i, part in enumerate(parts):
+            lower_part = part.lower()
+            if lower_part in abbr_map:
+                parts[i] = abbr_map[lower_part]
+                
+        clean = " ".join(parts).strip().title()
         return {"industry_designation": clean if clean else None}

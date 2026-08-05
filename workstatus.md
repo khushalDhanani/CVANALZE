@@ -196,3 +196,25 @@
 - `backend/app/services/work_experience_extraction_service.py`
 - `backend/scripts/seed_prompts.py` (NEW)
 - `backend/tests/test_prompt_service.py` (NEW)
+
+---
+
+## Work Completed — Phase 4: Removal of Duplicated Business Defaults
+- **Removed Hardcoded Configurations:** Deleted `MATCH_HIGH_THRESHOLD`, `MATCH_COMPONENT_WEIGHTS`, and other business-adjustable scoring parameters from `Settings` (`app/core/config.py`).
+- **Scoring Pipeline Refactor:** Refactored `ScoringConfig.load()` (`app/schemas/scoring_config.py`) to fetch fallback defaults directly from `RuleConfigManager` instead of `Settings`.
+- **API Cleanup:** Deleted deprecated `/api/config/match` endpoints and related unit tests (`tests/test_config.py`) that depended on the old `ConfigRepository`.
+- **Taxonomy Abbreviation Master Data:** Added `DesignationAbbreviation` model to `app/models/taxonomy.py` and implemented dynamic lookup in `TaxonomyService` to power abbreviation expansion (`Sr.` -> `Senior`) in `department_normalizer.py`.
+- **Legacy Compatibility Cleanup:** Fully removed the deprecated `FamilyCompatibility` model, along with `COMPATIBILITY_MAP` logic across `job_taxonomy.py` and `dynamic_taxonomy_service.py`, migrating the pipeline entirely toward the newer normalized exact matching.
+- **Verification:** Unit tests within `test_classification_normalization.py` were run and confirmed 100% pass, verifying the graceful fallback logic and proper abbreviation expansions.
+
+## Files Changed
+- `backend/app/core/config.py`
+- `backend/app/api/config.py`
+- `backend/app/schemas/scoring_config.py`
+- `backend/app/models/taxonomy.py`
+- `backend/app/services/taxonomy_service.py`
+- `backend/app/services/job_taxonomy.py`
+- `backend/app/services/dynamic_taxonomy_service.py`
+- `backend/app/services/department_normalizer.py`
+- `backend/app/models/__init__.py`
+- `backend/tests/test_config.py` (Deleted)
