@@ -62,6 +62,8 @@
 - `backend/app/core/rule_config_manager.py` — implemented real JSON traversal tests in `_run_synthetic_smoke_tests`
 - `backend/app/schemas/analysis.py` — added `config_version` and `prompt_version` to `EnrichedCandidateAnalysis`
 - `backend/app/services/match_service.py` — injected version fields into match result payload
+- `backend/scripts/migrate_phase1_inventory.py` — new script to map and seed `rule_config.json` and `department_domains_seed.json` into DB
+- `backend/scripts/migrations/mssql/008_phase1_inventory_seed.sql` — generated versioned SQL draft containing DML for the migrated configurations
 - `docker-compose.yml`
 - `docker-compose.local.yml` — added `./backend/uploads:/app/uploads` volume mounts for `api` and `worker`
 - `run.md` — updated with Docker Compose commands, container rebuild steps, and log monitoring
@@ -89,6 +91,7 @@
 ## Important Decisions
 - **Redis + Disk Result Merging**: `ResultRepository.list_all_results()` now scans Redis keys `cv_result:*.json` in addition to disk files, so candidates saved in Redis cache immediately show up in the candidate list UI even if saved prior to volume mounting.
 - **Taxonomy Source of Truth**: `TaxonomyService` is now the single source of truth for the `compatibility_map`, completely deprecating the static JSON file and decoupling `RuleConfigManager` from taxonomy rules.
+- **Phase 1 Configuration Migration**: Successfully seeded `department_domains_seed.json` and `rule_config.json` into `DepartmentDomainMaster` and `rule_config_profiles` (version `1.1.0-DRAFT`) in the DB, applying necessary fixes such as assigning Healthcare ID 24, removing Ramesh Maurya from the maintenance department, and dropping the redundant `industry_label`. This moves the application entirely off the static JSON files.
 
 ---
 
