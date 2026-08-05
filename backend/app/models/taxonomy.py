@@ -130,4 +130,26 @@ class DesignationSkill(PostgresAppBase):
     importance_weight = Column(Float, default=1.0)
 
     designation = relationship("DesignationMaster", back_populates="skills")
-    skill = relationship("SkillMaster")
+    skill = relationship("SkillMaster", back_populates="designations")
+
+
+class FamilyCompatibility(PostgresAppBase):
+    __tablename__ = "family_compatibilities"
+    __table_args__ = {"schema": "cvai"}
+
+    compatibility_id = Column(Integer, primary_key=True, autoincrement=True)
+    family_a_id = Column(
+        Integer,
+        ForeignKey("cvai.job_families.family_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    family_b_id = Column(
+        Integer,
+        ForeignKey("cvai.job_families.family_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    compatibility_score = Column(Float, nullable=False, default=1.0)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+
+    family_a = relationship("JobFamilyMaster", foreign_keys=[family_a_id])
+    family_b = relationship("JobFamilyMaster", foreign_keys=[family_b_id])

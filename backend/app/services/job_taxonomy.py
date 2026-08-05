@@ -228,107 +228,6 @@ class TaxonomyClassifier:
     intersection keyword matching, dual LRU caching, and strong typing via DTOs.
     """
 
-    @staticmethod
-    def _condition_matches(condition: Any, scopes: dict[str, str], scope_tokens: dict[str, set[str]]) -> tuple[bool, tuple[str, ...]]:
-        text = scopes.get(condition.scope, "")
-        tokens = scope_tokens.get(condition.scope, set())
-
-        if not condition.keywords:
-            return (False, ())
-
-        matched_kws: list[str] = []
-
-        if condition.mode == "any":
-            # Fast single-word token intersection check
-            for k in condition.keywords:
-                k_norm = k.lower().strip()
-                if " " in k_norm or "-" in k_norm:
-                    if k_norm in text:
-                        matched_kws.append(k_norm)
-                elif k_norm in tokens or k_norm in text:
-                    matched_kws.append(k_norm)
-            is_match = len(matched_kws) > 0
-        else:  # mode == "all"
-            is_match = True
-            for k in condition.keywords:
-                k_norm = k.lower().strip()
-                if " " in k_norm or "-" in k_norm:
-                    if k_norm not in text:
-                        is_match = False
-                        break
-                elif k_norm not in tokens and k_norm not in text:
-                    is_match = False
-                    break
-                else:
-                    matched_kws.append(k_norm)
-
-        final_match = not is_match if condition.negate else is_match
-        return (final_match, tuple(matched_kws) if is_match else ())
-
-    @staticmethod
-    def _branch_matches(branch: Any, scopes: dict[str, str], scope_tokens: dict[str, set[str]]) -> tuple[bool, tuple[str, ...]]:
-        branch_kws: list[str] = []
-        for c in branch.conditions:
-            matches, kws = TaxonomyClassifier._condition_matches(c, scopes, scope_tokens)
-            if not matches:
-                return (False, ())
-            branch_kws.extend(kws)
-        return (True, tuple(branch_kws))
-
-    @staticmethod
-    def _rule_matches(rule: Any, scopes: dict[str, str], scope_tokens: dict[str, set[str]]) -> tuple[bool, int | None, tuple[str, ...]]:
-        for branch_idx, b in enumerate(rule.branches):
-            matches, kws = TaxonomyClassifier._branch_matches(b, scopes, scope_tokens)
-            if matches:
-                return (True, branch_idx, kws)
-        return (False, None, ())
-
-    @staticmethod
-    @functools.lru_cache(maxsize=1024)
-    def _classify_vacancy_cached(normalized_job_text: str, title_lower: str, dept_lower: str) -> tuple[str, str, str | None, int | None, tuple[str, ...]]:
-        """
-        Classifies vacancy into (domain, family, rule_name, branch_idx, matched_keywords).
-        Thread-safe under CPython GIL atomic LRU cache operations.
-        """
-        scopes = {
-            "title": title_lower,
-            "dept": dept_lower,
-            "full_text": normalized_job_text,
-        }
-        scope_tokens = {
-            "title": set(re.findall(r"\w+", title_lower)),
-            "dept": set(re.findall(r"\w+", dept_lower)),
-            "full_text": set(re.findall(r"\w+", normalized_job_text)),
-        }
-        taxonomy = RuleConfigManager.get_taxonomy_rules()
-
-        for rule in taxonomy.vacancy_rules:
-            matches, branch_idx, kws = TaxonomyClassifier._rule_matches(rule, scopes, scope_tokens)
-            if matches:
-                return (rule.domain, rule.family, rule.name, branch_idx, kws)
-
-        return (taxonomy.default_domain, taxonomy.default_family, None, None, ())
-
-    @staticmethod
-    @functools.lru_cache(maxsize=512)
-    def classify_candidate_by_full_text(
-        candidate_full_text: str,
-    ) -> tuple[str, tuple[str, ...]]:
-        """
-        Classifies candidate full text into (domain, families_tuple).
-        Cached via functools.lru_cache(maxsize=512). Thread-safe under CPython GIL.
-        """
-        scopes = {"full_text": candidate_full_text}
-        scope_tokens = {"full_text": set(re.findall(r"\w+", candidate_full_text))}
-        taxonomy = RuleConfigManager.get_taxonomy_rules()
-
-        for rule in taxonomy.candidate_rules:
-            matches, _, _ = TaxonomyClassifier._rule_matches(rule, scopes, scope_tokens)
-            if matches:
-                return (rule.domain, tuple(rule.families))
-
-        return (taxonomy.default_domain, (taxonomy.default_family,))
-
     @classmethod
     def classify_vacancy_dto(cls, dto: VacancyDTO) -> TaxonomyClassification:
         """Strongly-typed classification of VacancyDTO returning TaxonomyClassification via DynamicTaxonomyService."""
@@ -342,12 +241,12 @@ class TaxonomyClassifier:
             required_skills=dto.required_skills,
         )
 
-        if dyn_res.match_source != "legacy_fallback":
+        if dyn_res.match_status == "DB_MATCH":
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             matched_kw = dyn_res.evidence[0].matched_term if dyn_res.evidence else ""
-            domain = dyn_res.industry_domain or RuleConfigManager.get_taxonomy_rules().default_domain
-            family = dyn_res.db_department_name or RuleConfigManager.get_taxonomy_rules().default_family
+            domain = dyn_res.industry_domain or "Unknown"
+            family = dyn_res.db_department_name or "Unknown"
             return TaxonomyClassification(
                 domain=domain,
                 job_family=family,
@@ -357,25 +256,15 @@ class TaxonomyClassifier:
                 matched_keywords=(matched_kw,) if matched_kw else (),
             )
 
-        # 2. Fallback to static rule classification
-        cache_info_before = cls._classify_vacancy_cached.cache_info()
-        domain, family, rule_name, branch_idx, kws = cls._classify_vacancy_cached(dto.normalized_job_text, dto.title_lower, dto.department_lower)
-        cache_info_after = cls._classify_vacancy_cached.cache_info()
-        cache_hit = cache_info_after.hits > cache_info_before.hits
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-        TaxonomyMetrics.record_hit(cache_hit, elapsed_ms)
-
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[TAXONOMY_VACANCY] Title='{dto.title}' -> Domain='{domain}', Family='{family}' | Rule='{rule_name}', Branch={branch_idx}, Keywords={kws}, CacheHit={cache_hit}")
-
+        TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
         return TaxonomyClassification(
-            domain=domain,
-            job_family=family,
-            compatible_families=(family,),
-            matched_rule=rule_name,
-            matched_branch=branch_idx,
-            matched_keywords=kws,
+            domain="Unknown",
+            job_family="Unknown",
+            compatible_families=(),
+            matched_rule="NO_SUITABLE_MATCH",
+            matched_branch=0,
+            matched_keywords=(),
         )
 
     @classmethod
@@ -401,12 +290,11 @@ class TaxonomyClassifier:
             skills=dto.skills,
         )
 
-        if dyn_res.match_source != "legacy_fallback":
+        if dyn_res.match_status == "DB_MATCH":
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
-            matched_kw = dyn_res.evidence[0].matched_term if dyn_res.evidence else ""
-            domain = dyn_res.industry_domain or RuleConfigManager.get_taxonomy_rules().default_domain
-            family = dyn_res.db_department_name or RuleConfigManager.get_taxonomy_rules().default_family
+            domain = dyn_res.industry_domain or "Unknown"
+            family = dyn_res.db_department_name or "Unknown"
             return TaxonomyClassification(
                 domain=domain,
                 job_family=family,
@@ -414,22 +302,13 @@ class TaxonomyClassifier:
                 matched_rule=f"dynamic:{dyn_res.match_source}",
             )
 
-        # 2. Fallback to static rule classification
-        cache_info_before = cls.classify_candidate_by_full_text.cache_info()
-        domain, families_tuple = cls.classify_candidate_by_full_text(dto.normalized_full_text)
-        cache_info_after = cls.classify_candidate_by_full_text.cache_info()
-        cache_hit = cache_info_after.hits > cache_info_before.hits
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-        TaxonomyMetrics.record_hit(cache_hit, elapsed_ms)
-
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[TAXONOMY_CANDIDATE] Domain='{domain}', Families={families_tuple} | CacheHit={cache_hit}")
-
+        TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
         return TaxonomyClassification(
-            domain=domain,
-            job_family=families_tuple[0] if families_tuple else JobTaxonomy.FAMILY_OTHER,
-            compatible_families=families_tuple,
+            domain="Unknown",
+            job_family="Unknown",
+            compatible_families=(),
+            matched_rule="NO_SUITABLE_MATCH",
         )
 
     @classmethod
