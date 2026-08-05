@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.core.config import settings
@@ -27,6 +27,20 @@ else:
 
 MssqlReadBase = declarative_base()
 PostgresAppBase = declarative_base()
+
+@event.listens_for(MssqlReadBase.metadata, "before_create")
+def block_mssql_create(target, connection, **kw):
+    raise RuntimeError("MSSQL database is read-only. DDL operations are permanently disabled.")
+
+@event.listens_for(MssqlReadBase.metadata, "before_drop")
+def block_mssql_drop(target, connection, **kw):
+    raise RuntimeError("MSSQL database is read-only. DDL operations are permanently disabled.")
+
+if MssqlReadSession:
+    @event.listens_for(MssqlReadSession, "before_flush")
+    def block_mssql_flush(session, flush_context, instances):
+        if session.new or session.dirty or session.deleted:
+            raise RuntimeError("MSSQL database is read-only. Writes are permanently disabled.")
 
 
 def get_mssql_read_db():

@@ -38,17 +38,33 @@ def test_postgres_app_base_contains_only_app_models():
     assert "RecruitCandidateMst" not in tables
 
 
-def test_mssql_no_create_table_emitted():
-    """Verify that MssqlReadBase cannot emit DDL that creates CV Analyzer tables."""
-    # We use a mock engine to capture DDL strings
+def test_mssql_ddl_is_permanently_disabled():
+    """Verify that MssqlReadBase blocks all DDL operations."""
     def dump_sql(sql, *multiparams, **params):
-        query = str(sql.compile(dialect=engine.dialect))
-        # Ensure we are not creating CV Analyzer tables in MSSQL
-        assert "DepartmentDomainMaster" not in query
-        assert "system_config" not in query
-        assert "cvai.rule_config_profiles" not in query
+        pass
 
     engine = create_mock_engine('mssql+pyodbc://', executor=dump_sql)
     
-    # This should not emit CREATE TABLE for PostgresAppBase tables
-    MssqlReadBase.metadata.create_all(engine, checkfirst=False)
+    with pytest.raises(RuntimeError, match="read-only"):
+        MssqlReadBase.metadata.create_all(engine)
+        
+    with pytest.raises(RuntimeError, match="read-only"):
+        MssqlReadBase.metadata.drop_all(engine)
+
+
+def test_mssql_writes_are_permanently_disabled():
+    """Verify that MssqlReadSession blocks all DML operations."""
+    from app.core.database import MssqlReadSession
+    if not MssqlReadSession:
+        pytest.skip("MSSQL read session not configured")
+        
+    session = MssqlReadSession()
+    # Create a dummy object to trigger flush event
+    candidate = org_models.OrgDepartmentMst(DepartmentName="Test")
+    session.add(candidate)
+    
+    with pytest.raises(RuntimeError, match="read-only"):
+        session.flush()
+        
+    session.rollback()
+    session.close()

@@ -238,3 +238,20 @@
 - `README.md`
 - `backend/scripts/run_migrations.py`
 - `backend/app/repositories/job.py`
+
+---
+
+## Work Completed — PR 2: Permanently disable MSSQL writes
+- **Removed Migrations:** Deleted `backend/scripts/migrations/archived_mssql` directory entirely.
+- **Rejected Migration Target:** Modified `backend/scripts/run_migrations.py` to raise a ValueError if `--dialect mssql` is passed.
+- **Added Startup Permission Verification:** Added `verify_mssql_readonly` in `backend/app/core/lifecycle.py` to query `fn_my_permissions(NULL, 'DATABASE')` and log a security warning if write access is granted.
+- **Blocked DDL & DML:** Added SQLAlchemy event listeners in `backend/app/core/database.py` that raise a `RuntimeError` on `before_flush` (DML) for `MssqlReadSession` and `before_create`/`before_drop` (DDL) for `MssqlReadBase.metadata`.
+- **Verified MSSQL Models:** Confirmed that all MSSQL models only inherit from `MssqlReadBase`.
+- **Added Safety Tests:** Added `test_mssql_ddl_is_permanently_disabled` and `test_mssql_writes_are_permanently_disabled` in `backend/tests/test_database_architecture.py` to prove that all write and schema operations fail gracefully with the expected errors.
+
+## Files Changed
+- `backend/scripts/migrations/archived_mssql/` (Deleted)
+- `backend/scripts/run_migrations.py`
+- `backend/app/core/database.py`
+- `backend/app/core/lifecycle.py`
+- `backend/tests/test_database_architecture.py`

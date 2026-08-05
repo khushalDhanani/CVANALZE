@@ -38,9 +38,7 @@ def detect_dialect(override: str | None = None) -> tuple[str, str]:
     if override:
         dialect = override.lower()
         if dialect == "mssql":
-            if not settings.MSSQL_READ_ONLY_URL:
-                raise ValueError("MSSQL requested but MSSQL_READ_ONLY_URL is not configured in settings.")
-            return "mssql", settings.MSSQL_READ_ONLY_URL
+            raise ValueError("MSSQL migrations are permanently disabled. The database is read-only.")
         elif dialect in ("postgres", "postgresql"):
             if not settings.POSTGRES_APP_URL:
                 raise ValueError("PostgreSQL requested but POSTGRES_APP_URL is not configured in settings.")
