@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/services/embedding_sync_service.py
 import hashlib
 import json

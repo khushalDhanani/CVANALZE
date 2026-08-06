@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/services/dynamic_taxonomy_service.py
 import logging
 

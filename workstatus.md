@@ -49,9 +49,17 @@
 - Designed `SyncService` to automate MSSQL-to-PostgreSQL synchronization.
 - Escaped startup warning to raise a `RuntimeError` if MSSQL write permissions are detected.
 
+### PR 9 — Strict Data Source Isolation & Persistence
+- Permanently deleted `app/core/jobs.py` and `DEFAULT_JOB_OPENINGS`.
+- `JobRepository` now explicitly returns `[]` instead of relying on a fake fallback JSON array.
+- Created `CVResult` SQLAlchemy model corresponding to a new `cvai.cv_results` PostgreSQL table.
+- Added `011_create_cv_results_table.sql` migration script to execute the new schema.
+- Completely rewrote `ResultRepository` to exclusively store and retrieve CV analysis payloads to/from PostgreSQL JSONB columns, purging the legacy `.json` disk caching mechanism inside `uploads/results/`.
+- Removed `_cv_file_cache` to guarantee no disk I/O leaks for match results.
+
 ## 2. Next Steps
-- P1 fixes have been completed.
-- Validate end-to-end integration flows against the strict unconfigured taxonomy.
+- P1 fixes and absolute data source isolation tasks have been completed.
+- Validate end-to-end integration flows against the strict unconfigured taxonomy and PostgreSQL-backed CV result storage.
 
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.

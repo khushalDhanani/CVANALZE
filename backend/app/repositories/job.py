@@ -1,9 +1,10 @@
+from __future__ import annotations
 # backend/app/repositories/job.py
 import hashlib
 import json
 import threading
 import time
-from datetime import UTC
+from datetime import timezone
 from typing import Any, ClassVar
 
 from sqlalchemy.orm import Session
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.cache import CacheInvalidator, vacancy_cache_manager
 from app.core.config import settings
 from app.core.database import MssqlReadSession
-from app.core.jobs import DEFAULT_JOB_OPENINGS
+
 from app.core.logging import logger
 from app.services.embedding_sync_service import EmbeddingSyncService
 from app.services.job_preprocessor import JobPreprocessor
@@ -53,7 +54,7 @@ class RepositoryMetrics:
             cls.last_version_hash = version
             from datetime import datetime
 
-            cls.last_loaded_timestamp = datetime.now(UTC).isoformat()
+            cls.last_loaded_timestamp = datetime.now(timezone.utc).isoformat()
 
     @classmethod
     def record_staleness_check(cls, duration_ms: float) -> None:
@@ -163,22 +164,16 @@ class JobRepository:
                     logger.info(f"JobRepository.get_all_jobs: Active Vacancies: {len(job_dicts)} | Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}")
                     job_dicts_to_return = job_dicts
                 else:
-                    logger.warning("JobRepository.get_all_jobs: 0 active vacancies returned from MSSQL DB. Falling back to default jobs.")
+                    logger.warning("JobRepository.get_all_jobs: 0 active vacancies returned from MSSQL DB.")
             except Exception as exc:
                 logger.error(f"JobRepository.get_all_jobs error querying DB: {exc}")
-                # Do not raise; fall back to default job openings when DB is unavailable.
-                # Previously we raised RuntimeError if settings.MSSQL_READ_ONLY_URL was set, which caused test failures.
-                # The repository should gracefully handle DB failures and use the static DEFAULT_JOB_OPENINGS.
-                # Continue without raising to allow fallback.
-                # if settings.MSSQL_READ_ONLY_URL:
-                #     raise RuntimeError(f"Failed to query active vacancies from configured MSSQL DB: {exc}") from exc
+                raise RuntimeError(f"Failed to query active vacancies from configured MSSQL DB: {exc}") from exc
             finally:
                 if close_session:
                     db.close()
 
         if job_dicts_to_return is None:
-            logger.warning("JobRepository.get_all_jobs: Using static DEFAULT_JOB_OPENINGS fallback.")
-            job_dicts_to_return = JobPreprocessor.preprocess_job_dicts([dict(j) for j in DEFAULT_JOB_OPENINGS])
+            job_dicts_to_return = []
 
         version = cls._compute_vacancy_hash(job_dicts_to_return)
         vacancy_cache_manager.set(

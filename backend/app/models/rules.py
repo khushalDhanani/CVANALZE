@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import PostgresAppBase
@@ -17,7 +18,7 @@ class RuleValidationTestCase(PostgresAppBase):
     payload_json = Column(Text, nullable=False)
     expected_result_json = Column(Text, nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class RuleConfigProfile(PostgresAppBase):
@@ -49,8 +50,8 @@ class RuleConfigProfile(PostgresAppBase):
     previous_version_tag = Column(String(50), nullable=True)
     audit_reason = Column(String(500), nullable=True)
     
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class RuleComponent(PostgresAppBase):

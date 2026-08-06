@@ -1,6 +1,7 @@
+from __future__ import annotations
 import hashlib
 import threading
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any
 
 from app.core.cache import processing_job_cache_manager
@@ -39,7 +40,7 @@ class ProcessingJobRepository:
 
     @classmethod
     def save(cls, record: ProcessingJobRecord) -> ProcessingJobRecord:
-        persisted = record.model_copy(update={"updated_at": datetime.now(UTC)})
+        persisted = record.model_copy(update={"updated_at": datetime.now(timezone.utc)})
         payload = persisted.model_dump(mode="json")
         ttl = settings.PROCESSING_JOB_TTL_SECONDS
         alias = hashlib.sha256(persisted.cv_key.encode("utf-8")).hexdigest()
@@ -60,7 +61,7 @@ class ProcessingJobRepository:
             if record is None:
                 raise LookupError(f"Processing job '{job_id}' was not found.")
             cls._assert_transition(record.state, state)
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             if state == JobState.PROCESSING and record.started_at is None:
                 updates.setdefault("started_at", now)
             if state in (JobState.COMPLETED, JobState.FAILED):

@@ -1,3 +1,4 @@
+from __future__ import annotations
 WORK_EXPERIENCE_PROMPT_VERSION = "1.0.0"
 
 def build_work_experience_prompt(candidate_id: str, ocr_text: str) -> str:

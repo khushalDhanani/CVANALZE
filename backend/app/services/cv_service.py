@@ -1,7 +1,8 @@
+from __future__ import annotations
 import asyncio
 import hashlib
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 
@@ -338,7 +339,7 @@ async def process_cv_file(
             current_stage = "complete"
             await _save_interim_status(90, current_stage)
 
-            now_iso = datetime.now(UTC).isoformat()
+            now_iso = datetime.now(timezone.utc).isoformat()
             created_at = existing_data.get("created_at") if existing_data and existing_data.get("created_at") else now_iso
             updated_at = now_iso
 
@@ -438,7 +439,7 @@ async def process_cv_file(
             raise
         except Exception as exc:
             logger.exception(f"CV processing failed for '{cv_key}' at stage '{current_stage}': {exc}")
-            now_iso = datetime.now(UTC).isoformat()
+            now_iso = datetime.now(timezone.utc).isoformat()
 
             stage_to_step = {
                 "parsing": "Docling Parsing",

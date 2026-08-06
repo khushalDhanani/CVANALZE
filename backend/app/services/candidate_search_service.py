@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlalchemy import select
 
 from app.core.config import settings

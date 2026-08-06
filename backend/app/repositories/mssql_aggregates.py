@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlalchemy.orm import Session, joinedload
 from app.models.recruit import RecruitCandidateMst, RecruitVacancyRequest
 from app.models.org import OrgJobProfileMst

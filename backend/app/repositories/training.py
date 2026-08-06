@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 from app.core.database import PostgresAppSession
 from app.core.logging import logger

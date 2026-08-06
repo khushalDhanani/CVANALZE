@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/services/dynamic_geo_heading_service.py
 import logging
 

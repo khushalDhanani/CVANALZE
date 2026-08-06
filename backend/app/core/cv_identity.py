@@ -1,3 +1,4 @@
+from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass

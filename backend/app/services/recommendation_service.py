@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any
 
 from app.core.config import settings
@@ -489,7 +490,7 @@ class RecommendationService:
             "top_candidate_matches": top_candidate_matches,
             "similar_candidates": top_candidate_matches[:3],
             "skill_gap_insights": skill_gap_insights,
-            "talent_pools": [f"{target_job.get('department_name') or target_job.get('department') or 'General'} Pool"],
+            "talent_pools": [f"{target_job.get('department_name') or target_job.get('department') or 'Unspecified'} Pool"],
         }
 
     @classmethod

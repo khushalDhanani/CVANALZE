@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 
@@ -14,7 +15,7 @@ class GeoLocation(PostgresAppBase):
     state_name = Column(String(255), nullable=True)
     country_name = Column(String(255), default="Global")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class SectionHeading(PostgresAppBase):
@@ -26,7 +27,7 @@ class SectionHeading(PostgresAppBase):
     category = Column(String(100), default="general")
     language = Column(String(10), default="en")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class NameDenylist(PostgresAppBase):
@@ -37,4 +38,4 @@ class NameDenylist(PostgresAppBase):
     word = Column(String(255), nullable=False, unique=True, index=True)
     category = Column(String(100), default="job_title")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

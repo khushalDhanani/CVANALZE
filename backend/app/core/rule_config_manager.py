@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/core/rule_config_manager.py
 import hashlib
 import json
@@ -5,7 +6,7 @@ import logging
 import re
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from re import Pattern
 from types import MappingProxyType
@@ -414,7 +415,7 @@ class RuleConfigManager:
                     "cache_build_time_ms": cache_build_time_ms,
                     "compiled_pattern_count": compiled_pattern_count,
                     "configuration_size_bytes": config_size_bytes,
-                    "last_loaded_timestamp": datetime.now(UTC).isoformat(),
+                    "last_loaded_timestamp": datetime.now(timezone.utc).isoformat(),
                     "file_hash": path_hash,
                 }
             )

@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/schemas/job_context.py
 import re
 from dataclasses import dataclass, field

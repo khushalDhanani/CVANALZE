@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 import hashlib
 import threading
@@ -5,7 +6,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any
 
 from redis import Redis
@@ -85,7 +86,7 @@ class ProcessingQueueService:
                 max_attempts=max(1, settings.RQ_MAX_RETRIES + 1),
                 enqueue_count=enqueue_count,
                 force_reprocess=force_reprocess,
-                created_at=existing.created_at if existing else datetime.now(UTC),
+                created_at=existing.created_at if existing else datetime.now(timezone.utc),
             )
             record = ProcessingJobRepository.save(record)
 
@@ -173,8 +174,8 @@ class ProcessingQueueService:
         if deadline is None:
             return False
         if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=UTC)
-        return datetime.now(UTC) < deadline
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < deadline
 
     @classmethod
     def _can_reuse(

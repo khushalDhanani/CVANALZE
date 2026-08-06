@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 from sqlalchemy import Column, DateTime, Integer, String, Text
 from app.core.database import PostgresAppBase
 
@@ -12,4 +13,4 @@ class HRFeedback(PostgresAppBase):
     candidate_id = Column(String(100), nullable=True)
     vacancy_id = Column(String(100), nullable=True)
     feedback_payload_json = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

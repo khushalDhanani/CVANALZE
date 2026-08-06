@@ -1,5 +1,6 @@
+from __future__ import annotations
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from enum import Enum
 from typing import Any
 
@@ -196,8 +197,8 @@ class ProcessingJobRecord(BaseModel):
     force_reprocess: bool = False
     outcome: ProcessingOutcome | None = None
     error: CanonicalError | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: datetime | None = None
     completed_at: datetime | None = None
 

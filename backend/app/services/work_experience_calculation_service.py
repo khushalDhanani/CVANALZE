@@ -1,3 +1,4 @@
+from __future__ import annotations
 import datetime
 from dateutil.relativedelta import relativedelta
 from app.schemas.work_experience_calculation import WorkExperienceCalculationSummary, MergedInterval

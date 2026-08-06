@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 
@@ -14,7 +15,7 @@ class StopWord(PostgresAppBase):
     category = Column(String(100), default="prefilter")
     language = Column(String(10), default="en")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ScoringProfileMaster(PostgresAppBase):
@@ -31,5 +32,5 @@ class ScoringProfileMaster(PostgresAppBase):
     thresholds_json = Column(String, nullable=True)
     is_default = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, DateTime, Index, Integer, String
 from sqlalchemy.sql import func

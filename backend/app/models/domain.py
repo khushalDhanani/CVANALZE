@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -32,10 +33,10 @@ class DepartmentDomainMaster(PostgresAppBase):
     DefaultRoles = Column(String, nullable=False)
     Priority = Column(Integer, nullable=False, default=0)
     IsActive = Column(Boolean, nullable=False, default=True)
-    CreatedOn = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    CreatedOn = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     ModifiedOn = Column(
         DateTime,
         nullable=False,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )

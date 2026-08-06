@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/services/job_preprocessor.py
 import re
 from typing import Any

@@ -1,0 +1,23 @@
+from __future__ import annotations
+from sqlalchemy import Column, DateTime, String
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import func
+from app.core.database import PostgresAppBase
+
+class CVResult(PostgresAppBase):
+    __tablename__ = "cv_results"
+
+    cv_key = Column(String, primary_key=True)
+    status = Column(String, nullable=True)
+    parsed_at = Column(DateTime(timezone=True), server_default=func.now())
+    full_name = Column(String, nullable=True)
+    candidate_id = Column(String, nullable=True)
+    cv_id = Column(String, nullable=True)
+    cv_hash = Column(String, nullable=True, index=True)
+    
+    resume_json = Column(JSONB, nullable=True)
+    match_analysis = Column(JSONB, nullable=True)
+    
+    text_content = Column(String, nullable=True)
+    markdown_content = Column(String, nullable=True)
+    raw_data = Column(JSONB, nullable=True)

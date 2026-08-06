@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, UniqueConstraint
 from app.core.database import PostgresAppBase
 
@@ -28,5 +29,5 @@ class PromptTemplateMaster(PostgresAppBase):
     environment = Column(String(50), default="production", nullable=False)
     
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

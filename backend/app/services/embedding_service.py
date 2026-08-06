@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/services/embedding_service.py
 import hashlib
 import math

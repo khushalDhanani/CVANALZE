@@ -1,3 +1,4 @@
+from __future__ import annotations
 import fnmatch
 import hashlib
 import json
@@ -6,7 +7,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from filelock import FileLock
 
@@ -48,7 +49,7 @@ class CacheKey:
         cls,
         document_hash: str = "",
         candidate_id: str = "",
-        vacancy_ids: list[str] | None = None,
+        vacancy_ids: Optional[list[str]] = None,
         vacancy_version: str = "",
         prompt_version: str = "",
         model_version: str = "",
@@ -80,7 +81,7 @@ class CacheKey:
         document_hash: str = "",
         candidate_id: str = "",
         vacancy_version: str = "",
-        vacancy_ids: list[str] | None = None,
+        vacancy_ids: Optional[list[str]] = None,
         prompt_version: str = "",
         model_version: str = "",
         extraction_version: str = "",
@@ -730,10 +731,9 @@ _redis_cache = RedisCache(key_prefix="")
 _memory_cache = MemoryCache(max_size=5000)
 
 _llm_file_cache = FileCache(settings.UPLOADS_DIR / ".llm_cache")
-_cv_file_cache = FileCache(settings.RESULTS_DIR)
 _doc_cache_file_cache = FileCache(settings.UPLOADS_DIR / ".doc_cache")
 _embedding_file_cache = FileCache(settings.UPLOADS_DIR / ".embed_cache")
-_processing_job_file_cache = FileCache(settings.RESULTS_DIR / ".processing_jobs")
+_processing_job_file_cache = FileCache(settings.UPLOADS_DIR / ".processing_jobs")
 
 llm_cache_manager = CacheManager(
     namespace="llm_cache",
@@ -743,7 +743,7 @@ llm_cache_manager = CacheManager(
 
 cv_result_cache_manager = CacheManager(
     namespace="cv_result",
-    providers=[_memory_cache, _redis_cache, _cv_file_cache],
+    providers=[_memory_cache, _redis_cache],
     default_ttl=settings.CACHE_TTL_MATCH_RESULT_SECONDS,
 )
 

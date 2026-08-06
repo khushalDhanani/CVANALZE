@@ -1,3 +1,4 @@
+from __future__ import annotations
 from app.models.config import SystemConfig
 from app.models.domain import DepartmentDomainMaster
 from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading
@@ -16,7 +17,10 @@ from app.models.taxonomy import (
 )
 from app.models.training import HRFeedback
 
+from app.models.result import CVResult
+
 __all__ = [
+    "CVResult",
     "CandidateEmbedding",
     "DepartmentDomainMaster",
     "DesignationMaster",

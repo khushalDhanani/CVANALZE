@@ -1,3 +1,4 @@
+from __future__ import annotations
 import string
 from typing import Any, Optional, Set
 from sqlalchemy.orm import Session

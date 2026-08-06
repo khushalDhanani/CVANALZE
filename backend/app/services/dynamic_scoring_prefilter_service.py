@@ -1,3 +1,4 @@
+from __future__ import annotations
 # backend/app/services/dynamic_scoring_prefilter_service.py
 import json
 import logging

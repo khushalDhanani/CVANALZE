@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
@@ -270,7 +271,7 @@ async def submit_hr_review(payload: HRReviewRequest):
             hr_corrected_score=payload.corrected_score,
             hr_corrected_classification=payload.corrected_classification,
             hr_feedback=payload.feedback_notes,
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
         TrainingRepository.append_training_example(example)

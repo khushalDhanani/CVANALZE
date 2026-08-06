@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -23,8 +24,8 @@ class DomainMaster(PostgresAppBase):
     domain_name = Column(String(255), nullable=False)
     description = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     families = relationship("JobFamilyMaster", back_populates="domain", cascade="all, delete-orphan")
 
@@ -44,8 +45,8 @@ class JobFamilyMaster(PostgresAppBase):
     mssql_department_id = Column(Integer, nullable=True)
     description = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     domain = relationship("DomainMaster", back_populates="families")
     designations = relationship("DesignationMaster", back_populates="family", cascade="all, delete-orphan")
@@ -67,8 +68,8 @@ class DesignationMaster(PostgresAppBase):
     seniority_level = Column(String(50), nullable=True)
     content_hash = Column(String(64), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     family = relationship("JobFamilyMaster", back_populates="designations")
     synonyms = relationship("DesignationSynonym", back_populates="designation", cascade="all, delete-orphan")
@@ -87,7 +88,7 @@ class DesignationSynonym(PostgresAppBase):
     )
     synonym_text = Column(String(255), nullable=False, index=True)
     is_canonical = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     designation = relationship("DesignationMaster", back_populates="synonyms")
 
@@ -111,7 +112,7 @@ class SkillMaster(PostgresAppBase):
     skill_name = Column(String(255), nullable=False, unique=True)
     category = Column(String(100), default="general")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     designations = relationship("DesignationSkill", back_populates="skill", cascade="all, delete-orphan")
 
@@ -152,7 +153,7 @@ class FamilyCompatibility(PostgresAppBase):
         nullable=False,
     )
     compatibility_score = Column(Float, nullable=False, default=1.0)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     family_a = relationship("JobFamilyMaster", foreign_keys=[family_a_id])
     family_b = relationship("JobFamilyMaster", foreign_keys=[family_b_id])
