@@ -27,7 +27,7 @@ class ConfigurationService:
         # Validate that the config is valid before saving
         RuleConfigManager._run_synthetic_smoke_tests(config)
         
-        from app.models.rules import RuleComponent, SystemRule, RuleCondition, RuleThreshold, RulePenalty, RuleWeight
+        from app.models.rules import RuleComponent, SystemRule, RuleCondition, RuleConditionValue, RuleThreshold, RulePenalty, RuleWeight
         
         profile = RuleConfigProfile(
             version_tag=version_tag,
@@ -63,7 +63,10 @@ class ConfigurationService:
             # Conditions (Keywords)
             rule = SystemRule(rule_type="keywords", rule_name="field_keywords", component=field_comp)
             for k, kw_list in field_cfg.keywords.items():
-                rule.conditions.append(RuleCondition(condition_scope=k, keywords_json=json.dumps(kw_list)))
+                cond = RuleCondition(condition_scope=k)
+                for kw in kw_list:
+                    cond.values.append(RuleConditionValue(value=kw))
+                rule.conditions.append(cond)
 
         # 3. Scoring - Match
         match_comp = RuleComponent(component_type="scoring", component_name="match", profile=profile)
@@ -82,6 +85,35 @@ class ConfigurationService:
                 for sub_k, sub_v in v.items():
                     if isinstance(sub_v, (int, float)):
                         match_comp.weights.append(RuleWeight(weight_key=f"{k}_{sub_k}", weight_value=float(sub_v)))
+        
+        # Cross Domain Guard
+        cdg = match_cfg.cross_domain_guard
+        match_comp.penalties.append(RulePenalty(penalty_key="domain_mismatch_multiplier", penalty_value=cdg.domain_mismatch_multiplier))
+        match_comp.penalties.append(RulePenalty(penalty_key="domain_mismatch_score_cap", penalty_value=cdg.domain_mismatch_score_cap))
+        match_comp.penalties.append(RulePenalty(penalty_key="mandatory_failure_score_impact", penalty_value=cdg.mandatory_failure_score_impact))
+        
+        cdg_rule = SystemRule(rule_type="cross_domain_guard", rule_name="guard_keywords", component=match_comp)
+        
+        def add_cdg_cond(scope, keywords):
+            cond = RuleCondition(condition_scope=scope)
+            for kw in keywords:
+                cond.values.append(RuleConditionValue(value=kw))
+            cdg_rule.conditions.append(cond)
+            
+        add_cdg_cond("software_candidate", cdg.software_candidate_keywords)
+        add_cdg_cond("non_it_job", cdg.non_it_job_keywords)
+        add_cdg_cond("software_requirement", cdg.software_requirement_keywords)
+        for domain, kws in cdg.domain_guard_terms.items():
+            add_cdg_cond(f"domain_guard_{domain}", kws)
+            
+        # Fallback Defaults
+        fb = match_cfg.fallback_defaults
+        fb_rule = SystemRule(rule_type="fallback_defaults", rule_name="defaults", component=match_comp, target_value=f"{fb.recommended_department}::{fb.professional_domain}")
+        if fb.suitable_roles:
+            role_cond = RuleCondition(condition_scope="suitable_roles")
+            for role in fb.suitable_roles:
+                role_cond.values.append(RuleConditionValue(value=role))
+            fb_rule.conditions.append(role_cond)
                         
         # 4. Scoring - Prefilter
         pref_comp = RuleComponent(component_type="scoring", component_name="prefilter", profile=profile)
@@ -91,36 +123,61 @@ class ConfigurationService:
                 pref_comp.weights.append(RuleWeight(weight_key=k, weight_value=float(v)))
         pref_comp.thresholds.append(RuleThreshold(threshold_key="rrf_k_constant", threshold_value=pref_cfg.rrf_k_constant))
         
+        # Prefilter stop words
+        pref_rule = SystemRule(rule_type="prefilter", rule_name="stop_words", component=pref_comp)
+        sw_cond = RuleCondition(condition_scope="stop_words")
+        for kw in pref_cfg.stop_words:
+            sw_cond.values.append(RuleConditionValue(value=kw))
+        pref_rule.conditions.append(sw_cond)
+        
         # 5. Scoring - Taxonomy
         tax_comp = RuleComponent(component_type="scoring", component_name="taxonomy", profile=profile)
         tax_cfg = config.scoring.taxonomy
+        
+        tax_defaults = SystemRule(rule_type="taxonomy_defaults", rule_name="defaults", component=tax_comp, target_value=f"{tax_cfg.default_domain}::{tax_cfg.default_family}")
+        if tax_cfg.canonical_domains:
+            cd_cond = RuleCondition(condition_scope="canonical_domains")
+            for dom in tax_cfg.canonical_domains:
+                cd_cond.values.append(RuleConditionValue(value=dom))
+            tax_defaults.conditions.append(cd_cond)
+        if tax_cfg.canonical_families:
+            cf_cond = RuleCondition(condition_scope="canonical_families")
+            for fam in tax_cfg.canonical_families:
+                cf_cond.values.append(RuleConditionValue(value=fam))
+            tax_defaults.conditions.append(cf_cond)
+            
         for vac_rule in tax_cfg.vacancy_rules:
             sys_rule = SystemRule(rule_type="vacancy_taxonomy", rule_name=vac_rule.name, target_value=f"{vac_rule.domain}::{vac_rule.family}", component=tax_comp)
             for branch in vac_rule.branches:
                 for cond in branch.conditions:
-                    sys_rule.conditions.append(RuleCondition(
+                    cond_obj = RuleCondition(
                         condition_scope=cond.scope,
                         condition_mode=cond.mode,
                         is_negated=cond.negate,
-                        keywords_json=json.dumps(cond.keywords)
-                    ))
+                    )
+                    for kw in cond.keywords:
+                        cond_obj.values.append(RuleConditionValue(value=kw))
+                    sys_rule.conditions.append(cond_obj)
 
         for cand_rule in tax_cfg.candidate_rules:
             sys_rule = SystemRule(rule_type="candidate_taxonomy", rule_name=cand_rule.name, target_value=f"{cand_rule.domain}::{','.join(cand_rule.families)}", component=tax_comp)
             for branch in cand_rule.branches:
                 for cond in branch.conditions:
-                    sys_rule.conditions.append(RuleCondition(
+                    cond_obj = RuleCondition(
                         condition_scope=cond.scope,
                         condition_mode=cond.mode,
                         is_negated=cond.negate,
-                        keywords_json=json.dumps(cond.keywords)
-                    ))
+                    )
+                    for kw in cond.keywords:
+                        cond_obj.values.append(RuleConditionValue(value=kw))
+                    sys_rule.conditions.append(cond_obj)
                     
         # 6. Scoring - Resume Quality
         rq_comp = RuleComponent(component_type="scoring", component_name="resume_quality", profile=profile)
         rq_cfg = config.scoring.resume_quality
         rq_comp.weights.append(RuleWeight(weight_key="section_weight", weight_value=rq_cfg.section_weight))
         rq_comp.thresholds.append(RuleThreshold(threshold_key="location_acceptance_min_confidence", threshold_value=rq_cfg.location_acceptance_min_confidence))
+        rq_comp.thresholds.append(RuleThreshold(threshold_key="default_density_score", threshold_value=rq_cfg.default_density_score))
         for k, v in rq_cfg.contact_weights.items():
             rq_comp.weights.append(RuleWeight(weight_key=f"contact_{k}", weight_value=v))
 

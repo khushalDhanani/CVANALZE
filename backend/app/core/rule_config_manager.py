@@ -24,14 +24,14 @@ class GlobalTierBoundary(BaseModel):
 
 
 class TierThresholds(BaseModel):
-    high_min: float = Field(0.80, ge=0.0, le=1.0)
-    medium_min: float = Field(0.50, ge=0.0, le=1.0)
-    low_min: float = Field(0.00, ge=0.0, le=1.0)
+    high_min: float = Field(..., ge=0.0, le=1.0)
+    medium_min: float = Field(..., ge=0.0, le=1.0)
+    low_min: float = Field(..., ge=0.0, le=1.0)
     override_reason: str | None = None
 
 
 class DownstreamGates(BaseModel):
-    min_acceptance_confidence: float = Field(0.50, ge=0.0, le=1.0)
+    min_acceptance_confidence: float = Field(..., ge=0.0, le=1.0)
     reject_email_fallback_as_unverified: bool = True
     max_word_count: int | None = None
     max_char_length: int | None = None
@@ -72,9 +72,9 @@ class CrossDomainGuard(BaseModel):
     non_it_job_keywords: list[str] = Field(default_factory=list)
     software_requirement_keywords: list[str] = Field(default_factory=list)
     domain_guard_terms: dict[str, list[str]] = Field(default_factory=dict)
-    domain_mismatch_multiplier: float = Field(0.15, gt=0.0, le=1.0)
-    domain_mismatch_score_cap: float = Field(20.0, gt=0.0)
-    mandatory_failure_score_impact: float = Field(50.0, gt=0.0)
+    domain_mismatch_multiplier: float = Field(..., gt=0.0, le=1.0)
+    domain_mismatch_score_cap: float = Field(..., gt=0.0)
+    mandatory_failure_score_impact: float = Field(..., gt=0.0)
 
 
 class RecommendationTexts(BaseModel):
@@ -91,34 +91,23 @@ class RecommendationTexts(BaseModel):
 
 
 class ScoringParameters(BaseModel):
-    career_transition_role_score: float = Field(50.0, ge=0.0, le=100.0)
-    role_divergence_score: float = Field(70.0, ge=0.0, le=100.0)
-    default_role_score: float = Field(100.0, ge=0.0, le=100.0)
-    below_min_exp_multiplier: float = Field(50.0, ge=0.0, le=100.0)
-    overqualification_penalty: float = Field(20.0, ge=0.0, le=100.0)
-    domain_default_match_score: float = Field(50.0, ge=0.0, le=100.0)
-    low_coverage_threshold: float = Field(0.5, ge=0.0, le=1.0)
-    false_positive_score_cap: float = Field(99.0, ge=0.0, le=100.0)
+    career_transition_role_score: float = Field(..., ge=0.0, le=100.0)
+    role_divergence_score: float = Field(..., ge=0.0, le=100.0)
+    default_role_score: float = Field(..., ge=0.0, le=100.0)
+    below_min_exp_multiplier: float = Field(..., ge=0.0, le=100.0)
+    overqualification_penalty: float = Field(..., ge=0.0, le=100.0)
+    domain_default_match_score: float = Field(..., ge=0.0, le=100.0)
+    low_coverage_threshold: float = Field(..., ge=0.0, le=1.0)
+    false_positive_score_cap: float = Field(..., ge=0.0, le=100.0)
     
     # Migrated from legacy ConfigRepository
-    match_high_threshold: float = Field(80.0, ge=0.0, le=100.0)
-    match_medium_threshold: float = Field(50.0, ge=0.0, le=100.0)
-    mandatory_failure_penalty: float = Field(20.0, ge=0.0, le=100.0)
-    max_score_on_failure: float = Field(80.0, ge=0.0, le=100.0)
-    llm_semantic_weight: float = Field(0.1, ge=0.0, le=1.0)
-    max_llm_boost: float = Field(10.0, ge=0.0, le=100.0)
-    component_weights: dict[str, float] = Field(
-        default_factory=lambda: {
-            "role": 0.15,
-            "skills": 0.25,
-            "experience": 0.15,
-            "education": 0.10,
-            "domain": 0.15,
-            "technology": 0.10,
-            "certification": 0.05,
-            "responsibilities": 0.05,
-        }
-    )
+    match_high_threshold: float = Field(..., ge=0.0, le=100.0)
+    match_medium_threshold: float = Field(..., ge=0.0, le=100.0)
+    mandatory_failure_penalty: float = Field(..., ge=0.0, le=100.0)
+    max_score_on_failure: float = Field(..., ge=0.0, le=100.0)
+    llm_semantic_weight: float = Field(..., ge=0.0, le=1.0)
+    max_llm_boost: float = Field(..., ge=0.0, le=100.0)
+    component_weights: dict[str, float] = Field(...)
 
 
 class MatchScoringRules(BaseModel):
@@ -134,17 +123,17 @@ class MatchScoringRules(BaseModel):
 
 
 class LexicalWeights(BaseModel):
-    department_match: float = Field(30.0, ge=0.0)
-    title_term_match: float = Field(15.0, ge=0.0)
-    required_skill_match: float = Field(10.0, ge=0.0)
-    preferred_keyword_match: float = Field(5.0, ge=0.0)
-    experience_suitability: float = Field(10.0, ge=0.0)
+    department_match: float = Field(..., ge=0.0)
+    title_term_match: float = Field(..., ge=0.0)
+    required_skill_match: float = Field(..., ge=0.0)
+    preferred_keyword_match: float = Field(..., ge=0.0)
+    experience_suitability: float = Field(..., ge=0.0)
 
 
 class PrefilterRules(BaseModel):
     stop_words: list[str] = Field(default_factory=list)
-    lexical_weights: LexicalWeights = Field(default_factory=LexicalWeights)
-    rrf_k_constant: float = Field(60.0, gt=0.0)
+    lexical_weights: LexicalWeights
+    rrf_k_constant: float = Field(..., gt=0.0)
 
 
 class TaxonomyCondition(BaseModel):
@@ -194,11 +183,11 @@ class HeadingNormalization(BaseModel):
 class ResumeQualityRules(BaseModel):
     section_patterns: dict[str, str] = Field(default_factory=dict)
     core_sections: list[str] = Field(default_factory=list)
-    section_weight: float = Field(0.10, ge=0.0, le=1.0)
-    contact_weights: dict[str, float] = Field(default_factory=dict)
-    location_acceptance_min_confidence: float = Field(0.50, ge=0.0, le=1.0)
+    section_weight: float = Field(..., ge=0.0, le=1.0)
+    contact_weights: dict[str, float] = Field(...)
+    location_acceptance_min_confidence: float = Field(..., ge=0.0, le=1.0)
     density_scores: list[DensityScoreTier] = Field(default_factory=list)
-    default_density_score: float = Field(0.05, ge=0.0, le=1.0)
+    default_density_score: float = Field(..., ge=0.0, le=1.0)
     heading_normalization: list[HeadingNormalization] = Field(default_factory=list)
 
 
@@ -339,32 +328,35 @@ class RuleConfigManager:
 
         try:
             from app.core.database import PostgresAppSession
-            from app.models.rules import RuleConfigProfile
+            from app.models.rules import RuleConfigProfile, RuleComponent, SystemRule, RuleCondition, RuleConditionValue, RuleThreshold, RulePenalty, RuleWeight
+            from sqlalchemy.orm import selectinload
             
             with PostgresAppSession() as db:
-                query = db.query(RuleConfigProfile).filter(RuleConfigProfile.is_active == True)
+                query = db.query(RuleConfigProfile).options(
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.system_rules).selectinload(SystemRule.conditions).selectinload(RuleCondition.values),
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.thresholds),
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.penalties),
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.weights),
+                ).filter(RuleConfigProfile.is_active == True)
                 if tenant_id:
                     query = query.filter(RuleConfigProfile.tenant_id == tenant_id)
                 else:
                     query = query.filter(RuleConfigProfile.tenant_id.is_(None))
                 active_profile = query.first()
                 if active_profile:
-                    # TODO: Hydrate UnifiedRuleConfig fully from normalized RuleComponent, SystemRule, RuleCondition, 
-                    # RuleThreshold, RulePenalty, and RuleWeight tables.
-                    # This requires a complex hierarchical aggregation logic. 
-                    # For this PR, we defer hydration and allow fallback to the cached/mocked configuration.
-                    raw_data = None
+                    raw_data = cls._hydrate_profile(active_profile)
                     path_hash = active_profile.version_tag
                     config_size_bytes = len(json.dumps(raw_data))
-                    logger.info(f"[RULE_CONFIG] Loading active profile from database (v{active_profile.version_tag})")
+                    logger.info(f"[RULE_CONFIG] Hydrated active profile from database (v{active_profile.version_tag})")
                     
                     from app.core.cache import config_cache_manager
                     cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
                     config_cache_manager.set(cache_key, raw_data)
         except Exception as e:
-            logger.warning(f"[RULE_CONFIG] Failed to load config from database: {e}")
+            logger.error(f"[RULE_CONFIG] Failed to load config from database: {e}")
 
         if raw_data is None:
+            # Check cache as a fallback for intermittent DB issues if cache is populated
             from app.core.cache import config_cache_manager
             cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
             cached_data = config_cache_manager.get(cache_key)
@@ -373,17 +365,9 @@ class RuleConfigManager:
                 path_hash = cached_data.get("version", "cached")
                 config_size_bytes = len(json.dumps(raw_data))
                 logger.info(f"[RULE_CONFIG] Loading active profile from cache (v{path_hash})")
-
-        if raw_data is None:
-            # Fallback to local rule_config.json
-            from pathlib import Path
-            rule_config_path = Path(__file__).resolve().parent / "rule_config.json"
-            if rule_config_path.exists():
-                with open(rule_config_path, "rb") as f:
-                    raw_data = json.loads(f.read().decode("utf-8"))
-                path_hash = raw_data.get("version", "local_file")
-                config_size_bytes = len(json.dumps(raw_data))
-                logger.info(f"[RULE_CONFIG] Loading active profile from local file (v{path_hash})")
+            else:
+                from app.core.error_handlers import SystemConfigurationError
+                raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
 
         if raw_data is None:
             from app.core.error_handlers import SystemConfigurationError
@@ -426,6 +410,191 @@ class RuleConfigManager:
             f"LoadTime={total_load_time_ms}ms, CacheTime={cache_build_time_ms}ms, CompiledPatterns={compiled_pattern_count}"
         )
         return cls._active_configs[tenant_key]
+
+    @classmethod
+    def _hydrate_profile(cls, profile) -> dict[str, Any]:
+        """Convert normalized DB rows back to UnifiedRuleConfig JSON structure."""
+        
+        # Initialize empty structure to be populated from DB
+        base_dict = {}
+
+        base_dict["version"] = profile.version_tag
+        base_dict["description"] = profile.description or ""
+        base_dict["last_updated"] = profile.updated_at.isoformat()
+        
+        # Override with DB values
+        for comp in profile.components:
+            if comp.component_type == "global_tiers":
+                # Ensure global_confidence_tiers exists in dict
+                if "global_confidence_tiers" not in base_dict:
+                    base_dict["global_confidence_tiers"] = {}
+                    
+                # Reconstruct tier names dynamically from threshold keys (e.g. HIGH_min)
+                tier_names = {t.threshold_key.replace("_min", "").replace("_max", "") for t in comp.thresholds}
+                for t_name in tier_names:
+                    min_val = next((t.threshold_value for t in comp.thresholds if t.threshold_key == f"{t_name}_min"), 0.0)
+                    max_val = next((t.threshold_value for t in comp.thresholds if t.threshold_key == f"{t_name}_max"), 1.0)
+                    base_dict["global_confidence_tiers"][t_name] = {"min_score": min_val, "max_score": max_val}
+                    
+            elif comp.component_type == "field":
+                if "fields" not in base_dict:
+                    base_dict["fields"] = {}
+                f_name = comp.component_name
+                
+                # We start with existing dict to keep description, or create empty
+                field_dict = base_dict["fields"].get(f_name, {
+                    "field_name": f_name,
+                    "description": "",
+                    "confidence_scoring": {},
+                    "tier_thresholds": {},
+                    "downstream_gates": {},
+                    "keywords": {}
+                })
+                
+                for w in comp.weights:
+                    if w.weight_key.startswith("confidence_"):
+                        field_dict["confidence_scoring"][w.weight_key.replace("confidence_", "")] = w.weight_value
+                        
+                for t in comp.thresholds:
+                    if t.threshold_key in ("high_min", "medium_min", "low_min"):
+                        field_dict["tier_thresholds"][t.threshold_key] = t.threshold_value
+                    if t.threshold_key == "min_acceptance_confidence":
+                        field_dict["downstream_gates"][t.threshold_key] = t.threshold_value
+                        
+                for r in comp.system_rules:
+                    if r.rule_type == "keywords":
+                        for c in r.conditions:
+                            field_dict["keywords"][c.condition_scope] = [v.value for v in c.values]
+                            
+                base_dict["fields"][f_name] = field_dict
+                
+            elif comp.component_type == "scoring":
+                if "scoring" not in base_dict:
+                    base_dict["scoring"] = {"match": {}, "prefilter": {}, "taxonomy": {}, "resume_quality": {}}
+                    
+                c_name = comp.component_name
+                
+                if c_name == "match":
+                    match_dict = base_dict["scoring"].get("match", {})
+                    if "scoring_parameters" not in match_dict:
+                        match_dict["scoring_parameters"] = {}
+                    
+                    # scoring_parameters weights
+                    comp_weights = {}
+                    for w in comp.weights:
+                        if "_" in w.weight_key and not w.weight_key.startswith("llm_"):
+                            # This might be a nested component weight like role_skills, but scoring_parameters is flat
+                            # We just assign it if we don't know it's a component weight, but we know component_weights are nested in pydantic
+                            # However, create_profile flattens component_weights with underscore!
+                            # Let's map it back based on create_profile logic: f"{k}_{sub_k}"
+                            pass
+                        match_dict["scoring_parameters"][w.weight_key] = w.weight_value
+                        
+                    for t in comp.thresholds:
+                        match_dict["scoring_parameters"][t.threshold_key] = t.threshold_value
+                    
+                    for p in comp.penalties:
+                        if p.penalty_key in ("domain_mismatch_multiplier", "domain_mismatch_score_cap", "mandatory_failure_score_impact"):
+                            if "cross_domain_guard" not in match_dict:
+                                match_dict["cross_domain_guard"] = {}
+                            match_dict["cross_domain_guard"][p.penalty_key] = p.penalty_value
+                        else:
+                            match_dict["scoring_parameters"][p.penalty_key] = p.penalty_value
+                            
+                    # Extract component weights
+                    comp_weights = {}
+                    for w in comp.weights:
+                        if w.weight_key.startswith("component_weights_"):
+                            comp_weights[w.weight_key.replace("component_weights_", "")] = w.weight_value
+                    if comp_weights:
+                        match_dict["scoring_parameters"]["component_weights"] = comp_weights
+
+                    # Extract cross_domain_guard keywords
+                    for r in comp.system_rules:
+                        if r.rule_type == "cross_domain_guard":
+                            cdg = match_dict.get("cross_domain_guard", {})
+                            if "domain_guard_terms" not in cdg:
+                                cdg["domain_guard_terms"] = {}
+                            for c in r.conditions:
+                                kws = [v.value for v in c.values]
+                                if c.condition_scope == "software_candidate":
+                                    cdg["software_candidate_keywords"] = kws
+                                elif c.condition_scope == "non_it_job":
+                                    cdg["non_it_job_keywords"] = kws
+                                elif c.condition_scope == "software_requirement":
+                                    cdg["software_requirement_keywords"] = kws
+                                elif c.condition_scope.startswith("domain_guard_"):
+                                    cdg["domain_guard_terms"][c.condition_scope.replace("domain_guard_", "")] = kws
+                            match_dict["cross_domain_guard"] = cdg
+
+                    base_dict["scoring"]["match"] = match_dict
+                    
+                elif c_name == "prefilter":
+                    pref_dict = base_dict["scoring"].get("prefilter", {})
+                    if "lexical_weights" not in pref_dict:
+                        pref_dict["lexical_weights"] = {}
+                    for w in comp.weights:
+                        pref_dict["lexical_weights"][w.weight_key] = w.weight_value
+                    for t in comp.thresholds:
+                        if t.threshold_key == "rrf_k_constant":
+                            pref_dict["rrf_k_constant"] = t.threshold_value
+                    for r in comp.system_rules:
+                        if r.rule_type == "prefilter" and r.rule_name == "stop_words":
+                            for c in r.conditions:
+                                if c.condition_scope == "stop_words":
+                                    pref_dict["stop_words"] = [v.value for v in c.values]
+                    base_dict["scoring"]["prefilter"] = pref_dict
+                    
+                elif c_name == "taxonomy":
+                    tax_dict = base_dict["scoring"].get("taxonomy", {})
+                    vac_rules = []
+                    cand_rules = []
+                    for r in comp.system_rules:
+                        if not r.target_value:
+                            continue
+                        parts = r.target_value.split("::")
+                        domain = parts[0]
+                        families = parts[1].split(",") if len(parts) > 1 else []
+                        
+                        rule_obj = {
+                            "name": r.rule_name,
+                            "domain": domain,
+                            "branches": [{"conditions": []}]
+                        }
+                        for c in r.conditions:
+                            rule_obj["branches"][0]["conditions"].append({
+                                "scope": c.condition_scope,
+                                "mode": c.condition_mode,
+                                "negate": c.is_negated,
+                                "keywords": [v.value for v in c.values]
+                            })
+                            
+                        if r.rule_type == "vacancy_taxonomy":
+                            rule_obj["family"] = families[0] if families else ""
+                            vac_rules.append(rule_obj)
+                        elif r.rule_type == "candidate_taxonomy":
+                            rule_obj["families"] = families
+                            cand_rules.append(rule_obj)
+                            
+                    tax_dict["vacancy_rules"] = vac_rules
+                    tax_dict["candidate_rules"] = cand_rules
+                    base_dict["scoring"]["taxonomy"] = tax_dict
+                    
+                elif c_name == "resume_quality":
+                    rq_dict = base_dict["scoring"].get("resume_quality", {})
+                    if "contact_weights" not in rq_dict:
+                        rq_dict["contact_weights"] = {}
+                    for w in comp.weights:
+                        if w.weight_key == "section_weight":
+                            rq_dict["section_weight"] = w.weight_value
+                        elif w.weight_key.startswith("contact_"):
+                            rq_dict["contact_weights"][w.weight_key.replace("contact_", "")] = w.weight_value
+                    for t in comp.thresholds:
+                        rq_dict[t.threshold_key] = t.threshold_value
+                    base_dict["scoring"]["resume_quality"] = rq_dict
+
+        return base_dict
+
 
     @classmethod
     def _build_and_validate_all_caches(cls, config: UnifiedRuleConfig) -> tuple[MappingProxyType, int]:

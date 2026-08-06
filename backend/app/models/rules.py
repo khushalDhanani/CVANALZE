@@ -57,7 +57,10 @@ class RuleConfigProfile(PostgresAppBase):
 class RuleComponent(PostgresAppBase):
     """Normalized table replacing top-level sections (e.g., 'role', 'job_title', 'skills')."""
     __tablename__ = "rule_components"
-    __table_args__ = {"schema": "cvai"}
+    __table_args__ = (
+        UniqueConstraint("profile_id", "component_type", "component_name", name="uq_rule_component_profile"),
+        {"schema": "cvai"}
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     profile_id = Column(Integer, ForeignKey("cvai.rule_config_profiles.profile_id", ondelete="CASCADE"), nullable=False)
@@ -75,7 +78,10 @@ class RuleComponent(PostgresAppBase):
 class SystemRule(PostgresAppBase):
     """Normalized table for specific business rules (e.g., 'cross_domain_guard', 'vacancy_taxonomy')."""
     __tablename__ = "system_rules"
-    __table_args__ = {"schema": "cvai"}
+    __table_args__ = (
+        UniqueConstraint("component_id", "rule_name", name="uq_system_rule_component"),
+        {"schema": "cvai"}
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     component_id = Column(Integer, ForeignKey("cvai.rule_components.id", ondelete="CASCADE"), nullable=False)
@@ -96,16 +102,31 @@ class RuleCondition(PostgresAppBase):
     rule_id = Column(Integer, ForeignKey("cvai.system_rules.id", ondelete="CASCADE"), nullable=False)
     condition_scope = Column(String(100), nullable=False)
     condition_mode = Column(String(50), nullable=False, default="any")
-    keywords_json = Column(Text, nullable=True)
     is_negated = Column(Boolean, default=False)
 
     rule = relationship("SystemRule", back_populates="conditions")
+    values = relationship("RuleConditionValue", back_populates="condition", cascade="all, delete-orphan")
+
+
+class RuleConditionValue(PostgresAppBase):
+    """Normalized table for condition values (replacing keywords_json)."""
+    __tablename__ = "rule_condition_values"
+    __table_args__ = {"schema": "cvai"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    condition_id = Column(Integer, ForeignKey("cvai.rule_conditions.id", ondelete="CASCADE"), nullable=False)
+    value = Column(String(500), nullable=False)
+
+    condition = relationship("RuleCondition", back_populates="values")
 
 
 class RuleThreshold(PostgresAppBase):
     """Normalized table for thresholds (e.g., high_min, low_coverage_threshold)."""
     __tablename__ = "rule_thresholds"
-    __table_args__ = {"schema": "cvai"}
+    __table_args__ = (
+        UniqueConstraint("component_id", "threshold_key", name="uq_rule_threshold_component"),
+        {"schema": "cvai"}
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     component_id = Column(Integer, ForeignKey("cvai.rule_components.id", ondelete="CASCADE"), nullable=False)
@@ -118,7 +139,10 @@ class RuleThreshold(PostgresAppBase):
 class RulePenalty(PostgresAppBase):
     """Normalized table for penalties (e.g., domain_mismatch_multiplier)."""
     __tablename__ = "rule_penalties"
-    __table_args__ = {"schema": "cvai"}
+    __table_args__ = (
+        UniqueConstraint("component_id", "penalty_key", name="uq_rule_penalty_component"),
+        {"schema": "cvai"}
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     component_id = Column(Integer, ForeignKey("cvai.rule_components.id", ondelete="CASCADE"), nullable=False)
@@ -131,7 +155,10 @@ class RulePenalty(PostgresAppBase):
 class RuleWeight(PostgresAppBase):
     """Normalized table for weights (e.g., semantic weights, contact weights)."""
     __tablename__ = "rule_weights"
-    __table_args__ = {"schema": "cvai"}
+    __table_args__ = (
+        UniqueConstraint("component_id", "weight_key", name="uq_rule_weight_component"),
+        {"schema": "cvai"}
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     component_id = Column(Integer, ForeignKey("cvai.rule_components.id", ondelete="CASCADE"), nullable=False)

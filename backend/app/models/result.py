@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import Column, DateTime, String, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from app.core.database import PostgresAppBase
@@ -15,9 +15,9 @@ class CVResult(PostgresAppBase):
     cv_id = Column(String, nullable=True)
     cv_hash = Column(String, nullable=True, index=True)
     
-    resume_json = Column(JSONB, nullable=True)
-    match_analysis = Column(JSONB, nullable=True)
+    resume_json = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    match_analysis = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     
     text_content = Column(String, nullable=True)
     markdown_content = Column(String, nullable=True)
-    raw_data = Column(JSONB, nullable=True)
+    raw_data = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)

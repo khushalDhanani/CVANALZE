@@ -16,18 +16,19 @@
 - Validated application startup to immediately throw a `RuntimeError` if the configured MSSQL account contains any write permissions.
 - Created robust test coverage proving MSSQL cannot be written to via ORM, raw text, or migration runner.
 
-### PR 3 — Repair configuration loading
-- Replaced non-existent `SessionLocal` with `PostgresAppSession` in `RuleConfigManager`.
-- Removed legacy `rule_config.json` file-fallback loading logic.
-- Configured application startup to hard fail if no PostgreSQL rule configuration exists.
+### PR 3 & PR 5 — Repair and Normalize PostgreSQL configuration
+- Replaced monolithic JSON configuration blobs with fully normalized relational models: `RuleConfigProfile`, `RuleComponent`, `SystemRule`, `RuleCondition`, `RuleConditionValue`, `RuleThreshold`, `RulePenalty`, `RuleWeight`.
+- Applied strict unique constraints across rules, components, thresholds, weights, and penalties.
+- Rewrote `ConfigurationService.create_profile` to insert all config dimensions strictly using relational mapping logic.
+- Rewrote `RuleConfigManager.load_config` to rebuild the `UnifiedRuleConfig` object purely from database records, eliminating the legacy `rule_config.json` fallback logic.
+- Configured application startup to hard fail if no valid configuration can be loaded.
+- Modified tests to use an explicitly patched dynamic config test-fixture for unit testing, and fixed SQLite compilation issues involving `JSONB`.
 
 ### PR 4 — Implement complete MSSQL repositories
 - Migrated legacy `candidate`, `vacancy`, `job-profile`, `qualification`, `domain`, and `workflow` schemas.
 - Implemented `get_candidate_aggregate(candidate_id)`, `get_vacancy_aggregate(vacancy_id)`, and `get_job_profile_aggregate(job_profile_id)` leveraging `MssqlReadBase`.
 
-### PR 5 — Normalize PostgreSQL configuration
-- Replaced monolithic JSON configuration blobs with 6 relational models: `RuleConfigProfile`, `RuleConfigRule`, `RuleConfigCondition`, `RuleConfigThreshold`, `RuleConfigPenalty`, `RuleConfigWeight`, `RuleConfigComponent`.
-- Upgraded `RuleConfigManager` caching and serialization logic.
+
 
 ### PR 6 — Correct taxonomy resolution
 - Added `FamilyCompatibility` PostgreSQL schema model.

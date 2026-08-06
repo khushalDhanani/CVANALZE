@@ -93,7 +93,7 @@ class CandidateDomainService:
             skills=sorted(skills_set),
         )
 
-        if dyn_res.match_status != "NO_SUITABLE_MATCH":
+        if dyn_res.match_status not in ("NO_MATCH", "NO_SUITABLE_MATCH"):
             industry_dept = dyn_res.industry_department or dyn_res.industry_domain or dyn_res.db_department_name
             prof_domain = dyn_res.industry_domain or dyn_res.db_department_name or ""
             recommended_dept = industry_dept or prof_domain
