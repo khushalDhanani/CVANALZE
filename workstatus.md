@@ -101,10 +101,11 @@
 - [x] Fixed `run_auto_migrations` in `database.py` to no longer swallow exceptions, ensuring startup halts gracefully with a loud exception if migrations fail.
 
 ### PR4 — Repository Corrections (AIRIS Model Alignments)
-- Built `test_repository_contracts.py` utilizing a mocked SQLAlchemy Session to execute queries safely, catching any references to undeclared schema properties via native `AttributeError`.
-- **Candidate Aggregates:** Replaced `CandidateSkillIsActive` with the correct `IsActive` property. Implemented complete fetch queries spanning `experiences`, `languages`, `locations`, and `notice_period_id`.
-- **Vacancy Aggregates:** Removed unsupported active/deleted metadata fields against qualifications, strictly asserting `RequriedQualificationID`. Added sub-lookups for `request_track` and `candidate_history`.
-- **Job Profile Aggregates:** Remapped attribute access for `OrgJobProfileQualificationDet` (`QualificationIsDeleted`) and `JobProfileDomainKnowledgeDet` (`DomainKnowlgID`, `JobProfileDomainKnowledgeDetIsActive`).
+- [x] Built `test_repository_contracts.py` utilizing a mocked SQLAlchemy Session to execute queries safely, catching any references to undeclared schema properties via native `AttributeError`.
+- [x] Implemented `test_models_configure_mappers()` and explicit `hasattr()` validation blocks for all models used in repositories.
+- [x] **Candidate Aggregates:** Verified `CandidateSkillIsActive` was correctly mapped to `IsActive`. 
+- [x] **Vacancy Aggregates:** Verified unsupported active/deleted metadata fields against qualifications were removed, strictly asserting `RequriedQualificationID`.
+- [x] **Job Profile Aggregates:** Verified exact attribute access for `OrgJobProfileQualificationDet` (`QualificationIsDeleted`) and `JobProfileDomainKnowledgeDet` (`DomainKnowlgID`, `JobProfileDomainKnowledgeDetIsActive`).
 
 ### PR6 and PR7 — Taxonomy Enforcement and Isolation
 - Replaced the memory-heavy `get_all_designations` loop inside `DynamicTaxonomyService` with an optimized PostgreSQL indexed lookup (`session.query().filter(ilike())`) directly mapped against `OrgDesignationMst`.
