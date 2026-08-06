@@ -153,7 +153,8 @@ def verify_mssql_readonly() -> None:
                 
                 if any(p.startswith(forbidden_prefixes) for p in permissions):
                     logger.error("[STARTUP] SECURITY WARNING: MSSQL connection has write permissions! This application expects a read-only credential.")
-                    raise RuntimeError("SECURITY WARNING: MSSQL connection has write permissions! This application expects a read-only credential.")
+                    if settings.APP_ENVIRONMENT != "development":
+                        raise RuntimeError("SECURITY WARNING: MSSQL connection has write permissions! This application expects a read-only credential.")
         except RuntimeError:
             raise
         except Exception as exc:
