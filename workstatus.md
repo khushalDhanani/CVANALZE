@@ -107,6 +107,12 @@
 - [x] **Vacancy Aggregates:** Verified unsupported active/deleted metadata fields against qualifications were removed, strictly asserting `RequriedQualificationID`.
 - [x] **Job Profile Aggregates:** Verified exact attribute access for `OrgJobProfileQualificationDet` (`QualificationIsDeleted`) and `JobProfileDomainKnowledgeDet` (`DomainKnowlgID`, `JobProfileDomainKnowledgeDetIsActive`).
 
+### PR5, PR6, and PR7 — PostgreSQL Normalization & Data Migration
+- [x] **Consolidated Rules Migration:** Deleted the fragmented `008` and `012` JSON-column deletion migrations. 
+- [x] **Normalized Migration Script:** Created a unified `008_normalized_configuration_schema.sql` (and rollback) that explicitly builds `rule_config_profiles` and all associated component tables (`rule_components`, `system_rules`, `rule_conditions`, `rule_condition_values`, `rule_thresholds`, `rule_penalties`, `rule_weights`) with forward and reverse declarations.
+- [x] **Constraint Injection:** Added all required composite `UNIQUE` constraints to enforce hierarchical data integrity across profile-components, component-rules, and condition-values.
+- [x] **Safe JSON Sunsetting:** Implemented a `DO $$` block to cleanly test for and bypass legacy `fields_config_json` data before permanently dropping `global_confidence_tiers_json`, `fields_config_json`, and `scoring_rules_json` from the profile table.
+
 ### PR5 and PR6 — MSSQL Aggregate Completion
 - [x] **Candidate Aggregate:** Rewrote `get_candidate_aggregate` to use `.outerjoin` blocks against `OrgJobProfileMst`, `RecruitDomainKnowledgeMst`, `RecruitSkillMst`, `LanguageMst`, and `OrgLocationMst`. The payload now returns a fully structured nested dictionary for `experiences`, `qualifications`, `skills`, `languages`, `locations`, `notice_period`, and `domain_knowledge` instead of raw detached IDs.
 - [x] **Vacancy Aggregate:** Rewrote `get_vacancy_aggregate` to fetch related taxonomic descriptions by explicitly joining `TransactionStatusMst` (for `RequestStatusID` and `VacancyReqStatusID`), `QualificationMst`, `RecruitDomainKnowledgeMst`, and `RecruitCandidateMst`. Output now includes embedded `candidate_applications`, `request_track`, `candidate_history`, `required_qualifications`, and `job_profile.domains`.
