@@ -98,6 +98,12 @@
 - Added `tests/test_startup.py` to ensure all models load correctly and `configure_mappers()` runs without error.
 - Fixed an import error in `app/models/__init__.py` where `DesignationAbbreviation` was declared in `__all__` but not imported.
 
+### PR4 — Repository Corrections (AIRIS Model Alignments)
+- Built `test_repository_contracts.py` utilizing a mocked SQLAlchemy Session to execute queries safely, catching any references to undeclared schema properties via native `AttributeError`.
+- **Candidate Aggregates:** Replaced `CandidateSkillIsActive` with the correct `IsActive` property. Implemented complete fetch queries spanning `experiences`, `languages`, `locations`, and `notice_period_id`.
+- **Vacancy Aggregates:** Removed unsupported active/deleted metadata fields against qualifications, strictly asserting `RequriedQualificationID`. Added sub-lookups for `request_track` and `candidate_history`.
+- **Job Profile Aggregates:** Remapped attribute access for `OrgJobProfileQualificationDet` (`QualificationIsDeleted`) and `JobProfileDomainKnowledgeDet` (`DomainKnowlgID`, `JobProfileDomainKnowledgeDetIsActive`).
+
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.
 - Taxonomy Classifier now correctly throws `Unknown` / `NO_SUITABLE_MATCH` for unrecognized domains instead of blindly falling back to `General Operations`, enforcing strict DB-backed taxonomy resolutions.

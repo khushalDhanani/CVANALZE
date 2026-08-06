@@ -35,15 +35,13 @@ class JobProfileSourceRepository:
 
         q_stmt = select(OrgJobProfileQualificationDet.QualificationID).where(
             OrgJobProfileQualificationDet.JobProfileID == job_profile_id,
-            OrgJobProfileQualificationDet.JobProfileQualiIsActive == True,
-            OrgJobProfileQualificationDet.JobProfileQualiIsDeleted == False
+            OrgJobProfileQualificationDet.QualificationIsDeleted == False
         )
         qualifications = [q for q, in self.db.execute(q_stmt).all() if q is not None]
 
-        d_stmt = select(JobProfileDomainKnowledgeDet.DomainKnowledgeID).where(
+        d_stmt = select(JobProfileDomainKnowledgeDet.DomainKnowlgID).where(
             JobProfileDomainKnowledgeDet.JobProfileID == job_profile_id,
-            JobProfileDomainKnowledgeDet.JobProfileDomainKnowledgeIsActive == True,
-            JobProfileDomainKnowledgeDet.JobProfileDomainKnowledgeIsDeleted == False
+            JobProfileDomainKnowledgeDet.JobProfileDomainKnowledgeDetIsActive == True
         )
         domains = [d for d, in self.db.execute(d_stmt).all() if d is not None]
 

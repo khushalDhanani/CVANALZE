@@ -45,12 +45,26 @@ class VacancySourceRepository:
             is_force_closed, status_id
         ) = row
 
-        q_stmt = select(RecruitVacancyRequriedQualificationDet.QualificationID).where(
-            RecruitVacancyRequriedQualificationDet.VacancyRequestID == vacancy_id,
-            RecruitVacancyRequriedQualificationDet.VacancyReqQualiIsActive == True,
-            RecruitVacancyRequriedQualificationDet.VacancyReqQualiIsDeleted == False
+        q_stmt = select(RecruitVacancyRequriedQualificationDet.RequriedQualificationID).where(
+            RecruitVacancyRequriedQualificationDet.VacancyRequestID == vacancy_id
         )
         qualifications = [q for q, in self.db.execute(q_stmt).all() if q is not None]
+
+        from app.models.mssql.vacancy import RecruitVacancyRequestTrack, RecruitVacancyCandidateList, RecruitVacancyCandidiateHistoryDet
+
+        track_stmt = select(RecruitVacancyRequestTrack.VacancyTrackID).where(
+            RecruitVacancyRequestTrack.VacancyRequestID == vacancy_id,
+            RecruitVacancyRequestTrack.VacancyReqIsDeleted == False
+        )
+        request_track = [t for t, in self.db.execute(track_stmt).all() if t is not None]
+
+        history_stmt = select(RecruitVacancyCandidiateHistoryDet.VacancyAppliedHistoryID).join(
+            RecruitVacancyCandidateList,
+            RecruitVacancyCandidiateHistoryDet.VacancyCandidateID == RecruitVacancyCandidateList.VacancyCandidateID
+        ).where(
+            RecruitVacancyCandidateList.VacancyRequestID == vacancy_id
+        )
+        candidate_history = [h for h, in self.db.execute(history_stmt).all() if h is not None]
 
         return {
             "vacancy_id": v_id,
@@ -71,5 +85,7 @@ class VacancySourceRepository:
             "is_force_closed": is_force_closed,
             "status_id": status_id,
             "qualifications": qualifications,
+            "request_track": request_track,
+            "candidate_history": candidate_history,
             "domains": []
         }

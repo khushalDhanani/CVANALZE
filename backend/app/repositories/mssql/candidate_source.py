@@ -29,7 +29,8 @@ class CandidateSourceRepository:
                 RecruitCandidateMst.CandidateIsActive,
                 RecruitCandidateMst.CandidateStatusID,
                 OrgJobProfileMst.JobProfileName,
-                RecruitCandidateMst.CandidateDomainKnowlgID
+                RecruitCandidateMst.CandidateDomainKnowlgID,
+                RecruitCandidateMst.NoticePeriodID
             )
             .outerjoin(
                 OrgJobProfileMst,
@@ -41,7 +42,7 @@ class CandidateSourceRepository:
         if not row:
             return None
             
-        candidate_id, first_name, last_name, job_profile_id, total_exp, expected_ctc, is_active, status_id, jp_name, domain_id = row
+        candidate_id, first_name, last_name, job_profile_id, total_exp, expected_ctc, is_active, status_id, jp_name, domain_id, notice_period_id = row
 
         q_stmt = select(RecruitCandidateQualificationDet.QualificationID).where(
             RecruitCandidateQualificationDet.CandidateID == candidate_id,
@@ -52,11 +53,29 @@ class CandidateSourceRepository:
 
         s_stmt = select(RecruitCandidateSkillDet.SkillID).where(
             RecruitCandidateSkillDet.CandidateID == candidate_id,
-            RecruitCandidateSkillDet.CandidateSkillIsActive == True,
-            RecruitCandidateSkillDet.CandidateSkillIsDeleted == False
+            RecruitCandidateSkillDet.IsActive == True
         )
         skills = [s for s, in self.db.execute(s_stmt).all() if s is not None]
         
+        e_stmt = select(RecruitCandidateExperienceDet.CandidExpDetID).where(
+            RecruitCandidateExperienceDet.CandidateID == candidate_id,
+            RecruitCandidateExperienceDet.CandidExpIsActive == True,
+            RecruitCandidateExperienceDet.CandidExpIsDeleted == False
+        )
+        experiences = [e for e, in self.db.execute(e_stmt).all() if e is not None]
+
+        l_stmt = select(RecruitCandidateLanguageDet.LanguageID).where(
+            RecruitCandidateLanguageDet.CandidateID == candidate_id,
+            RecruitCandidateLanguageDet.LanguageIsDeleted == False
+        )
+        languages = [l for l, in self.db.execute(l_stmt).all() if l is not None]
+
+        loc_stmt = select(RecruitCandidateLocationMst.LocID).where(
+            RecruitCandidateLocationMst.CandidateID == candidate_id,
+            RecruitCandidateLocationMst.IsActive == True
+        )
+        locations = [loc for loc, in self.db.execute(loc_stmt).all() if loc is not None]
+
         return {
             "candidate_id": candidate_id,
             "first_name": first_name,
@@ -71,5 +90,9 @@ class CandidateSourceRepository:
             } if jp_name else None,
             "qualifications": qualifications,
             "skills": skills,
+            "experiences": experiences,
+            "languages": languages,
+            "locations": locations,
+            "notice_period_id": notice_period_id,
             "domains": [domain_id] if domain_id else []
         }
