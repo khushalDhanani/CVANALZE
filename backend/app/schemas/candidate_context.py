@@ -176,8 +176,8 @@ class CandidateAnalysisContext:
         it_software_family = "Software Engineering & Development"
         is_software_cand = False
         if cand_primary_family:
-            is_compat, score = DynamicTaxonomyService.check_family_compatibility(cand_primary_family, it_software_family)
-            if is_compat and score >= 0.4:
+            is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(cand_primary_family, it_software_family)
+            if is_compat and score is not None and score >= 0.4:
                 is_software_cand = True
         if not is_software_cand:
             is_software_cand = "Information Technology" in cand_tax_domain or "Software" in cand_tax_domain
@@ -269,8 +269,8 @@ class CandidateAnalysisContext:
         it_software_family = "Software Engineering & Development"
         self.is_software_cand = False
         if self.cand_primary_family:
-            is_compat, score = DynamicTaxonomyService.check_family_compatibility(self.cand_primary_family, it_software_family)
-            if is_compat and score >= 0.4:
+            is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(self.cand_primary_family, it_software_family)
+            if is_compat and score is not None and score >= 0.4:
                 self.is_software_cand = True
         if not self.is_software_cand:
             self.is_software_cand = "Information Technology" in self.cand_domain or "Software" in self.cand_domain

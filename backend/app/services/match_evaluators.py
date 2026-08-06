@@ -623,8 +623,8 @@ class CrossDomainGuardEvaluator:
             if not is_tax_compat and not has_software_req:
                 domain_mismatch = True
             elif context.cand_primary_family and vac_family:
-                is_compat, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
-                if not is_compat or score < 0.4:
+                is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
+                if not is_compat or (score is not None and score < 0.4):
                     domain_mismatch = True
 
         final_score = initial_score

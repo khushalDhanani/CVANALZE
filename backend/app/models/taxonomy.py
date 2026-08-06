@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -50,6 +51,8 @@ class JobFamilyMaster(PostgresAppBase):
 
     domain = relationship("DomainMaster", back_populates="families")
     designations = relationship("DesignationMaster", back_populates="family", cascade="all, delete-orphan")
+    compatibilities_a = relationship("FamilyCompatibility", foreign_keys="FamilyCompatibility.family_a_id", back_populates="family_a")
+    compatibilities_b = relationship("FamilyCompatibility", foreign_keys="FamilyCompatibility.family_b_id", back_populates="family_b")
 
 
 class DesignationMaster(PostgresAppBase):
@@ -139,7 +142,10 @@ class DesignationSkill(PostgresAppBase):
 
 class FamilyCompatibility(PostgresAppBase):
     __tablename__ = "family_compatibilities"
-    __table_args__ = {"schema": "cvai"}
+    __table_args__ = (
+        UniqueConstraint("family_a_id", "family_b_id", name="uq_family_pair"),
+        {"schema": "cvai"}
+    )
 
     compatibility_id = Column(Integer, primary_key=True, autoincrement=True)
     family_a_id = Column(
@@ -153,7 +159,9 @@ class FamilyCompatibility(PostgresAppBase):
         nullable=False,
     )
     compatibility_score = Column(Float, nullable=False, default=1.0)
+    is_allowed = Column(Boolean, nullable=False, default=True)
+    status = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    family_a = relationship("JobFamilyMaster", foreign_keys=[family_a_id])
-    family_b = relationship("JobFamilyMaster", foreign_keys=[family_b_id])
+    family_a = relationship("JobFamilyMaster", foreign_keys=[family_a_id], back_populates="compatibilities_a")
+    family_b = relationship("JobFamilyMaster", foreign_keys=[family_b_id], back_populates="compatibilities_b")

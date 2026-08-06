@@ -332,8 +332,8 @@ class TaxonomyClassifier:
         for cand_fam in candidate_families:
             if cand_fam == job_family:
                 return True
-            is_compat, score = DynamicTaxonomyService.check_family_compatibility(cand_fam, job_family)
-            if is_compat and score > 0.4:
+            is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(cand_fam, job_family)
+            if is_compat and score is not None and score > 0.4:
                 return True
         return False
 
