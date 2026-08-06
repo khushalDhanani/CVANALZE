@@ -12,8 +12,13 @@ class SyncRun(PostgresAppBase):
     status = Column(String(20), nullable=False) # e.g. RUNNING, COMPLETED, FAILED
     started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
-    records_processed = Column(Integer, default=0, nullable=False)
-    error_count = Column(Integer, default=0, nullable=False)
+    records_read = Column(Integer, default=0, nullable=False)
+    records_inserted = Column(Integer, default=0, nullable=False)
+    records_updated = Column(Integer, default=0, nullable=False)
+    records_skipped = Column(Integer, default=0, nullable=False)
+    records_failed = Column(Integer, default=0, nullable=False)
+    watermark_before = Column(DateTime(timezone=True), nullable=True)
+    watermark_after = Column(DateTime(timezone=True), nullable=True)
 
 class SyncWatermark(PostgresAppBase):
     __tablename__ = "sync_watermarks"
@@ -34,6 +39,7 @@ class SyncError(PostgresAppBase):
     error_type = Column(String(100), nullable=False)
     error_message = Column(String, nullable=False) # Without PII
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    is_resolved = Column(Boolean, default=False, nullable=False)
 
 class DepartmentSnapshot(PostgresAppBase):
     __tablename__ = "department_snapshots"

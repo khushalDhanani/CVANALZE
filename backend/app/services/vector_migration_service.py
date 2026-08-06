@@ -56,7 +56,9 @@ class VectorDatabaseMigrationService:
                 r_updated_at = r.get("updated_at")
                 
                 # If we have an embedding and it is fresh, skip it
-                if not r_updated_at or (source_watermark and str(source_watermark) >= str(r_updated_at)):
+                dt_source = _parse_dt(source_watermark)
+                dt_job = _parse_dt(r_updated_at)
+                if not r_updated_at or (dt_source and dt_job and dt_source >= dt_job):
                     metrics["skipped"] += 1
                     continue
 

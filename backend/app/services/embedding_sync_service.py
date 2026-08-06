@@ -65,7 +65,9 @@ class EmbeddingSyncService:
                     source_watermark = existing_meta.get("source_watermark") if existing_meta else None
                     job_updated_at = job.get("updated_at") or job.get("VacancyRequestCreatedAt")
                     
-                    if not job_updated_at or (source_watermark and str(source_watermark) >= str(job_updated_at)):
+                    dt_source = _parse_dt(source_watermark)
+                    dt_job = _parse_dt(job_updated_at)
+                    if not job_updated_at or (dt_source and dt_job and dt_source >= dt_job):
                         cached_emb = pg_emb
                         _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
 
