@@ -110,18 +110,25 @@ class ShadowEvaluator:
                     is_false_negative = False
                     is_agreement = True
 
+        # Prepare historical mapping details
+        historical_airis_result = {
+            "status_id": airis_status_id,
+            "is_hired": airis_is_hired
+        } if airis_status_id is not None else None
+
         result = ShadowValidationResult(
             airis_status_id=airis_status_id,
             airis_is_hired=airis_is_hired,
             cvai_score=new_score,
             cvai_recommendation=new_rec,
-            old_result_payload=json.loads(json.dumps(old_result.dict(), default=pydantic_encoder)) if old_result else None,
-            new_result_payload=json.loads(json.dumps(new_result.dict(), default=pydantic_encoder)) if new_result else None,
-            score_delta=score_delta,
-            classification_delta=class_delta,
-            department_delta=dept_delta,
-            designation_delta=desig_delta,
-            reason_and_evidence_delta=reason_delta,
+            production_result=json.loads(json.dumps(old_result.dict(), default=pydantic_encoder)) if old_result else None,
+            shadow_result=json.loads(json.dumps(new_result.dict(), default=pydantic_encoder)) if new_result else None,
+            score_difference=score_delta,
+            status_difference=class_delta,
+            department_difference=dept_delta,
+            designation_difference=desig_delta,
+            evidence_difference=reason_delta,
+            historical_airis_result=historical_airis_result,
             is_false_positive=is_false_positive,
             is_false_negative=is_false_negative,
             is_agreement=is_agreement
@@ -232,33 +239,33 @@ class MetricsEngine:
             if total == 0:
                 return
             
-            # Explicit True Positives
-            tps = pg_db.query(ShadowValidationResult).filter(
+            # True Positive (TP): CV-AI predicted match, AIRIS was hired
+            tp = pg_db.query(ShadowValidationResult).filter(
                 ShadowValidationResult.is_agreement == True,
                 ShadowValidationResult.airis_is_hired == True
             ).count()
             
-            # Explicit True Negatives
-            tns = pg_db.query(ShadowValidationResult).filter(
+            # True Negative (TN): CV-AI predicted no-match, AIRIS was not hired
+            tn = pg_db.query(ShadowValidationResult).filter(
                 ShadowValidationResult.is_agreement == True,
                 ShadowValidationResult.airis_is_hired == False
             ).count()
 
-            # Explicit False Positives
-            fps = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_positive == True).count()
+            # False Positive (FP): CV-AI predicted match, AIRIS was not hired
+            fp = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_positive == True).count()
             
-            # Explicit False Negatives
-            fns = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_negative == True).count()
+            # False Negative (FN): CV-AI predicted no-match, AIRIS was hired
+            fn = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_negative == True).count()
             
-            precision = tps / (tps + fps) if (tps + fps) > 0 else 0
-            recall = tps / (tps + fns) if (tps + fns) > 0 else 0
-            fpr = fps / (fps + tns) if (fps + tns) > 0 else 0
-            fnr = fns / (fns + tps) if (fns + tps) > 0 else 0
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+            fnr = fn / (fn + tp) if (fn + tp) > 0 else 0
             
-            agreement_rate = (tps + tns) / total if total > 0 else 0
+            agreement_rate = (tp + tn) / total if total > 0 else 0
             
             # No-match accuracy: correctly identifying when a candidate is NOT a match
-            no_match_accuracy = tns / (tns + fps) if (tns + fps) > 0 else 0
+            no_match_accuracy = tn / (tn + fp) if (tn + fp) > 0 else 0
 
             snap = ValidationMetricsSnapshot(
                 total_runs=total,

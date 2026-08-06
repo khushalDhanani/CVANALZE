@@ -31,15 +31,18 @@ class ShadowValidationResult(PostgresAppBase):
     cvai_recommendation = Column(String(50), nullable=True)
     
     # Raw Payloads
-    old_result_payload = Column(JSONB, nullable=True)
-    new_result_payload = Column(JSONB, nullable=True)
+    production_result = Column(JSONB, nullable=True)
+    shadow_result = Column(JSONB, nullable=True)
     
     # Deltas
-    score_delta = Column(Numeric, nullable=True)
-    classification_delta = Column(String, nullable=True)
-    department_delta = Column(String, nullable=True)
-    designation_delta = Column(String, nullable=True)
-    reason_and_evidence_delta = Column(JSONB, nullable=True)
+    score_difference = Column(Numeric, nullable=True)
+    department_difference = Column(String, nullable=True)
+    designation_difference = Column(String, nullable=True)
+    status_difference = Column(String, nullable=True)
+    evidence_difference = Column(JSONB, nullable=True)
+    
+    # Historical AIRIS mapping
+    historical_airis_result = Column(JSONB, nullable=True)
     
     # Calculated Metrics
     is_false_positive = Column(Boolean, nullable=True)

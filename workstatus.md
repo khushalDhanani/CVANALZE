@@ -148,3 +148,11 @@
 - Taxonomy Classifier now correctly throws `Unknown` / `NO_SUITABLE_MATCH` for unrecognized domains instead of blindly falling back to `General Operations`, enforcing strict DB-backed taxonomy resolutions.
 - Enriched analysis results now strictly delimit "verified authoritative matches" from "AI extrapolated career suggestions", resolving pipeline hallucinations.
 - Added a non-blocking background thread `ShadowValidationService` in `match_service.py` to seamlessly audit CV Analyzer decisions against historical AIRIS outputs without stalling production API latency.
+
+### PR11 — Shadow Validation Rewrite
+- [x] **Shadow Validation Result Normalization:** Migrated `ShadowValidationResult` payload structure in database (`validation.py` + `016_shadow_validation_schema_update.sql`) to explicitly persist `production_result`, `shadow_result`, `score_difference`, `department_difference`, `designation_difference`, `status_difference`, `evidence_difference`, and `historical_airis_result`.
+- [x] **RQ Worker System Check:** Verified `ShadowValidationService` runs exclusively through the `rq` queue (`queue.enqueue`), preventing unauthorized use of unmanaged Python background threads in standard FastAPI flows.
+- [x] **AIRIS Status Benchmark Seed:** Wrote a migration to seed the standard AIRIS positive `status_id`s (4, 5, 6, 7) into `airis_historical_benchmarks`, completely eliminating any legacy hardcoded placeholder validation lists.
+- [x] **Explicit Metric Formulas:** Explicitly rewrote `MetricsEngine.snapshot_metrics()` variable assignments in `shadow_validation_service.py` using formal boolean confusion matrix terminology (`tp`, `tn`, `fp`, `fn`), strictly mirroring standard PR11 formulas: `Precision = TP / (TP + FP)`, `Recall = TP / (TP + FN)`, `FPR = FP / (FP + TN)`, `FNR = FN / (FN + TP)`.
+
+## 4. Unfinished Work (Carry-over / Pending)
