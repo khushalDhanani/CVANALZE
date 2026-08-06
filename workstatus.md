@@ -98,6 +98,7 @@
 - [x] Added `tests/test_startup.py` to ensure all models load correctly and `configure_mappers()` runs without error.
 - [x] Fixed an import error in `app/models/__init__.py` where `DesignationAbbreviation` was declared in `__all__` but not imported.
 - [x] Repaired `api/config.py` to fetch configuration via `RuleConfigManager.get_config().model_dump()` instead of referencing deleted JSON string columns (`global_confidence_tiers_json`, `fields_config_json`, `scoring_rules_json`).
+- [x] Fixed `run_auto_migrations` in `database.py` to no longer swallow exceptions, ensuring startup halts gracefully with a loud exception if migrations fail.
 
 ### PR4 — Repository Corrections (AIRIS Model Alignments)
 - Built `test_repository_contracts.py` utilizing a mocked SQLAlchemy Session to execute queries safely, catching any references to undeclared schema properties via native `AttributeError`.

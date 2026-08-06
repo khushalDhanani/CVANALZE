@@ -107,14 +107,8 @@ def run_auto_migrations():
         logger.warning("[AUTO_MIGRATE] Ignored in production; use scripts/run_migrations.py explicitly.")
         return
 
-    try:
-        from scripts.run_migrations import run_migrations
+    from scripts.run_migrations import run_migrations
 
-        if settings.POSTGRES_APP_URL:
-            try:
-                logger.info("[AUTO_MIGRATE] Checking pending PostgreSQL schema migrations...")
-                run_migrations(db_url=settings.POSTGRES_APP_URL, dry_run=False, dialect="postgres")
-            except Exception as exc:
-                logger.warning(f"[AUTO_MIGRATE] PostgreSQL auto-migration warning: {exc}")
-    except Exception as exc:
-        logger.warning(f"[AUTO_MIGRATE] Could not execute auto-migrations: {exc}")
+    if settings.POSTGRES_APP_URL:
+        logger.info("[AUTO_MIGRATE] Checking pending PostgreSQL schema migrations...")
+        run_migrations(db_url=settings.POSTGRES_APP_URL, dry_run=False, dialect="postgres")
