@@ -77,14 +77,18 @@ class RecruitSkillMst(MssqlReadBase):
 class RecruitWorkflowMst(MssqlReadBase):
     __tablename__ = "RecruitWorkflowMst"
 
-    __table_args__ = {"schema": "AIRIS"}    WorkflowID = Column(BigInteger, primary_key=True)
+    __table_args__ = {"schema": "AIRIS"}
+
+    WorkflowID = Column(BigInteger, primary_key=True)
     WorkflowName = Column(String)
 
 
 class RecruitCandidateQualification(MssqlReadBase):
     __tablename__ = "RecruitCandidateQualification"
 
-    __table_args__ = {"schema": "AIRIS"}    CandQualID = Column(BigInteger, primary_key=True)
+    __table_args__ = {"schema": "AIRIS"}
+
+    CandQualID = Column(BigInteger, primary_key=True)
     CandidateID = Column(BigInteger, ForeignKey("RecruitCandidateMst.CandidateID"))
     QualID = Column(BigInteger, ForeignKey("OrgQualificationMst.QualID"))
 
@@ -92,7 +96,9 @@ class RecruitCandidateQualification(MssqlReadBase):
 class RecruitCandidateDomain(MssqlReadBase):
     __tablename__ = "RecruitCandidateDomain"
 
-    __table_args__ = {"schema": "AIRIS"}    CandDomainID = Column(BigInteger, primary_key=True)
+    __table_args__ = {"schema": "AIRIS"}
+
+    CandDomainID = Column(BigInteger, primary_key=True)
     CandidateID = Column(BigInteger, ForeignKey("RecruitCandidateMst.CandidateID"))
     DomainID = Column(BigInteger, ForeignKey("OrgDomainMst.DomainID"))
 
@@ -100,7 +106,9 @@ class RecruitCandidateDomain(MssqlReadBase):
 class RecruitVacancyQualification(MssqlReadBase):
     __tablename__ = "RecruitVacancyQualification"
 
-    __table_args__ = {"schema": "AIRIS"}    VacancyQualID = Column(BigInteger, primary_key=True)
+    __table_args__ = {"schema": "AIRIS"}
+
+    VacancyQualID = Column(BigInteger, primary_key=True)
     VacancyRequestID = Column(BigInteger, ForeignKey("RecruitVacancyRequest.VacancyRequestID"))
     QualID = Column(BigInteger, ForeignKey("OrgQualificationMst.QualID"))
 
@@ -108,7 +116,9 @@ class RecruitVacancyQualification(MssqlReadBase):
 class RecruitVacancyDomain(MssqlReadBase):
     __tablename__ = "RecruitVacancyDomain"
 
-    __table_args__ = {"schema": "AIRIS"}    VacancyDomainID = Column(BigInteger, primary_key=True)
+    __table_args__ = {"schema": "AIRIS"}
+
+    VacancyDomainID = Column(BigInteger, primary_key=True)
     VacancyRequestID = Column(BigInteger, ForeignKey("RecruitVacancyRequest.VacancyRequestID"))
     DomainID = Column(BigInteger, ForeignKey("OrgDomainMst.DomainID"))
 
@@ -116,7 +126,9 @@ class RecruitVacancyDomain(MssqlReadBase):
 class RecruitWorkflowState(MssqlReadBase):
     __tablename__ = "RecruitWorkflowState"
 
-    __table_args__ = {"schema": "AIRIS"}    StateID = Column(BigInteger, primary_key=True)
+    __table_args__ = {"schema": "AIRIS"}
+
+    StateID = Column(BigInteger, primary_key=True)
     CandidateID = Column(BigInteger, ForeignKey("RecruitCandidateMst.CandidateID"))
     VacancyRequestID = Column(BigInteger, ForeignKey("RecruitVacancyRequest.VacancyRequestID"))
     WorkflowID = Column(BigInteger, ForeignKey("RecruitWorkflowMst.WorkflowID"))

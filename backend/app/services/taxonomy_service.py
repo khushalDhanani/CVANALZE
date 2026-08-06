@@ -8,28 +8,7 @@ from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.taxonomy import DomainMaster, JobFamilyMaster, DesignationAbbreviation
 
-# Predefined defaults for fallback and bootstrapping
-DEFAULT_DOMAINS = [
-    "IT & Software Services",
-    "Plant Operations & Maintenance",
-    "Quality Assurance & QC Laboratory",
-    "Environmental Health & Safety (EHS)",
-    "Process & Project Engineering",
-    "Finance & Administration"
-]
 
-DEFAULT_FAMILIES = [
-    ("Software Engineering & Development", "IT & Software Services"),
-    ("IT Infrastructure, Networking & AV Systems", "IT & Software Services"),
-    ("Plant Electrical & Utility Maintenance", "Plant Operations & Maintenance"),
-    ("Control & Instrumentation (C&I)", "Plant Operations & Maintenance"),
-    ("Quality Control (QC) & Laboratory", "Quality Assurance & QC Laboratory"),
-    ("Quality Assurance (QA)", "Quality Assurance & QC Laboratory"),
-    ("Fire, Safety & EHS", "Environmental Health & Safety (EHS)"),
-    ("Process & Project Engineering", "Process & Project Engineering"),
-    ("Environment & ETP Operations", "Environmental Health & Safety (EHS)"),
-    ("Finance & Administration", "Finance & Administration")
-]
 
 class TaxonomyService:
     """
@@ -57,10 +36,7 @@ class TaxonomyService:
             with cls._lock:
                 domains = db.execute(select(DomainMaster).where(DomainMaster.is_active == True)).scalars().all()
                 if not domains:
-                    logger.info("[TAXONOMY] Taxonomy tables empty. Bootstrapping defaults...")
-                    cls._bootstrap_defaults(db)
-                    db.commit()
-                    domains = db.execute(select(DomainMaster).where(DomainMaster.is_active == True)).scalars().all()
+                    logger.warning("[TAXONOMY] Taxonomy tables empty. No bootstrap applied.")
                 
                 families = db.execute(select(JobFamilyMaster).where(JobFamilyMaster.is_active == True)).scalars().all()
 
@@ -91,48 +67,7 @@ class TaxonomyService:
             if close_session:
                 db.close()
 
-    @classmethod
-    def _bootstrap_defaults(cls, db: Session) -> None:
-        """Inserts default taxonomy records if the tables are empty."""
-        domain_objs = {}
-        for idx, d_name in enumerate(DEFAULT_DOMAINS, start=1):
-            dom = DomainMaster(
-                domain_code=f"DOM_{idx:03d}",
-                domain_name=d_name,
-                description="Auto-bootstrapped domain",
-                is_active=True
-            )
-            db.add(dom)
-            domain_objs[d_name] = dom
-        
-        db.flush() # To get domain_ids
-        
-        for idx, (f_name, d_name) in enumerate(DEFAULT_FAMILIES, start=1):
-            if d_name in domain_objs:
-                fam = JobFamilyMaster(
-                    domain_id=domain_objs[d_name].domain_id,
-                    family_code=f"FAM_{idx:03d}",
-                    family_name=f_name,
-                    description="Auto-bootstrapped family",
-                    is_active=True
-                )
-                db.add(fam)
-        db.commit()
 
-        # Bootstrap basic abbreviations
-        default_abbrs = {
-            "sr.": "Senior",
-            "sr": "Senior",
-            "jr.": "Junior",
-            "jr": "Junior",
-            "mgr.": "Manager",
-            "mgr": "Manager",
-            "asst.": "Assistant",
-            "asst": "Assistant"
-        }
-        for abbr, exp in default_abbrs.items():
-            db.add(DesignationAbbreviation(abbreviation=abbr, expansion=exp, is_active=True))
-        db.commit()
 
     @classmethod
     def get_domain_by_name(cls, name: str) -> Optional[DomainMaster]:

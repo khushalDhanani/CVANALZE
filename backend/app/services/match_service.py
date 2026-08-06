@@ -336,7 +336,7 @@ class MatchService:
             best_match = top_m
         else:
             active_vacancy_summary = f"No suitable active vacancy found matching candidate domain/taxonomy profile (Primary Domain: {professional_domain}). Manual HR review recommended."
-            best_match = evaluated_matches[0] if evaluated_matches else MatchService._empty_job_match()
+            best_match = evaluated_matches[0] if evaluated_matches else None
 
         roles_str = ", ".join(suitable_roles) if suitable_roles else ""
         strengths_str = "; ".join(strengths) if strengths else "Solid technical and professional baseline."
@@ -434,7 +434,7 @@ class MatchService:
     @staticmethod
     def _empty_job_match() -> EnrichedJobMatchResult:
         return EnrichedJobMatchResult(
-            job_id="general",
+            job_id="",
             job_title="",
             department="",
             vacancy_id=None,
@@ -473,9 +473,9 @@ class MatchService:
         cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
         rec_dept = cand_profile.get("recommended_department", "")
         prof_domain = cand_profile.get("professional_domain", "")
-        strengths = cand_profile.get("strengths", ["General technical background"])
-        roles = cand_profile.get("suitable_job_roles", ["Operations Associate"])
-        best_match = MatchService._empty_job_match()
+        strengths = cand_profile.get("strengths", [])
+        roles = cand_profile.get("suitable_job_roles", [])
+        best_match = None
 
         return EnrichedCandidateAnalysis(
             primary_department=rec_dept,

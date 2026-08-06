@@ -39,9 +39,19 @@
 - Separated DB matches from AI suggestions: `classification` is now explicitly set to `null` if the candidate does not produce a `DB_MATCH` (preserving strict integrity), while AI career suggestions are kept distinctly in `ai_career_suggestions`.
 - Guaranteed explicit `NO_MATCH` fallback strings across all pipelines when insufficient evidence is found.
 
+### PR 8 — P1 Integration Stability
+- Removed hardcoded taxonomy bootstrapping logic and default seeds.
+- Removed keyword seeds from `005_create_department_domain_master.sql`.
+- Added `mssql_department_id` and `mssql_designation_id` to PostgreSQL taxonomy mappings and created migrations.
+- Normalized vocabulary: changed `NO_SUITABLE_MATCH` to `NO_MATCH`.
+- Replaced the hardcoded `0.3` fallback in family compatibility checks with a strict `0.0`.
+- Eliminated fake values in `_empty_job_match()` and `_empty_analysis()` inside MatchService.
+- Designed `SyncService` to automate MSSQL-to-PostgreSQL synchronization.
+- Escaped startup warning to raise a `RuntimeError` if MSSQL write permissions are detected.
+
 ## 2. Next Steps
-- All requested PR steps 1-7 are fully completed.
-- Review and deploy architectural changes.
+- P1 fixes have been completed.
+- Validate end-to-end integration flows against the strict unconfigured taxonomy.
 
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.

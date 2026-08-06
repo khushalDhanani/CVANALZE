@@ -52,7 +52,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_SUITABLE_MATCH",
+            match_status="NO_MATCH",
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -80,7 +80,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_SUITABLE_MATCH",
+            match_status="NO_MATCH",
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -108,7 +108,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_SUITABLE_MATCH",
+            match_status="NO_MATCH",
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -134,7 +134,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_SUITABLE_MATCH",
+            match_status="NO_MATCH",
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -155,7 +155,7 @@ class DynamicTaxonomyService:
 
         from app.core.database import PostgresAppSession
         if PostgresAppSession is None:
-            return False, 0.3
+            return False, 0.0
             
         try:
             with PostgresAppSession() as session:
@@ -179,7 +179,7 @@ class DynamicTaxonomyService:
         except Exception as e:
             logger.warning(f"[DYNAMIC_TAXONOMY] Failed to check compatibility: {e}")
             
-        return False, 0.3
+        return False, 0.0
 
     @classmethod
     def _try_exact_mssql_match(cls, term: str) -> NormalizedClassification | None:
@@ -324,7 +324,7 @@ class DynamicTaxonomyService:
                                 industry_department=None,
                                 industry_designation=None,
                                 industry_domain=None,
-                                match_status="NO_SUITABLE_MATCH",
+                                match_status="NO_MATCH",
                                 confidence=round(sim_score, 4),
                                 match_source="PostgreSQL Vector",
                                 evidence=[
@@ -352,7 +352,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=tax_rules.default_domain,
-            match_status="NO_SUITABLE_MATCH",
+            match_status="NO_MATCH",
             confidence=0.0,
             match_source="legacy_fallback",
             evidence=[

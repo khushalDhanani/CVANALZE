@@ -1,0 +1,2 @@
+-- Migration: 010_remove_hardcoded_seeds_down.sql
+-- Intentionally left blank. We do not restore hardcoded seeds on rollback.
