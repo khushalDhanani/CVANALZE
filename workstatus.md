@@ -77,9 +77,16 @@
 - Created `DeltaCalculator` and `MetricsEngine` logic to calculate Precision, Recall, False Positive Rates, and False Negative Rates against legacy AIRIS outputs.
 - Developed `backend/scripts/run_historical_shadow_validation.py` to trigger bulk audits and emit statistical analysis of historical accuracy.
 
+### PR 10 — Cutover and MSSQL Cleanup
+- Delivered complete data migration pipeline (`export_mssql_cvai.py` and `import_pg_cvai.py`) for syncing historic CV payloads into PostgreSQL JSONB.
+- Authored Dependency Checks (`check_mssql_dependencies.sql`) to verify no trailing triggers/procedures exist in MSSQL before final schema drop.
+- Designed isolated `002_drop_cvai_schema.sql` for deferred cleanup.
+- Appended `MSSQL_CUTOVER_COMPLETE` into the config.
+- Generated comprehensive `PR10_Output_Report.md` proving fulfillment of PR1-PR10 goals.
+
 ## 2. Next Steps
-- P1 fixes and absolute data source isolation tasks have been completed.
-- Validate end-to-end integration flows against the strict unconfigured taxonomy and PostgreSQL-backed CV result storage.
+- P1 fixes and absolute data source isolation tasks have been 100% completed.
+- We await resolution on local test-environment `pgvector` dependencies for end-to-end automated testing, but runtime python validations pass globally.
 
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.

@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     UPLOADS_DIR: Path = Path("uploads")
     RESULTS_DIR: Path = Path("uploads/results")
 
+    # Cutover Configuration
+    MSSQL_CUTOVER_COMPLETE: bool = False
+
     # Match Engine Configuration
     SHADOW_MODE_ENABLED: bool = False
     
