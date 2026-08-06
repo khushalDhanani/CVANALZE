@@ -8,7 +8,7 @@ from app.core.cache import master_data_cache_manager
 from app.core.database import MssqlReadSession, PostgresAppSession
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
-from app.models.org import OrgCompanyMst, OrgDepartmentMst, OrgJobProfileMst
+from app.models.mssql.organization import OrgCompanyMst, OrgDepartmentMst, OrgJobProfileMst
 from app.repositories.job import JobRepository
 
 
@@ -107,7 +107,7 @@ def warm_skills() -> list[dict[str, Any]]:
     if db is None:
         return []
     try:
-        from app.models.recruit import RecruitSkillMst
+        from app.models.mssql.taxonomy import RecruitSkillMst
         
         stmt = select(RecruitSkillMst).where(RecruitSkillMst.SkillIsActive == True)
         rows = db.execute(stmt).scalars().all()

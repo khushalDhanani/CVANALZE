@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 from sqlalchemy import select
 from app.core.database import MssqlReadSession, PostgresAppSession
-from app.models.org import OrgDepartmentMst, OrgDesignationMst
+from app.models.mssql.organization import OrgDepartmentMst, OrgDesignationMst
 from app.models.taxonomy import JobFamilyMaster, DesignationMaster, DomainMaster
 
 logger = logging.getLogger("cv_analyzer")

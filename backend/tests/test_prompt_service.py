@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-import app.models.org
-import app.models.recruit
+import app.models.mssql.organization
+import app.models.mssql.candidate
 from app.models.prompts import PromptTemplateMaster
 from app.services.prompt_service import PromptService
 from app.core.error_handlers import PromptError

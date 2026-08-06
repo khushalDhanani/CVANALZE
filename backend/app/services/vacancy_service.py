@@ -5,14 +5,14 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.logging import logger
-from app.models.org import (
+from app.models.mssql.organization import (
     OrgCompanyMst,
     OrgDepartmentMst,
     OrgDesignationMst,
     OrgJobProfileMst,
     OrgLocationMst,
 )
-from app.models.recruit import RecruitVacancyRequest
+from app.models.mssql.vacancy import RecruitVacancyRequest
 from app.schemas.job import JobOpening
 from app.services.department_normalizer import DepartmentNormalizer
 

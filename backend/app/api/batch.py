@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_mssql_read_db
 from app.core.logging import logger
-from app.models.recruit import RecruitCandidateMst
+from app.models.mssql.candidate import RecruitCandidateMst
 from app.services.match_service import MatchService
 from app.services.vacancy_service import VacancyService
 

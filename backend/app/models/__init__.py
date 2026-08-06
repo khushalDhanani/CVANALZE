@@ -4,7 +4,7 @@ from app.models.domain import DepartmentDomainMaster
 from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading
 from app.models.pg import CandidateEmbedding, DomainEmbedding, VacancyEmbedding
 from app.models.prompts import PromptTemplateMaster
-from app.models.recruit import RecruitCandidateMst
+from app.models.mssql.candidate import RecruitCandidateMst
 from app.models.rules import RuleConfigProfile, RuleValidationTestCase
 from app.models.scoring_profile import ScoringProfileMaster, StopWord
 from app.models.taxonomy import (

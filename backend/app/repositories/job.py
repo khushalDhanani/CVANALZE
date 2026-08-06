@@ -229,7 +229,7 @@ class JobRepository:
 
         try:
             from sqlalchemy import select
-            from app.models.recruit import RecruitVacancyRequest
+            from app.models.mssql.vacancy import RecruitVacancyRequest
 
             stmt = select(RecruitVacancyRequest.VacancyRequestID).where(
                 (RecruitVacancyRequest.VacancyRequestIsActive == True) | (RecruitVacancyRequest.VacancyRequestIsActive.is_(None)),
@@ -258,7 +258,7 @@ class JobRepository:
                 db.rollback()
                 from sqlalchemy import func, or_
 
-                from app.models.recruit import RecruitVacancyRequest
+                from app.models.mssql.vacancy import RecruitVacancyRequest
 
                 count = (
                     db.query(func.count(RecruitVacancyRequest.VacancyRequestID))

@@ -16,6 +16,10 @@ from app.schemas.analysis import (
 from app.services.document_parser import MarkdownResult
 
 client = TestClient(app)
+import pytest
+
+
+
 
 
 def test_document_cache_roundtrip():
@@ -193,7 +197,11 @@ def test_redis_result_repository_caching():
     with (
         patch("app.core.cache._REDIS_CLIENT", mock_redis),
         patch("app.repositories.result._REDIS_CLIENT", mock_redis),
+        patch("app.repositories.result.PostgresAppSession") as mock_pg,
     ):
+        mock_session = MagicMock()
+        mock_pg.return_value.__enter__.return_value = mock_session
+        mock_session.query.return_value.filter.return_value.first.return_value = None
         mock_data = {"extracted": "content", "pages": 1}
 
         # 1. Test atomic_save_result
