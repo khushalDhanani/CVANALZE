@@ -111,6 +111,7 @@ class SkillMaster(PostgresAppBase):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
+    designations = relationship("DesignationSkill", back_populates="skill")
 
 class DesignationSkill(PostgresAppBase):
     __tablename__ = "designation_skills"

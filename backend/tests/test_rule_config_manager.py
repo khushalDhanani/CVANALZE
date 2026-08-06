@@ -103,7 +103,7 @@ def test_scoring_accessors_expose_data_driven_rules():
     assert "work experience" in match_rules.cv_section_heading_denylist
     assert "skills" in match_rules.cv_section_heading_compact_denylist
     assert "contact" in match_rules.cv_section_heading_substring_denylist
-    assert match_rules.fallback_defaults.recommended_department == "General Engineering & Operations"
+    assert match_rules.fallback_defaults.recommended_department == ""
     assert "widgets" in match_rules.term_matching.aliases
     assert "flutter developer" in match_rules.cross_domain_guard.software_candidate_keywords
     assert match_rules.cross_domain_guard.domain_mismatch_multiplier == 0.15

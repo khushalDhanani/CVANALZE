@@ -120,10 +120,10 @@ def test_incremental_candidate_sync_skips_unchanged():
             return_value=mock_results,
         ),
         patch(
-            "app.services.vector_migration_service.get_candidate_embedding",
-            return_value=[0.1] * 768,
+            "app.services.vector_migration_service.get_candidate_embedding_metadata",
+            return_value={"source_watermark": "2099-01-01T00:00:00Z"},
         ),
-        patch("app.services.embedding_service.EmbeddingService.generate_embedding") as mock_gen,
+        patch("app.services.embedding_service.EmbeddingService.generate_batch_embeddings") as mock_gen,
     ):
         metrics = VectorDatabaseMigrationService.sync_candidate_embeddings()
         assert metrics["total"] == 2

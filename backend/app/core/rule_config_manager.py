@@ -55,8 +55,8 @@ class FieldRuleConfig(BaseModel):
 
 
 class FallbackDefaults(BaseModel):
-    recommended_department: str = Field(..., min_length=1)
-    professional_domain: str = Field(..., min_length=1)
+    recommended_department: str
+    professional_domain: str
     suitable_roles: list[str] = Field(default_factory=list)
 
 

@@ -8,7 +8,9 @@ from app.services.match_evaluators import (
 from app.services.scoring_engine import ScoringEngine
 
 
-def test_candidate_analysis_context_creation():
+def test_candidate_analysis_context_creation(monkeypatch):
+    from app.services.job_taxonomy import TaxonomyClassifier
+    monkeypatch.setattr(TaxonomyClassifier, 'classify_candidate', lambda *args, **kwargs: ('IT & Software Services', ('Software Engineering',)))
     cv_text = """
     John Doe
     Email: john@example.com

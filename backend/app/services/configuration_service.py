@@ -116,6 +116,7 @@ class ConfigurationService:
         profile_to_activate.status = "ACTIVE"
         profile_to_activate.activated_by = activated_by
         profile_to_activate.activation_reason = activation_reason
+        profile_to_activate.audit_reason = f"Activated by {activated_by}: {activation_reason}" if activated_by else (activation_reason or "System activation")
         profile_to_activate.activated_at = datetime.now(UTC)
         
         db.commit()
@@ -169,6 +170,7 @@ class ConfigurationService:
         profile_to_restore.status = "ACTIVE"
         profile_to_restore.activated_by = rolled_back_by
         profile_to_restore.activation_reason = rollback_reason or f"Rolled back from {current_active.version_tag}"
+        profile_to_restore.audit_reason = f"Rolled back by {rolled_back_by}: {profile_to_restore.activation_reason}" if rolled_back_by else profile_to_restore.activation_reason
         profile_to_restore.activated_at = datetime.now(UTC)
         
         # We don't overwrite profile_to_restore.previous_version_tag to maintain history chain

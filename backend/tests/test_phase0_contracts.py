@@ -92,6 +92,10 @@ def test_success_response_field_snapshots_are_stable():
         "unsuitable_openings",
         "config_version",
         "prompt_version",
+        "match_status",
+        "freshness_status",
+        "source_watermark",
+        "source_snapshot",
     }
     assert set(CVUploadResponse.model_fields) == {
         "id",

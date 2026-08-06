@@ -2,7 +2,9 @@ from app.schemas.job_context import JobEvaluationContext
 from app.services.scoring_engine import ScoringEngine
 
 
-def test_job_evaluation_context_creation():
+def test_job_evaluation_context_creation(monkeypatch):
+    from app.services.job_taxonomy import TaxonomyClassifier
+    monkeypatch.setattr(TaxonomyClassifier, 'classify_vacancy', lambda *args, **kwargs: ('IT & Software Services', 'Software Engineering'))
     job_dict = {
         "id": "job_101",
         "title": "Senior Software Engineer",

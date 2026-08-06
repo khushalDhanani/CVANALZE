@@ -342,6 +342,7 @@ class DynamicTaxonomyService:
 
     @classmethod
     def _get_default_fallback(cls, matched_term: str | None = None) -> NormalizedClassification:
+        from app.core.rule_config_manager import RuleConfigManager
         tax_rules = RuleConfigManager.get_taxonomy_rules()
         return NormalizedClassification(
             db_department_id=None,

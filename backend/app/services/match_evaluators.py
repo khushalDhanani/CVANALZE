@@ -618,12 +618,13 @@ class CrossDomainGuardEvaluator:
         is_tax_compat = TaxonomyClassifier.are_families_compatible(context.cand_families, vac_family)
 
         domain_mismatch = False
-        if not is_tax_compat and not has_software_req:
-            domain_mismatch = True
-        elif context.cand_primary_family and vac_family:
-            is_compat, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
-            if not is_compat or score < 0.4:
+        if vac_family not in (None, "Unknown") and context.cand_primary_family not in (None, "Unknown"):
+            if not is_tax_compat and not has_software_req:
                 domain_mismatch = True
+            elif context.cand_primary_family and vac_family:
+                is_compat, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
+                if not is_compat or score < 0.4:
+                    domain_mismatch = True
 
         final_score = initial_score
         domain_score = initial_domain_score

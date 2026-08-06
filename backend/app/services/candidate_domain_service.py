@@ -92,7 +92,7 @@ class CandidateDomainService:
             skills=sorted(skills_set),
         )
 
-        if dyn_res.match_source != "legacy_fallback":
+        if dyn_res.match_status != "NO_SUITABLE_MATCH":
             industry_dept = dyn_res.industry_department or dyn_res.industry_domain or dyn_res.db_department_name
             prof_domain = dyn_res.industry_domain or dyn_res.db_department_name or ""
             recommended_dept = industry_dept or prof_domain
@@ -197,7 +197,7 @@ class CandidateDomainService:
 
         # Add taxonomy families as base roles, giving them a high initial score
         for family in compatible_families:
-            if family not in seen_roles and family != RuleConfigManager.get_taxonomy_rules().default_family:
+            if family not in seen_roles and family not in (RuleConfigManager.get_taxonomy_rules().default_family, "Unknown"):
                 scored_roles.append((10, family))
                 seen_roles.add(family)
 

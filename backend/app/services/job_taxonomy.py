@@ -261,7 +261,7 @@ class TaxonomyClassifier:
         return TaxonomyClassification(
             domain="Unknown",
             job_family="Unknown",
-            compatible_families=(),
+            compatible_families=("Unknown",),
             matched_rule="NO_SUITABLE_MATCH",
             matched_branch=0,
             matched_keywords=(),
@@ -307,7 +307,7 @@ class TaxonomyClassifier:
         return TaxonomyClassification(
             domain="Unknown",
             job_family="Unknown",
-            compatible_families=(),
+            compatible_families=("Unknown",),
             matched_rule="NO_SUITABLE_MATCH",
         )
 

@@ -1,5 +1,6 @@
 # backend/app/services/embedding_sync_service.py
 import hashlib
+import json
 from typing import Any
 
 from app.core.config import settings
@@ -32,6 +33,7 @@ class EmbeddingSyncService:
         from app.services.embedding_service import (
             build_vacancy_canonical_text,
             get_vacancy_embedding,
+            get_vacancy_embedding_metadata,
             save_vacancy_embedding,
         )
 
@@ -58,8 +60,13 @@ class EmbeddingSyncService:
             if cached_emb is None and vac_id_int > 0:
                 pg_emb, stored_hash = get_vacancy_embedding(vac_id_int)
                 if pg_emb is not None and stored_hash == content_hash:
-                    cached_emb = pg_emb
-                    _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
+                    existing_meta = get_vacancy_embedding_metadata(vac_id_int)
+                    source_watermark = existing_meta.get("source_watermark") if existing_meta else None
+                    job_updated_at = job.get("updated_at") or job.get("VacancyRequestCreatedAt")
+                    
+                    if not job_updated_at or (source_watermark and str(source_watermark) >= str(job_updated_at)):
+                        cached_emb = pg_emb
+                        _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
 
             if cached_emb is None:
                 uncached.append((vac_id_int, job, canonical_text, content_hash))
@@ -73,7 +80,9 @@ class EmbeddingSyncService:
                     if emb:
                         _ecm.set(f"{model}:vac:{content_hash}", emb)
                         if vac_id_int > 0:
-                            save_vacancy_embedding(vac_id_int, emb, content_hash)
+                            source_snapshot = json.dumps(job, default=str)
+                            source_watermark = job.get("updated_at") or job.get("VacancyRequestCreatedAt")
+                            save_vacancy_embedding(vac_id_int, emb, content_hash, source_snapshot=source_snapshot, source_watermark=source_watermark)
                         metrics["synced"] += 1
                     else:
                         metrics["failed"] += 1

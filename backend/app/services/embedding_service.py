@@ -256,7 +256,7 @@ class EmbeddingService:
         return dot / (norm_a * norm_b)
 
 
-def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: str | None = None) -> bool:
+def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: str | None = None, source_snapshot: str | None = None, source_watermark: Any = None, freshness_status: str = "FRESH") -> bool:
     """
     Upsert candidate embedding into PostgreSQL candidate_embeddings table keyed by cv_key.
     """
@@ -277,6 +277,9 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
             embedding=embedding,
             embedding_model_version=settings.EMBEDDING_MODEL,
             content_hash=content_hash,
+            source_snapshot=source_snapshot,
+            source_watermark=source_watermark,
+            freshness_status=freshness_status,
             updated_at=func.now(),
         )
         stmt = stmt.on_conflict_do_update(
@@ -285,6 +288,9 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
                 "embedding": stmt.excluded.embedding,
                 "embedding_model_version": stmt.excluded.embedding_model_version,
                 "content_hash": stmt.excluded.content_hash,
+                "source_snapshot": stmt.excluded.source_snapshot,
+                "source_watermark": stmt.excluded.source_watermark,
+                "freshness_status": stmt.excluded.freshness_status,
                 "updated_at": func.now(),
             },
         )
@@ -387,7 +393,7 @@ def build_vacancy_canonical_text(job: dict[str, Any]) -> str:
     return "\n".join(parts).strip()
 
 
-def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash: str | None = None) -> bool:
+def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash: str | None = None, source_snapshot: str | None = None, source_watermark: Any = None, freshness_status: str = "FRESH") -> bool:
     """
     Upsert vacancy embedding into PostgreSQL vacancy_embeddings table keyed by vacancy_id.
     Also caches in embedding_cache_manager.
@@ -415,6 +421,9 @@ def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash
             embedding=embedding,
             embedding_model_version=settings.EMBEDDING_MODEL,
             content_hash=content_hash,
+            source_snapshot=source_snapshot,
+            source_watermark=source_watermark,
+            freshness_status=freshness_status,
             updated_at=func.now(),
         )
         stmt = stmt.on_conflict_do_update(
@@ -423,6 +432,8 @@ def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash
                 "embedding": stmt.excluded.embedding,
                 "embedding_model_version": stmt.excluded.embedding_model_version,
                 "content_hash": stmt.excluded.content_hash,
+                "source_snapshot": stmt.excluded.source_snapshot,
+                "source_watermark": stmt.excluded.source_watermark,
                 "updated_at": func.now(),
             },
         )
@@ -462,3 +473,43 @@ def get_vacancy_embedding(vacancy_id: int) -> tuple[list[float] | None, str | No
     if cached is not None:
         return cached, None
     return None, None
+
+def get_candidate_embedding_metadata(cv_key: str) -> dict | None:
+    from app.core.database import PostgresAppSession
+    from app.models.pg import CandidateEmbedding
+    
+    if PostgresAppSession is None:
+        return None
+        
+    pg_db = PostgresAppSession()
+    try:
+        record = pg_db.query(CandidateEmbedding).filter(CandidateEmbedding.cv_key == cv_key).first()
+        if record:
+            return {
+                "source_watermark": record.source_watermark,
+                "freshness_status": record.freshness_status,
+                "content_hash": record.content_hash
+            }
+        return None
+    finally:
+        pg_db.close()
+
+def get_vacancy_embedding_metadata(vacancy_id: int) -> dict | None:
+    from app.core.database import PostgresAppSession
+    from app.models.pg import VacancyEmbedding
+    
+    if PostgresAppSession is None:
+        return None
+        
+    pg_db = PostgresAppSession()
+    try:
+        record = pg_db.query(VacancyEmbedding).filter(VacancyEmbedding.vacancy_id == vacancy_id).first()
+        if record:
+            return {
+                "source_watermark": record.source_watermark,
+                "freshness_status": record.freshness_status,
+                "content_hash": record.content_hash
+            }
+        return None
+    finally:
+        pg_db.close()

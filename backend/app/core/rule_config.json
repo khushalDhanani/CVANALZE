@@ -186,9 +186,9 @@
       "cv_section_heading_compact_denylist": ["skills", "workexperience"],
       "cv_section_heading_substring_denylist": ["contact", "education", "language"],
       "fallback_defaults": {
-        "recommended_department": "General Engineering & Operations",
-        "professional_domain": "General Operations",
-        "suitable_roles": ["Operations Associate", "General Specialist"]
+        "recommended_department": "",
+        "professional_domain": "",
+        "suitable_roles": []
       },
       "term_matching": {
         "stop_phrases": ["e.g", "eg", "e.g.", "etc", "etc.", "i.e", "i.e."],

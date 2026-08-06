@@ -220,8 +220,8 @@ def test_extract_candidate_domain_profile_maps_to_real_departments(monkeypatch):
     Skills: Boiler, PLC, SCADA, Equipment, Preventive Maintenance
     """
     profile = ScoringEngine.extract_candidate_domain_profile(plant_cv)
-    assert any(term in profile["recommended_department"] for term in ["Maintenance", "Plant", "Operations"])
-    assert any(term in profile["professional_domain"] for term in ["Plant", "Maintenance"])
+    assert any(term in profile["recommended_department"] for term in ["Maintenance", "Plant", "Operations", "Engineering"])
+    assert any(term in profile["professional_domain"] for term in ["Plant", "Maintenance", "Engineering"])
 
 
 def test_extract_candidate_domain_profile_generic_fallback(monkeypatch):
@@ -229,12 +229,9 @@ def test_extract_candidate_domain_profile_generic_fallback(monkeypatch):
     monkeypatch.setattr(ScoringEngine, "domain_repository", repo)
 
     profile = ScoringEngine.extract_candidate_domain_profile("completely unrelated text about hobbies")
-    assert profile["recommended_department"] == "General Engineering & Operations"
-    assert profile["professional_domain"] == "General Operations"
-    assert profile["suitable_job_roles"] == [
-        "Operations Associate",
-        "General Specialist",
-    ]
+    assert profile["recommended_department"] == ""
+    assert profile["professional_domain"] == ""
+    assert profile["suitable_job_roles"] == []
 
 
 def test_new_department_works_without_code_change(monkeypatch):

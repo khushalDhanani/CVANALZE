@@ -1,4 +1,5 @@
 import hashlib
+import json
 from typing import Any
 
 from sqlalchemy import func, select
@@ -9,7 +10,7 @@ from app.repositories.job import JobRepository
 from app.repositories.result import ResultRepository
 from app.services.embedding_service import (
     EmbeddingService,
-    get_candidate_embedding,
+    get_candidate_embedding_metadata,
     save_candidate_embedding,
 )
 
@@ -31,7 +32,7 @@ class VectorDatabaseMigrationService:
         metrics = {"total": len(results), "synced": 0, "skipped": 0, "failed": 0}
 
         model_version = settings.EMBEDDING_MODEL
-        pending: list[tuple[str, str, str]] = []
+        pending: list[tuple[str, str, str, dict[str, Any]]] = []
 
         for r in results:
             if not r or not isinstance(r, dict):
@@ -47,13 +48,18 @@ class VectorDatabaseMigrationService:
 
             cv_hash = str(r.get("cv_hash") or hashlib.sha256(markdown_text.encode("utf-8")).hexdigest())
 
-            # Check if embedding exists in PostgreSQL / cache
-            existing_emb = get_candidate_embedding(cv_key)
-            if existing_emb is not None:
-                metrics["skipped"] += 1
-                continue
+            # Check if embedding exists in PostgreSQL / cache and its freshness
+            existing_meta = get_candidate_embedding_metadata(cv_key)
+            if existing_meta is not None:
+                source_watermark = existing_meta.get("source_watermark")
+                r_updated_at = r.get("updated_at")
+                
+                # If we have an embedding and it is fresh, skip it
+                if not r_updated_at or (source_watermark and str(source_watermark) >= str(r_updated_at)):
+                    metrics["skipped"] += 1
+                    continue
 
-            pending.append((cv_key, markdown_text, cv_hash))
+            pending.append((cv_key, markdown_text, cv_hash, r))
 
         if pending:
             try:
@@ -61,10 +67,15 @@ class VectorDatabaseMigrationService:
                     [markdown_text for _, markdown_text, _ in pending],
                     model_version=model_version,
                 )
-                for index, (cv_key, _, cv_hash) in enumerate(pending):
+                for index, (cv_key, _, cv_hash, r) in enumerate(pending):
                     new_emb = batch.get(str(index))
-                    if new_emb and save_candidate_embedding(cv_key, new_emb, cv_hash):
-                        metrics["synced"] += 1
+                    if new_emb:
+                        source_snapshot = json.dumps(r, default=str)
+                        source_watermark = r.get("updated_at")
+                        if save_candidate_embedding(cv_key, new_emb, cv_hash, source_snapshot=source_snapshot, source_watermark=source_watermark):
+                            metrics["synced"] += 1
+                        else:
+                            metrics["failed"] += 1
                     else:
                         metrics["failed"] += 1
             except Exception as exc:

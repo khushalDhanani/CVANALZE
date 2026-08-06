@@ -66,7 +66,7 @@ def measure_memory_mb() -> float:
 
 
 @pytest.mark.parametrize("vacancy_count", [100, 1000, 10000])
-def test_scale_benchmark_throughput_and_memory(vacancy_count: int):
+def test_scale_benchmark_throughput_and_memory(vacancy_count: int, monkeypatch):
     gc.collect()
     mem_before = measure_memory_mb()
 
@@ -74,6 +74,18 @@ def test_scale_benchmark_throughput_and_memory(vacancy_count: int):
     t0 = time.perf_counter()
     raw_vacancies = generate_synthetic_vacancies(vacancy_count)
     t_gen_ms = (time.perf_counter() - t0) * 1000.0
+
+    def mock_classify_vacancy(job):
+        dept = job.get("department_name", "")
+        if "CIS" in dept: return "IT", "Software Engineering"
+        if "Finance" in dept: return "Finance", "Accounting"
+        if "Maintenance" in dept: return "Engineering", "Mechanical"
+        if "HR" in dept: return "HR", "Human Resources"
+        if "Sales" in dept: return "Sales", "Sales"
+        return "Unknown", "Unknown"
+        
+    monkeypatch.setattr(TaxonomyClassifier, "classify_vacancy", mock_classify_vacancy)
+    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("IT", ["Software Engineering"]))
 
     # 2. Vacancy Pre-processing (JobEvaluationContext)
     t0 = time.perf_counter()

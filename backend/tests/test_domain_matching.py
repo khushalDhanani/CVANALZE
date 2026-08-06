@@ -39,7 +39,10 @@ def test_extract_candidate_domain_profile_finance():
     assert len(profile["suitable_job_roles"]) > 0
 
 
-def test_domain_mismatch_penalty_software_vs_plant():
+def test_domain_mismatch_penalty_software_vs_plant(monkeypatch):
+    from app.services.job_taxonomy import TaxonomyClassifier
+    monkeypatch.setattr(TaxonomyClassifier, "classify_vacancy", lambda *args, **kwargs: ("Engineering", "Mechanical"))
+    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("IT", ("Software Engineering",)))
     cv_text = """
     Alex Engineer
     Senior Software & Mobile Developer

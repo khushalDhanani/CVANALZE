@@ -13,6 +13,9 @@ class VacancyEmbedding(PostgresAppBase):
     embedding_model_version = Column(String, nullable=True)
     content_hash = Column(String, nullable=True)
     tenant_id = Column(Integer, nullable=True)  # Unused for now
+    source_snapshot = Column(String, nullable=True)  # JSON dump of the source payload
+    source_watermark = Column(DateTime(timezone=True), nullable=True)  # Source system last updated timestamp
+    freshness_status = Column(String, default="FRESH", nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
@@ -33,6 +36,9 @@ class CandidateEmbedding(PostgresAppBase):
     embedding = Column(Vector(768), nullable=True)
     embedding_model_version = Column(String, nullable=True)
     content_hash = Column(String, nullable=True)
+    source_snapshot = Column(String, nullable=True)  # JSON dump of the source payload
+    source_watermark = Column(DateTime(timezone=True), nullable=True)  # Source system last updated timestamp
+    freshness_status = Column(String, default="FRESH", nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (

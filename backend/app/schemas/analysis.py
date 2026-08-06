@@ -176,6 +176,18 @@ class EnrichedCandidateAnalysis(BaseModel):
         default="NO_MATCH",
         description="Top level match status indicating if this candidate matches an active vacancy or DB profile",
     )
+    freshness_status: str = Field(
+        default="FRESH",
+        description="Indicates if the candidate data or vacancy data used is stale compared to the DB",
+    )
+    source_watermark: str | None = Field(
+        default=None,
+        description="Source system watermark (timestamp or version) when this analysis was synchronized",
+    )
+    source_snapshot: str | None = Field(
+        default=None,
+        description="A snapshot of the original source payload for auditing",
+    )
 
 
 class HRReviewRequest(BaseModel):
