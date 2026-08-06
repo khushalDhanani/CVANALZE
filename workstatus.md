@@ -89,14 +89,15 @@
 - We await resolution on local test-environment `pgvector` dependencies for end-to-end automated testing, but runtime python validations pass globally.
 
 ### P0 — Restore Executable Runtime
-- Verified that `SessionLocal` is fully replaced with `PostgresAppSession` in `RuleConfigManager`.
-- Removed legacy `rule_config.json` fallback references from docstrings and comments in `cache_warmer.py` and `job_taxonomy.py`.
-- Ensured `ConfigurationService.create_profile` stores the UnifiedRuleConfig using fully normalized PostgreSQL relational rows (e.g., `RuleComponent`, `SystemRule`, `RuleCondition`, etc.) in a single transaction.
-- Verified that `_hydrate_profile` in `RuleConfigManager` dynamically reconstructs the config dict solely from these normalized PostgreSQL rows.
-- Verified that `ConfigurationService.activate_profile` properly captures `activated_by`, `activated_at`, `activation_reason`, `audit_reason`, and `previous_version_tag`.
-- Fixed the argument bug in `run_auto_migrations()` within `app/core/database.py` (switched to explicit keyword arguments: `db_url=settings.POSTGRES_APP_URL`, `dry_run=False`, `dialect="postgres"`).
-- Added `tests/test_startup.py` to ensure all models load correctly and `configure_mappers()` runs without error.
-- Fixed an import error in `app/models/__init__.py` where `DesignationAbbreviation` was declared in `__all__` but not imported.
+- [x] Verified that `SessionLocal` is fully replaced with `PostgresAppSession` in `RuleConfigManager`.
+- [x] Removed legacy `rule_config.json` fallback references from docstrings and comments in `cache_warmer.py` and `job_taxonomy.py`.
+- [x] Ensured `ConfigurationService.create_profile` stores the UnifiedRuleConfig using fully normalized PostgreSQL relational rows (e.g., `RuleComponent`, `SystemRule`, `RuleCondition`, etc.) in a single transaction.
+- [x] Verified that `_hydrate_profile` in `RuleConfigManager` dynamically reconstructs the config dict solely from these normalized PostgreSQL rows.
+- [x] Verified that `ConfigurationService.activate_profile` properly captures `activated_by`, `activated_at`, `activation_reason`, `audit_reason`, and `previous_version_tag`.
+- [x] Fixed the argument bug in `run_auto_migrations()` within `app/core/database.py` (switched to explicit keyword arguments: `db_url=settings.POSTGRES_APP_URL`, `dry_run=False`, `dialect="postgres"`).
+- [x] Added `tests/test_startup.py` to ensure all models load correctly and `configure_mappers()` runs without error.
+- [x] Fixed an import error in `app/models/__init__.py` where `DesignationAbbreviation` was declared in `__all__` but not imported.
+- [x] Repaired `api/config.py` to fetch configuration via `RuleConfigManager.get_config().model_dump()` instead of referencing deleted JSON string columns (`global_confidence_tiers_json`, `fields_config_json`, `scoring_rules_json`).
 
 ### PR4 — Repository Corrections (AIRIS Model Alignments)
 - Built `test_repository_contracts.py` utilizing a mocked SQLAlchemy Session to execute queries safely, catching any references to undeclared schema properties via native `AttributeError`.

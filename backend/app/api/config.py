@@ -72,18 +72,14 @@ async def get_active_rule_config(
 ):
     """Retrieve the currently active unified rule configuration for a tenant."""
     try:
-        profile = ConfigurationService.get_active_profile(db=db, tenant_id=tenant_id)
-        if not profile:
+        from app.core.rule_config_manager import RuleConfigManager
+        from app.core.error_handlers import SystemConfigurationError
+        
+        try:
+            config = RuleConfigManager.get_config(tenant_id=tenant_id)
+            return config.model_dump()
+        except SystemConfigurationError:
             raise HTTPException(status_code=404, detail="No active configuration found.")
-            
-        import json
-        return {
-            "version": profile.version_tag,
-            "description": profile.description,
-            "global_confidence_tiers": json.loads(profile.global_confidence_tiers_json),
-            "fields": json.loads(profile.fields_config_json),
-            "scoring": json.loads(profile.scoring_rules_json),
-        }
     except HTTPException:
         raise
     except Exception as exc:
