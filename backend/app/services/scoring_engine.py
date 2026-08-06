@@ -394,18 +394,7 @@ class ScoringEngine:
         best_match = (
             evaluated_matches[0]
             if evaluated_matches
-            else JobMatchResult(
-                job_id="general",
-                job_title="",
-                department="",
-                score=0.0,
-                classification="LOW",
-                recommendation="HR review required.",
-                matched_skills=[],
-                missing_skills=[],
-                matched_keywords=[],
-                missing_keywords=[],
-            )
+            else None
         )
 
         # Split evaluated matches into suitable (HIGH/MEDIUM) vs unsuitable (LOW)
@@ -413,7 +402,7 @@ class ScoringEngine:
         unsuitable_matches = [m for m in evaluated_matches if m.classification not in ("HIGH", "MEDIUM")]
 
         return CandidateMatchAnalysis(
-            primary_department=best_match.department,
+            primary_department=best_match.department if best_match else "",
             best_match=best_match,
             suitable_openings=suitable_matches,
             unsuitable_openings=unsuitable_matches,

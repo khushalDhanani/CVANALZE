@@ -1,6 +1,15 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from enum import Enum
+
+class MatchStatus(str, Enum):
+    DB_MATCH = "DB_MATCH"
+    PARTIAL_MATCH = "PARTIAL_MATCH"
+    NO_SUITABLE_MATCH = "NO_SUITABLE_MATCH"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    SOURCE_DATA_UNAVAILABLE = "SOURCE_DATA_UNAVAILABLE"
+
 
 class ClassificationEvidence(BaseModel):
     """Evidence for a single match component.
@@ -42,7 +51,7 @@ class NormalizedClassification(BaseModel):
     industry_domain: Optional[str] = None
 
     # Classification quality
-    match_status: str = Field(..., description="One of: DB_MATCH, NO_SUITABLE_MATCH, INSUFFICIENT_EVIDENCE")
+    match_status: MatchStatus = Field(..., description="One of: DB_MATCH, NO_SUITABLE_MATCH, INSUFFICIENT_EVIDENCE")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Overall confidence of the classification")
     evidence: List[ClassificationEvidence] = Field(default_factory=list, description="Supporting evidence items")
     match_source: Optional[str] = None

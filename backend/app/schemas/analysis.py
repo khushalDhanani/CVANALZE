@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.schemas.classification_types import AISuggestion, NormalizedClassification
+from app.schemas.classification_types import AISuggestion, MatchStatus, NormalizedClassification
 from app.schemas.match import JobMatchResult
 from app.schemas.normalized_resume import NormalizedResume
 
@@ -147,7 +147,7 @@ class EnrichedCandidateAnalysis(BaseModel):
         default="",
         description="Independent AI analysis of candidate profile, strengths, department, and suitable roles",
     )
-    best_match: EnrichedJobMatchResult = Field(..., description="Top matching job opening")
+    best_match: EnrichedJobMatchResult | None = Field(default=None, description="Top matching job opening")
     suitable_openings: list[EnrichedJobMatchResult] = Field(..., description="Job openings classified as HIGH or MEDIUM, ranked by match score")
     unsuitable_openings: list[EnrichedJobMatchResult] = Field(
         default_factory=list,
@@ -173,8 +173,8 @@ class EnrichedCandidateAnalysis(BaseModel):
         default_factory=list,
         description="AI career suggestions when no DB match found — clearly separated from verified DB matches",
     )
-    match_status: str = Field(
-        default="NO_MATCH",
+    match_status: MatchStatus = Field(
+        default=MatchStatus.NO_SUITABLE_MATCH,
         description="Top level match status indicating if this candidate matches an active vacancy or DB profile",
     )
     freshness_status: str = Field(

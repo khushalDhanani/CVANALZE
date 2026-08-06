@@ -39,10 +39,13 @@
 - Verified test suite integration passes successfully.
 
 ### PR 7 — Fix no-match responses
+- Standardized on a single explicit `MatchStatus` Enum (`DB_MATCH`, `PARTIAL_MATCH`, `NO_SUITABLE_MATCH`, `INSUFFICIENT_EVIDENCE`, `SOURCE_DATA_UNAVAILABLE`).
 - Added top-level `match_status` to `EnrichedCandidateAnalysis`.
-- Stripped arbitrary `"General"`, `"General Role"`, and `"General Operations"` fallback assignments from `match_service.py`, `scoring_engine.py`, `candidate_domain_service.py`, and `taxonomy_service.py`.
-- Separated DB matches from AI suggestions: `classification` is now explicitly set to `null` if the candidate does not produce a `DB_MATCH` (preserving strict integrity), while AI career suggestions are kept distinctly in `ai_career_suggestions`.
-- Guaranteed explicit `NO_MATCH` fallback strings across all pipelines when insufficient evidence is found.
+- Made `best_match` explicitly optional (`Optional[EnrichedJobMatchResult]`) across schemas, dropping the forced initialization of fake jobs.
+- Stripped arbitrary `job_id="general"` and `"Solid technical and professional baseline"` fallback assignments from `match_service.py` and `scoring_engine.py`.
+- Preserved no-match classification evidence instead of arbitrarily replacing `classification` with `None`.
+- Fully decoupled AI career suggestions from the authoritative database classification.
+- Strictly enforced that `DB_MATCH` is only returned for genuine active vacancy matches, never derived purely from candidate taxonomy dictionaries.
 
 ### PR 8 — P1 Integration Stability
 - Removed hardcoded taxonomy bootstrapping logic and default seeds.

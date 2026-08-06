@@ -14,7 +14,7 @@ from app.models.taxonomy import (
 )
 from app.services.domain_embedding_service import DomainEmbeddingService
 from app.services.embedding_service import EmbeddingService
-from app.schemas.classification_types import NormalizedClassification, ClassificationEvidence
+from app.schemas.classification_types import ClassificationEvidence, NormalizedClassification, MatchStatus
 from app.services.department_normalizer import DepartmentNormalizer
 
 logger = logging.getLogger("cv_analyzer")
@@ -53,7 +53,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_MATCH",
+            match_status=MatchStatus.NO_SUITABLE_MATCH,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -86,7 +86,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_MATCH",
+            match_status=MatchStatus.NO_SUITABLE_MATCH,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -114,7 +114,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_MATCH",
+            match_status=MatchStatus.NO_SUITABLE_MATCH,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -145,7 +145,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status="NO_MATCH",
+            match_status=MatchStatus.NO_SUITABLE_MATCH,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -251,7 +251,7 @@ class DynamicTaxonomyService:
                         industry_department=industry_dept,
                         industry_designation=industry_desig,
                         industry_domain=None,
-                        match_status="DB_MATCH",
+                        match_status=MatchStatus.DB_MATCH,
                         confidence=1.0,
                         match_source="MSSQL Source IDs",
                         evidence=[
@@ -312,7 +312,7 @@ class DynamicTaxonomyService:
                         industry_department=industry_dept,
                         industry_designation=industry_desig,
                         industry_domain=dom.domain_name if dom else None,
-                        match_status="DB_MATCH",
+                        match_status=MatchStatus.DB_MATCH,
                         confidence=1.0,
                         match_source="PostgreSQL Alias",
                         evidence=[
@@ -367,7 +367,7 @@ class DynamicTaxonomyService:
                                 industry_department=res_classification.industry_department,
                                 industry_designation=res_classification.industry_designation,
                                 industry_domain=res_classification.industry_domain,
-                                match_status="DB_MATCH",
+                                match_status=MatchStatus.DB_MATCH,
                                 confidence=round(sim_score, 4),
                                 match_source="PostgreSQL Vector",
                                 evidence=[
@@ -388,7 +388,7 @@ class DynamicTaxonomyService:
                                 industry_department=None,
                                 industry_designation=None,
                                 industry_domain=None,
-                                match_status="NO_MATCH",
+                                match_status=MatchStatus.NO_SUITABLE_MATCH,
                                 confidence=round(sim_score, 4),
                                 match_source="PostgreSQL Vector",
                                 evidence=[
@@ -407,6 +407,7 @@ class DynamicTaxonomyService:
     @classmethod
     def _get_default_fallback(cls, matched_term: str | None = None) -> NormalizedClassification:
         from app.core.rule_config_manager import RuleConfigManager
+        from app.schemas.classification_types import MatchStatus
         tax_rules = RuleConfigManager.get_taxonomy_rules()
         return NormalizedClassification(
             db_department_id=None,
@@ -416,7 +417,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=tax_rules.default_domain,
-            match_status="NO_MATCH",
+            match_status=MatchStatus.NO_SUITABLE_MATCH,
             confidence=0.0,
             match_source="legacy_fallback",
             evidence=[

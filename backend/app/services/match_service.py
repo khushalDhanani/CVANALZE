@@ -340,7 +340,7 @@ class MatchService:
             best_match = evaluated_matches[0] if evaluated_matches else None
 
         roles_str = ", ".join(suitable_roles) if suitable_roles else ""
-        strengths_str = "; ".join(strengths) if strengths else "Solid technical and professional baseline."
+        strengths_str = "; ".join(strengths) if strengths else ""
 
         if optimized_response and optimized_response.ai_career_summary:
             ai_career_summary = optimized_response.ai_career_summary
@@ -395,10 +395,14 @@ class MatchService:
                 for role in suitable_roles[:3]
             ]
             
-        top_level_match_status = "DB_MATCH" if has_genuine_match or (cand_classification and cand_classification.match_status == "DB_MATCH") else "NO_MATCH"
-        
-        if cand_classification and cand_classification.match_status == "NO_SUITABLE_MATCH":
-            cand_classification = None
+        from app.schemas.classification_types import MatchStatus
+
+        if has_genuine_match:
+            top_level_match_status = MatchStatus.DB_MATCH
+        elif cand_classification and cand_classification.match_status == "DB_MATCH":
+            top_level_match_status = MatchStatus.PARTIAL_MATCH
+        else:
+            top_level_match_status = MatchStatus.NO_SUITABLE_MATCH
 
         result = EnrichedCandidateAnalysis(
             match_status=top_level_match_status,
