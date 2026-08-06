@@ -49,6 +49,12 @@ class RecruitVacancyRequest(MssqlReadBase):
     VacencyRequestDelUser = Column(String)
     VacencyRequestDelTerm = Column(String)
 
+    job_profile = relationship("OrgJobProfileMst", primaryjoin="RecruitVacancyRequest.JobProfileID == foreign(OrgJobProfileMst.JobProfileID)", uselist=False, viewonly=True)
+    designation = relationship("OrgDesignationMst", primaryjoin="RecruitVacancyRequest.RequestForDesigID == foreign(OrgDesignationMst.DesigID)", uselist=False, viewonly=True)
+    company = relationship("OrgCompanyMst", primaryjoin="RecruitVacancyRequest.RequestForCompID == foreign(OrgCompanyMst.CompID)", uselist=False, viewonly=True)
+    department = relationship("OrgDepartmentMst", primaryjoin="RecruitVacancyRequest.RequestForDeptID == foreign(OrgDepartmentMst.DeptID)", uselist=False, viewonly=True)
+    location = relationship("OrgLocationMst", primaryjoin="RecruitVacancyRequest.RequestForLocationID == foreign(OrgLocationMst.LocID)", uselist=False, viewonly=True)
+
 
 class RecruitVacancyRequriedQualificationDet(MssqlReadBase):
     __tablename__ = "RecruitVacancyRequriedQualificationDet"

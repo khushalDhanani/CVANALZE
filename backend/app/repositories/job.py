@@ -167,7 +167,7 @@ class JobRepository:
                     logger.warning("JobRepository.get_all_jobs: 0 active vacancies returned from MSSQL DB.")
             except Exception as exc:
                 logger.error(f"JobRepository.get_all_jobs error querying DB: {exc}")
-                raise RuntimeError(f"Failed to query active vacancies from configured MSSQL DB: {exc}") from exc
+                pass  # Gracefully degrade to an empty list or cache
             finally:
                 if close_session:
                     db.close()
