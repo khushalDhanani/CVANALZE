@@ -82,21 +82,27 @@ async def upload_and_analyze(
                 content_type=accepted.detected_content_type,
                 storage_filename=accepted.storage_filename,
             )
+            if submission.schedule_development_fallback:
+                from app.services.processing_queue import run_processing_job_fallback
+                background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
+            ProcessingJobRepository.save(submission.record)
 
         except Exception:
             if not accepted.was_already_stored:
                 UploadService.remove_stored_upload(accepted.storage_filename)
             raise
 
+        record_state = submission.record.state.value if hasattr(submission.record.state, "value") else str(submission.record.state)
+        record_exec_mode = submission.record.execution_mode.value if hasattr(submission.record.execution_mode, "value") else str(submission.record.execution_mode)
         return CVProcessingResponse(
             message=submission.record.message,
-            cv_key=cv_key,
+            cv_key=submission.record.cv_key,
             status="processing",
             progress=submission.record.progress,
             stage=submission.record.stage,
             job_id=submission.record.job_id,
-            job_state=submission.record.state,
-            execution_mode=submission.record.execution_mode.value,
+            job_state=record_state,
+            execution_mode=record_exec_mode,
             retry_count=submission.record.attempt,
         )
 
@@ -119,9 +125,11 @@ async def get_match_status(cv_key: str):
     """Get the status or result of an enriched background match job."""
     result = ResultRepository.resolve_result(cv_key)
     job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
+    exec_mode_val = (job.execution_mode.value if hasattr(job.execution_mode, "value") else str(job.execution_mode)) if job else None
     if result:
         if result.get("status") == "FAILED":
-            if job and job.state.value in ("QUEUED", "PROCESSING", "RETRYING"):
+            if job and job_state_val in ("QUEUED", "PROCESSING", "RETRYING"):
                 return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
             return CVProcessingResponse(
                 message=result.get("message") or result.get("error") or "CV processing failed.",
@@ -132,8 +140,8 @@ async def get_match_status(cv_key: str):
                 failed_step=result.get("failed_step"),
                 error_details=None,
                 job_id=job.job_id if job else None,
-                job_state=job.state.value if job else "FAILED",
-                execution_mode=job.execution_mode.value if job else None,
+                job_state=job_state_val or "FAILED",
+                execution_mode=exec_mode_val,
                 retry_count=job.attempt if job else None,
             )
 
@@ -150,8 +158,8 @@ async def get_match_status(cv_key: str):
             if job:
                 match_analysis.update(
                     job_id=job.job_id,
-                    job_state=job.state.value,
-                    execution_mode=job.execution_mode.value,
+                    job_state=job_state_val,
+                    execution_mode=exec_mode_val,
                     retry_count=job.attempt,
                 )
             try:
@@ -167,8 +175,8 @@ async def get_match_status(cv_key: str):
                 progress=100,
                 stage="complete",
                 job_id=job.job_id if job else None,
-                job_state=job.state.value if job else "COMPLETED",
-                execution_mode=job.execution_mode.value if job else None,
+                job_state=job_state_val or "COMPLETED",
+                execution_mode=exec_mode_val,
                 retry_count=job.attempt if job else None,
             )
 
@@ -179,8 +187,8 @@ async def get_match_status(cv_key: str):
             progress=result.get("progress", 50),
             stage=result.get("stage"),
             job_id=job.job_id if job else None,
-            job_state=job.state.value if job else "PROCESSING",
-            execution_mode=job.execution_mode.value if job else None,
+            job_state=job_state_val or "PROCESSING",
+            execution_mode=exec_mode_val,
             retry_count=job.attempt if job else None,
         )
 

@@ -133,7 +133,8 @@ def _matches_any(candidate: str, configured_keys: list[str]) -> bool:
 
 
 def _fingerprint(api_key: str) -> str:
-    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+    salt = b"cv_analyzer_api_key_fingerprint_salt"
+    return hmac.new(salt, api_key.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
 
 
 def _role_allows(actual: AccessTier, required: AccessTier) -> bool:

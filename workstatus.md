@@ -155,4 +155,12 @@
 - [x] **AIRIS Status Benchmark Seed:** Wrote a migration to seed the standard AIRIS positive `status_id`s (4, 5, 6, 7) into `airis_historical_benchmarks`, completely eliminating any legacy hardcoded placeholder validation lists.
 - [x] **Explicit Metric Formulas:** Explicitly rewrote `MetricsEngine.snapshot_metrics()` variable assignments in `shadow_validation_service.py` using formal boolean confusion matrix terminology (`tp`, `tn`, `fp`, `fn`), strictly mirroring standard PR11 formulas: `Precision = TP / (TP + FP)`, `Recall = TP / (TP + FN)`, `FPR = FP / (FP + TN)`, `FNR = FN / (FN + TP)`.
 
+### PR 12 — Fix Stuck CV Processing Flow and Queue Worker Configuration
+- **RQ Worker Queue Configuration:** Fixed `start_worker.py` to listen to `[settings.RQ_QUEUE_NAME, "shadow_validation", "default"]` instead of `"default"` only, allowing background workers to pick up and process queued CV upload jobs from `"cv-processing"`.
+- **Identity Alias Resolution:** Enhanced `ProcessingJobRepository.save` and `get_by_cv_key` as well as `ResultRepository.resolve_result` and `_result_matches_scan_id` to resolve prefix variations (`cv_document_{id}`, `cv_candidate_{id}`) and raw `cv_id` / `candidate_id` aliases seamlessly.
+- **Development Fallback Scheduling:** Fixed upload endpoints in `api/cv.py` and `api/analysis.py` to schedule `background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)` when Redis is unavailable (`schedule_development_fallback=True`).
+- **Safe Job State Handling:** Handled job state enum/string property access (`job_state_val` / `exec_mode_val`) safely across status endpoints, preventing 500 `AttributeError` exceptions during status polling.
+- **Verification:** Added `tests/test_cv_status_resolution.py` and verified all 27 unit tests pass.
+
 ## 4. Unfinished Work (Carry-over / Pending)
+None. All tasks completed successfully.

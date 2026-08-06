@@ -153,13 +153,26 @@ class ResultRepository:
 
         stems_to_try = [stem]
         if stem.lower().startswith("cv_"):
-            stems_to_try.append(stem[3:])
-            stems_to_try.append(f"cv_{stem[3:]}")
-            stems_to_try.append(f"CV_{stem[3:]}")
+            raw_stem = stem[3:]
+            stems_to_try.extend([raw_stem, f"cv_{raw_stem}", f"CV_{raw_stem}"])
         else:
             stems_to_try.append(f"cv_{stem}")
 
+        for s in list(stems_to_try):
+            if not s.startswith("cv_document_"):
+                stems_to_try.append(f"cv_document_{s}")
+                if s.startswith("cv_"):
+                    stems_to_try.append(f"cv_document_{s[3:]}")
+            if not s.startswith("cv_candidate_"):
+                stems_to_try.append(f"cv_candidate_{s}")
+                if s.startswith("cv_"):
+                    stems_to_try.append(f"cv_candidate_{s[3:]}")
+
+        seen: set[str] = set()
         for s in stems_to_try:
+            if s in seen:
+                continue
+            seen.add(s)
             fn = f"{s}.json"
             alt_res = cls.read_result_by_filename(fn)
             if alt_res and alt_res.get("status") not in ("processing", None):
@@ -254,11 +267,16 @@ class ResultRepository:
     def _result_matches_scan_id(data: dict[str, Any], scan_id: str) -> bool:
         target = scan_id.removesuffix(".json").lower()
         target_without_prefix = target.removeprefix("cv_")
-        for value in (data.get("id"), data.get("scan_id")):
+        values_to_check = [data.get("id"), data.get("scan_id"), data.get("cv_id"), data.get("candidate_id")]
+        for value in values_to_check:
             if value is None:
                 continue
             normalized = str(value).removesuffix(".json").lower()
             if normalized == target or normalized.removeprefix("cv_") == target_without_prefix:
+                return True
+            if f"cv_document_{normalized}" == target or f"cv_document_{normalized.removeprefix('cv_')}" == target_without_prefix:
+                return True
+            if f"cv_candidate_{normalized}" == target or f"cv_candidate_{normalized.removeprefix('cv_')}" == target_without_prefix:
                 return True
         return False
 
