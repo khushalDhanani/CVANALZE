@@ -397,12 +397,13 @@ class MatchService:
             
         from app.schemas.classification_types import MatchStatus
 
-        if has_genuine_match:
-            top_level_match_status = MatchStatus.DB_MATCH
-        elif cand_classification and cand_classification.match_status == "DB_MATCH":
-            top_level_match_status = MatchStatus.PARTIAL_MATCH
-        else:
+        if not has_genuine_match:
+            recommended_dept = None
+            professional_domain = None
+            best_match = None
             top_level_match_status = MatchStatus.NO_SUITABLE_MATCH
+        else:
+            top_level_match_status = MatchStatus.DB_MATCH
 
         result = EnrichedCandidateAnalysis(
             match_status=top_level_match_status,

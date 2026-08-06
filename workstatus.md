@@ -104,6 +104,13 @@
 - **Vacancy Aggregates:** Removed unsupported active/deleted metadata fields against qualifications, strictly asserting `RequriedQualificationID`. Added sub-lookups for `request_track` and `candidate_history`.
 - **Job Profile Aggregates:** Remapped attribute access for `OrgJobProfileQualificationDet` (`QualificationIsDeleted`) and `JobProfileDomainKnowledgeDet` (`DomainKnowlgID`, `JobProfileDomainKnowledgeDetIsActive`).
 
+### PR6 and PR7 — Taxonomy Enforcement and Isolation
+- Replaced the memory-heavy `get_all_designations` loop inside `DynamicTaxonomyService` with an optimized PostgreSQL indexed lookup (`session.query().filter(ilike())`) directly mapped against `OrgDesignationMst`.
+- Downgraded aliases and semantic vector classification to `MatchStatus.PARTIAL_MATCH`. Isolated `MatchStatus.DB_MATCH` strictly to exact MSSQL source identifier matching.
+- Permanently deleted `_get_default_fallback` from the taxonomy stack, eliminating the legacy `General Operations` domain hallucination.
+- Rewrote the match status termination logic in `analyze_single_cv` inside `MatchService` to aggressively return `MatchStatus.NO_SUITABLE_MATCH` for any candidate failing the active vacancy filter.
+- Enforced complete nullification of `recommended_department`, `professional_domain`, `primary_department`, and `best_match` when no active vacancy corresponds to the candidate, ensuring non-authoritative AI career advice is corralled safely into the `ai_career_suggestions` block instead.
+
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.
 - Taxonomy Classifier now correctly throws `Unknown` / `NO_SUITABLE_MATCH` for unrecognized domains instead of blindly falling back to `General Operations`, enforcing strict DB-backed taxonomy resolutions.

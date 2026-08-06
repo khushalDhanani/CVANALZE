@@ -202,26 +202,14 @@ class DynamicTaxonomyService:
             
         try:
             with MssqlReadSession() as session:
-                from app.repositories.mssql.organization_source import OrganizationSourceRepository
-                from app.repositories.mssql.taxonomy_source import TaxonomySourceRepository
+                from app.models.mssql.organization import OrgDesignationMst, OrgDepartmentMst
                 
-                org_repo = OrganizationSourceRepository(session)
-                tax_repo = TaxonomySourceRepository(session)
-                
-                # Check MSSQL Designation
-                all_desigs = org_repo.get_all_designations()
-                matched_desig = None
-                for desig in all_desigs:
-                    if desig.DesigName and desig.DesigName.lower() == clean_term:
-                        matched_desig = desig
-                        break
+                # Check MSSQL Designation EXACT Match
+                matched_desig = session.query(OrgDesignationMst).filter(OrgDesignationMst.DesigName.ilike(clean_term)).first()
                 
                 if not matched_desig:
                     # Partial match
-                    partial_matches = []
-                    for desig in all_desigs:
-                        if desig.DesigName and clean_term in desig.DesigName.lower():
-                            partial_matches.append(desig)
+                    partial_matches = session.query(OrgDesignationMst).filter(OrgDesignationMst.DesigName.ilike(f"%{clean_term}%")).all()
                     
                     if len(partial_matches) == 1:
                         matched_desig = partial_matches[0]
@@ -235,8 +223,7 @@ class DynamicTaxonomyService:
                     dept_id = matched_desig.DeptID
                     dept_name = None
                     if dept_id:
-                        all_depts = org_repo.get_active_departments()
-                        dept = next((d for d in all_depts if d.DeptID == dept_id), None)
+                        dept = session.query(OrgDepartmentMst).filter(OrgDepartmentMst.DeptID == dept_id).first()
                         if dept:
                             dept_name = dept.DeptName
 
@@ -312,7 +299,7 @@ class DynamicTaxonomyService:
                         industry_department=industry_dept,
                         industry_designation=industry_desig,
                         industry_domain=dom.domain_name if dom else None,
-                        match_status=MatchStatus.DB_MATCH,
+                        match_status=MatchStatus.PARTIAL_MATCH,
                         confidence=1.0,
                         match_source="PostgreSQL Alias",
                         evidence=[
@@ -367,7 +354,7 @@ class DynamicTaxonomyService:
                                 industry_department=res_classification.industry_department,
                                 industry_designation=res_classification.industry_designation,
                                 industry_domain=res_classification.industry_domain,
-                                match_status=MatchStatus.DB_MATCH,
+                                match_status=MatchStatus.PARTIAL_MATCH,
                                 confidence=round(sim_score, 4),
                                 match_source="PostgreSQL Vector",
                                 evidence=[
@@ -403,29 +390,3 @@ class DynamicTaxonomyService:
         except Exception as exc:
             logger.warning(f"[DYNAMIC_TAXONOMY] Vector semantic lookup failed for '{query_text}': {exc}")
         return None
-
-    @classmethod
-    def _get_default_fallback(cls, matched_term: str | None = None) -> NormalizedClassification:
-        from app.core.rule_config_manager import RuleConfigManager
-        from app.schemas.classification_types import MatchStatus
-        tax_rules = RuleConfigManager.get_taxonomy_rules()
-        return NormalizedClassification(
-            db_department_id=None,
-            db_department_name=None,
-            db_designation_id=None,
-            db_designation_name=None,
-            industry_department=None,
-            industry_designation=None,
-            industry_domain=tax_rules.default_domain,
-            match_status=MatchStatus.NO_SUITABLE_MATCH,
-            confidence=0.0,
-            match_source="legacy_fallback",
-            evidence=[
-                ClassificationEvidence(
-                    source="fallback",
-                    matched_term=matched_term,
-                    matched_against=None,
-                    confidence=0.0,
-                )
-            ],
-        )
