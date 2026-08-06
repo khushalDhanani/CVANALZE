@@ -218,10 +218,17 @@ class DynamicTaxonomyService:
                 
                 if not matched_desig:
                     # Partial match
+                    partial_matches = []
                     for desig in all_desigs:
                         if desig.DesigName and clean_term in desig.DesigName.lower():
-                            matched_desig = desig
-                            break
+                            partial_matches.append(desig)
+                    
+                    if len(partial_matches) == 1:
+                        matched_desig = partial_matches[0]
+                    elif len(partial_matches) > 1:
+                        # Ambiguity rejection: if partial match gives multiple distinct designations, reject
+                        logger.warning(f"[DYNAMIC_TAXONOMY] Ambiguous partial MSSQL match for '{term}', rejecting.")
+                        return None
                             
                 if matched_desig:
                     # Fetch department if available
