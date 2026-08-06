@@ -374,6 +374,17 @@ class RuleConfigManager:
                 logger.info(f"[RULE_CONFIG] Loading active profile from cache (v{path_hash})")
 
         if raw_data is None:
+            # Fallback to local rule_config.json
+            from pathlib import Path
+            rule_config_path = Path(__file__).resolve().parent / "rule_config.json"
+            if rule_config_path.exists():
+                with open(rule_config_path, "rb") as f:
+                    raw_data = json.loads(f.read().decode("utf-8"))
+                path_hash = raw_data.get("version", "local_file")
+                config_size_bytes = len(json.dumps(raw_data))
+                logger.info(f"[RULE_CONFIG] Loading active profile from local file (v{path_hash})")
+
+        if raw_data is None:
             from app.core.error_handlers import SystemConfigurationError
             raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
 

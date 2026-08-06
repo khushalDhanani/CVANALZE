@@ -11,7 +11,8 @@ def config_invalidation_worker():
     """Background thread that listens for configuration invalidation events."""
     while True:
         try:
-            client = RedisCache._get_client()
+            from app.core.cache import _REDIS_CLIENT
+            client = _REDIS_CLIENT
             if not client:
                 time.sleep(5)
                 continue
