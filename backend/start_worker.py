@@ -1,3 +1,12 @@
+import os
+import sys
+
+# Fix for macOS fork() issue with PyTorch/CoreFoundation
+# We must restart the process via execv to ensure the C-level env is set before any libraries load
+if os.environ.get("OBJC_DISABLE_INITIALIZE_FORK_SAFETY") != "YES":
+    os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
 import warnings
 
 from redis import Redis

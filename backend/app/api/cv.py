@@ -125,14 +125,20 @@ async def get_cv_status(cv_key: str):
                 execution_mode=exec_mode_val,
                 retry_count=job.attempt if job else None,
             )
-        if result.get("status") == "processing" and not result.get("match_analysis"):
+        is_completed = (
+            result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+            or result.get("progress") == 100
+            or result.get("is_complete") is True
+        ) and result.get("status") != "processing"
+
+        if not is_completed:
             payload = ProcessingQueueService.legacy_status_payload(job) if job else {}
             return CVProcessingResponse(
                 message=f"{result.get('progress', 25)}% - {result.get('stage', 'Processing')}...",
                 cv_key=result.get("id") or cv_key,
                 status="processing",
                 progress=result.get("progress", 25),
-                stage=result.get("stage"),
+                stage=result.get("stage", "processing"),
                 job_id=payload.get("job_id"),
                 job_state=payload.get("job_state", "PROCESSING"),
                 execution_mode=payload.get("execution_mode"),

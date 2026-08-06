@@ -195,13 +195,22 @@ class CandidateSearchService:
                 if edu_req not in edu_text and edu_req not in text_lower:
                     continue
 
-            # Status Filter
+            # Status Filter & Completion Guard
+            cand_status = str(r.get("status") or "").upper()
+            is_complete_record = (
+                cand_status in ("COMPLETED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+                or r.get("progress") == 100
+                or r.get("is_complete") is True
+            ) and cand_status != "PROCESSING"
+
             if request.status:
-                req_st = request.status.strip().lower()
-                cand_status = str(r.get("status") or "completed").lower()
-                if req_st in ("complete", "completed") and cand_status in ("complete", "completed"):
+                req_st = request.status.strip().upper()
+                if req_st in ("COMPLETE", "COMPLETED") and is_complete_record:
                     pass
-                elif req_st != cand_status:
+                elif req_st != cand_status and req_st != "ALL":
+                    continue
+            else:
+                if not is_complete_record:
                     continue
 
             location_val = r.get("location") or contact_info.get("location")

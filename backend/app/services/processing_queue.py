@@ -168,6 +168,45 @@ class ProcessingQueueService:
             "retry_count": record.attempt,
         }
 
+    @classmethod
+    def reconcile_job(cls, record: ProcessingJobRecord) -> ProcessingJobRecord:
+        """Sync application state with RQ if the job crashed abruptly."""
+        if record.execution_mode != ProcessingExecutionMode.RQ or record.state not in (JobState.QUEUED, JobState.PROCESSING, JobState.RETRYING):
+            return record
+
+        if not record.rq_job_id:
+            return record
+
+        connection = cls._redis_connection()
+        if not connection:
+            return record
+
+        try:
+            from rq.job import Job, NoSuchJobError
+            try:
+                rq_job = Job.fetch(record.rq_job_id, connection=connection)
+                if rq_job.get_status() == "failed":
+                    error_msg = str(rq_job.exc_info or "CV processing failed due to unexpected worker termination.")
+                    error = CanonicalError(
+                        code=ErrorCode.PROCESSING_FAILED,
+                        message="CV processing failed abruptly during background execution.",
+                        retryable=False,
+                    )
+                    return ProcessingJobRepository.transition(
+                        record.job_id,
+                        JobState.FAILED,
+                        progress=100,
+                        stage="failed",
+                        message=f"CV processing failed abruptly: {error_msg[:100]}...",
+                        error=error,
+                    )
+            except NoSuchJobError:
+                pass
+        except Exception as e:
+            logger.warning(f"Failed to reconcile RQ job {record.rq_job_id}: {e}")
+
+        return record
+
     @staticmethod
     def unknown_job_compatibility_active() -> bool:
         deadline = settings.JOB_NOT_FOUND_COMPATIBILITY_UNTIL

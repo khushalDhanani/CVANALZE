@@ -208,8 +208,14 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
             cv_id=existing_result.get("cv_id"),
             storage_filename=retained_upload.storage_filename,
         )
+        if submission.schedule_development_fallback:
+            from app.services.processing_queue import run_processing_job_fallback
+            background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
     except ProcessingQueueUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    record_state = submission.record.state.value if hasattr(submission.record.state, "value") else str(submission.record.state)
+    record_exec_mode = submission.record.execution_mode.value if hasattr(submission.record.execution_mode, "value") else str(submission.record.execution_mode)
 
     return {
         "message": submission.record.message,
@@ -217,7 +223,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         "status": "processing",
         "progress": submission.record.progress,
         "job_id": submission.record.job_id,
-        "job_state": submission.record.state.value,
-        "execution_mode": submission.record.execution_mode.value,
+        "job_state": record_state,
+        "execution_mode": record_exec_mode,
         "retry_count": submission.record.attempt,
     }

@@ -125,6 +125,9 @@ async def get_match_status(cv_key: str):
     """Get the status or result of an enriched background match job."""
     result = ResultRepository.resolve_result(cv_key)
     job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    if job:
+        job = ProcessingQueueService.reconcile_job(job)
+        
     job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
     exec_mode_val = (job.execution_mode.value if hasattr(job.execution_mode, "value") else str(job.execution_mode)) if job else None
     if result:
@@ -145,10 +148,14 @@ async def get_match_status(cv_key: str):
                 retry_count=job.attempt if job else None,
             )
 
-        is_completed = result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED") or result.get("progress") == 100 or result.get("is_complete") is True
+        is_completed = (
+            result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+            or result.get("progress") == 100
+            or result.get("is_complete") is True
+        ) and result.get("status") != "processing"
 
         match_analysis = result.get("match_analysis")
-        if match_analysis:
+        if match_analysis and is_completed:
             match_analysis["scan_id"] = result.get("scan_id", result.get("id"))
             match_analysis["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
             match_analysis["status"] = result.get("status", "COMPLETED")
@@ -183,9 +190,9 @@ async def get_match_status(cv_key: str):
         return CVProcessingResponse(
             message=result.get("message") or f"{result.get('progress', 50)}% - Processing in progress...",
             cv_key=cv_key,
-            status=result.get("status", "processing"),
+            status="processing",
             progress=result.get("progress", 50),
-            stage=result.get("stage"),
+            stage=result.get("stage", "processing"),
             job_id=job.job_id if job else None,
             job_state=job_state_val or "PROCESSING",
             execution_mode=exec_mode_val,

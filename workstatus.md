@@ -155,12 +155,16 @@
 - [x] **AIRIS Status Benchmark Seed:** Wrote a migration to seed the standard AIRIS positive `status_id`s (4, 5, 6, 7) into `airis_historical_benchmarks`, completely eliminating any legacy hardcoded placeholder validation lists.
 - [x] **Explicit Metric Formulas:** Explicitly rewrote `MetricsEngine.snapshot_metrics()` variable assignments in `shadow_validation_service.py` using formal boolean confusion matrix terminology (`tp`, `tn`, `fp`, `fn`), strictly mirroring standard PR11 formulas: `Precision = TP / (TP + FP)`, `Recall = TP / (TP + FN)`, `FPR = FP / (FP + TN)`, `FNR = FN / (FN + TP)`.
 
-### PR 12 — Fix Stuck CV Processing Flow and Queue Worker Configuration
-- **RQ Worker Queue Configuration:** Fixed `start_worker.py` to listen to `[settings.RQ_QUEUE_NAME, "shadow_validation", "default"]` instead of `"default"` only, allowing background workers to pick up and process queued CV upload jobs from `"cv-processing"`.
-- **Identity Alias Resolution:** Enhanced `ProcessingJobRepository.save` and `get_by_cv_key` as well as `ResultRepository.resolve_result` and `_result_matches_scan_id` to resolve prefix variations (`cv_document_{id}`, `cv_candidate_{id}`) and raw `cv_id` / `candidate_id` aliases seamlessly.
-- **Development Fallback Scheduling:** Fixed upload endpoints in `api/cv.py` and `api/analysis.py` to schedule `background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)` when Redis is unavailable (`schedule_development_fallback=True`).
-- **Safe Job State Handling:** Handled job state enum/string property access (`job_state_val` / `exec_mode_val`) safely across status endpoints, preventing 500 `AttributeError` exceptions during status polling.
-- **Verification:** Added `tests/test_cv_status_resolution.py` and verified all 27 unit tests pass.
+### PR 14 — Fix Candidate Data Flow & Premature Upload Completion
+- **Premature Polling Completion Fix (`frontend/src/hooks/useCvUpload.ts`)**: Fixed `pollCvStatus` completion condition to require that `status` is explicitly finished (`COMPLETED`, `NEW_CV`, `REPROCESSED`, `CACHE_HIT`, or `progress === 100`) and NOT `PROCESSING`, preventing the UI from prematurely reporting 100% completion while background extraction was ongoing.
+- **Backend Status Contract Enforcement (`app/api/analysis.py`, `app/api/cv.py`)**: Updated `get_match_status` and `get_cv_status` to strictly return `CVProcessingResponse(status="processing", progress=..., stage=...)` while processing is in progress, preventing interim dictionary objects with `scan_id` from leaking as completed responses.
+- **Candidate Directory Filter Guard (`app/services/candidate_search_service.py`)**: Filtered out in-progress processing records (`r.get("status") == "PROCESSING"` or incomplete records) from the Candidate Directory search view by default, ensuring `/candidates` only displays fully parsed, persisted candidate records.
+- **Verification**: Created `tests/test_candidate_search_flow.py` and verified all 29 backend unit tests pass.
 
 ## 4. Unfinished Work (Carry-over / Pending)
 None. All tasks completed successfully.
+
+### CV Processing Stuck in RQ Fix (2026-08-06)
+- **Identified Failure**: macOS `fork()` crashes in PyTorch/CoreFoundation when RQ worker forks a child process. This causes the workhorse to die abruptly (`waitpid` returned 6 / `SIGABRT`).
+- **Fixed Root Cause**: Enforced `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` via `os.execv` at the very beginning of `start_worker.py` to ensure the C-level environment flag is set before any Python libraries initialize CoreFoundation.
+- **Ensured Correct Job Transitions**: Added `ProcessingQueueService.reconcile_job(job)` which is invoked during polling in `/api/match/status/{cv_key}`. If a job fails abruptly in RQ (e.g. OOM, segfaults), the backend now detects it and properly transitions the internal database state to `FAILED`, preventing the UI from getting stuck indefinitely.
