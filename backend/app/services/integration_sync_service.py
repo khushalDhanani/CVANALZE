@@ -92,56 +92,71 @@ class BaseSyncService:
                         coalesced_dt = func.coalesce(cls.MSSQL_UPDATED_COL, cls.MSSQL_CREATED_COL)
                         query = query.filter(coalesced_dt > watermark)
 
+                    # Order by timestamp to safely track watermark during partial failures
+                    coalesced_dt = func.coalesce(cls.MSSQL_UPDATED_COL, cls.MSSQL_CREATED_COL)
+                    query = query.order_by(coalesced_dt.asc())
+
                     source_records = query.yield_per(1000)
+                    lowest_failed_timestamp = None
 
                     for record in source_records:
                         metrics["records_processed"] += 1
                         try:
-                            source_id = str(getattr(record, cls.MSSQL_ID_COL.name))
-                            payload = cls.serialize_payload(record)
-                            payload_hash = cls._compute_hash(payload)
-                            record_updated = cls._get_updated_timestamp(record)
+                            with pg_db.begin_nested():
+                                source_id = str(getattr(record, cls.MSSQL_ID_COL.name))
+                                payload = cls.serialize_payload(record)
+                                payload_hash = cls._compute_hash(payload)
+                                record_updated = cls._get_updated_timestamp(record)
 
-                            if max_updated is None or record_updated > max_updated:
-                                max_updated = record_updated
+                                is_active = True
+                                if cls.MSSQL_IS_ACTIVE_COL:
+                                    is_active = getattr(record, cls.MSSQL_IS_ACTIVE_COL.name)
 
-                            is_active = True
-                            if cls.MSSQL_IS_ACTIVE_COL:
-                                is_active = getattr(record, cls.MSSQL_IS_ACTIVE_COL.name)
+                                # Check if exists in snapshot
+                                snapshot = pg_db.query(cls.SNAPSHOT_MODEL).filter(cls.SNAPSHOT_MODEL.source_id == source_id).first()
 
-                            # Check if exists in snapshot
-                            snapshot = pg_db.query(cls.SNAPSHOT_MODEL).filter(cls.SNAPSHOT_MODEL.source_id == source_id).first()
+                                if not snapshot:
+                                    new_snap = cls.SNAPSHOT_MODEL(
+                                        source_id=source_id,
+                                        source_hash=payload_hash,
+                                        source_updated_at=record_updated,
+                                        is_active=is_active,
+                                        payload=payload
+                                    )
+                                    pg_db.add(new_snap)
+                                    metrics["inserted"] += 1
+                                else:
+                                    if snapshot.source_hash != payload_hash or snapshot.is_active != is_active:
+                                        snapshot.source_hash = payload_hash
+                                        snapshot.source_updated_at = record_updated
+                                        snapshot.is_active = is_active
+                                        snapshot.payload = payload
+                                        metrics["updated"] += 1
 
-                            if not snapshot:
-                                new_snap = cls.SNAPSHOT_MODEL(
-                                    source_id=source_id,
-                                    source_hash=payload_hash,
-                                    source_updated_at=record_updated,
-                                    is_active=is_active,
-                                    payload=payload
-                                )
-                                pg_db.add(new_snap)
-                                metrics["inserted"] += 1
-                            else:
-                                if snapshot.source_hash != payload_hash or snapshot.is_active != is_active:
-                                    snapshot.source_hash = payload_hash
-                                    snapshot.source_updated_at = record_updated
-                                    snapshot.is_active = is_active
-                                    snapshot.payload = payload
-                                    metrics["updated"] += 1
-
-                            pg_db.flush()
+                                pg_db.flush()
+                                
+                                if max_updated is None or record_updated > max_updated:
+                                    max_updated = record_updated
 
                         except Exception as e:
                             metrics["errors"] += 1
-                            err = SyncError(
-                                sync_run_id=run.id,
-                                entity_type=cls.ENTITY_TYPE,
-                                source_id=str(getattr(record, cls.MSSQL_ID_COL.name, "unknown")),
-                                error_type=type(e).__name__,
-                                error_message=str(e)[:500]
-                            )
-                            pg_db.add(err)
+                            record_updated = cls._get_updated_timestamp(record)
+                            if lowest_failed_timestamp is None or record_updated < lowest_failed_timestamp:
+                                lowest_failed_timestamp = record_updated
+                                
+                            try:
+                                with pg_db.begin_nested():
+                                    err = SyncError(
+                                        sync_run_id=run.id,
+                                        entity_type=cls.ENTITY_TYPE,
+                                        source_id=str(getattr(record, cls.MSSQL_ID_COL.name, "unknown")),
+                                        error_type=type(e).__name__,
+                                        error_message=str(e)[:500]
+                                    )
+                                    pg_db.add(err)
+                                    pg_db.flush()
+                            except Exception as inner_e:
+                                logger.error(f"Failed to record SyncError for {cls.ENTITY_TYPE}: {inner_e}")
 
                     # Now handle deactivated records by checking against all MSSQL IDs
                     if watermark:
@@ -158,7 +173,10 @@ class BaseSyncService:
                                 metrics["deactivated"] += 1
 
                 if max_updated:
-                    cls.set_watermark(pg_db, max_updated)
+                    if lowest_failed_timestamp and lowest_failed_timestamp < max_updated:
+                        cls.set_watermark(pg_db, lowest_failed_timestamp)
+                    else:
+                        cls.set_watermark(pg_db, max_updated)
 
                 run.status = "COMPLETED"
                 run.completed_at = datetime.now(timezone.utc)
@@ -228,6 +246,17 @@ class CandidateSyncService(BaseSyncService):
     MSSQL_UPDATED_COL = RecruitCandidateMst.CandidateUpdDt
     MSSQL_CREATED_COL = RecruitCandidateMst.CandidateEntDt
     MSSQL_IS_ACTIVE_COL = RecruitCandidateMst.CandidateIsActive
+
+    @classmethod
+    def serialize_payload(cls, record) -> dict:
+        """Allowlist explicit fields to prevent PII duplication in JSON snapshot."""
+        allowlist = {
+            "CandidateID", "NoticePeriodID", "MainDeptID", "DeptID", "DesigID",
+            "CandidateDomainKnowlgID", "CandidateJobProfileID", "CandidateTotExperience",
+            "CandidateExpectedCtc", "CandidateLanguageKnown", "CandidateHighestQualificationID",
+            "CandidateStatusID", "CandidateIsActive"
+        }
+        return {c.name: getattr(record, c.name) for c in record.__table__.columns if c.name in allowlist}
 
 class VacancySyncService(BaseSyncService):
     ENTITY_TYPE = "vacancy"

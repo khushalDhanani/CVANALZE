@@ -118,6 +118,12 @@
 - Connected the `AirisHistoricalBenchmark` table directly into `ShadowEvaluator.evaluate`, mapping MSSQL status IDs to authoritative `is_hired` states in real time, rather than relying on hardcoded integer mocks (`[4, 5, 6, 7]`).
 - Architected explicit True Positive (TP), True Negative (TN), False Positive (FP), and False Negative (FN) calculations inside `MetricsEngine`, and built concrete algorithmic definitions for Precision, Recall, FPR, and FNR natively logged to `ValidationMetricsSnapshot`.
 
+### P1 — Pre-Integration Fixes
+- **Candidate Snapshot Allowlist:** Implemented an explicit column allowlist via `serialize_payload` inside `CandidateSyncService` to prevent the unauthorized duplication of personal identifiable information (PII) like names, emails, and phone numbers into the PostgreSQL integration cache.
+- **Partial Failure & Watermark Repair:** Restructured the `run_sync` block to sequentially `.order_by` timestamp and evaluate every row insertion through nested PostgreSQL transactions (`pg_db.begin_nested()`). This allows valid rows to commit while safely pausing the `lowest_failed_timestamp` watermark before a broken row, guaranteeing recovery and preventing total batch drops.
+- **Taxonomy Validation & Fallbacks:** Purged `_get_default_fallback` from the codebase.
+- **Shadow Threads to RQ:** Converted the last standing instances of unmanaged threads into robust `execute_shadow_pipeline` background RQ workers.
+
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.
 - Taxonomy Classifier now correctly throws `Unknown` / `NO_SUITABLE_MATCH` for unrecognized domains instead of blindly falling back to `General Operations`, enforcing strict DB-backed taxonomy resolutions.
