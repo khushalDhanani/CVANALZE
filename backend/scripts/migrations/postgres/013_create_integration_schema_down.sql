@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS integration.vacancy_snapshots;
+DROP TABLE IF EXISTS integration.candidate_snapshots;
+DROP TABLE IF EXISTS integration.job_profile_snapshots;
+DROP TABLE IF EXISTS integration.designation_snapshots;
+DROP TABLE IF EXISTS integration.department_snapshots;
+DROP TABLE IF EXISTS integration.sync_errors;
+DROP TABLE IF EXISTS integration.sync_watermarks;
+DROP TABLE IF EXISTS integration.sync_runs;
+DROP SCHEMA IF EXISTS integration;

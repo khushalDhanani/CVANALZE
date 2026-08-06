@@ -18,6 +18,16 @@ from app.models.taxonomy import (
 from app.models.training import HRFeedback
 
 from app.models.result import CVResult
+from app.models.integration import (
+    SyncRun,
+    SyncWatermark,
+    SyncError,
+    DepartmentSnapshot,
+    DesignationSnapshot,
+    JobProfileSnapshot,
+    CandidateSnapshot,
+    VacancySnapshot,
+)
 
 __all__ = [
     "CVResult",
@@ -42,4 +52,12 @@ __all__ = [
     "StopWord",
     "SystemConfig",
     "VacancyEmbedding",
+    "SyncRun",
+    "SyncWatermark",
+    "SyncError",
+    "DepartmentSnapshot",
+    "DesignationSnapshot",
+    "JobProfileSnapshot",
+    "CandidateSnapshot",
+    "VacancySnapshot",
 ]
