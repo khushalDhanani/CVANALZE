@@ -168,3 +168,53 @@ None. All tasks completed successfully.
 - **Identified Failure**: macOS `fork()` crashes in PyTorch/CoreFoundation when RQ worker forks a child process. This causes the workhorse to die abruptly (`waitpid` returned 6 / `SIGABRT`).
 - **Fixed Root Cause**: Enforced `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` via `os.execv` at the very beginning of `start_worker.py` to ensure the C-level environment flag is set before any Python libraries initialize CoreFoundation.
 - **Ensured Correct Job Transitions**: Added `ProcessingQueueService.reconcile_job(job)` which is invoked during polling in `/api/match/status/{cv_key}`. If a job fails abruptly in RQ (e.g. OOM, segfaults), the backend now detects it and properly transitions the internal database state to `FAILED`, preventing the UI from getting stuck indefinitely.
+
+## 2026-08-06: Improve Recommendation Accuracy and Filter Weak Matches
+
+### Work Completed:
+- **CV Parsing**: Fixed regex in `ResumeFieldExtractor._extract_skills` that was inadvertently parsing date strings like "2022 - PRESENT" as skills.
+- **Match Evaluation**: Refined `CrossDomainGuardEvaluator.evaluate` to correctly penalize mismatched professional domains instead of allowing them to bypass penalties when job families were unknown.
+- **Recommendation Logic**: Overhauled `RecommendationService.get_candidate_recommendations`:
+  - Added a strict 80% confidence threshold to filter out weak, keyword-only, or unrelated matches in `best_vacancies`.
+  - Updated career transition logic to only suggest transitions if a valid strong match exists, preventing nonsensical bridging.
+  - Implemented logic to explicitly state "No strong match exists. Closest valid role without forcing a recommendation: [Role]" when applicable.
+  - Adjusted `skill_bridge` extraction for transitions to pull from actual job requirements rather than candidate strengths.
+
+### Files Modified:
+- `backend/app/services/resume_field_extractor.py`
+- `backend/app/services/match_evaluators.py`
+- `backend/app/services/recommendation_service.py`
+
+### Next Steps:
+- Continue monitoring recommendations across more diverse CV profiles.
+
+## 2026-08-06: Database Taxonomy Seeding and CV Matching Logic Verification
+
+### Work Completed:
+- **Taxonomy Seeding**: Created `app/data/department_domains_seed.json` covering all 52 active MSSQL departments mapped to canonical industry domains (e.g. Information Technology, Chemical R&D, Chemical Manufacturing, Quality Control, etc.) with default roles and domain keywords.
+- **ORM Model Repair**: Updated `DepartmentDomainMaster` model in `app/models/domain.py` to map `Keywords` and `DefaultRoles` as PostgreSQL `JSONB` type. Updated `DepartmentDomainRepository` in `app/repositories/department_domain.py` to handle both lists and json strings safely.
+- **Seeding Script**: Created and ran `scripts/seed_department_domains.py`, successfully inserting and verifying 52 active department-domain mapping rows in PostgreSQL `DepartmentDomainMaster`.
+- **End-to-End Matching Verification**: Re-processed candidate `cv_gptsuifgr321345678o9p` (Flutter Developer). Verified that the candidate's domain resolved to `Cis Team` / `Information Technology` and matched vacancy ID 1065 (`Flutter Developer` in `CIS Team`) with an 86.9% score and `Highly Recommended` recommendation.
+
+### Files Modified:
+- `backend/app/models/domain.py`
+- `backend/app/repositories/department_domain.py`
+- `backend/app/data/department_domains_seed.json` [NEW]
+- `backend/scripts/seed_department_domains.py` [NEW]
+- `backend/scripts/migrate_phase1_inventory.py`
+
+### Next Steps:
+- System is fully seeded and matching pipeline is verified end-to-end.
+
+## 2026-08-06: Fix Frontend Polling Timeout & Transient Network Resilience
+
+### Root Cause:
+- The frontend `apiClient` had a 30-second hard request timeout (`API_CONFIG.TIMEOUT_MS = 30000`).
+- If a single status polling HTTP request (`/api/match/status/{cv_key}`) encountered a 30s timeout or transient network delay while Ollama LLM was executing heavy generation, `apiClient` threw `AbortError` (`Request timed out`).
+- `useCvUpload.ts` immediately caught the exception and aborted the entire polling loop, setting the UI state to `Processing Failed: Halted at Step 6`, even though the background worker was still processing and successfully completed the job moments later (`Job OK`).
+
+### Work Completed:
+- **Client Timeout Adjustment**: Increased `API_CONFIG.TIMEOUT_MS` from 30,000 ms to 60,000 ms in `frontend/src/constants/config.ts` to accommodate heavy initial LLM generation runs without client-side `AbortError` timeouts.
+- **Polling Error Resilience**: Refactored `pollCvStatus` in `frontend/src/hooks/useCvUpload.ts` to track `consecutiveErrors`. Single transient status check failures or network timeouts log a warning and allow subsequent poll attempts to retry up to 5 consecutive errors before marking the step as failed.
+
+

@@ -108,15 +108,28 @@ class CandidateResumeDTO(BaseModel):
 
         if resume_json and isinstance(resume_json, dict):
             summary = str(resume_json.get("summary") or "").lower()
-            exp_list = resume_json.get("experience", [])
+            exp_list = resume_json.get("work_experience", []) or resume_json.get("experience", [])
             if isinstance(exp_list, list):
-                exp_titles = [str(e.get("title") or "").lower() for e in exp_list if isinstance(e, dict)]
+                exp_titles = [str(e.get("job_title") or e.get("title") or "").lower() for e in exp_list if isinstance(e, dict)]
+            
+            projects_list = resume_json.get("projects", [])
+            if isinstance(projects_list, list):
+                exp_titles.extend([str(p.get("title") or p.get("project_name") or "").lower() for p in projects_list if isinstance(p, dict)])
+            
             skills_data = resume_json.get("skills")
-            if isinstance(skills_data, (list, dict)):
+            if isinstance(skills_data, dict):
+                if "all_skills" in skills_data:
+                    skills_str = [str(s).lower() for s in skills_data["all_skills"]]
+                elif "categorized" in skills_data:
+                    for cat, s_list in skills_data["categorized"].items():
+                        if isinstance(s_list, list):
+                            skills_str.extend([str(s).lower() for s in s_list])
+            elif isinstance(skills_data, list):
                 skills_str = [str(s).lower() for s in skills_data]
+            
             edu_list = resume_json.get("education", [])
             if isinstance(edu_list, list):
-                edu_str = [str(e).lower() for e in edu_list]
+                edu_str = [str(e.get("degree", "")) + " " + str(e.get("field", "")) + " " + str(e.get("institution", "")) if isinstance(e, dict) else str(e).lower() for e in edu_list]
 
         combined = f"{text_lower} {summary} {' '.join(exp_titles)} {' '.join(skills_str)} {' '.join(edu_str)}"
         norm_full_text = re.sub(r"\s+", " ", combined).strip()

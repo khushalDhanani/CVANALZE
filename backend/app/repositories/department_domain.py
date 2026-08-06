@@ -137,8 +137,8 @@ class DepartmentDomainRepository:
                     department_id=(int(row.DepartmentId) if row.DepartmentId is not None else None),
                     department_name=(row.DepartmentNameSnapshot or row.DomainName),
                     domain_name=row.DomainName,
-                    keywords=json.loads(row.Keywords) if row.Keywords else [],
-                    default_roles=json.loads(row.DefaultRoles) if row.DefaultRoles else [],
+                    keywords=json.loads(row.Keywords) if isinstance(row.Keywords, str) else (row.Keywords or []),
+                    default_roles=json.loads(row.DefaultRoles) if isinstance(row.DefaultRoles, str) else (row.DefaultRoles or []),
                     priority=int(row.Priority or 0),
                     is_active=bool(row.IsActive),
                 )

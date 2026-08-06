@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.database import PostgresAppSession, init_db
 from app.models.rules import RuleConfigProfile
 from app.models.domain import DepartmentDomainMaster
-from app.models import org, recruit  # Import to register models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("migrate_phase1_inventory")
@@ -96,6 +95,7 @@ def migrate():
                 dept_record = DepartmentDomainMaster(DepartmentId=dept_id)
                 db.add(dept_record)
                 
+            dept_record.DepartmentNameSnapshot = dept_name
             dept_record.DomainName = domain_name
             dept_record.Keywords = keywords_json
             dept_record.DefaultRoles = default_roles_json

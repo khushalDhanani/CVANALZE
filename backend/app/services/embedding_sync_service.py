@@ -3,6 +3,18 @@ from __future__ import annotations
 import hashlib
 import json
 from typing import Any
+from datetime import datetime
+
+def _parse_dt(val: Any) -> datetime | None:
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        return val
+    try:
+        from dateutil.parser import parse
+        return parse(str(val))
+    except Exception:
+        return None
 
 from app.core.config import settings
 from app.core.logging import logger

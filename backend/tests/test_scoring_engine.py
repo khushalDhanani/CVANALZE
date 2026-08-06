@@ -13,8 +13,8 @@ def test_scoring_engine_high_match():
     # Since we are matching against real DB vacancies, we just assert that it finds a match
     # and the logic doesn't crash.
     assert analysis.primary_department is not None
-    assert analysis.best_match is not None
-    assert analysis.best_match.score >= 0.0
+    reviewed_match = analysis.best_match or analysis.unsuitable_openings[0]
+    assert reviewed_match.score >= 0.0
 
 
 def test_scoring_engine_medium_match():
@@ -26,7 +26,7 @@ def test_scoring_engine_medium_match():
     """
     analysis = ScoringEngine.analyze_cv(cv_text)
 
-    best = analysis.best_match
+    best = analysis.best_match or analysis.unsuitable_openings[0]
     assert best.classification in ["HIGH", "MEDIUM", "LOW"]
     assert best.score >= 0.0
 
@@ -39,7 +39,7 @@ def test_scoring_engine_low_match_never_rejects():
     """
     analysis = ScoringEngine.analyze_cv(cv_text)
 
-    best = analysis.best_match
+    best = analysis.best_match or analysis.unsuitable_openings[0]
     assert best.classification in ["HIGH", "MEDIUM", "LOW"]
     assert "NEVER automatically rejected" in analysis.rejection_policy_note
 
@@ -58,7 +58,8 @@ def test_api_cv_match_endpoint(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert "primary_department" in data
-    assert data["best_match"]["classification"] in ["HIGH", "MEDIUM", "LOW"]
+    reviewed_match = data["best_match"] or data["unsuitable_openings"][0]
+    assert reviewed_match["classification"] in ["HIGH", "MEDIUM", "LOW"]
     assert "rejection_policy_note" in data
 
 

@@ -275,6 +275,8 @@ class MatchService:
                         mandatory_failures=job_match.mandatory_failures,
                         confidence=job_match.confidence,
                         hr_review_required=job_match.hr_review_required,
+                        domain_mismatch_capped=job_match.domain_mismatch_capped,
+                        domain_mismatch_reason=job_match.domain_mismatch_reason,
                         reason=job_match.reason or llm_reason,
                         career_transition_detected=job_match.career_transition_detected,
                         career_transition_note=job_match.career_transition_note,
@@ -319,15 +321,19 @@ class MatchService:
         strengths = cand_profile.get("strengths", [])
         suitable_roles = cand_profile.get("suitable_job_roles", [])
 
-        has_genuine_match = False
-        if evaluated_matches and evaluated_matches[0].score >= RuleConfigManager.get_match_rules().scoring_parameters.match_medium_threshold:
-            top_m = evaluated_matches[0]
-            has_domain_mismatch = any(f.requirement_id == "req_domain_mismatch" for f in top_m.mandatory_failures)
-            if not has_domain_mismatch:
-                has_genuine_match = True
+        strong_threshold = scoring_config.match_high_threshold
+        eligible_matches = [
+            match
+            for match in evaluated_matches
+            if match.score >= strong_threshold
+            and match.classification == "HIGH"
+            and not match.domain_mismatch_capped
+            and not any(f.requirement_id == "req_domain_mismatch" for f in match.mandatory_failures)
+        ]
+        has_genuine_match = bool(eligible_matches)
 
-        if has_genuine_match and evaluated_matches:
-            top_m = evaluated_matches[0]
+        if has_genuine_match:
+            top_m = eligible_matches[0]
             skills_str = ", ".join(top_m.matched_skills[:4]) if top_m.matched_skills else "core qualification requirements"
             active_vacancy_summary = (
                 f"Genuine Match Found: Candidate is a strong match for '{top_m.job_title}' "
@@ -336,8 +342,11 @@ class MatchService:
             )
             best_match = top_m
         else:
-            active_vacancy_summary = f"No suitable active vacancy found matching candidate domain/taxonomy profile (Primary Domain: {professional_domain}). Manual HR review recommended."
-            best_match = evaluated_matches[0] if evaluated_matches else None
+            active_vacancy_summary = (
+                "NO_STRONG_MATCH: No suitable active vacancy found matching candidate domain/taxonomy profile "
+                f"(Primary Domain: {professional_domain}). Manual HR review recommended."
+            )
+            best_match = None
 
         roles_str = ", ".join(suitable_roles) if suitable_roles else ""
         strengths_str = "; ".join(strengths) if strengths else ""
@@ -355,9 +364,8 @@ class MatchService:
 
         logger.info(f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}', has_genuine_match={has_genuine_match}")
 
-        # Split evaluated matches into suitable (HIGH/MEDIUM) vs unsuitable (LOW)
-        suitable_matches = [m for m in evaluated_matches if m.classification in ("HIGH", "MEDIUM")]
-        unsuitable_matches = [m for m in evaluated_matches if m.classification not in ("HIGH", "MEDIUM")]
+        suitable_matches = eligible_matches
+        unsuitable_matches = [m for m in evaluated_matches if m not in eligible_matches]
 
         # Build NormalizedClassification for the candidate from their resolved context
         cand_classification: NormalizedClassification | None = None
@@ -376,6 +384,11 @@ class MatchService:
         except Exception as _cls_err:
             logger.warning(f"[MATCH_SERVICE] Could not build NormalizedClassification: {_cls_err}")
 
+        role_suggestion_source = "candidate_domain_profile"
+        if not has_genuine_match and not suitable_roles and candidate_context.current_role:
+            suitable_roles = [candidate_context.current_role]
+            role_suggestion_source = "verified_professional_experience"
+
         if not has_genuine_match and suitable_roles:
             ai_career_suggestions = [
                 AISuggestion(
@@ -384,8 +397,8 @@ class MatchService:
                     confidence=0.5,
                     evidence=[
                         ClassificationEvidence(
-                            source="candidate_domain_profile",
-                            matched_term=professional_domain,
+                            source=role_suggestion_source,
+                            matched_term=candidate_context.current_role if role_suggestion_source == "verified_professional_experience" else professional_domain,
                             matched_against=role,
                             confidence=0.5,
                         )
@@ -503,34 +516,56 @@ class MatchService:
         normalized_resume: NormalizedResume | None = None,
     ) -> EnrichedCandidateAnalysis:
         cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
-        rec_dept = cand_profile.get("recommended_department", "")
-        prof_domain = cand_profile.get("professional_domain", "")
+        industry_dept = cand_profile.get("recommended_department", "")
+        industry_domain = cand_profile.get("professional_domain", "")
         strengths = cand_profile.get("strengths", [])
         roles = cand_profile.get("suitable_job_roles", [])
+        if not roles and normalized_resume and normalized_resume.employment:
+            current_title = normalized_resume.employment[0].job_title.normalized_value
+            roles = [current_title] if current_title else []
         best_match = None
+        ai_career_suggestions = [
+            AISuggestion(
+                suggested_role=role,
+                suggested_domain=industry_domain,
+                confidence=0.5,
+                evidence=[
+                    ClassificationEvidence(
+                        source="verified_professional_experience" if normalized_resume and normalized_resume.employment else "candidate_domain_profile",
+                        matched_term=role if normalized_resume and normalized_resume.employment else industry_domain,
+                        matched_against=role,
+                        confidence=0.5,
+                    )
+                ],
+                missing_requirements=["No eligible active vacancy is available"],
+            )
+            for role in roles[:3]
+        ]
 
         return EnrichedCandidateAnalysis(
-            primary_department=rec_dept,
-            recommended_department=rec_dept,
-            professional_domain=prof_domain,
+            match_status=MatchStatus.NO_SUITABLE_MATCH,
+            primary_department=None,
+            recommended_department=None,
+            professional_domain=None,
             strengths=strengths,
             suitable_job_roles=roles,
             has_genuine_match=False,
-            active_vacancy_summary="No suitable active vacancy found.",
+            active_vacancy_summary="NO_STRONG_MATCH: No suitable active vacancy found.",
             scoring_profile_code=scoring_config.profile_code if 'scoring_config' in locals() else None,
             scoring_profile_version=scoring_config.profile_version if 'scoring_config' in locals() else None,
             config_version=RuleConfigManager.get_config().version,
             prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
             ai_career_summary=(
                 f"Candidate Profile Analysis:\n"
-                f"• Recommended Department: {rec_dept}\n"
-                f"• Professional Domain: {prof_domain}\n"
+                f"• Industry Department: {industry_dept}\n"
+                f"• Industry Domain: {industry_domain}\n"
                 f"• Key Strengths: {'; '.join(strengths)}\n"
                 f"• Suitable Job Roles: {', '.join(roles)}"
             ),
             best_match=best_match,
             suitable_openings=[],
             normalized_resume=normalized_resume,
+            ai_career_suggestions=ai_career_suggestions,
         )
 
     @staticmethod

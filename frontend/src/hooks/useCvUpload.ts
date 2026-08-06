@@ -106,6 +106,7 @@ export function useCvUpload() {
     async (cvKey: string, isEnriched: boolean = false) => {
       stopPollTimer();
       let attempts = 0;
+      let consecutiveErrors = 0;
       pollIntervalRef.current = setInterval(async () => {
         attempts++;
         if (attempts > API_CONFIG.MAX_POLL_RETRIES) {
@@ -219,6 +220,7 @@ export function useCvUpload() {
 
               setCurrentStepIndex(nextStep);
               updateStepState(nextStep, 'active', isEnriched);
+              consecutiveErrors = 0;
             }
           } else {
             const res = await cvService.getCvStatus(cvKey);
@@ -310,18 +312,23 @@ export function useCvUpload() {
 
               setCurrentStepIndex(nextStep);
               updateStepState(nextStep, 'active', false);
+              consecutiveErrors = 0;
             }
           }
         } catch (err: any) {
-          stopPollTimer();
-          stopTimer();
-          setUploading(false);
-          setError(err.message || 'Status check failed');
-          setStepStates((prev) => {
-            const next = [...prev];
-            next[currentStepIndexRef.current] = 'failed';
-            return next;
-          });
+          consecutiveErrors++;
+          console.warn(`[POLL_RETRY] Status check transient error (attempt ${consecutiveErrors}/5):`, err?.message);
+          if (consecutiveErrors >= 5) {
+            stopPollTimer();
+            stopTimer();
+            setUploading(false);
+            setError(err.message || 'Status check failed');
+            setStepStates((prev) => {
+              const next = [...prev];
+              next[currentStepIndexRef.current] = 'failed';
+              return next;
+            });
+          }
         }
       }, API_CONFIG.POLL_INTERVAL_MS);
     },

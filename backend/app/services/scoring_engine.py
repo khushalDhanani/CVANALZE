@@ -329,11 +329,10 @@ class ScoringEngine:
                 }
                 for f in req_results.mandatory_failures
             ],
-            confidence_score=rec_results.confidence_val,
+            confidence=rec_results.confidence_val,
             hr_review_required=comp_results.hr_review_required,
-            is_cross_domain=guard_results.is_domain_capped,
-            cross_domain_penalty_applied=guard_results.is_domain_capped,
-            cross_domain_penalty_reason=guard_results.domain_capped_reason,
+            domain_mismatch_capped=guard_results.is_domain_capped,
+            domain_mismatch_reason=guard_results.domain_capped_reason,
             reason=rec_results.reason_str,
             career_transition_detected=transition_detected,
             career_transition_note=transition_note,
@@ -391,15 +390,14 @@ class ScoringEngine:
 
         evaluated_matches.sort(key=lambda m: m.score, reverse=True)
 
-        best_match = (
-            evaluated_matches[0]
-            if evaluated_matches
-            else None
-        )
-
-        # Split evaluated matches into suitable (HIGH/MEDIUM) vs unsuitable (LOW)
-        suitable_matches = [m for m in evaluated_matches if m.classification in ("HIGH", "MEDIUM")]
-        unsuitable_matches = [m for m in evaluated_matches if m.classification not in ("HIGH", "MEDIUM")]
+        high_threshold = scoring_config.match_high_threshold
+        suitable_matches = [
+            m
+            for m in evaluated_matches
+            if m.score >= high_threshold and m.classification == "HIGH" and not m.domain_mismatch_capped
+        ]
+        unsuitable_matches = [m for m in evaluated_matches if m not in suitable_matches]
+        best_match = suitable_matches[0] if suitable_matches else None
 
         return CandidateMatchAnalysis(
             primary_department=best_match.department if best_match else "",

@@ -1,0 +1,472 @@
+{
+  "domains": [
+    {
+      "department_id": 1,
+      "department_name": "Research & Development Team",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory", "chemical research", "analytical chemistry", "organic chemistry", "process development"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst", "Senior Research Associate"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 2,
+      "department_name": "Analytical Development Team",
+      "domain_name": "Analytical Chemistry",
+      "keywords": ["analytical", "hplc", "gc", "spectroscopy", "chromatography", "method development", "validation", "analytical development", "instrumentation", "mass spectrometry", "titration"],
+      "default_roles": ["Analytical Chemist", "Senior Analyst", "Method Development Scientist", "Instrument Analyst"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 3,
+      "department_name": "Production Team",
+      "domain_name": "Chemical Manufacturing",
+      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield", "distillation", "filtration"],
+      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 4,
+      "department_name": "Maintenance Team",
+      "domain_name": "Industrial Maintenance",
+      "keywords": ["maintenance", "mechanical", "repair", "preventive maintenance", "breakdown", "equipment", "machinery", "plumbing", "welding", "fitter", "lathe"],
+      "default_roles": ["Maintenance Engineer", "Maintenance Technician", "Mechanical Fitter", "Maintenance Supervisor"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 5,
+      "department_name": "Control & Instrumentation Team",
+      "domain_name": "Instrumentation & Control",
+      "keywords": ["instrumentation", "control", "plc", "scada", "dcs", "automation", "calibration", "sensors", "control systems", "pid", "process control"],
+      "default_roles": ["Instrumentation Engineer", "Control Systems Engineer", "Automation Engineer", "C&I Technician"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 6,
+      "department_name": "EHS Team",
+      "domain_name": "Environment Health & Safety",
+      "keywords": ["ehs", "safety", "environment", "health", "fire", "hazard", "risk assessment", "safety audit", "incident", "osha", "iso 14001", "iso 45001"],
+      "default_roles": ["EHS Officer", "Safety Engineer", "Environment Engineer", "EHS Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 7,
+      "department_name": "Board of Directors",
+      "domain_name": "Executive Leadership",
+      "keywords": ["director", "board", "ceo", "cfo", "coo", "managing director", "executive", "leadership", "strategy", "governance"],
+      "default_roles": ["Director", "Managing Director", "Chief Executive Officer"],
+      "priority": 10,
+      "is_active": true
+    },
+    {
+      "department_id": 8,
+      "department_name": "Finance Team",
+      "domain_name": "Finance & Accounting",
+      "keywords": ["finance", "accounting", "accounts", "taxation", "gst", "tds", "audit", "budgeting", "tally", "sap fico", "payroll", "costing", "financial reporting"],
+      "default_roles": ["Accountant", "Finance Executive", "Accounts Officer", "Finance Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 9,
+      "department_name": "CIS Team",
+      "domain_name": "Information Technology",
+      "keywords": ["it", "software", "network", "server", "database", "erp", "sap", "helpdesk", "cybersecurity", "infrastructure", "system administration", "it support", "web development", "programming"],
+      "default_roles": ["IT Executive", "System Administrator", "Network Engineer", "Software Developer", "IT Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 10,
+      "department_name": "HR & IR Team",
+      "domain_name": "Human Resources",
+      "keywords": ["hr", "human resources", "recruitment", "payroll", "industrial relations", "labor", "compliance", "training", "performance management", "employee engagement"],
+      "default_roles": ["HR Executive", "HR Manager", "IR Officer", "Recruiter", "Training Coordinator"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 11,
+      "department_name": "Procurement Team",
+      "domain_name": "Procurement & Supply Chain",
+      "keywords": ["procurement", "purchasing", "vendor", "supplier", "sourcing", "negotiation", "purchase order", "supply chain", "material management"],
+      "default_roles": ["Purchase Executive", "Procurement Officer", "Vendor Manager", "Supply Chain Executive"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 12,
+      "department_name": "Logistic Team",
+      "domain_name": "Logistics & Warehousing",
+      "keywords": ["logistics", "warehouse", "transportation", "shipping", "dispatch", "inventory", "freight", "supply chain", "distribution"],
+      "default_roles": ["Logistics Executive", "Warehouse Supervisor", "Dispatch Coordinator", "Logistics Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 13,
+      "department_name": "Business Development Team",
+      "domain_name": "Business Development",
+      "keywords": ["business development", "sales", "marketing", "client", "revenue", "pipeline", "lead generation", "market research", "strategic partnership"],
+      "default_roles": ["Business Development Executive", "BD Manager", "Key Account Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 14,
+      "department_name": "Environment Team",
+      "domain_name": "Environmental Engineering",
+      "keywords": ["environment", "etp", "stp", "pollution", "waste management", "effluent", "emission", "environmental compliance", "pcb", "cpcb"],
+      "default_roles": ["Environmental Engineer", "ETP Operator", "Environmental Officer"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 15,
+      "department_name": "Store Team (Engineering)",
+      "domain_name": "Stores & Inventory",
+      "keywords": ["stores", "inventory", "stock", "spare parts", "material issue", "bin card", "engineering stores", "asset management"],
+      "default_roles": ["Store Keeper", "Store Supervisor", "Inventory Controller"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 16,
+      "department_name": "Sales Team",
+      "domain_name": "Sales & Marketing",
+      "keywords": ["sales", "marketing", "customer", "revenue", "target", "crm", "export", "domestic sales", "international sales", "key account"],
+      "default_roles": ["Sales Executive", "Area Sales Manager", "Sales Manager", "Marketing Executive"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 17,
+      "department_name": "Commercial Team",
+      "domain_name": "Commercial Operations",
+      "keywords": ["commercial", "import", "export", "customs", "documentation", "shipping", "forex", "letter of credit", "trade compliance"],
+      "default_roles": ["Commercial Executive", "Import-Export Coordinator", "Documentation Officer"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 18,
+      "department_name": "Technical Team",
+      "domain_name": "Technical Services",
+      "keywords": ["technical", "process engineering", "technology transfer", "scale-up", "validation", "technical support", "process optimization"],
+      "default_roles": ["Technical Officer", "Process Engineer", "Technical Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 19,
+      "department_name": "Production Team - 1 (Rakesh Modi)",
+      "domain_name": "Chemical Manufacturing",
+      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
+      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 20,
+      "department_name": "Production Team - 2 (Viral Panchal)",
+      "domain_name": "Chemical Manufacturing",
+      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
+      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 21,
+      "department_name": "Production Team - 3 (Kalpesh Patel)",
+      "domain_name": "Chemical Manufacturing",
+      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
+      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 22,
+      "department_name": "Production Team - 4 (Hiren Fultariya)",
+      "domain_name": "Chemical Manufacturing",
+      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
+      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 23,
+      "department_name": "Maintenance Team - 1",
+      "domain_name": "Industrial Maintenance",
+      "keywords": ["maintenance", "mechanical", "repair", "preventive maintenance", "breakdown", "equipment", "machinery", "fitter"],
+      "default_roles": ["Maintenance Engineer", "Maintenance Technician", "Mechanical Fitter"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 24,
+      "department_name": "Maintenance Team - 2 (Parag Detroja)",
+      "domain_name": "Industrial Maintenance",
+      "keywords": ["maintenance", "mechanical", "repair", "preventive maintenance", "breakdown", "equipment", "machinery", "fitter"],
+      "default_roles": ["Maintenance Engineer", "Maintenance Technician", "Mechanical Fitter"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 25,
+      "department_name": "Creative Team",
+      "domain_name": "Creative & Design",
+      "keywords": ["creative", "design", "graphic", "photoshop", "illustrator", "branding", "ui", "ux", "visual design", "video editing", "photography"],
+      "default_roles": ["Graphic Designer", "Creative Designer", "UI/UX Designer", "Video Editor"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 26,
+      "department_name": "Electrical Team",
+      "domain_name": "Electrical Engineering",
+      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear", "ht", "lt", "electrical maintenance", "relay"],
+      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 27,
+      "department_name": "Admin Team",
+      "domain_name": "Administration",
+      "keywords": ["admin", "administration", "office", "facility", "housekeeping", "travel", "canteen", "guest house", "security"],
+      "default_roles": ["Admin Executive", "Office Coordinator", "Facility Manager", "Admin Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 28,
+      "department_name": "Quality Control Team",
+      "domain_name": "Quality Control",
+      "keywords": ["quality control", "qc", "testing", "analysis", "hplc", "gc", "dissolution", "stability", "raw material testing", "finished product testing"],
+      "default_roles": ["QC Analyst", "QC Chemist", "QC Executive", "QC Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 29,
+      "department_name": "QA Team",
+      "domain_name": "Quality Assurance",
+      "keywords": ["quality assurance", "qa", "gmp", "documentation", "deviation", "capa", "change control", "validation", "audit", "regulatory", "batch record", "sop"],
+      "default_roles": ["QA Executive", "QA Officer", "QA Manager", "Validation Engineer"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 30,
+      "department_name": "Electrical Team - 2 (Deep Parikh)",
+      "domain_name": "Electrical Engineering",
+      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear", "ht", "lt"],
+      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 31,
+      "department_name": "Electrical Team - 1 (Ramesh Maurya)",
+      "domain_name": "Electrical Engineering",
+      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear", "ht", "lt"],
+      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 32,
+      "department_name": "Process & Project Team",
+      "domain_name": "Process Engineering",
+      "keywords": ["process", "project", "piping", "p&id", "engineering design", "commissioning", "project management", "capex", "erection"],
+      "default_roles": ["Process Engineer", "Project Engineer", "Project Manager"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 33,
+      "department_name": "Process & Safety Team",
+      "domain_name": "Process Safety",
+      "keywords": ["process safety", "hazop", "hazard", "risk", "safety", "psr", "psm", "incident investigation", "fire safety"],
+      "default_roles": ["Process Safety Engineer", "Safety Officer", "Hazop Leader"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 34,
+      "department_name": "Store Team (RM)",
+      "domain_name": "Stores & Inventory",
+      "keywords": ["stores", "raw material", "inventory", "stock", "material receipt", "warehousing", "rm stores"],
+      "default_roles": ["Store Keeper", "Store Supervisor", "Material Handler"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 35,
+      "department_name": "Quality Control Team",
+      "domain_name": "Quality Control",
+      "keywords": ["quality control", "qc", "testing", "analysis", "hplc", "gc", "dissolution", "stability"],
+      "default_roles": ["QC Analyst", "QC Chemist", "QC Executive"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 36,
+      "department_name": "Quality Assurance Team",
+      "domain_name": "Quality Assurance",
+      "keywords": ["quality assurance", "qa", "gmp", "documentation", "deviation", "capa", "change control", "validation", "audit"],
+      "default_roles": ["QA Executive", "QA Officer", "QA Manager"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 37,
+      "department_name": "R&D Team - 1 (Udaysinh Parmar)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 38,
+      "department_name": "R&D Team - 2 (Mahesh Koladiya)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 39,
+      "department_name": "R&D Team - 3 (Dr. Anish Patel)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 40,
+      "department_name": "R&D Team - 4 (Sunil Namballa)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 41,
+      "department_name": "R&D Team - 6 (Vijay Rakholiya)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 42,
+      "department_name": "R&D Team - 7 (Dr. Bipin Devani)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 43,
+      "department_name": "R&D Team - 5 (Sandeep Patel)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 44,
+      "department_name": "Founder",
+      "domain_name": "Executive Leadership",
+      "keywords": ["founder", "promoter", "chairman", "director"],
+      "default_roles": ["Founder", "Chairman"],
+      "priority": 10,
+      "is_active": true
+    },
+    {
+      "department_id": 45,
+      "department_name": "C & I - 1 (Ramesh Maurya)",
+      "domain_name": "Instrumentation & Control",
+      "keywords": ["instrumentation", "control", "plc", "scada", "dcs", "automation", "calibration", "sensors"],
+      "default_roles": ["Instrumentation Engineer", "C&I Technician"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 46,
+      "department_name": "C & I - 2 (Chetan Panchal)",
+      "domain_name": "Instrumentation & Control",
+      "keywords": ["instrumentation", "control", "plc", "scada", "dcs", "automation", "calibration", "sensors"],
+      "default_roles": ["Instrumentation Engineer", "C&I Technician"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 47,
+      "department_name": "Dispatch Team",
+      "domain_name": "Logistics & Warehousing",
+      "keywords": ["dispatch", "shipping", "packing", "loading", "transportation", "delivery", "consignment"],
+      "default_roles": ["Dispatch Coordinator", "Dispatch Supervisor", "Logistics Executive"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 48,
+      "department_name": "R&D Team - 8 (Dr. Sharad Bobe)",
+      "domain_name": "Chemical R&D",
+      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
+      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 49,
+      "department_name": "Corporate Affairs Team",
+      "domain_name": "Corporate Affairs",
+      "keywords": ["corporate", "legal", "compliance", "regulatory", "government", "liaison", "secretarial", "company secretary"],
+      "default_roles": ["Corporate Affairs Executive", "Legal Officer", "Company Secretary"],
+      "priority": 1,
+      "is_active": true
+    },
+    {
+      "department_id": 50,
+      "department_name": "Electrical Team - 3 (Chetan Panchal)",
+      "domain_name": "Electrical Engineering",
+      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear"],
+      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 51,
+      "department_name": "Chemical Engineer, R&D Leader",
+      "domain_name": "Chemical R&D",
+      "keywords": ["chemical engineering", "r&d leader", "process development", "scale-up", "reaction engineering"],
+      "default_roles": ["Chemical Engineer", "R&D Leader", "Senior Scientist"],
+      "priority": 2,
+      "is_active": true
+    },
+    {
+      "department_id": 52,
+      "department_name": "Horticulture & Landscaping Team",
+      "domain_name": "Horticulture & Facility",
+      "keywords": ["horticulture", "landscaping", "garden", "greenery", "plantation", "nursery"],
+      "default_roles": ["Horticulture Supervisor", "Landscape Officer"],
+      "priority": 3,
+      "is_active": true
+    }
+  ]
+}

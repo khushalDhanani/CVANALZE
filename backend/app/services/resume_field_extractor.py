@@ -374,20 +374,30 @@ class ResumeFieldExtractor:
         commit()
         return education
 
-    @staticmethod
-    def _extract_skills(lines: list[str]) -> dict[str, Any]:
+    @classmethod
+    def _extract_skills(cls, lines: list[str]) -> dict[str, Any]:
         categorized: dict[str, list[str]] = {}
         all_skills: list[str] = []
+        date_only_pattern = re.compile(
+            r"(?i)^(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*)?(?:19|20)\d{2}\s*(?:-|to|till|until|–|—)\s*(?:present|current|now|(?:19|20)\d{2})$"
+        )
         for raw_line in lines:
             line = raw_line.lstrip("-• ").strip()
             if not line:
                 continue
             if ":" in line:
                 category, values = line.split(":", 1)
-                items = [item.strip() for item in re.split(r"[,;&|]+", values) if item.strip()]
-                categorized[category.strip()] = items
+                items = [
+                    item.strip() for item in re.split(r"[,;&|]+", values)
+                    if item.strip() and not date_only_pattern.match(item.strip()) and not cls._DATE_RANGE.fullmatch(item.strip())
+                ]
+                if items:
+                    categorized[category.strip()] = items
             else:
-                items = [item.strip() for item in re.split(r"[,;&|]+", line) if item.strip()]
+                items = [
+                    item.strip() for item in re.split(r"[,;&|]+", line)
+                    if item.strip() and not date_only_pattern.match(item.strip()) and not cls._DATE_RANGE.fullmatch(item.strip())
+                ]
             all_skills.extend(items)
         deduplicated: list[str] = []
         seen: set[str] = set()

@@ -20,6 +20,33 @@ from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.job_taxonomy import TaxonomyClassifier
 
 
+def _has_relevant_experience(
+    context: CandidateAnalysisContext,
+    job: JobEvaluationContext,
+    matched_responsibilities: list[str] | None = None,
+) -> bool:
+    """Return whether verified experience is relevant to the vacancy evidence."""
+    if context.candidate_experience is None or context.candidate_experience <= 0:
+        return False
+
+    if job.vac_family not in (None, "Unknown") and TaxonomyClassifier.are_families_compatible(context.cand_families, job.vac_family):
+        return True
+
+    if context.cand_tax_domain not in (None, "", "Unknown") and job.vac_tax_domain not in (None, "", "Unknown"):
+        if context.cand_tax_domain == job.vac_tax_domain:
+            return True
+
+    if matched_responsibilities:
+        return True
+
+    if context.current_role and job.title_words:
+        current_role_words = set(re.findall(r"\w+", context.current_role.lower()))
+        if current_role_words.intersection(job.title_words):
+            return True
+
+    return False
+
+
 @dataclass
 class RequirementEvaluationResults:
     mandatory_reqs: list[RequirementEvaluation] = field(default_factory=list)
@@ -158,6 +185,9 @@ class RequirementEvaluator:
         results.matched_skills = matched_skills
         results.missing_skills = missing_skills
 
+        matched_responsibilities, _ = extract_term_matches_fn(context.domain_candidate_text or context.norm_text, job_ctx.responsibilities)
+        has_relevant_experience = _has_relevant_experience(context, job_ctx, matched_responsibilities)
+
         for skill in req_skills:
             req_id = f"req_skill_{skill.lower().replace(' ', '_')}"
             vac_ev = f"Mandatory Skill Requirement: {skill}"
@@ -220,7 +250,7 @@ class RequirementEvaluator:
         if min_exp is not None:
             req_id = "req_min_experience"
             vac_ev = f"Mandatory Minimum Experience: {min_exp} years"
-            if context.candidate_experience is not None and context.candidate_experience >= min_exp:
+            if has_relevant_experience and context.candidate_experience is not None and context.candidate_experience >= min_exp:
                 cv_ev = f"Candidate experience {context.candidate_experience} years meets minimum requirement ({min_exp} years)"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
@@ -237,7 +267,11 @@ class RequirementEvaluator:
             else:
                 exp_val = context.candidate_experience if context.candidate_experience is not None else 0.0
                 cv_ev = f"Candidate experience {exp_val} years is below minimum required ({min_exp} years)"
-                reason = f"Candidate experience ({exp_val} yrs) is less than required minimum ({min_exp} yrs)."
+                reason = (
+                    f"Candidate experience ({exp_val} yrs) is not relevant to the vacancy domain or responsibilities."
+                    if context.candidate_experience is not None and context.candidate_experience >= min_exp and not has_relevant_experience
+                    else f"Candidate experience ({exp_val} yrs) is less than required minimum ({min_exp} yrs)."
+                )
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
                     cls._create_requirement(
@@ -258,7 +292,9 @@ class RequirementEvaluator:
             req_id = "req_education"
             vac_ev = f"Mandatory Education Requirement: {education_req}"
             edu_matched, _ = extract_term_matches_fn(context.norm_text, [str(education_req)])
-            has_profile_edu = bool(context.optimized_profile and context.optimized_profile.education_domains)
+            profile_education = " ".join(context.optimized_profile.education_domains) if context.optimized_profile else ""
+            profile_edu_matched, _ = extract_term_matches_fn(profile_education.lower(), [str(education_req)]) if profile_education else ([], [])
+            has_profile_edu = bool(profile_edu_matched)
             if edu_matched or has_profile_edu:
                 cv_ev = f"CV satisfies education requirement: '{education_req}'"
                 ev = cls._create_evidence(cv_ev, vac_ev)
@@ -358,7 +394,7 @@ class RequirementEvaluator:
             results.missing_criteria.append(f"Max CTC Budget ({max_ctc})")
 
         # 7. Preferred Upper Experience Limit
-        if max_exp is not None and context.candidate_experience is not None:
+        if max_exp is not None and context.candidate_experience is not None and has_relevant_experience:
             req_id = "req_max_experience"
             vac_ev = f"Preferred Upper Experience Limit: {max_exp} years"
             if context.candidate_experience <= max_exp:
@@ -484,13 +520,15 @@ class ComponentScoreEvaluator:
         max_exp = job_ctx.max_experience_years
         experience_score = None
         if min_exp is not None or max_exp is not None:
-            experience_score = typed_config.perfect_component_score
-            if min_exp is not None and context.candidate_experience is not None and context.candidate_experience < min_exp:
+            matched_responsibilities, _ = extract_term_matches_fn(context.domain_candidate_text or context.norm_text, job_ctx.responsibilities)
+            has_relevant_experience = _has_relevant_experience(context, job_ctx, matched_responsibilities)
+            experience_score = typed_config.perfect_component_score if has_relevant_experience else 0.0
+            if has_relevant_experience and min_exp is not None and context.candidate_experience is not None and context.candidate_experience < min_exp:
                 if min_exp > 0:
                     experience_score = (context.candidate_experience / min_exp) * params.below_min_exp_multiplier
                 else:
                     experience_score = 0.0
-            if max_exp is not None and context.candidate_experience is not None and context.candidate_experience > max_exp:
+            if has_relevant_experience and max_exp is not None and context.candidate_experience is not None and context.candidate_experience > max_exp:
                 experience_score -= params.overqualification_penalty
             experience_score = max(0.0, min(typed_config.perfect_component_score, experience_score))
 
@@ -500,7 +538,9 @@ class ComponentScoreEvaluator:
         if education_req:
             education_score = typed_config.perfect_component_score
             edu_matched, _ = extract_term_matches_fn(context.norm_text, [str(education_req)])
-            if not edu_matched and not (context.optimized_profile and context.optimized_profile.education_domains):
+            profile_education = " ".join(context.optimized_profile.education_domains) if context.optimized_profile else ""
+            profile_edu_matched, _ = extract_term_matches_fn(profile_education.lower(), [str(education_req)]) if profile_education else ([], [])
+            if not edu_matched and not profile_edu_matched:
                 education_score = 0.0
 
         # 5. Certification Score
@@ -579,6 +619,11 @@ class ComponentScoreEvaluator:
             hr_review_required = final_score < high_threshold
             reason_str = f"All mandatory requirements satisfied. Overall match score is {final_score}%."
 
+        # Penalty for keyword-only matches (0% skills match but high domain/other scores)
+        if skills_score is not None and skills_score == 0.0 and final_score > 40.0:
+            final_score = min(final_score, 40.0)
+            reason_str += " | Capped score due to 0% skills match (keyword-only match)."
+
         return ComponentScoreResults(
             role_score=role_score,
             skills_score=skills_score,
@@ -613,19 +658,22 @@ class CrossDomainGuardEvaluator:
         job_ctx = job if isinstance(job, JobEvaluationContext) else JobEvaluationContext.create(job)
         guard_params = RuleConfigManager.get_match_rules().cross_domain_guard
 
-        has_software_req = job_ctx.has_software_req
-
         vac_tax_domain, vac_family = job_ctx.vac_tax_domain, job_ctx.vac_family
         is_tax_compat = TaxonomyClassifier.are_families_compatible(context.cand_families, vac_family)
 
         domain_mismatch = False
         if vac_family not in (None, "Unknown") and context.cand_primary_family not in (None, "Unknown"):
-            if not is_tax_compat and not has_software_req:
+            if not is_tax_compat:
                 domain_mismatch = True
             elif context.cand_primary_family and vac_family:
                 is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
                 if not is_compat or (score is not None and score < 0.4):
                     domain_mismatch = True
+        elif vac_family in (None, "Unknown") and context.cand_tax_domain and vac_tax_domain:
+            if context.cand_tax_domain != "Unknown" and vac_tax_domain != "Unknown":
+                if context.cand_tax_domain != vac_tax_domain:
+                    if context.candidate_experience and context.candidate_experience >= 1.0:
+                        domain_mismatch = True
 
         final_score = initial_score
         domain_score = initial_domain_score

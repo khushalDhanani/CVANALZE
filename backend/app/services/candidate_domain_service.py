@@ -77,10 +77,15 @@ class CandidateDomainService:
                     else:
                         projects_list.append(str(proj))
 
+        # Enforce that education does not override established professional experience
+        active_education = []
+        if not roles_list and not projects_list:
+            active_education = education_list
+
         combined_text = " ".join(
             filter(
                 None,
-                combined_parts + sorted(skills_set) + education_list + projects_list + roles_list,
+                combined_parts + sorted(skills_set) + active_education + projects_list + roles_list,
             )
         ).lower()
 

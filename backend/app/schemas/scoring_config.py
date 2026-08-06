@@ -24,28 +24,28 @@ class ScoringConfig:
     match_medium_threshold: float = 50.0
     component_weights: dict[str, float] = field(
         default_factory=lambda: {
-            "role": 0.15,
-            "skills": 0.25,
-            "experience": 0.15,
-            "education": 0.10,
+            "role": 0.10,
+            "skills": 0.20,
+            "experience": 0.25,
+            "education": 0.05,
             "domain": 0.15,
             "technology": 0.10,
             "certification": 0.05,
-            "responsibilities": 0.05,
+            "responsibilities": 0.10,
         }
     )
 
     @classmethod
     def load(cls, override_config: dict[str, Any] | None = None, tenant_id: str | None = None) -> "ScoringConfig":
         default_weights = {
-            "role": 0.15,
-            "skills": 0.25,
-            "experience": 0.15,
-            "education": 0.10,
+            "role": 0.10,
+            "skills": 0.20,
+            "experience": 0.25,
+            "education": 0.05,
             "domain": 0.15,
             "technology": 0.10,
             "certification": 0.05,
-            "responsibilities": 0.05,
+            "responsibilities": 0.10,
         }
         if override_config:
             raw_w = override_config.get("MATCH_COMPONENT_WEIGHTS")
