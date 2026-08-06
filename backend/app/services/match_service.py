@@ -16,7 +16,7 @@ from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
 from app.schemas.candidate_context import CandidateAnalysisContext
-from app.schemas.classification_types import AISuggestion, ClassificationEvidence, NormalizedClassification
+from app.schemas.classification_types import AISuggestion, ClassificationEvidence, MatchStatus, NormalizedClassification
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import ResumeJsonExtractor
@@ -395,13 +395,24 @@ class MatchService:
                 for role in suitable_roles[:3]
             ]
             
-        from app.schemas.classification_types import MatchStatus
-
         if not has_genuine_match:
             recommended_dept = None
             professional_domain = None
             best_match = None
             top_level_match_status = MatchStatus.NO_SUITABLE_MATCH
+            cand_classification = NormalizedClassification(
+                db_department_id=None,
+                db_department_name=None,
+                db_designation_id=None,
+                db_designation_name=None,
+                industry_department=None,
+                industry_designation=None,
+                industry_domain=None,
+                match_status=MatchStatus.NO_SUITABLE_MATCH,
+                confidence=0.0,
+                match_source="NO_MATCH",
+                evidence=[]
+            )
         else:
             top_level_match_status = MatchStatus.DB_MATCH
 

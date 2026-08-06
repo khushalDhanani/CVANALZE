@@ -126,9 +126,9 @@ class EnrichedCandidateAnalysis(BaseModel):
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
     full_name: str | None = Field(default=None, description="Extracted candidate full name")
     candidate_name: str | None = Field(default=None, description="Extracted candidate name")
-    primary_department: str = Field(..., description="Top recommended department for candidate")
-    recommended_department: str = Field(default="", description="Recommended department derived from candidate profile")
-    professional_domain: str = Field(default="", description="Candidate's specialized professional domain")
+    primary_department: str | None = Field(default=None, description="Top recommended department for candidate")
+    recommended_department: str | None = Field(default=None, description="Recommended department derived from candidate profile")
+    professional_domain: str | None = Field(default=None, description="Candidate's specialized professional domain")
     strengths: list[str] = Field(default_factory=list, description="Key strengths identified from CV")
     suitable_job_roles: list[str] = Field(default_factory=list, description="Suitable job roles for candidate")
     has_genuine_match: bool = Field(

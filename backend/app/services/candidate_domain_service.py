@@ -111,10 +111,9 @@ class CandidateDomainService:
                 prof_domain = best_domain.domain_name
                 suitable_roles = best_domain.default_roles
             else:
-                fallback_defaults = RuleConfigManager.get_match_rules().fallback_defaults
-                recommended_dept = fallback_defaults.recommended_department
-                prof_domain = fallback_defaults.professional_domain
-                suitable_roles = list(fallback_defaults.suitable_roles)
+                recommended_dept = ""
+                prof_domain = ""
+                suitable_roles = []
 
         # Build custom roles from structured profile roles first
         custom_roles = []
@@ -260,14 +259,8 @@ class CandidateDomainService:
                 strengths.append(f"Key Expertise: {'; '.join(top_resp)}")
 
         # Domain-based strength as fallback
-        if not strengths:
-            fallback_defaults = RuleConfigManager.get_match_rules().fallback_defaults
-            current_domain = prof_domain or fallback_defaults.professional_domain
-
-            if current_domain != fallback_defaults.professional_domain:
-                strengths.append(f"Professional background in {current_domain}")
-            else:
-                strengths.append(f"Broad operational background suitable for {current_domain}")
+        if not strengths and prof_domain:
+            strengths.append(f"Professional background in {prof_domain}")
 
         return strengths
 

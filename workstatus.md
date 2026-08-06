@@ -125,6 +125,8 @@
 - [x] **Classification Fallback Resolution:** Fixed `job_taxonomy.py` (`classify_vacancy_dto` and `classify_candidate_dto`) to correctly preserve and accept both `DB_MATCH` and `PARTIAL_MATCH` resolutions instead of treating partial matches as `NO_SUITABLE_MATCH`.
 - [x] **Static Rules Decoupling:** Purged the legacy `validate_taxonomy_config()` method which attempted to read canonical taxonomy bounds from the obsolete static `RuleConfigManager`.
 - [x] **Dead Code Purge:** Removed the obsolete `_get_default_fallback` method completely from unit tests (`test_dynamic_taxonomy_evidence.py`).
+- [x] **No-Match Response Nullification:** Updated `EnrichedCandidateAnalysis` schema to accept `None` for authoritative fields (`primary_department`, `recommended_department`, `professional_domain`). Enforced total nullification of these fields and the `classification` object in `match_service.py` when `has_genuine_match` is False, while preserving `ai_career_suggestions`.
+- [x] **Fallback Value Purge:** Removed `fallback_defaults` dependencies and references to `General Operations` from `candidate_domain_service.py`.
 - Rewrote the match status termination logic in `analyze_single_cv` inside `MatchService` to aggressively return `MatchStatus.NO_SUITABLE_MATCH` for any candidate failing the active vacancy filter.
 - Enforced complete nullification of `recommended_department`, `professional_domain`, `primary_department`, and `best_match` when no active vacancy corresponds to the candidate, ensuring non-authoritative AI career advice is corralled safely into the `ai_career_suggestions` block instead.
 
