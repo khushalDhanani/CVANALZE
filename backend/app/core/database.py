@@ -113,7 +113,7 @@ def run_auto_migrations():
         if settings.POSTGRES_APP_URL:
             try:
                 logger.info("[AUTO_MIGRATE] Checking pending PostgreSQL schema migrations...")
-                run_migrations("postgres", settings.POSTGRES_APP_URL, dry_run=False)
+                run_migrations(db_url=settings.POSTGRES_APP_URL, dry_run=False, dialect="postgres")
             except Exception as exc:
                 logger.warning(f"[AUTO_MIGRATE] PostgreSQL auto-migration warning: {exc}")
     except Exception as exc:

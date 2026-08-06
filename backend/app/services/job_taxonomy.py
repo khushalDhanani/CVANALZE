@@ -152,7 +152,7 @@ class classproperty:
 class JobTaxonomy:
     """
     4-Tier Enterprise Job Taxonomy: Department -> Domain -> Job Family -> Vacancy.
-    Canonical domain/family identifiers below stay consistent with rule_config.json.
+    Canonical domain/family identifiers below stay consistent with the unified rule configuration.
     """
 
 

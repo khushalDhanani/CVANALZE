@@ -139,7 +139,7 @@ def warm_department_domains() -> int:
 
 
 def warm_rule_config() -> int:
-    """Reload, validate, and atomically swap the rule config from rule_config.json."""
+    """Reload, validate, and atomically swap the rule config from the database."""
     try:
         config = RuleConfigManager.load_config()
         logger.info(f"[WARM] Rule config reloaded: v{config.version}.")

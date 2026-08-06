@@ -88,6 +88,16 @@
 - P1 fixes and absolute data source isolation tasks have been 100% completed.
 - We await resolution on local test-environment `pgvector` dependencies for end-to-end automated testing, but runtime python validations pass globally.
 
+### P0 — Restore Executable Runtime
+- Verified that `SessionLocal` is fully replaced with `PostgresAppSession` in `RuleConfigManager`.
+- Removed legacy `rule_config.json` fallback references from docstrings and comments in `cache_warmer.py` and `job_taxonomy.py`.
+- Ensured `ConfigurationService.create_profile` stores the UnifiedRuleConfig using fully normalized PostgreSQL relational rows (e.g., `RuleComponent`, `SystemRule`, `RuleCondition`, etc.) in a single transaction.
+- Verified that `_hydrate_profile` in `RuleConfigManager` dynamically reconstructs the config dict solely from these normalized PostgreSQL rows.
+- Verified that `ConfigurationService.activate_profile` properly captures `activated_by`, `activated_at`, `activation_reason`, `audit_reason`, and `previous_version_tag`.
+- Fixed the argument bug in `run_auto_migrations()` within `app/core/database.py` (switched to explicit keyword arguments: `db_url=settings.POSTGRES_APP_URL`, `dry_run=False`, `dialect="postgres"`).
+- Added `tests/test_startup.py` to ensure all models load correctly and `configure_mappers()` runs without error.
+- Fixed an import error in `app/models/__init__.py` where `DesignationAbbreviation` was declared in `__all__` but not imported.
+
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.
 - Taxonomy Classifier now correctly throws `Unknown` / `NO_SUITABLE_MATCH` for unrecognized domains instead of blindly falling back to `General Operations`, enforcing strict DB-backed taxonomy resolutions.

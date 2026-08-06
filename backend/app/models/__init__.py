@@ -11,6 +11,7 @@ from app.models.taxonomy import (
     DesignationMaster,
     DesignationSkill,
     DesignationSynonym,
+    DesignationAbbreviation,
     DomainMaster,
     JobFamilyMaster,
     SkillMaster,
