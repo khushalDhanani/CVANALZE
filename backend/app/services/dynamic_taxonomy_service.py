@@ -53,7 +53,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status=MatchStatus.NO_SUITABLE_MATCH,
+            match_status=MatchStatus.INSUFFICIENT_EVIDENCE,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -77,6 +77,9 @@ class DynamicTaxonomyService:
         if vector_res:
             return vector_res
 
+        from app.core.database import MssqlReadSession
+        fallback_status = MatchStatus.SOURCE_DATA_UNAVAILABLE if MssqlReadSession is None else MatchStatus.NO_SUITABLE_MATCH
+
         # 3. Fallback to default domain
         return NormalizedClassification(
             db_department_id=None,
@@ -86,7 +89,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status=MatchStatus.NO_SUITABLE_MATCH,
+            match_status=fallback_status,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -114,7 +117,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status=MatchStatus.NO_SUITABLE_MATCH,
+            match_status=MatchStatus.INSUFFICIENT_EVIDENCE,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]
@@ -137,6 +140,9 @@ class DynamicTaxonomyService:
         if vector_res:
             return vector_res
 
+        from app.core.database import MssqlReadSession
+        fallback_status = MatchStatus.SOURCE_DATA_UNAVAILABLE if MssqlReadSession is None else MatchStatus.NO_SUITABLE_MATCH
+
         return NormalizedClassification(
             db_department_id=None,
             db_department_name=None,
@@ -145,7 +151,7 @@ class DynamicTaxonomyService:
             industry_department=None,
             industry_designation=None,
             industry_domain=None,
-            match_status=MatchStatus.NO_SUITABLE_MATCH,
+            match_status=fallback_status,
             confidence=0.0,
             match_source="NO_MATCH",
             evidence=[]

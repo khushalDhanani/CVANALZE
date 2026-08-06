@@ -119,9 +119,12 @@
 - [x] **Job Profile Aggregate:** Rewrote `get_job_profile_aggregate` to natively `.outerjoin` `OrgCompanyMst`, `OrgDepartmentMst`, and `OrgDesignationMst`, converting them into structured sub-dictionaries (`company`, `department`, `designation`). Joined `QualificationMst` and `RecruitDomainKnowledgeMst` to resolve name fields.
 
 ### PR6 and PR7 — Taxonomy Enforcement and Isolation
-- Replaced the memory-heavy `get_all_designations` loop inside `DynamicTaxonomyService` with an optimized PostgreSQL indexed lookup (`session.query().filter(ilike())`) directly mapped against `OrgDesignationMst`.
-- Downgraded aliases and semantic vector classification to `MatchStatus.PARTIAL_MATCH`. Isolated `MatchStatus.DB_MATCH` strictly to exact MSSQL source identifier matching.
-- Permanently deleted `_get_default_fallback` from the taxonomy stack, eliminating the legacy `General Operations` domain hallucination.
+- [x] Replaced the memory-heavy `get_all_designations` loop inside `DynamicTaxonomyService` with an optimized PostgreSQL indexed lookup (`session.query().filter(ilike())`) directly mapped against `OrgDesignationMst` (completed previously).
+- [x] Downgraded aliases and semantic vector classification to `MatchStatus.PARTIAL_MATCH`. Isolated `MatchStatus.DB_MATCH` strictly to exact MSSQL source identifier matching (completed previously).
+- [x] **Match Semantics Correction:** Updated `DynamicTaxonomyService` to properly assign `MatchStatus.INSUFFICIENT_EVIDENCE` for empty queries, and `MatchStatus.SOURCE_DATA_UNAVAILABLE` when the MSSQL connection (`MssqlReadSession`) cannot be established.
+- [x] **Classification Fallback Resolution:** Fixed `job_taxonomy.py` (`classify_vacancy_dto` and `classify_candidate_dto`) to correctly preserve and accept both `DB_MATCH` and `PARTIAL_MATCH` resolutions instead of treating partial matches as `NO_SUITABLE_MATCH`.
+- [x] **Static Rules Decoupling:** Purged the legacy `validate_taxonomy_config()` method which attempted to read canonical taxonomy bounds from the obsolete static `RuleConfigManager`.
+- [x] **Dead Code Purge:** Removed the obsolete `_get_default_fallback` method completely from unit tests (`test_dynamic_taxonomy_evidence.py`).
 - Rewrote the match status termination logic in `analyze_single_cv` inside `MatchService` to aggressively return `MatchStatus.NO_SUITABLE_MATCH` for any candidate failing the active vacancy filter.
 - Enforced complete nullification of `recommended_department`, `professional_domain`, `primary_department`, and `best_match` when no active vacancy corresponds to the candidate, ensuring non-authoritative AI career advice is corralled safely into the `ai_career_suggestions` block instead.
 

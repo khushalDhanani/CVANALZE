@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.core.rule_config_manager import RuleConfigManager
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
+from app.schemas.classification_types import MatchStatus
 
 logger = logging.getLogger("cv_analyzer")
 
@@ -160,34 +161,9 @@ class JobTaxonomy:
     @classmethod
     def validate_taxonomy_config(cls) -> None:
         """
-        Ensures:
-          1. Every rule domain exists in canonical_domains.
-          2. Every rule family exists in canonical_families.
-          3. Zero orphan or unknown domains/families.
+        Deprecated. Taxonomy is now fully dynamic via PostgreSQL and MSSQL schemas.
         """
-        from app.services.taxonomy_service import TaxonomyService
-        rules = RuleConfigManager.get_taxonomy_rules()
-        
-        canonical_domains = set(TaxonomyService.get_all_domains())
-        canonical_families = set(TaxonomyService.get_all_families())
-
-        if not canonical_domains:
-            raise ValueError("[TAXONOMY_VALIDATION_FAILURE] canonical_domains must not be empty")
-        if not canonical_families:
-            raise ValueError("[TAXONOMY_VALIDATION_FAILURE] canonical_families must not be empty")
-
-        for r in rules.vacancy_rules:
-            if r.domain not in canonical_domains:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Vacancy rule '{r.name}' has unknown domain: '{r.domain}'")
-            if r.family not in canonical_families:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Vacancy rule '{r.name}' has unknown family: '{r.family}'")
-
-        for r in rules.candidate_rules:
-            if r.domain not in canonical_domains:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Candidate rule '{r.name}' has unknown domain: '{r.domain}'")
-            for f in r.families:
-                if f not in canonical_families:
-                    raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Candidate rule '{r.name}' has unknown family: '{f}'")
+        pass
 
 
 class TaxonomyMetrics:
@@ -242,12 +218,12 @@ class TaxonomyClassifier:
             required_skills=dto.required_skills,
         )
 
-        if dyn_res.match_status == "DB_MATCH":
+        if dyn_res.match_status in (MatchStatus.DB_MATCH, MatchStatus.PARTIAL_MATCH):
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             matched_kw = dyn_res.evidence[0].matched_term if dyn_res.evidence else ""
             domain = dyn_res.industry_domain or "Unknown"
-            family = dyn_res.db_department_name or "Unknown"
+            family = dyn_res.industry_department or dyn_res.db_department_name or "Unknown"
             return TaxonomyClassification(
                 domain=domain,
                 job_family=family,
@@ -263,7 +239,7 @@ class TaxonomyClassifier:
             domain="Unknown",
             job_family="Unknown",
             compatible_families=("Unknown",),
-            matched_rule="NO_SUITABLE_MATCH",
+            matched_rule=dyn_res.match_status.value if hasattr(dyn_res.match_status, "value") else str(dyn_res.match_status),
             matched_branch=0,
             matched_keywords=(),
         )
@@ -291,11 +267,11 @@ class TaxonomyClassifier:
             skills=dto.skills,
         )
 
-        if dyn_res.match_status == "DB_MATCH":
+        if dyn_res.match_status in (MatchStatus.DB_MATCH, MatchStatus.PARTIAL_MATCH):
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             domain = dyn_res.industry_domain or "Unknown"
-            family = dyn_res.db_department_name or "Unknown"
+            family = dyn_res.industry_department or dyn_res.db_department_name or "Unknown"
             return TaxonomyClassification(
                 domain=domain,
                 job_family=family,
@@ -309,7 +285,7 @@ class TaxonomyClassifier:
             domain="Unknown",
             job_family="Unknown",
             compatible_families=("Unknown",),
-            matched_rule="NO_SUITABLE_MATCH",
+            matched_rule=dyn_res.match_status.value if hasattr(dyn_res.match_status, "value") else str(dyn_res.match_status),
         )
 
     @classmethod
