@@ -181,6 +181,7 @@ export interface EnrichedCandidateAnalysis {
   rejection_policy_note: string;
   llm_model_used?: string;
   llm_skipped?: boolean;
+  match_status?: string;
 }
 
 export interface OptimizedCandidateProfile {

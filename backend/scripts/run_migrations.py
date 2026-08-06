@@ -51,40 +51,17 @@ def detect_dialect(override: str | None = None) -> tuple[str, str]:
 
 def ensure_migrations_table(conn, dialect: str):
     """Ensures cvai.schema_migrations tracking table exists in the target database."""
-    if dialect == "mssql":
-        conn.execute(
-            text("""
-            IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'cvai')
-            BEGIN
-                EXEC('CREATE SCHEMA cvai');
-            END
-        """)
-        )
-        conn.execute(
-            text("""
-            IF NOT EXISTS (SELECT * FROM sys.tables WHERE object_id = OBJECT_ID('cvai.schema_migrations'))
-            BEGIN
-                CREATE TABLE cvai.schema_migrations (
-                    version VARCHAR(50) PRIMARY KEY,
-                    migration_name VARCHAR(255) NOT NULL,
-                    applied_at DATETIME2 DEFAULT CURRENT_TIMESTAMP,
-                    checksum VARCHAR(64)
-                );
-            END
-        """)
-        )
-    else:
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS cvai;"))
-        conn.execute(
-            text("""
-            CREATE TABLE IF NOT EXISTS cvai.schema_migrations (
-                version VARCHAR(50) PRIMARY KEY,
-                migration_name VARCHAR(255) NOT NULL,
-                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                checksum VARCHAR(64)
-            );
-        """)
-        )
+    conn.execute(text("CREATE SCHEMA IF NOT EXISTS cvai;"))
+    conn.execute(
+        text("""
+        CREATE TABLE IF NOT EXISTS cvai.schema_migrations (
+            version VARCHAR(50) PRIMARY KEY,
+            migration_name VARCHAR(255) NOT NULL,
+            applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            checksum VARCHAR(64)
+        );
+    """)
+    )
 
 
 def get_applied_migrations(conn) -> dict[str, dict[str, Any]]:
@@ -102,27 +79,7 @@ def get_applied_migrations(conn) -> dict[str, dict[str, Any]]:
     return applied
 
 
-def split_mssql_batches(sql_text: str) -> list[str]:
-    """Splits T-SQL script into individual execution batches separated by 'GO' statements."""
-    lines = sql_text.splitlines()
-    batches = []
-    current_batch = []
 
-    for line in lines:
-        if re.match(r"^\s*GO\s*$", line, re.IGNORECASE):
-            batch_str = "\n".join(current_batch).strip()
-            if batch_str:
-                batches.append(batch_str)
-            current_batch = []
-        else:
-            current_batch.append(line)
-
-    if current_batch:
-        batch_str = "\n".join(current_batch).strip()
-        if batch_str:
-            batches.append(batch_str)
-
-    return batches
 
 
 def get_migration_files(dialect: str, mode: str = "up") -> list[Path]:
@@ -214,40 +171,22 @@ def run_migrations(dialect: str, db_url: str, dry_run: bool = False):
         # Execute migration inside transaction
         try:
             with engine.begin() as conn:
-                if dialect == "mssql":
-                    batches = split_mssql_batches(content)
-                    for batch in batches:
-                        conn.execute(text(batch))
-                    now = datetime.now(UTC)
-                    conn.execute(
-                        text("""
-                        INSERT INTO cvai.schema_migrations (version, migration_name, applied_at, checksum)
-                        VALUES (:version, :name, :applied_at, :checksum)
-                    """),
-                        {
-                            "version": version,
-                            "name": migration_name,
-                            "applied_at": now,
-                            "checksum": checksum,
-                        },
-                    )
-                else:
-                    conn.execute(text(content))
-                    now = datetime.now(UTC)
-                    conn.execute(
-                        text("""
-                        INSERT INTO cvai.schema_migrations (version, migration_name, applied_at, checksum)
-                        VALUES (:version, :name, :applied_at, :checksum)
-                        ON CONFLICT (version) DO UPDATE 
-                        SET applied_at = EXCLUDED.applied_at, checksum = EXCLUDED.checksum;
-                    """),
-                        {
-                            "version": version,
-                            "name": migration_name,
-                            "applied_at": now,
-                            "checksum": checksum,
-                        },
-                    )
+                conn.execute(text(content))
+                now = datetime.now(UTC)
+                conn.execute(
+                    text("""
+                    INSERT INTO cvai.schema_migrations (version, migration_name, applied_at, checksum)
+                    VALUES (:version, :name, :applied_at, :checksum)
+                    ON CONFLICT (version) DO UPDATE 
+                    SET applied_at = EXCLUDED.applied_at, checksum = EXCLUDED.checksum;
+                """),
+                    {
+                        "version": version,
+                        "name": migration_name,
+                        "applied_at": now,
+                        "checksum": checksum,
+                    },
+                )
 
             print(f"✅ Applied [{version}] {file_path.name} successfully.")
         except Exception as err:
@@ -309,12 +248,7 @@ def run_rollback(dialect: str, db_url: str, steps: str = "1", dry_run: bool = Fa
 
         try:
             with engine.begin() as conn:
-                if dialect == "mssql":
-                    batches = split_mssql_batches(content)
-                    for batch in batches:
-                        conn.execute(text(batch))
-                else:
-                    conn.execute(text(content))
+                conn.execute(text(content))
 
                 conn.execute(
                     text("DELETE FROM cvai.schema_migrations WHERE version = :version"),
@@ -335,7 +269,7 @@ def main():
     parser = argparse.ArgumentParser(description="CV Analyzer Database Migration & Rollback Runner")
     parser.add_argument(
         "--dialect",
-        choices=["mssql", "postgres"],
+        choices=["postgres"],
         help="Explicitly specify target database dialect",
     )
     parser.add_argument(

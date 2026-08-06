@@ -24,22 +24,105 @@ class ConfigurationService:
         """Create a new version of the rule config in DRAFT state."""
         
         # Validate that the config is valid before saving
-        # This will raise an exception if it violates safety invariants
         RuleConfigManager._run_synthetic_smoke_tests(config)
+        
+        from app.models.rules import RuleComponent, SystemRule, RuleCondition, RuleThreshold, RulePenalty, RuleWeight
         
         profile = RuleConfigProfile(
             version_tag=version_tag,
             tenant_id=tenant_id,
             description=description,
-            global_confidence_tiers_json=json.dumps(config.global_confidence_tiers, default=lambda x: x.model_dump()),
-            fields_config_json=json.dumps(config.fields, default=lambda x: x.model_dump()),
-            scoring_rules_json=json.dumps(config.scoring.model_dump()),
             is_active=False,
             status="DRAFT",
             created_by=created_by,
             audit_reason=audit_reason,
         )
         db.add(profile)
+        db.flush()  # to get profile.profile_id if needed, though SQLAlchemy relationship appending handles it
+
+        # 1. Global Tiers
+        global_comp = RuleComponent(component_type="global_tiers", component_name="global", profile=profile)
+        for tier_name, tier_bounds in config.global_confidence_tiers.items():
+            global_comp.thresholds.append(RuleThreshold(threshold_key=f"{tier_name}_min", threshold_value=tier_bounds.min_score))
+            global_comp.thresholds.append(RuleThreshold(threshold_key=f"{tier_name}_max", threshold_value=tier_bounds.max_score))
+            
+        # 2. Fields
+        for field_name, field_cfg in config.fields.items():
+            field_comp = RuleComponent(component_type="field", component_name=field_name, profile=profile)
+            # Thresholds
+            field_comp.thresholds.append(RuleThreshold(threshold_key="high_min", threshold_value=field_cfg.tier_thresholds.high_min))
+            field_comp.thresholds.append(RuleThreshold(threshold_key="medium_min", threshold_value=field_cfg.tier_thresholds.medium_min))
+            field_comp.thresholds.append(RuleThreshold(threshold_key="low_min", threshold_value=field_cfg.tier_thresholds.low_min))
+            field_comp.thresholds.append(RuleThreshold(threshold_key="min_acceptance_confidence", threshold_value=field_cfg.downstream_gates.min_acceptance_confidence))
+            
+            # System rules for confidence scoring
+            for k, v in field_cfg.confidence_scoring.items():
+                field_comp.weights.append(RuleWeight(weight_key=f"confidence_{k}", weight_value=v))
+                
+            # Conditions (Keywords)
+            rule = SystemRule(rule_type="keywords", rule_name="field_keywords", component=field_comp)
+            for k, kw_list in field_cfg.keywords.items():
+                rule.conditions.append(RuleCondition(condition_scope=k, keywords_json=json.dumps(kw_list)))
+
+        # 3. Scoring - Match
+        match_comp = RuleComponent(component_type="scoring", component_name="match", profile=profile)
+        match_cfg = config.scoring.match
+        
+        # Scoring parameters
+        for k, v in match_cfg.scoring_parameters.model_dump().items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                if "penalty" in k or "mismatch" in k:
+                    match_comp.penalties.append(RulePenalty(penalty_key=k, penalty_value=float(v)))
+                elif "weight" in k:
+                    match_comp.weights.append(RuleWeight(weight_key=k, weight_value=float(v)))
+                else:
+                    match_comp.thresholds.append(RuleThreshold(threshold_key=k, threshold_value=float(v)))
+            elif isinstance(v, dict):
+                for sub_k, sub_v in v.items():
+                    if isinstance(sub_v, (int, float)):
+                        match_comp.weights.append(RuleWeight(weight_key=f"{k}_{sub_k}", weight_value=float(sub_v)))
+                        
+        # 4. Scoring - Prefilter
+        pref_comp = RuleComponent(component_type="scoring", component_name="prefilter", profile=profile)
+        pref_cfg = config.scoring.prefilter
+        for k, v in pref_cfg.lexical_weights.model_dump().items():
+            if isinstance(v, (int, float)):
+                pref_comp.weights.append(RuleWeight(weight_key=k, weight_value=float(v)))
+        pref_comp.thresholds.append(RuleThreshold(threshold_key="rrf_k_constant", threshold_value=pref_cfg.rrf_k_constant))
+        
+        # 5. Scoring - Taxonomy
+        tax_comp = RuleComponent(component_type="scoring", component_name="taxonomy", profile=profile)
+        tax_cfg = config.scoring.taxonomy
+        for vac_rule in tax_cfg.vacancy_rules:
+            sys_rule = SystemRule(rule_type="vacancy_taxonomy", rule_name=vac_rule.name, target_value=f"{vac_rule.domain}::{vac_rule.family}", component=tax_comp)
+            for branch in vac_rule.branches:
+                for cond in branch.conditions:
+                    sys_rule.conditions.append(RuleCondition(
+                        condition_scope=cond.scope,
+                        condition_mode=cond.mode,
+                        is_negated=cond.negate,
+                        keywords_json=json.dumps(cond.keywords)
+                    ))
+
+        for cand_rule in tax_cfg.candidate_rules:
+            sys_rule = SystemRule(rule_type="candidate_taxonomy", rule_name=cand_rule.name, target_value=f"{cand_rule.domain}::{','.join(cand_rule.families)}", component=tax_comp)
+            for branch in cand_rule.branches:
+                for cond in branch.conditions:
+                    sys_rule.conditions.append(RuleCondition(
+                        condition_scope=cond.scope,
+                        condition_mode=cond.mode,
+                        is_negated=cond.negate,
+                        keywords_json=json.dumps(cond.keywords)
+                    ))
+                    
+        # 6. Scoring - Resume Quality
+        rq_comp = RuleComponent(component_type="scoring", component_name="resume_quality", profile=profile)
+        rq_cfg = config.scoring.resume_quality
+        rq_comp.weights.append(RuleWeight(weight_key="section_weight", weight_value=rq_cfg.section_weight))
+        rq_comp.thresholds.append(RuleThreshold(threshold_key="location_acceptance_min_confidence", threshold_value=rq_cfg.location_acceptance_min_confidence))
+        for k, v in rq_cfg.contact_weights.items():
+            rq_comp.weights.append(RuleWeight(weight_key=f"contact_{k}", weight_value=v))
+
         db.commit()
         db.refresh(profile)
         return profile

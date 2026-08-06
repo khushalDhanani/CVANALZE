@@ -6,8 +6,7 @@ def get_candidate_aggregate(db: Session, candidate_id: int) -> dict | None:
     candidate = db.query(RecruitCandidateMst).options(
         joinedload(RecruitCandidateMst.job_profile),
         joinedload(RecruitCandidateMst.qualifications),
-        joinedload(RecruitCandidateMst.domains),
-        joinedload(RecruitCandidateMst.workflow_states)
+        joinedload(RecruitCandidateMst.domains)
     ).filter(RecruitCandidateMst.CandidateID == candidate_id).first()
     
     if not candidate:
@@ -26,8 +25,7 @@ def get_candidate_aggregate(db: Session, candidate_id: int) -> dict | None:
             "name": candidate.job_profile.JobProfileName if candidate.job_profile else None
         } if candidate.job_profile else None,
         "qualifications": [q.QualID for q in candidate.qualifications],
-        "domains": [d.DomainID for d in candidate.domains],
-        "workflow_states": [{"workflow_id": w.WorkflowID, "state": w.CurrentState} for w in candidate.workflow_states]
+        "domains": [d.DomainID for d in candidate.domains]
     }
 
 def get_vacancy_aggregate(db: Session, vacancy_id: int) -> dict | None:

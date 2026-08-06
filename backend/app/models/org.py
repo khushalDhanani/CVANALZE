@@ -6,7 +6,8 @@ from app.core.database import MssqlReadBase
 
 class OrgBusinessGroupMst(MssqlReadBase):
     __tablename__ = "OrgBusinessGroupMst"
-    BusinessGrpID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    BusinessGrpID = Column(BigInteger, primary_key=True)
     BusinessGrpName = Column(String)
     BusinessGrpIsActive = Column(Boolean)
 
@@ -15,7 +16,8 @@ class OrgBusinessGroupMst(MssqlReadBase):
 
 class OrgCompanyMst(MssqlReadBase):
     __tablename__ = "OrgCompanyMst"
-    CompID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    CompID = Column(BigInteger, primary_key=True)
     BusinessGrpID = Column(BigInteger, ForeignKey("OrgBusinessGroupMst.BusinessGrpID"))
     CompName = Column(String)
     CompIsActive = Column(Boolean)
@@ -27,7 +29,8 @@ class OrgCompanyMst(MssqlReadBase):
 
 class OrgDepartmentMst(MssqlReadBase):
     __tablename__ = "OrgDepartmentMst"
-    DeptID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    DeptID = Column(BigInteger, primary_key=True)
     CompID = Column(BigInteger, ForeignKey("OrgCompanyMst.CompID"))
     DeptName = Column(String)
     DeptIsActive = Column(Boolean)
@@ -37,7 +40,8 @@ class OrgDepartmentMst(MssqlReadBase):
 
 class OrgLocationMst(MssqlReadBase):
     __tablename__ = "OrgLocationMst"
-    LocID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    LocID = Column(BigInteger, primary_key=True)
     CompID = Column(BigInteger, ForeignKey("OrgCompanyMst.CompID"))
     LocName = Column(String)
     LocAddress = Column(String)
@@ -48,7 +52,8 @@ class OrgLocationMst(MssqlReadBase):
 
 class OrgDesignationMst(MssqlReadBase):
     __tablename__ = "OrgDesignationMst"
-    DesigID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    DesigID = Column(BigInteger, primary_key=True)
     CompID = Column(BigInteger, ForeignKey("OrgCompanyMst.CompID"))
     DeptID = Column(BigInteger, ForeignKey("OrgDepartmentMst.DeptID"))
     DesigName = Column(String)
@@ -57,7 +62,8 @@ class OrgDesignationMst(MssqlReadBase):
 
 class OrgJobProfileMst(MssqlReadBase):
     __tablename__ = "OrgJobProfileMst"
-    JobProfileID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    JobProfileID = Column(BigInteger, primary_key=True)
     JobProfileName = Column(String)
     JobProfileDesc = Column(String)
     CompID = Column(BigInteger, ForeignKey("OrgCompanyMst.CompID"))
@@ -70,21 +76,24 @@ class OrgJobProfileMst(MssqlReadBase):
 
 class OrgQualificationMst(MssqlReadBase):
     __tablename__ = "OrgQualificationMst"
-    QualID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    QualID = Column(BigInteger, primary_key=True)
     QualName = Column(String)
     QualIsActive = Column(Boolean)
 
 
 class OrgDomainMst(MssqlReadBase):
     __tablename__ = "OrgDomainMst"
-    DomainID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    DomainID = Column(BigInteger, primary_key=True)
     DomainName = Column(String)
     DomainIsActive = Column(Boolean)
 
 
 class OrgJobProfileQualification(MssqlReadBase):
     __tablename__ = "OrgJobProfileQualification"
-    JobProfileQualID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    JobProfileQualID = Column(BigInteger, primary_key=True)
     JobProfileID = Column(BigInteger, ForeignKey("OrgJobProfileMst.JobProfileID"))
     QualID = Column(BigInteger, ForeignKey("OrgQualificationMst.QualID"))
     IsMandatory = Column(Boolean, default=True)
@@ -94,7 +103,8 @@ class OrgJobProfileQualification(MssqlReadBase):
 
 class OrgJobProfileDomain(MssqlReadBase):
     __tablename__ = "OrgJobProfileDomain"
-    JobProfileDomainID = Column(BigInteger, primary_key=True)
+
+    __table_args__ = {"schema": "AIRIS"}    JobProfileDomainID = Column(BigInteger, primary_key=True)
     JobProfileID = Column(BigInteger, ForeignKey("OrgJobProfileMst.JobProfileID"))
     DomainID = Column(BigInteger, ForeignKey("OrgDomainMst.DomainID"))
     IsMandatory = Column(Boolean, default=True)
