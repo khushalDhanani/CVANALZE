@@ -48,10 +48,11 @@ class ShadowEvaluator:
         old_result: Optional[EnrichedCandidateAnalysis], 
         new_result: EnrichedCandidateAnalysis,
         airis_status_id: Optional[int] = None,
-        is_historical: bool = False
+        is_historical: bool = False,
+        pg_db = None
     ) -> ShadowValidationResult:
         
-        # 1. Compare Scores (Assuming best_match contains the score)
+        # 1. Compare Scores
         old_score = old_result.best_match.overall_score if old_result and old_result.best_match else None
         new_score = new_result.best_match.overall_score if new_result and new_result.best_match else None
         score_delta = DeltaCalculator.calculate_score_delta(old_score, new_score)
@@ -83,31 +84,31 @@ class ShadowEvaluator:
         } if old_evidence != new_evidence else None
 
         # 5. Calculate Truth Metrics (Against AIRIS)
-        # Assuming AIRIS status: e.g. 1=Hired, 2=Rejected (Mock logic, depends on AirisHistoricalBenchmark mapping)
-        # If airis_status_id is provided, we can map it.
-        # Let's say status_id == 5 is 'Hired/Selected' for the sake of metric calculation
         airis_is_hired = None
         is_false_positive = None
         is_false_negative = None
         is_agreement = None
 
-        if airis_status_id is not None:
-            # Simple heuristic for demonstration: Assume any status indicating moving forward is a positive
-            airis_is_hired = (airis_status_id in [4, 5, 6, 7]) # Placeholder standard IDs
-            cvai_is_positive = (new_rec in ["HIGH", "MEDIUM"])
+        if airis_status_id is not None and pg_db is not None:
+            from app.models.validation import AirisHistoricalBenchmark
+            benchmark = pg_db.query(AirisHistoricalBenchmark).filter_by(status_id=airis_status_id).first()
+            if benchmark:
+                airis_is_hired = benchmark.is_hired
+                
+                cvai_is_positive = (new_rec in ["HIGH", "MEDIUM"])
 
-            if airis_is_hired and not cvai_is_positive:
-                is_false_negative = True
-                is_false_positive = False
-                is_agreement = False
-            elif not airis_is_hired and cvai_is_positive:
-                is_false_positive = True
-                is_false_negative = False
-                is_agreement = False
-            else:
-                is_false_positive = False
-                is_false_negative = False
-                is_agreement = True
+                if airis_is_hired and not cvai_is_positive:
+                    is_false_negative = True
+                    is_false_positive = False
+                    is_agreement = False
+                elif not airis_is_hired and cvai_is_positive:
+                    is_false_positive = True
+                    is_false_negative = False
+                    is_agreement = False
+                else:
+                    is_false_positive = False
+                    is_false_negative = False
+                    is_agreement = True
 
         result = ShadowValidationResult(
             airis_status_id=airis_status_id,
@@ -128,88 +129,135 @@ class ShadowEvaluator:
 
         return result
 
+def execute_shadow_pipeline(candidate_id: int, vacancy_id: Optional[int], prod_result_dict: dict, cv_text: str):
+    import asyncio
+    from app.services.match_service import MatchService
+    from app.schemas.analysis import EnrichedCandidateAnalysis
+    
+    # 1. Parse prod_result
+    prod_result = EnrichedCandidateAnalysis.model_validate(prod_result_dict)
+    
+    # 2. Run shadow pipeline independently
+    try:
+        shadow_result = asyncio.run(MatchService.analyze_single_cv(
+            cv_text=cv_text,
+            candidate_id=str(candidate_id)
+        ))
+    except Exception as e:
+        logger.error(f"Shadow pipeline execution failed: {e}")
+        raise
+        
+    # 3. Evaluate and persist
+    try:
+        with PostgresAppSession() as pg_db:
+            airis_status_id = None
+            if vacancy_id:
+                with MssqlReadSession() as mssql_db:
+                    mapping = mssql_db.query(RecruitVacancyCandidateList).filter(
+                        RecruitVacancyCandidateList.CandidateID == candidate_id,
+                        RecruitVacancyCandidateList.VacancyRequestID == vacancy_id
+                    ).first()
+                    if mapping:
+                        airis_status_id = mapping.StatusID
+
+            run = ShadowValidationRun(
+                candidate_id=candidate_id,
+                vacancy_id=vacancy_id,
+                is_historical=False,
+                status="RUNNING"
+            )
+            pg_db.add(run)
+            pg_db.flush()
+
+            eval_result = ShadowEvaluator.evaluate(
+                candidate_id=candidate_id,
+                vacancy_id=vacancy_id,
+                old_result=prod_result,
+                new_result=shadow_result,
+                airis_status_id=airis_status_id,
+                pg_db=pg_db
+            )
+            
+            eval_result.run_id = run.id
+            pg_db.add(eval_result)
+            
+            run.status = "COMPLETED"
+            run.completed_at = datetime.now(timezone.utc)
+            pg_db.commit()
+    except Exception as e:
+        logger.error(f"Shadow validation persistence failed: {e}", exc_info=True)
+        raise
 
 class ShadowValidationService:
     @classmethod
-    def run_shadow_validation(
+    def enqueue_shadow_validation(
         cls, 
         candidate_id: int, 
         vacancy_id: Optional[int], 
-        prod_result: EnrichedCandidateAnalysis,
-        shadow_result: EnrichedCandidateAnalysis
+        prod_result_dict: dict,
+        cv_text: str
     ):
         """
-        Runs the shadow validation comparison and persists it asynchronously.
-        Does not block production execution.
+        Enqueues the shadow validation comparison via RQ to prevent unmanaged threads.
         """
         try:
-            with PostgresAppSession() as pg_db:
-                # Get historical AIRIS status if available
-                airis_status_id = None
-                if vacancy_id:
-                    with MssqlReadSession() as mssql_db:
-                        mapping = mssql_db.query(RecruitVacancyCandidateList).filter(
-                            RecruitVacancyCandidateList.CandidateID == candidate_id,
-                            RecruitVacancyCandidateList.VacancyRequestID == vacancy_id
-                        ).first()
-                        if mapping:
-                            airis_status_id = mapping.StatusID
+            from rq import Queue, Retry
+            from redis import Redis
+            from app.core.config import settings
+            
+            if not settings.REDIS_URL:
+                logger.warning("REDIS_URL not set. Shadow validation will not be queued.")
+                return
 
-                run = ShadowValidationRun(
-                    candidate_id=candidate_id,
-                    vacancy_id=vacancy_id,
-                    is_historical=False,
-                    status="RUNNING"
-                )
-                pg_db.add(run)
-                pg_db.flush()
-
-                eval_result = ShadowEvaluator.evaluate(
-                    candidate_id=candidate_id,
-                    vacancy_id=vacancy_id,
-                    old_result=prod_result,
-                    new_result=shadow_result,
-                    airis_status_id=airis_status_id
-                )
-                
-                eval_result.run_id = run.id
-                pg_db.add(eval_result)
-                
-                run.status = "COMPLETED"
-                run.completed_at = datetime.now(timezone.utc)
-                pg_db.commit()
-
+            connection = Redis.from_url(settings.REDIS_URL)
+            queue = Queue("shadow_validation", connection=connection)
+            queue.enqueue(
+                execute_shadow_pipeline,
+                candidate_id=candidate_id,
+                vacancy_id=vacancy_id,
+                prod_result_dict=prod_result_dict,
+                cv_text=cv_text,
+                retry=Retry(max=3, interval=60),
+                job_timeout=600
+            )
         except Exception as e:
-            logger.error(f"Shadow validation failed: {e}", exc_info=True)
-
+            logger.error(f"Failed to enqueue shadow validation: {e}")
 
 class MetricsEngine:
     @classmethod
     def snapshot_metrics(cls):
-        """Calculates global FPR, FNR, etc and stores a snapshot."""
+        """Calculates explicit global TP, TN, FP, FNR and stores a snapshot."""
         with PostgresAppSession() as pg_db:
             total = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_agreement.isnot(None)).count()
             if total == 0:
                 return
             
-            agreements = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_agreement == True).count()
-            fps = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_positive == True).count()
-            fns = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_negative == True).count()
+            # Explicit True Positives
+            tps = pg_db.query(ShadowValidationResult).filter(
+                ShadowValidationResult.is_agreement == True,
+                ShadowValidationResult.airis_is_hired == True
+            ).count()
             
-            # Simple standard metrics
-            precision = (agreements) / (agreements + fps) if (agreements + fps) > 0 else 0
-            recall = (agreements) / (agreements + fns) if (agreements + fns) > 0 else 0
-            fpr = fps / total
-            fnr = fns / total
-            agreement_rate = agreements / total
-            
-            # No-match accuracy: correctly identifying when a candidate is NOT a match
-            # True Negatives / (True Negatives + False Positives)
+            # Explicit True Negatives
             tns = pg_db.query(ShadowValidationResult).filter(
                 ShadowValidationResult.is_agreement == True,
                 ShadowValidationResult.airis_is_hired == False
             ).count()
+
+            # Explicit False Positives
+            fps = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_positive == True).count()
             
+            # Explicit False Negatives
+            fns = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_false_negative == True).count()
+            
+            precision = tps / (tps + fps) if (tps + fps) > 0 else 0
+            recall = tps / (tps + fns) if (tps + fns) > 0 else 0
+            fpr = fps / (fps + tns) if (fps + tns) > 0 else 0
+            fnr = fns / (fns + tps) if (fns + tps) > 0 else 0
+            
+            agreement_rate = (tps + tns) / total if total > 0 else 0
+            
+            # No-match accuracy: correctly identifying when a candidate is NOT a match
             no_match_accuracy = tns / (tns + fps) if (tns + fps) > 0 else 0
 
             snap = ValidationMetricsSnapshot(

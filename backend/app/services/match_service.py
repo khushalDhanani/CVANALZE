@@ -437,12 +437,18 @@ class MatchService:
 
         if getattr(settings, "SHADOW_MODE_ENABLED", False) and candidate_id:
             from app.services.shadow_validation_service import ShadowValidationService
-            import threading
-            # Run shadow validation in the background so it doesn't block
-            threading.Thread(
-                target=ShadowValidationService.run_shadow_validation,
-                args=(candidate_id, None, None, result)
-            ).start()
+            try:
+                numeric_cand_id = int(candidate_id)
+                vacancy_id = result.best_match.vacancy_id if result.best_match else None
+                numeric_vac_id = int(vacancy_id) if vacancy_id else None
+                ShadowValidationService.enqueue_shadow_validation(
+                    candidate_id=numeric_cand_id,
+                    vacancy_id=numeric_vac_id,
+                    prod_result_dict=result.model_dump(),
+                    cv_text=cv_text
+                )
+            except ValueError:
+                logger.warning(f"Could not enqueue shadow validation for non-numeric candidate_id: {candidate_id}")
 
         return result
 

@@ -111,6 +111,13 @@
 - Rewrote the match status termination logic in `analyze_single_cv` inside `MatchService` to aggressively return `MatchStatus.NO_SUITABLE_MATCH` for any candidate failing the active vacancy filter.
 - Enforced complete nullification of `recommended_department`, `professional_domain`, `primary_department`, and `best_match` when no active vacancy corresponds to the candidate, ensuring non-authoritative AI career advice is corralled safely into the `ai_career_suggestions` block instead.
 
+### PR9 — Shadow Validation Rewrite
+- Completely eliminated unmanaged `threading.Thread` utilization from `MatchService`, ensuring background workload execution does not compromise HTTP worker bounds.
+- Re-routed all Shadow Validation requests through the native `RQ` infrastructure (`shadow_validation` queue) wrapped with automated durable persistence / `Retry(max=3)` policies.
+- Decoupled `ShadowValidationService` into two distinctly versioned pipelines: the HTTP response executes the production iteration natively, while `execute_shadow_pipeline` initializes a fresh, non-mutating instance of `MatchService.analyze_single_cv`.
+- Connected the `AirisHistoricalBenchmark` table directly into `ShadowEvaluator.evaluate`, mapping MSSQL status IDs to authoritative `is_hired` states in real time, rather than relying on hardcoded integer mocks (`[4, 5, 6, 7]`).
+- Architected explicit True Positive (TP), True Negative (TN), False Positive (FP), and False Negative (FN) calculations inside `MetricsEngine`, and built concrete algorithmic definitions for Precision, Recall, FPR, and FNR natively logged to `ValidationMetricsSnapshot`.
+
 ## 3. Important Decisions
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.
 - Taxonomy Classifier now correctly throws `Unknown` / `NO_SUITABLE_MATCH` for unrecognized domains instead of blindly falling back to `General Operations`, enforcing strict DB-backed taxonomy resolutions.
