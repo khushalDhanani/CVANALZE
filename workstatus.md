@@ -65,6 +65,18 @@
 - Completely rewrote `ResultRepository` to exclusively store and retrieve CV analysis payloads to/from PostgreSQL JSONB columns, purging the legacy `.json` disk caching mechanism inside `uploads/results/`.
 - Removed `_cv_file_cache` to guarantee no disk I/O leaks for match results.
 
+### PR 8 — Implement Source Synchronization and Audit
+- Created `backend/app/models/integration.py` defining standard sync constructs (`SyncRun`, `SyncWatermark`, `SyncError`) and payload snapshot tables (`DepartmentSnapshot`, `DesignationSnapshot`, `JobProfileSnapshot`, `CandidateSnapshot`, `VacancySnapshot`).
+- Added robust synchronization services (`integration_sync_service.py`) supporting idempotency via payload hashes and tracking source watermarks (using strict `TIMESTAMP WITH TIME ZONE`).
+- Structured deactivation logic to mark `is_active=False` when upstream MSSQL records are hard-deleted.
+- Created SQL migration `013_create_integration_schema.sql` to explicitly define the synchronization boundaries.
+
+### PR 9 — Implement Real Shadow Validation
+- Built `backend/app/models/validation.py` for evaluating CV-Analyzer runs directly against historical AIRIS human decisions (`ShadowValidationResult`, `ValidationMetricsSnapshot`).
+- Implemented `ShadowValidationService` providing non-blocking asynchronous validation wrapping the production matching flow via a newly added `SHADOW_MODE_ENABLED` configuration flag.
+- Created `DeltaCalculator` and `MetricsEngine` logic to calculate Precision, Recall, False Positive Rates, and False Negative Rates against legacy AIRIS outputs.
+- Developed `backend/scripts/run_historical_shadow_validation.py` to trigger bulk audits and emit statistical analysis of historical accuracy.
+
 ## 2. Next Steps
 - P1 fixes and absolute data source isolation tasks have been completed.
 - Validate end-to-end integration flows against the strict unconfigured taxonomy and PostgreSQL-backed CV result storage.
@@ -73,3 +85,4 @@
 - All MSSQL mapping logic strictly delegates to `MssqlReadBase` and all transactional logic delegates to `PostgresAppBase`.
 - Taxonomy Classifier now correctly throws `Unknown` / `NO_SUITABLE_MATCH` for unrecognized domains instead of blindly falling back to `General Operations`, enforcing strict DB-backed taxonomy resolutions.
 - Enriched analysis results now strictly delimit "verified authoritative matches" from "AI extrapolated career suggestions", resolving pipeline hallucinations.
+- Added a non-blocking background thread `ShadowValidationService` in `match_service.py` to seamlessly audit CV Analyzer decisions against historical AIRIS outputs without stalling production API latency.

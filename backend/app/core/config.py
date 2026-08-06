@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     RESULTS_DIR: Path = Path("uploads/results")
 
     # Match Engine Configuration
+    SHADOW_MODE_ENABLED: bool = False
+    
     # Resource Optimization & Batch Processing Configuration
     BATCH_SIZE: int = 2
     MAX_BATCH_LIMIT: int = 50

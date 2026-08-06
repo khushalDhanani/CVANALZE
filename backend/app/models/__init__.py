@@ -28,6 +28,13 @@ from app.models.integration import (
     CandidateSnapshot,
     VacancySnapshot,
 )
+from app.models.validation import (
+    ShadowValidationRun,
+    ShadowValidationResult,
+    AirisHistoricalBenchmark,
+    ValidationMetricsSnapshot,
+    HRDisagreementReview,
+)
 
 __all__ = [
     "CVResult",
@@ -60,4 +67,9 @@ __all__ = [
     "JobProfileSnapshot",
     "CandidateSnapshot",
     "VacancySnapshot",
+    "ShadowValidationRun",
+    "ShadowValidationResult",
+    "AirisHistoricalBenchmark",
+    "ValidationMetricsSnapshot",
+    "HRDisagreementReview",
 ]

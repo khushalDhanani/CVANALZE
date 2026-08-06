@@ -434,6 +434,15 @@ class MatchService:
             CacheIndex.add("match_by_cand", candidate_id, match_cache_key)
         logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
 
+        if getattr(settings, "SHADOW_MODE_ENABLED", False) and candidate_id:
+            from app.services.shadow_validation_service import ShadowValidationService
+            import threading
+            # Run shadow validation in the background so it doesn't block
+            threading.Thread(
+                target=ShadowValidationService.run_shadow_validation,
+                args=(candidate_id, None, None, result)
+            ).start()
+
         return result
 
     @staticmethod
