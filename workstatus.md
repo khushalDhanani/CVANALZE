@@ -5,6 +5,7 @@
 ### PR 1 — Fix database contract
 - Added `MSSQL_READ_ONLY_URL` and `POSTGRES_APP_URL` to configuration and decoupled `DB_URL`/`PG_DB_URL`.
 - Enforced dual database requirements for production mode in `database.py`.
+- Updated scripts (`run_migrations.py` and `verify_schema_drift.py`) and documentation to enforce that migrations target PostgreSQL only.
 
 ### PR 2 — Permanently disable MSSQL writes
 - Removed `migrations/mssql` folder.

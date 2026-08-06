@@ -87,14 +87,12 @@ docker compose --profile tools run --rm migrate-postgres
 PostgreSQL migration `007_create_vector_embeddings.sql` creates the pgvector extension and embedding tables that were formerly supplied by startup `create_all()`.
 MSSQL migration `007_create_system_config.sql` similarly makes the matching configuration table explicit.
 
-For a configured MSSQL deployment, run `uv run python scripts/run_migrations.py --dialect mssql` as a separate release step.
-
 Local development may retain `INITIALIZE_DATABASE_ON_STARTUP=true`; automatic local migrations remain opt-in and default to false.
 
 ## Docker alignment
 
 - API, worker, and migration services share one environment mapping.
-- Compose now supplies `PG_DB_URL`, matching the application setting, instead of the unused `DB_URL` variable.
+- Compose now supplies `POSTGRES_APP_URL` and `MSSQL_READ_ONLY_URL`, matching the application setting, instead of legacy variables.
 - The queue name is shared between worker command and API configuration.
 - Redis and PostgreSQL readiness gate API/worker startup; API liveness plus worker, Redis, and PostgreSQL health checks have restart behavior.
 - The Python base image is pinned to Debian Bookworm. The image includes Microsoft ODBC Driver 18 for the configured MSSQL dialect plus the PDF/OCR runtime libraries.

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
 Automated Database Migration & Rollback Runner CLI for CV Analyzer backend.
-Supports MSSQL and PostgreSQL dialects, SHA-256 checksum verification,
+Supports PostgreSQL dialect, SHA-256 checksum verification,
 schema migration tracking, step-down rollbacks (*_down.sql), and dry-run previews.
 """
 
 import argparse
 import hashlib
-import re
 import sys
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,26 +29,16 @@ def compute_checksum(content: str) -> str:
     return hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()
 
 
-def detect_dialect(override: str | None = None) -> tuple[str, str]:
+def get_db_url() -> str:
     """
-    Detects target dialect and database URL.
-    Returns tuple of (dialect_name, db_url).
+    Detects target database URL for PostgreSQL.
     """
-    if override:
-        dialect = override.lower()
-        if dialect == "mssql":
-            raise ValueError("MSSQL migrations are permanently disabled. The database is read-only.")
-        elif dialect in ("postgres", "postgresql"):
-            if not settings.POSTGRES_APP_URL:
-                raise ValueError("PostgreSQL requested but POSTGRES_APP_URL is not configured in settings.")
-            return "postgres", settings.POSTGRES_APP_URL
-        else:
-            raise ValueError(f"Unsupported dialect override: {override}")
-
-    raise ValueError("No database dialect specified. Please run with --dialect postgres or --dialect mssql.")
+    if not settings.POSTGRES_APP_URL:
+        raise ValueError("POSTGRES_APP_URL is not configured in settings.")
+    return settings.POSTGRES_APP_URL
 
 
-def ensure_migrations_table(conn, dialect: str):
+def ensure_migrations_table(conn):
     """Ensures cvai.schema_migrations tracking table exists in the target database."""
     conn.execute(text("CREATE SCHEMA IF NOT EXISTS cvai;"))
     conn.execute(
@@ -79,16 +68,13 @@ def get_applied_migrations(conn) -> dict[str, dict[str, Any]]:
     return applied
 
 
-
-
-
-def get_migration_files(dialect: str, mode: str = "up") -> list[Path]:
+def get_migration_files(mode: str = "up") -> list[Path]:
     """
-    Returns sorted list of .sql migration files for the given dialect.
+    Returns sorted list of .sql migration files for postgres.
     mode='up' returns forward migrations (excluding *_down.sql).
     mode='down' returns rollback migrations (only *_down.sql).
     """
-    migrations_dir = script_dir / "migrations" / dialect
+    migrations_dir = script_dir / "migrations" / "postgres"
     if not migrations_dir.exists():
         raise FileNotFoundError(f"Migrations directory not found: {migrations_dir}")
 
@@ -99,19 +85,19 @@ def get_migration_files(dialect: str, mode: str = "up") -> list[Path]:
     return files
 
 
-def run_status(dialect: str, db_url: str):
+def run_status(db_url: str):
     """Displays migration status table in terminal."""
     engine = create_engine(db_url)
-    up_files = get_migration_files(dialect, mode="up")
-    down_files = get_migration_files(dialect, mode="down")
+    up_files = get_migration_files(mode="up")
+    down_files = get_migration_files(mode="down")
     down_names = {f.name for f in down_files}
 
     with engine.begin() as conn:
-        ensure_migrations_table(conn, dialect)
+        ensure_migrations_table(conn)
         applied = get_applied_migrations(conn)
 
     print("\n" + "=" * 85)
-    print(f"DATABASE MIGRATION STATUS ({dialect.upper()})")
+    print(f"DATABASE MIGRATION STATUS (POSTGRESQL)")
     print("=" * 85)
     print(f"{'VERSION':<10} | {'MIGRATION NAME':<38} | {'STATUS':<10} | {'REVERSAL SCRIPT'}")
     print("-" * 85)
@@ -135,17 +121,17 @@ def run_status(dialect: str, db_url: str):
     print("=" * 85 + "\n")
 
 
-def run_migrations(dialect: str, db_url: str, dry_run: bool = False):
+def run_migrations(db_url: str, dry_run: bool = False):
     """Executes pending database migrations."""
     engine = create_engine(db_url)
-    files = get_migration_files(dialect, mode="up")
+    files = get_migration_files(mode="up")
 
-    print(f"\n[MIGRATION RUNNER] Dialect: {dialect.upper()}")
+    print(f"\n[MIGRATION RUNNER] Dialect: POSTGRESQL")
     print(f"[MIGRATION RUNNER] Dry Run: {dry_run}")
-    print(f"[MIGRATION RUNNER] Target Directory: {script_dir / 'migrations' / dialect}\n")
+    print(f"[MIGRATION RUNNER] Target Directory: {script_dir / 'migrations' / 'postgres'}\n")
 
     with engine.begin() as conn:
-        ensure_migrations_table(conn, dialect)
+        ensure_migrations_table(conn)
         applied = get_applied_migrations(conn)
 
     pending_count = 0
@@ -172,7 +158,7 @@ def run_migrations(dialect: str, db_url: str, dry_run: bool = False):
         try:
             with engine.begin() as conn:
                 conn.execute(text(content))
-                now = datetime.now(UTC)
+                now = datetime.now(timezone.utc)
                 conn.execute(
                     text("""
                     INSERT INTO cvai.schema_migrations (version, migration_name, applied_at, checksum)
@@ -201,18 +187,18 @@ def run_migrations(dialect: str, db_url: str, dry_run: bool = False):
         print(f"\n🎉 [MIGRATIONS COMPLETE] Successfully applied {pending_count} migration(s).")
 
 
-def run_rollback(dialect: str, db_url: str, steps: str = "1", dry_run: bool = False):
+def run_rollback(db_url: str, steps: str = "1", dry_run: bool = False):
     """Rolls back applied migrations in reverse order using *_down.sql scripts."""
     engine = create_engine(db_url)
-    down_files = get_migration_files(dialect, mode="down")
+    down_files = get_migration_files(mode="down")
     down_map = {f.name.replace("_down.sql", ".sql"): f for f in down_files}
 
-    print(f"\n[MIGRATION ROLLBACK] Dialect: {dialect.upper()}")
+    print(f"\n[MIGRATION ROLLBACK] Dialect: POSTGRESQL")
     print(f"[MIGRATION ROLLBACK] Dry Run: {dry_run}")
     print(f"[MIGRATION ROLLBACK] Requested Rollback Steps: {steps}\n")
 
     with engine.begin() as conn:
-        ensure_migrations_table(conn, dialect)
+        ensure_migrations_table(conn)
         applied = get_applied_migrations(conn)
 
     if not applied:
@@ -268,11 +254,6 @@ def run_rollback(dialect: str, db_url: str, steps: str = "1", dry_run: bool = Fa
 def main():
     parser = argparse.ArgumentParser(description="CV Analyzer Database Migration & Rollback Runner")
     parser.add_argument(
-        "--dialect",
-        choices=["postgres"],
-        help="Explicitly specify target database dialect",
-    )
-    parser.add_argument(
         "--status",
         "-s",
         action="store_true",
@@ -300,22 +281,21 @@ def main():
     args = parser.parse_args()
 
     try:
-        dialect, db_url = detect_dialect(args.dialect)
+        db_url = get_db_url()
     except ValueError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
     if args.audit:
         from scripts.verify_schema_drift import audit_schema_drift
-
-        healthy = audit_schema_drift(dialect)
+        healthy = audit_schema_drift()
         sys.exit(0 if healthy else 1)
     elif args.status:
-        run_status(dialect, db_url)
+        run_status(db_url)
     elif args.rollback is not None:
-        run_rollback(dialect, db_url, steps=args.rollback, dry_run=args.dry_run)
+        run_rollback(db_url, steps=args.rollback, dry_run=args.dry_run)
     else:
-        run_migrations(dialect, db_url, dry_run=args.dry_run)
+        run_migrations(db_url, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

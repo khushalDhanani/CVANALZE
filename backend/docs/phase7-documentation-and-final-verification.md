@@ -93,7 +93,7 @@ Important deployment distinctions are explicit:
 - API and worker must use the same queue name and shared uploads volume.
 - The Compose stack provisions PostgreSQL/pgvector and Redis but not MSSQL or Ollama.
 - Production authentication fails closed until recruiter or administrator secrets are supplied.
-- PostgreSQL and MSSQL schema changes are release operations; the normal API/worker path does not migrate schemas.
+- PostgreSQL schema changes are release operations; the normal API/worker path does not migrate schemas.
 - Multi-host deployments must replace the host-local uploads bind mount with storage shared by API and workers.
 
 ## Remaining limitations and residual risks
@@ -148,7 +148,7 @@ and migrations remain pending. Migrations still require separate explicit author
 
 - Generate and deploy unique recruiter/administrator keys; rotate any credentials previously exposed through version control.
 - Replace the Compose PostgreSQL development password and configure explicit trusted origins.
-- Apply PostgreSQL and any enabled MSSQL migrations before starting production API/worker processes.
+- Apply PostgreSQL migrations before starting production API/worker processes.
 - Confirm API/worker queue names, Redis URL, parser/schema versions, models, and shared storage are identical.
 - Pull and validate the configured Ollama generation and embedding models, or disable their features deliberately.
 - Run the backend tests, Ruff, schema-drift verification, Compose validation/build, and authenticated endpoint smoke tests.

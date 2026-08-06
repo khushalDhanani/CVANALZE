@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Schema Integrity & Drift Detection Utility for CV Analyzer backend.
-Audits live database tables, columns, and migration checksums against expected schema definitions.
+Audits live PostgreSQL database tables, columns, and migration checksums against expected schema definitions.
 """
 
 import sys
@@ -17,13 +17,27 @@ if str(backend_dir) not in sys.path:
 
 from scripts.run_migrations import (
     compute_checksum,
-    detect_dialect,
+    get_db_url,
     get_applied_migrations,
     get_migration_files,
 )
 
 EXPECTED_CATALOG: dict[str, dict[str, list[str]]] = {
     "cvai": {
+        "cv_results": [
+            "cv_key",
+            "status",
+            "parsed_at",
+            "full_name",
+            "candidate_id",
+            "cv_id",
+            "cv_hash",
+            "resume_json",
+            "match_analysis",
+            "text_content",
+            "markdown_content",
+            "raw_data"
+        ],
         "cv_documents": [
             "id",
             "cv_hash",
@@ -78,33 +92,23 @@ EXPECTED_CATALOG: dict[str, dict[str, list[str]]] = {
         "stop_words": ["stopword_id", "word"],
         "scoring_profiles": ["profile_id", "profile_code", "profile_name"],
         "schema_migrations": ["migration_name"],
-    },
-    "default": {
-        "DepartmentDomainMaster": [
-            "Id",
-            "DomainName",
-            "Keywords",
-            "DefaultRoles",
-            "Priority",
-            "IsActive",
-        ],
-    },
+    }
 }
 
 
-def audit_schema_drift(dialect: str | None = None) -> bool:
+def audit_schema_drift() -> bool:
     """
-    Audits the database schema for drift, missing tables, missing columns, and checksum tampering.
+    Audits the PostgreSQL database schema for drift, missing tables, missing columns, and checksum tampering.
     Returns True if schema is healthy, False if drift detected.
     """
     try:
-        detected_dialect, db_url = detect_dialect(dialect)
+        db_url = get_db_url()
     except Exception as err:
         print(f"❌ Error detecting database: {err}")
         return False
 
     print("\n" + "=" * 80)
-    print(f"DATABASE SCHEMA INTEGRITY & DRIFT AUDIT ({detected_dialect.upper()})")
+    print(f"DATABASE SCHEMA INTEGRITY & DRIFT AUDIT (POSTGRESQL)")
     print("=" * 80)
 
     engine = create_engine(db_url)
@@ -112,18 +116,11 @@ def audit_schema_drift(dialect: str | None = None) -> bool:
 
     with engine.connect() as conn:
         # 1. Fetch all tables from DB
-        if detected_dialect == "mssql":
-            query_tables = text("""
-                SELECT TABLE_SCHEMA, TABLE_NAME 
-                FROM INFORMATION_SCHEMA.TABLES 
-                WHERE TABLE_TYPE = 'BASE TABLE'
-            """)
-        else:
-            query_tables = text("""
-                SELECT table_schema, table_name 
-                FROM information_schema.tables 
-                WHERE table_type = 'BASE TABLE'
-            """)
+        query_tables = text("""
+            SELECT table_schema, table_name 
+            FROM information_schema.tables 
+            WHERE table_type = 'BASE TABLE'
+        """)
 
         db_tables_rows = conn.execute(query_tables).fetchall()
         db_tables_by_schema: dict[str, set[str]] = {}
@@ -140,17 +137,9 @@ def audit_schema_drift(dialect: str | None = None) -> bool:
         for exp_schema, expected_tables in EXPECTED_CATALOG.items():
             for table_name, expected_cols in expected_tables.items():
                 table_found = False
-                if exp_schema == "default":
-                    # Check in dbo or public or root
-                    for candidate_schema in ["dbo", "public", "cvai"]:
-                        if candidate_schema in db_tables_by_schema:
-                            if table_name in db_tables_by_schema[candidate_schema] or table_name.lower() in db_tables_by_schema[candidate_schema]:
-                                table_found = True
-                                break
-                else:
-                    if exp_schema in db_tables_by_schema:
-                        if table_name in db_tables_by_schema[exp_schema] or table_name.lower() in db_tables_by_schema[exp_schema]:
-                            table_found = True
+                if exp_schema in db_tables_by_schema:
+                    if table_name in db_tables_by_schema[exp_schema] or table_name.lower() in db_tables_by_schema[exp_schema]:
+                        table_found = True
 
                 if not table_found:
                     issue = f"MISSING TABLE: Table '{exp_schema}.{table_name}' was not found in database."
@@ -160,9 +149,9 @@ def audit_schema_drift(dialect: str | None = None) -> bool:
 
                 # Fetch columns for existing table
                 query_cols = text("""
-                    SELECT COLUMN_NAME 
-                    FROM INFORMATION_SCHEMA.COLUMNS 
-                    WHERE TABLE_NAME = :table_name
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = :table_name
                 """)
                 cols_rows = conn.execute(query_cols, {"table_name": table_name}).fetchall()
                 actual_cols = {c[0].lower() for c in cols_rows}
@@ -179,7 +168,7 @@ def audit_schema_drift(dialect: str | None = None) -> bool:
         print("\n🔍 Phase 2: Auditing Migration Script Checksums...")
         try:
             applied = get_applied_migrations(conn)
-            local_files = get_migration_files(detected_dialect, mode="up")
+            local_files = get_migration_files(mode="up")
 
             for file_path in local_files:
                 version = file_path.name.split("_")[0]
@@ -216,8 +205,7 @@ def audit_schema_drift(dialect: str | None = None) -> bool:
 
 
 def main():
-    dialect_arg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
-    healthy = audit_schema_drift(dialect_arg)
+    healthy = audit_schema_drift()
     sys.exit(0 if healthy else 1)
 
 

@@ -45,7 +45,7 @@ Key boundaries are intentionally centralized:
 - `backend/app/schemas/` owns legacy-compatible API models and typed normalized resume/job contexts.
 - `backend/app/services/` owns upload, extraction, matching, scoring, queueing, Ollama, embedding, search, recommendations, and synchronization workflows.
 - `backend/app/repositories/` owns jobs, results, processing records, cache data, and training data.
-- `backend/scripts/migrations/` contains explicit PostgreSQL and MSSQL migrations; production startup never mutates schemas.
+- `backend/scripts/migrations/` contains explicit PostgreSQL migrations; production startup never mutates schemas. MSSQL is considered a static read-only enterprise source and is never migrated.
 
 ## API access model
 
@@ -254,11 +254,10 @@ cd backend
 uv sync --frozen
 ```
 
-Run the explicit migration for each configured database:
+Run the explicit migration for the PostgreSQL database:
 
 ```bash
-uv run python scripts/run_migrations.py --dialect postgres
-uv run python scripts/run_migrations.py --dialect mssql
+uv run python scripts/run_migrations.py
 ```
 
 Start the API and worker in separate terminals from `backend/` so they share the same configured paths:
@@ -300,8 +299,7 @@ docker compose up -d api worker
 The API and worker share `backend/uploads`, use the same queue and service configuration, wait for healthy Redis/PostgreSQL, and restart unless stopped. The worker
 must retain access to that shared volume because RQ payloads contain only job IDs. The Compose stack expects Ollama on the Docker host by default.
 
-Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `DB_*` variables to the API/worker through a deployment override and run the MSSQL
-migration command as a separate release step.
+Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `MSSQL_READ_ONLY_URL` to the API/worker through a deployment override.
 
 ### Lightweight Docker on Apple Silicon
 
