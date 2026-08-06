@@ -87,7 +87,7 @@ class SystemRule(PostgresAppBase):
     component_id = Column(Integer, ForeignKey("cvai.rule_components.id", ondelete="CASCADE"), nullable=False)
     rule_type = Column(String(50), nullable=False)
     rule_name = Column(String(100), nullable=False)
-    target_value = Column(String(255), nullable=True)
+    target_value = Column(Text, nullable=True)
 
     component = relationship("RuleComponent", back_populates="system_rules")
     conditions = relationship("RuleCondition", back_populates="rule", cascade="all, delete-orphan")

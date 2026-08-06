@@ -415,21 +415,17 @@ class RuleConfigManager:
     def _hydrate_profile(cls, profile) -> dict[str, Any]:
         """Convert normalized DB rows back to UnifiedRuleConfig JSON structure."""
         
-        # Initialize empty structure to be populated from DB
-        base_dict = {}
+        base_dict: dict[str, Any] = {}
 
         base_dict["version"] = profile.version_tag
         base_dict["description"] = profile.description or ""
         base_dict["last_updated"] = profile.updated_at.isoformat()
         
-        # Override with DB values
         for comp in profile.components:
             if comp.component_type == "global_tiers":
-                # Ensure global_confidence_tiers exists in dict
                 if "global_confidence_tiers" not in base_dict:
                     base_dict["global_confidence_tiers"] = {}
                     
-                # Reconstruct tier names dynamically from threshold keys (e.g. HIGH_min)
                 tier_names = {t.threshold_key.replace("_min", "").replace("_max", "") for t in comp.thresholds}
                 for t_name in tier_names:
                     min_val = next((t.threshold_value for t in comp.thresholds if t.threshold_key == f"{t_name}_min"), 0.0)
@@ -441,58 +437,75 @@ class RuleConfigManager:
                     base_dict["fields"] = {}
                 f_name = comp.component_name
                 
-                # We start with existing dict to keep description, or create empty
-                field_dict = base_dict["fields"].get(f_name, {
+                field_dict: dict[str, Any] = {
                     "field_name": f_name,
                     "description": "",
                     "confidence_scoring": {},
                     "tier_thresholds": {},
                     "downstream_gates": {},
                     "keywords": {}
-                })
-                
+                }
+
+                # Thresholds → tier_thresholds and downstream_gates
+                tier_keys = {"high_min", "medium_min", "low_min"}
+                gate_threshold_key = "min_acceptance_confidence"
+                gate_bool_keys = {"reject_email_fallback_as_unverified", "require_gazetteer_for_high"}
+                gate_int_keys = {"max_word_count", "max_char_length"}
+
+                for t in comp.thresholds:
+                    if t.threshold_key in tier_keys:
+                        field_dict["tier_thresholds"][t.threshold_key] = t.threshold_value
+                    elif t.threshold_key == gate_threshold_key:
+                        field_dict["downstream_gates"][t.threshold_key] = t.threshold_value
+                    elif t.threshold_key in gate_bool_keys:
+                        field_dict["downstream_gates"][t.threshold_key] = t.threshold_value >= 0.5
+                    elif t.threshold_key in gate_int_keys:
+                        field_dict["downstream_gates"][t.threshold_key] = int(t.threshold_value)
+
+                # Weights → confidence_scoring
                 for w in comp.weights:
                     if w.weight_key.startswith("confidence_"):
                         field_dict["confidence_scoring"][w.weight_key.replace("confidence_", "")] = w.weight_value
                         
-                for t in comp.thresholds:
-                    if t.threshold_key in ("high_min", "medium_min", "low_min"):
-                        field_dict["tier_thresholds"][t.threshold_key] = t.threshold_value
-                    if t.threshold_key == "min_acceptance_confidence":
-                        field_dict["downstream_gates"][t.threshold_key] = t.threshold_value
-                        
+                # System rules → keywords, description, override_reason
                 for r in comp.system_rules:
                     if r.rule_type == "keywords":
                         for c in r.conditions:
                             field_dict["keywords"][c.condition_scope] = [v.value for v in c.values]
+                    elif r.rule_type == "field_meta":
+                        if r.rule_name == "description" and r.target_value:
+                            field_dict["description"] = r.target_value
+                        elif r.rule_name == "override_reason" and r.target_value:
+                            field_dict["tier_thresholds"]["override_reason"] = r.target_value
                             
                 base_dict["fields"][f_name] = field_dict
                 
             elif comp.component_type == "scoring":
                 if "scoring" not in base_dict:
-                    base_dict["scoring"] = {"match": {}, "prefilter": {}, "taxonomy": {}, "resume_quality": {}}
+                    base_dict["scoring"] = {}
                     
                 c_name = comp.component_name
                 
                 if c_name == "match":
-                    match_dict = base_dict["scoring"].get("match", {})
+                    match_dict: dict[str, Any] = base_dict["scoring"].get("match", {})
                     if "scoring_parameters" not in match_dict:
                         match_dict["scoring_parameters"] = {}
                     
-                    # scoring_parameters weights
-                    comp_weights = {}
+                    # Weights → scoring_parameters + component_weights
+                    comp_weights: dict[str, float] = {}
                     for w in comp.weights:
-                        if "_" in w.weight_key and not w.weight_key.startswith("llm_"):
-                            # This might be a nested component weight like role_skills, but scoring_parameters is flat
-                            # We just assign it if we don't know it's a component weight, but we know component_weights are nested in pydantic
-                            # However, create_profile flattens component_weights with underscore!
-                            # Let's map it back based on create_profile logic: f"{k}_{sub_k}"
-                            pass
-                        match_dict["scoring_parameters"][w.weight_key] = w.weight_value
-                        
+                        if w.weight_key.startswith("component_weights_"):
+                            comp_weights[w.weight_key.replace("component_weights_", "")] = w.weight_value
+                        else:
+                            match_dict["scoring_parameters"][w.weight_key] = w.weight_value
+                    if comp_weights:
+                        match_dict["scoring_parameters"]["component_weights"] = comp_weights
+
+                    # Thresholds → scoring_parameters
                     for t in comp.thresholds:
                         match_dict["scoring_parameters"][t.threshold_key] = t.threshold_value
                     
+                    # Penalties → cross_domain_guard or scoring_parameters
                     for p in comp.penalties:
                         if p.penalty_key in ("domain_mismatch_multiplier", "domain_mismatch_score_cap", "mandatory_failure_score_impact"):
                             if "cross_domain_guard" not in match_dict:
@@ -500,16 +513,8 @@ class RuleConfigManager:
                             match_dict["cross_domain_guard"][p.penalty_key] = p.penalty_value
                         else:
                             match_dict["scoring_parameters"][p.penalty_key] = p.penalty_value
-                            
-                    # Extract component weights
-                    comp_weights = {}
-                    for w in comp.weights:
-                        if w.weight_key.startswith("component_weights_"):
-                            comp_weights[w.weight_key.replace("component_weights_", "")] = w.weight_value
-                    if comp_weights:
-                        match_dict["scoring_parameters"]["component_weights"] = comp_weights
 
-                    # Extract cross_domain_guard keywords
+                    # System rules
                     for r in comp.system_rules:
                         if r.rule_type == "cross_domain_guard":
                             cdg = match_dict.get("cross_domain_guard", {})
@@ -527,10 +532,42 @@ class RuleConfigManager:
                                     cdg["domain_guard_terms"][c.condition_scope.replace("domain_guard_", "")] = kws
                             match_dict["cross_domain_guard"] = cdg
 
+                        elif r.rule_type == "fallback_defaults":
+                            parts = (r.target_value or "::").split("::")
+                            fb: dict[str, Any] = {
+                                "recommended_department": parts[0] if parts else "",
+                                "professional_domain": parts[1] if len(parts) > 1 else "",
+                                "suitable_roles": [],
+                            }
+                            for c in r.conditions:
+                                if c.condition_scope == "suitable_roles":
+                                    fb["suitable_roles"] = [v.value for v in c.values]
+                            match_dict["fallback_defaults"] = fb
+
+                        elif r.rule_type == "match_denylists":
+                            for c in r.conditions:
+                                match_dict[c.condition_scope] = [v.value for v in c.values]
+
+                        elif r.rule_type == "term_matching":
+                            tm: dict[str, Any] = {"stop_phrases": [], "noise_words": [], "aliases": {}}
+                            for c in r.conditions:
+                                if c.condition_scope == "stop_phrases":
+                                    tm["stop_phrases"] = [v.value for v in c.values]
+                                elif c.condition_scope == "noise_words":
+                                    tm["noise_words"] = [v.value for v in c.values]
+                                elif c.condition_scope.startswith("alias_"):
+                                    alias_key = c.condition_scope.replace("alias_", "")
+                                    tm["aliases"][alias_key] = [v.value for v in c.values]
+                            match_dict["term_matching"] = tm
+
+                        elif r.rule_type == "recommendations":
+                            if r.target_value:
+                                match_dict["recommendations"] = json.loads(r.target_value)
+
                     base_dict["scoring"]["match"] = match_dict
                     
                 elif c_name == "prefilter":
-                    pref_dict = base_dict["scoring"].get("prefilter", {})
+                    pref_dict: dict[str, Any] = base_dict["scoring"].get("prefilter", {})
                     if "lexical_weights" not in pref_dict:
                         pref_dict["lexical_weights"] = {}
                     for w in comp.weights:
@@ -546,42 +583,60 @@ class RuleConfigManager:
                     base_dict["scoring"]["prefilter"] = pref_dict
                     
                 elif c_name == "taxonomy":
-                    tax_dict = base_dict["scoring"].get("taxonomy", {})
+                    tax_dict: dict[str, Any] = base_dict["scoring"].get("taxonomy", {})
                     vac_rules = []
                     cand_rules = []
                     for r in comp.system_rules:
-                        if not r.target_value:
-                            continue
-                        parts = r.target_value.split("::")
-                        domain = parts[0]
-                        families = parts[1].split(",") if len(parts) > 1 else []
-                        
-                        rule_obj = {
-                            "name": r.rule_name,
-                            "domain": domain,
-                            "branches": [{"conditions": []}]
-                        }
-                        for c in r.conditions:
-                            rule_obj["branches"][0]["conditions"].append({
-                                "scope": c.condition_scope,
-                                "mode": c.condition_mode,
-                                "negate": c.is_negated,
-                                "keywords": [v.value for v in c.values]
-                            })
+                        if r.rule_type == "taxonomy_defaults":
+                            parts = (r.target_value or "::").split("::")
+                            tax_dict["default_domain"] = parts[0] if parts else "General Operations"
+                            tax_dict["default_family"] = parts[1] if len(parts) > 1 else "General Professional"
+                            for c in r.conditions:
+                                if c.condition_scope == "canonical_domains":
+                                    tax_dict["canonical_domains"] = [v.value for v in c.values]
+                                elif c.condition_scope == "canonical_families":
+                                    tax_dict["canonical_families"] = [v.value for v in c.values]
+
+                        elif r.rule_type == "taxonomy_compatibility":
+                            if r.target_value:
+                                tax_dict["compatibility_map"] = json.loads(r.target_value)
+
+                        elif r.rule_type in ("vacancy_taxonomy", "candidate_taxonomy"):
+                            if not r.target_value:
+                                continue
+                            parts = r.target_value.split("::")
+                            domain = parts[0]
+                            families = parts[1].split(",") if len(parts) > 1 else []
                             
-                        if r.rule_type == "vacancy_taxonomy":
-                            rule_obj["family"] = families[0] if families else ""
-                            vac_rules.append(rule_obj)
-                        elif r.rule_type == "candidate_taxonomy":
-                            rule_obj["families"] = families
-                            cand_rules.append(rule_obj)
-                            
+                            rule_name = r.rule_name
+                            if r.rule_type == "candidate_taxonomy" and rule_name.startswith("cand_"):
+                                rule_name = rule_name[5:]
+                            rule_obj: dict[str, Any] = {
+                                "name": rule_name,
+                                "domain": domain,
+                                "branches": [{"conditions": []}]
+                            }
+                            for c in r.conditions:
+                                rule_obj["branches"][0]["conditions"].append({
+                                    "scope": c.condition_scope,
+                                    "mode": c.condition_mode,
+                                    "negate": c.is_negated,
+                                    "keywords": [v.value for v in c.values]
+                                })
+                                
+                            if r.rule_type == "vacancy_taxonomy":
+                                rule_obj["family"] = families[0] if families else ""
+                                vac_rules.append(rule_obj)
+                            elif r.rule_type == "candidate_taxonomy":
+                                rule_obj["families"] = families
+                                cand_rules.append(rule_obj)
+
                     tax_dict["vacancy_rules"] = vac_rules
                     tax_dict["candidate_rules"] = cand_rules
                     base_dict["scoring"]["taxonomy"] = tax_dict
                     
                 elif c_name == "resume_quality":
-                    rq_dict = base_dict["scoring"].get("resume_quality", {})
+                    rq_dict: dict[str, Any] = base_dict["scoring"].get("resume_quality", {})
                     if "contact_weights" not in rq_dict:
                         rq_dict["contact_weights"] = {}
                     for w in comp.weights:
@@ -591,7 +646,33 @@ class RuleConfigManager:
                             rq_dict["contact_weights"][w.weight_key.replace("contact_", "")] = w.weight_value
                     for t in comp.thresholds:
                         rq_dict[t.threshold_key] = t.threshold_value
+
+                    for r in comp.system_rules:
+                        if r.rule_type == "resume_quality_meta":
+                            if r.rule_name == "core_sections":
+                                for c in r.conditions:
+                                    if c.condition_scope == "core_sections":
+                                        rq_dict["core_sections"] = [v.value for v in c.values]
+                            elif r.rule_name == "section_patterns" and r.target_value:
+                                rq_dict["section_patterns"] = json.loads(r.target_value)
+                            elif r.rule_name == "density_scores" and r.target_value:
+                                rq_dict["density_scores"] = json.loads(r.target_value)
+                            elif r.rule_name == "heading_normalization" and r.target_value:
+                                rq_dict["heading_normalization"] = json.loads(r.target_value)
+
                     base_dict["scoring"]["resume_quality"] = rq_dict
+
+                elif c_name == "domain_embedding":
+                    de_dict: dict[str, Any] = base_dict["scoring"].get("domain_embedding", {})
+                    for r in comp.system_rules:
+                        if r.rule_type == "domain_embedding_meta":
+                            if r.rule_name == "categories":
+                                for c in r.conditions:
+                                    if c.condition_scope == "categories":
+                                        de_dict["categories"] = [v.value for v in c.values]
+                            elif r.rule_name == "canonical_equivalents" and r.target_value:
+                                de_dict["canonical_equivalents"] = json.loads(r.target_value)
+                    base_dict["scoring"]["domain_embedding"] = de_dict
 
         return base_dict
 
