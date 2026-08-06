@@ -11,7 +11,10 @@
 - Removed `migrations/mssql` folder.
 - Configured Alembic `env.py` to reject `--dialect mssql`.
 - Created robust read-only `before_flush` listeners for `MssqlReadBase`.
-- Created robust test coverage proving MSSQL cannot be written to.
+- Intercepted raw SQL queries via SQLAlchemy `before_cursor_execute` to permanently block DML and DDL.
+- Added strict internal guards to `run_migrations.py` to reject any execution of the `mssql` dialect.
+- Validated application startup to immediately throw a `RuntimeError` if the configured MSSQL account contains any write permissions.
+- Created robust test coverage proving MSSQL cannot be written to via ORM, raw text, or migration runner.
 
 ### PR 3 — Repair configuration loading
 - Replaced non-existent `SessionLocal` with `PostgresAppSession` in `RuleConfigManager`.

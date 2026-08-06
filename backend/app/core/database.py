@@ -43,6 +43,12 @@ if MssqlReadSession:
         if session.new or session.dirty or session.deleted:
             raise RuntimeError("MSSQL database is read-only. Writes are permanently disabled.")
 
+    @event.listens_for(mssql_read_engine, "before_cursor_execute")
+    def block_mssql_raw_writes(conn, cursor, statement, parameters, context, executemany):
+        stmt = statement.strip().upper()
+        if stmt.startswith(("INSERT", "UPDATE", "DELETE", "ALTER", "CREATE", "DROP")):
+            raise RuntimeError("MSSQL database is read-only. Raw DML/DDL statements are permanently disabled.")
+
 
 def get_mssql_read_db():
     """

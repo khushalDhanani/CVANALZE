@@ -38,8 +38,10 @@ def get_db_url() -> str:
     return settings.POSTGRES_APP_URL
 
 
-def ensure_migrations_table(conn):
+def ensure_migrations_table(conn, dialect: str = "postgres"):
     """Ensures cvai.schema_migrations tracking table exists in the target database."""
+    if dialect.lower() == "mssql":
+        raise ValueError("MSSQL dialect is permanently disabled.")
     conn.execute(text("CREATE SCHEMA IF NOT EXISTS cvai;"))
     conn.execute(
         text("""
@@ -68,12 +70,14 @@ def get_applied_migrations(conn) -> dict[str, dict[str, Any]]:
     return applied
 
 
-def get_migration_files(mode: str = "up") -> list[Path]:
+def get_migration_files(mode: str = "up", dialect: str = "postgres") -> list[Path]:
     """
     Returns sorted list of .sql migration files for postgres.
     mode='up' returns forward migrations (excluding *_down.sql).
     mode='down' returns rollback migrations (only *_down.sql).
     """
+    if dialect.lower() == "mssql":
+        raise ValueError("MSSQL dialect is permanently disabled.")
     migrations_dir = script_dir / "migrations" / "postgres"
     if not migrations_dir.exists():
         raise FileNotFoundError(f"Migrations directory not found: {migrations_dir}")
@@ -85,8 +89,10 @@ def get_migration_files(mode: str = "up") -> list[Path]:
     return files
 
 
-def run_status(db_url: str):
+def run_status(db_url: str, dialect: str = "postgres"):
     """Displays migration status table in terminal."""
+    if dialect.lower() == "mssql":
+        raise ValueError("MSSQL dialect is permanently disabled.")
     engine = create_engine(db_url)
     up_files = get_migration_files(mode="up")
     down_files = get_migration_files(mode="down")
@@ -121,8 +127,10 @@ def run_status(db_url: str):
     print("=" * 85 + "\n")
 
 
-def run_migrations(db_url: str, dry_run: bool = False):
+def run_migrations(db_url: str, dry_run: bool = False, dialect: str = "postgres"):
     """Executes pending database migrations."""
+    if dialect.lower() == "mssql":
+        raise ValueError("MSSQL dialect is permanently disabled.")
     engine = create_engine(db_url)
     files = get_migration_files(mode="up")
 
@@ -187,8 +195,10 @@ def run_migrations(db_url: str, dry_run: bool = False):
         print(f"\n🎉 [MIGRATIONS COMPLETE] Successfully applied {pending_count} migration(s).")
 
 
-def run_rollback(db_url: str, steps: str = "1", dry_run: bool = False):
+def run_rollback(db_url: str, steps: str = "1", dry_run: bool = False, dialect: str = "postgres"):
     """Rolls back applied migrations in reverse order using *_down.sql scripts."""
+    if dialect.lower() == "mssql":
+        raise ValueError("MSSQL dialect is permanently disabled.")
     engine = create_engine(db_url)
     down_files = get_migration_files(mode="down")
     down_map = {f.name.replace("_down.sql", ".sql"): f for f in down_files}

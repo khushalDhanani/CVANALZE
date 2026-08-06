@@ -149,9 +149,12 @@ def verify_mssql_readonly() -> None:
             with mssql_read_engine.connect() as conn:
                 result = conn.execute(text("SELECT permission_name FROM fn_my_permissions(NULL, 'DATABASE')"))
                 permissions = {row[0].upper() for row in result}
-                forbidden = {"INSERT", "UPDATE", "DELETE", "CREATE TABLE", "DROP TABLE"}
-                if permissions.intersection(forbidden):
+                forbidden_prefixes = ("INSERT", "UPDATE", "DELETE", "ALTER", "CREATE", "DROP")
+                
+                if any(p.startswith(forbidden_prefixes) for p in permissions):
                     logger.error("[STARTUP] SECURITY WARNING: MSSQL connection has write permissions! This application expects a read-only credential.")
                     raise RuntimeError("SECURITY WARNING: MSSQL connection has write permissions! This application expects a read-only credential.")
+        except RuntimeError:
+            raise
         except Exception as exc:
             logger.warning(f"[STARTUP] Could not verify MSSQL read-only permissions: {type(exc).__name__}")
