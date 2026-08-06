@@ -5,7 +5,14 @@ from sqlalchemy import select
 from app.models.mssql.vacancy import (
     RecruitVacancyRequest,
     RecruitVacancyRequriedQualificationDet,
+    RecruitVacancyRequestTrack,
+    RecruitVacancyCandidateList,
+    RecruitVacancyCandidiateHistoryDet
 )
+from app.models.mssql.organization import OrgJobProfileMst, JobProfileDomainKnowledgeDet
+from app.models.mssql.taxonomy import QualificationMst, TransactionStatusMst, RecruitDomainKnowledgeMst
+from app.models.mssql.candidate import RecruitCandidateMst
+
 
 class VacancySourceRepository:
     def __init__(self, db: Session):
@@ -16,6 +23,7 @@ class VacancySourceRepository:
             select(
                 RecruitVacancyRequest.VacancyRequestID,
                 RecruitVacancyRequest.JobProfileID,
+                OrgJobProfileMst.JobProfileName,
                 RecruitVacancyRequest.RequestForCompID,
                 RecruitVacancyRequest.RequestForDeptID,
                 RecruitVacancyRequest.RequestForLocationID,
@@ -30,7 +38,14 @@ class VacancySourceRepository:
                 RecruitVacancyRequest.VacancyRequestIsDeleted,
                 RecruitVacancyRequest.VacancyRequestClose,
                 RecruitVacancyRequest.VacancyRequestIsForceClosed,
-                RecruitVacancyRequest.RequestStatusID
+                RecruitVacancyRequest.RequestStatusID,
+                TransactionStatusMst.StatusDesc
+            )
+            .outerjoin(
+                OrgJobProfileMst, RecruitVacancyRequest.JobProfileID == OrgJobProfileMst.JobProfileID
+            )
+            .outerjoin(
+                TransactionStatusMst, RecruitVacancyRequest.RequestStatusID == TransactionStatusMst.StatusID
             )
             .where(RecruitVacancyRequest.VacancyRequestID == vacancy_id)
         )
@@ -39,36 +54,122 @@ class VacancySourceRepository:
             return None
             
         (
-            v_id, jp_id, comp_id, dept_id, loc_id, desig_id,
+            v_id, jp_id, jp_name, comp_id, dept_id, loc_id, desig_id,
             exp_from, exp_to, ctc_from, ctc_to,
             add_know, gender, is_active, is_deleted, is_closed,
-            is_force_closed, status_id
+            is_force_closed, status_id, status_name
         ) = row
 
-        q_stmt = select(RecruitVacancyRequriedQualificationDet.RequriedQualificationID).where(
+        # Required Qualifications
+        q_stmt = select(
+            RecruitVacancyRequriedQualificationDet.RequriedQualificationID,
+            QualificationMst.QualificationName
+        ).outerjoin(
+            QualificationMst, RecruitVacancyRequriedQualificationDet.RequriedQualificationID == QualificationMst.QualificationID
+        ).where(
             RecruitVacancyRequriedQualificationDet.VacancyRequestID == vacancy_id
         )
-        qualifications = [q for q, in self.db.execute(q_stmt).all() if q is not None]
+        qualifications = [
+            {"qualification_id": r.RequriedQualificationID, "name": r.QualificationName}
+            for r in self.db.execute(q_stmt).all() if r.RequriedQualificationID is not None
+        ]
 
-        from app.models.mssql.vacancy import RecruitVacancyRequestTrack, RecruitVacancyCandidateList, RecruitVacancyCandidiateHistoryDet
+        # Job Profile Domains
+        domains = []
+        if jp_id:
+            d_stmt = select(
+                JobProfileDomainKnowledgeDet.DomainKnowlgID,
+                RecruitDomainKnowledgeMst.DomainKnowlgName
+            ).outerjoin(
+                RecruitDomainKnowledgeMst, JobProfileDomainKnowledgeDet.DomainKnowlgID == RecruitDomainKnowledgeMst.DomainKnowlgID
+            ).where(
+                JobProfileDomainKnowledgeDet.JobProfileID == jp_id,
+                JobProfileDomainKnowledgeDet.JobProfileDomainKnowledgeDetIsActive == True
+            )
+            domains = [
+                {"domain_id": r.DomainKnowlgID, "name": r.DomainKnowlgName}
+                for r in self.db.execute(d_stmt).all() if r.DomainKnowlgID is not None
+            ]
 
-        track_stmt = select(RecruitVacancyRequestTrack.VacancyTrackID).where(
+        # Request Tracking
+        track_stmt = select(
+            RecruitVacancyRequestTrack.VacancyTrackID,
+            RecruitVacancyRequestTrack.VacancyReqStatusID,
+            TransactionStatusMst.StatusDesc,
+            RecruitVacancyRequestTrack.VacancyReqRemark
+        ).outerjoin(
+            TransactionStatusMst, RecruitVacancyRequestTrack.VacancyReqStatusID == TransactionStatusMst.StatusID
+        ).where(
             RecruitVacancyRequestTrack.VacancyRequestID == vacancy_id,
             RecruitVacancyRequestTrack.VacancyReqIsDeleted == False
         )
-        request_track = [t for t, in self.db.execute(track_stmt).all() if t is not None]
+        request_track = [
+            {
+                "track_id": r.VacancyTrackID,
+                "status_id": r.VacancyReqStatusID,
+                "status_name": r.StatusDesc,
+                "remark": r.VacancyReqRemark
+            }
+            for r in self.db.execute(track_stmt).all()
+        ]
 
-        history_stmt = select(RecruitVacancyCandidiateHistoryDet.VacancyAppliedHistoryID).join(
-            RecruitVacancyCandidateList,
-            RecruitVacancyCandidiateHistoryDet.VacancyCandidateID == RecruitVacancyCandidateList.VacancyCandidateID
+        # Candidate Applications
+        cand_stmt = select(
+            RecruitVacancyCandidateList.VacancyCandidateID,
+            RecruitVacancyCandidateList.CandidateID,
+            RecruitCandidateMst.CandidateFirstName,
+            RecruitCandidateMst.CandidateLastName,
+            RecruitVacancyCandidateList.StatusID,
+            TransactionStatusMst.StatusDesc,
+            RecruitVacancyCandidateList.HRRemarks
+        ).outerjoin(
+            RecruitCandidateMst, RecruitVacancyCandidateList.CandidateID == RecruitCandidateMst.CandidateID
+        ).outerjoin(
+            TransactionStatusMst, RecruitVacancyCandidateList.StatusID == TransactionStatusMst.StatusID
         ).where(
             RecruitVacancyCandidateList.VacancyRequestID == vacancy_id
         )
-        candidate_history = [h for h, in self.db.execute(history_stmt).all() if h is not None]
+        applications = [
+            {
+                "application_id": r.VacancyCandidateID,
+                "candidate_id": r.CandidateID,
+                "candidate_first_name": r.CandidateFirstName,
+                "candidate_last_name": r.CandidateLastName,
+                "status_id": r.StatusID,
+                "status_name": r.StatusDesc,
+                "hr_remarks": r.HRRemarks
+            }
+            for r in self.db.execute(cand_stmt).all()
+        ]
+
+        # Candidate History
+        history_stmt = select(
+            RecruitVacancyCandidiateHistoryDet.VacancyAppliedHistoryID,
+            RecruitVacancyCandidiateHistoryDet.VacancyCandidateID,
+            RecruitVacancyCandidiateHistoryDet.StatusID,
+            TransactionStatusMst.StatusDesc,
+            RecruitVacancyCandidiateHistoryDet.StatusDT
+        ).join(
+            RecruitVacancyCandidateList,
+            RecruitVacancyCandidiateHistoryDet.VacancyCandidateID == RecruitVacancyCandidateList.VacancyCandidateID
+        ).outerjoin(
+            TransactionStatusMst, RecruitVacancyCandidiateHistoryDet.StatusID == TransactionStatusMst.StatusID
+        ).where(
+            RecruitVacancyCandidateList.VacancyRequestID == vacancy_id
+        )
+        candidate_history = [
+            {
+                "history_id": r.VacancyAppliedHistoryID,
+                "application_id": r.VacancyCandidateID,
+                "status_id": r.StatusID,
+                "status_name": r.StatusDesc,
+                "status_date": str(r.StatusDT) if r.StatusDT else None
+            }
+            for r in self.db.execute(history_stmt).all()
+        ]
 
         return {
             "vacancy_id": v_id,
-            "job_profile_id": jp_id,
             "company_id": comp_id,
             "department_id": dept_id,
             "location_id": loc_id,
@@ -83,9 +184,17 @@ class VacancySourceRepository:
             "is_deleted": is_deleted,
             "is_closed": is_closed,
             "is_force_closed": is_force_closed,
-            "status_id": status_id,
-            "qualifications": qualifications,
+            "status": {
+                "id": status_id,
+                "name": status_name
+            } if status_id else None,
+            "job_profile": {
+                "id": jp_id,
+                "name": jp_name,
+                "domains": domains
+            } if jp_id else None,
+            "required_qualifications": qualifications,
             "request_track": request_track,
-            "candidate_history": candidate_history,
-            "domains": []
+            "candidate_applications": applications,
+            "candidate_history": candidate_history
         }

@@ -5,8 +5,13 @@ from sqlalchemy import select
 from app.models.mssql.organization import (
     OrgJobProfileMst,
     OrgJobProfileQualificationDet,
-    JobProfileDomainKnowledgeDet
+    JobProfileDomainKnowledgeDet,
+    OrgCompanyMst,
+    OrgDepartmentMst,
+    OrgDesignationMst
 )
+from app.models.mssql.taxonomy import QualificationMst, RecruitDomainKnowledgeMst
+
 
 class JobProfileSourceRepository:
     def __init__(self, db: Session):
@@ -19,10 +24,16 @@ class JobProfileSourceRepository:
                 OrgJobProfileMst.JobProfileName,
                 OrgJobProfileMst.JobProfileDesc,
                 OrgJobProfileMst.CompID,
+                OrgCompanyMst.CompName,
                 OrgJobProfileMst.DeptID,
+                OrgDepartmentMst.DeptName,
                 OrgJobProfileMst.DesigID,
+                OrgDesignationMst.DesigName,
                 OrgJobProfileMst.JobProfileIsActive
             )
+            .outerjoin(OrgCompanyMst, OrgJobProfileMst.CompID == OrgCompanyMst.CompID)
+            .outerjoin(OrgDepartmentMst, OrgJobProfileMst.DeptID == OrgDepartmentMst.DeptID)
+            .outerjoin(OrgDesignationMst, OrgJobProfileMst.DesigID == OrgDesignationMst.DesigID)
             .where(OrgJobProfileMst.JobProfileID == job_profile_id)
         )
         row = self.db.execute(stmt).first()
@@ -30,29 +41,57 @@ class JobProfileSourceRepository:
             return None
             
         (
-            jp_id, name, desc, comp_id, dept_id, desig_id, is_active
+            jp_id, name, desc, comp_id, comp_name, dept_id, dept_name,
+            desig_id, desig_name, is_active
         ) = row
 
-        q_stmt = select(OrgJobProfileQualificationDet.QualificationID).where(
+        # Required Qualifications
+        q_stmt = select(
+            OrgJobProfileQualificationDet.QualificationID,
+            QualificationMst.QualificationName
+        ).outerjoin(
+            QualificationMst, OrgJobProfileQualificationDet.QualificationID == QualificationMst.QualificationID
+        ).where(
             OrgJobProfileQualificationDet.JobProfileID == job_profile_id,
             OrgJobProfileQualificationDet.QualificationIsDeleted == False
         )
-        qualifications = [q for q, in self.db.execute(q_stmt).all() if q is not None]
+        qualifications = [
+            {"qualification_id": r.QualificationID, "name": r.QualificationName}
+            for r in self.db.execute(q_stmt).all() if r.QualificationID is not None
+        ]
 
-        d_stmt = select(JobProfileDomainKnowledgeDet.DomainKnowlgID).where(
+        # Domains
+        d_stmt = select(
+            JobProfileDomainKnowledgeDet.DomainKnowlgID,
+            RecruitDomainKnowledgeMst.DomainKnowlgName
+        ).outerjoin(
+            RecruitDomainKnowledgeMst, JobProfileDomainKnowledgeDet.DomainKnowlgID == RecruitDomainKnowledgeMst.DomainKnowlgID
+        ).where(
             JobProfileDomainKnowledgeDet.JobProfileID == job_profile_id,
             JobProfileDomainKnowledgeDet.JobProfileDomainKnowledgeDetIsActive == True
         )
-        domains = [d for d, in self.db.execute(d_stmt).all() if d is not None]
+        domains = [
+            {"domain_id": r.DomainKnowlgID, "name": r.DomainKnowlgName}
+            for r in self.db.execute(d_stmt).all() if r.DomainKnowlgID is not None
+        ]
 
         return {
             "job_profile_id": jp_id,
             "name": name,
             "description": desc,
-            "company_id": comp_id,
-            "department_id": dept_id,
-            "designation_id": desig_id,
             "is_active": is_active,
+            "company": {
+                "id": comp_id,
+                "name": comp_name
+            } if comp_id else None,
+            "department": {
+                "id": dept_id,
+                "name": dept_name
+            } if dept_id else None,
+            "designation": {
+                "id": desig_id,
+                "name": desig_name
+            } if desig_id else None,
             "qualifications": qualifications,
             "domains": domains
         }

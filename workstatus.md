@@ -107,6 +107,11 @@
 - [x] **Vacancy Aggregates:** Verified unsupported active/deleted metadata fields against qualifications were removed, strictly asserting `RequriedQualificationID`.
 - [x] **Job Profile Aggregates:** Verified exact attribute access for `OrgJobProfileQualificationDet` (`QualificationIsDeleted`) and `JobProfileDomainKnowledgeDet` (`DomainKnowlgID`, `JobProfileDomainKnowledgeDetIsActive`).
 
+### PR5 and PR6 — MSSQL Aggregate Completion
+- [x] **Candidate Aggregate:** Rewrote `get_candidate_aggregate` to use `.outerjoin` blocks against `OrgJobProfileMst`, `RecruitDomainKnowledgeMst`, `RecruitSkillMst`, `LanguageMst`, and `OrgLocationMst`. The payload now returns a fully structured nested dictionary for `experiences`, `qualifications`, `skills`, `languages`, `locations`, `notice_period`, and `domain_knowledge` instead of raw detached IDs.
+- [x] **Vacancy Aggregate:** Rewrote `get_vacancy_aggregate` to fetch related taxonomic descriptions by explicitly joining `TransactionStatusMst` (for `RequestStatusID` and `VacancyReqStatusID`), `QualificationMst`, `RecruitDomainKnowledgeMst`, and `RecruitCandidateMst`. Output now includes embedded `candidate_applications`, `request_track`, `candidate_history`, `required_qualifications`, and `job_profile.domains`.
+- [x] **Job Profile Aggregate:** Rewrote `get_job_profile_aggregate` to natively `.outerjoin` `OrgCompanyMst`, `OrgDepartmentMst`, and `OrgDesignationMst`, converting them into structured sub-dictionaries (`company`, `department`, `designation`). Joined `QualificationMst` and `RecruitDomainKnowledgeMst` to resolve name fields.
+
 ### PR6 and PR7 — Taxonomy Enforcement and Isolation
 - Replaced the memory-heavy `get_all_designations` loop inside `DynamicTaxonomyService` with an optimized PostgreSQL indexed lookup (`session.query().filter(ilike())`) directly mapped against `OrgDesignationMst`.
 - Downgraded aliases and semantic vector classification to `MatchStatus.PARTIAL_MATCH`. Isolated `MatchStatus.DB_MATCH` strictly to exact MSSQL source identifier matching.

@@ -11,7 +11,9 @@ from app.models.mssql.candidate import (
     RecruitCandidateLocationMst,
     RecruitCandidateNoticePeriodMst
 )
-from app.models.mssql.organization import OrgJobProfileMst
+from app.models.mssql.organization import OrgJobProfileMst, OrgLocationMst
+from app.models.mssql.taxonomy import RecruitSkillMst, LanguageMst, RecruitDomainKnowledgeMst
+
 
 class CandidateSourceRepository:
     def __init__(self, db: Session):
@@ -30,11 +32,21 @@ class CandidateSourceRepository:
                 RecruitCandidateMst.CandidateStatusID,
                 OrgJobProfileMst.JobProfileName,
                 RecruitCandidateMst.CandidateDomainKnowlgID,
-                RecruitCandidateMst.NoticePeriodID
+                RecruitDomainKnowledgeMst.DomainKnowlgName,
+                RecruitCandidateMst.NoticePeriodID,
+                RecruitCandidateNoticePeriodMst.NoticePeriod
             )
             .outerjoin(
                 OrgJobProfileMst,
                 RecruitCandidateMst.CandidateJobProfileID == OrgJobProfileMst.JobProfileID
+            )
+            .outerjoin(
+                RecruitDomainKnowledgeMst,
+                RecruitCandidateMst.CandidateDomainKnowlgID == RecruitDomainKnowledgeMst.DomainKnowlgID
+            )
+            .outerjoin(
+                RecruitCandidateNoticePeriodMst,
+                RecruitCandidateMst.NoticePeriodID == RecruitCandidateNoticePeriodMst.NoticePeriodID
             )
             .where(RecruitCandidateMst.CandidateID == candidate_id)
         )
@@ -42,42 +54,128 @@ class CandidateSourceRepository:
         if not row:
             return None
             
-        candidate_id, first_name, last_name, job_profile_id, total_exp, expected_ctc, is_active, status_id, jp_name, domain_id, notice_period_id = row
+        (
+            c_id, first_name, last_name, job_profile_id, total_exp,
+            expected_ctc, is_active, status_id, jp_name, domain_id,
+            domain_name, np_id, np_name
+        ) = row
 
-        q_stmt = select(RecruitCandidateQualificationDet.QualificationID).where(
+        # Qualifications
+        q_stmt = select(
+            RecruitCandidateQualificationDet.QualificationID,
+            RecruitCandidateQualificationDet.CollegeName,
+            RecruitCandidateQualificationDet.UniversityName,
+            RecruitCandidateQualificationDet.PassingYear,
+            RecruitCandidateQualificationDet.PassPercentage,
+            RecruitCandidateQualificationDet.CourseType,
+            RecruitCandidateQualificationDet.Pursuing
+        ).where(
             RecruitCandidateQualificationDet.CandidateID == candidate_id,
             RecruitCandidateQualificationDet.CandidQualiIsActive == True,
             RecruitCandidateQualificationDet.CandidQualiIsDeleted == False
         )
-        qualifications = [q for q, in self.db.execute(q_stmt).all() if q is not None]
+        qualifications = [
+            {
+                "qualification_id": r.QualificationID,
+                "college": r.CollegeName,
+                "university": r.UniversityName,
+                "passing_year": r.PassingYear,
+                "percentage": float(r.PassPercentage) if r.PassPercentage is not None else None,
+                "course_type": r.CourseType,
+                "is_pursuing": r.Pursuing
+            }
+            for r in self.db.execute(q_stmt).all()
+        ]
 
-        s_stmt = select(RecruitCandidateSkillDet.SkillID).where(
+        # Skills
+        s_stmt = select(
+            RecruitCandidateSkillDet.SkillID,
+            RecruitSkillMst.SkillName
+        ).outerjoin(
+            RecruitSkillMst, RecruitCandidateSkillDet.SkillID == RecruitSkillMst.SkillID
+        ).where(
             RecruitCandidateSkillDet.CandidateID == candidate_id,
             RecruitCandidateSkillDet.IsActive == True
         )
-        skills = [s for s, in self.db.execute(s_stmt).all() if s is not None]
+        skills = [
+            {
+                "skill_id": r.SkillID,
+                "name": r.SkillName
+            }
+            for r in self.db.execute(s_stmt).all() if r.SkillID is not None
+        ]
         
-        e_stmt = select(RecruitCandidateExperienceDet.CandidExpDetID).where(
+        # Experiences
+        e_stmt = select(
+            RecruitCandidateExperienceDet.CandidExpDetID,
+            RecruitCandidateExperienceDet.PrevOrganizationName,
+            RecruitCandidateExperienceDet.PrevDesignation,
+            RecruitCandidateExperienceDet.PrevCtc,
+            RecruitCandidateExperienceDet.IsCurrentlyWorking,
+            RecruitCandidateExperienceDet.PrevDurectionFrom,
+            RecruitCandidateExperienceDet.PrevDurectionTo
+        ).where(
             RecruitCandidateExperienceDet.CandidateID == candidate_id,
             RecruitCandidateExperienceDet.CandidExpIsActive == True,
             RecruitCandidateExperienceDet.CandidExpIsDeleted == False
         )
-        experiences = [e for e, in self.db.execute(e_stmt).all() if e is not None]
+        experiences = [
+            {
+                "experience_id": r.CandidExpDetID,
+                "organization": r.PrevOrganizationName,
+                "designation": r.PrevDesignation,
+                "ctc": float(r.PrevCtc) if r.PrevCtc is not None else None,
+                "is_current": r.IsCurrentlyWorking,
+                "from_date": str(r.PrevDurectionFrom) if r.PrevDurectionFrom else None,
+                "to_date": str(r.PrevDurectionTo) if r.PrevDurectionTo else None
+            }
+            for r in self.db.execute(e_stmt).all()
+        ]
 
-        l_stmt = select(RecruitCandidateLanguageDet.LanguageID).where(
+        # Languages
+        l_stmt = select(
+            RecruitCandidateLanguageDet.LanguageID,
+            LanguageMst.LanguageDesc,
+            RecruitCandidateLanguageDet.LanguageRead,
+            RecruitCandidateLanguageDet.LanguageWrite,
+            RecruitCandidateLanguageDet.LanguageSpeak
+        ).outerjoin(
+            LanguageMst, RecruitCandidateLanguageDet.LanguageID == LanguageMst.LanguageID
+        ).where(
             RecruitCandidateLanguageDet.CandidateID == candidate_id,
             RecruitCandidateLanguageDet.LanguageIsDeleted == False
         )
-        languages = [l for l, in self.db.execute(l_stmt).all() if l is not None]
+        languages = [
+            {
+                "language_id": r.LanguageID,
+                "name": r.LanguageDesc,
+                "read": r.LanguageRead,
+                "write": r.LanguageWrite,
+                "speak": r.LanguageSpeak
+            }
+            for r in self.db.execute(l_stmt).all() if r.LanguageID is not None
+        ]
 
-        loc_stmt = select(RecruitCandidateLocationMst.LocID).where(
+        # Locations
+        loc_stmt = select(
+            RecruitCandidateLocationMst.LocID,
+            OrgLocationMst.LocName
+        ).outerjoin(
+            OrgLocationMst, RecruitCandidateLocationMst.LocID == OrgLocationMst.LocID
+        ).where(
             RecruitCandidateLocationMst.CandidateID == candidate_id,
             RecruitCandidateLocationMst.IsActive == True
         )
-        locations = [loc for loc, in self.db.execute(loc_stmt).all() if loc is not None]
+        locations = [
+            {
+                "location_id": r.LocID,
+                "name": r.LocName
+            }
+            for r in self.db.execute(loc_stmt).all() if r.LocID is not None
+        ]
 
         return {
-            "candidate_id": candidate_id,
+            "candidate_id": c_id,
             "first_name": first_name,
             "last_name": last_name,
             "job_profile_id": job_profile_id,
@@ -86,13 +184,20 @@ class CandidateSourceRepository:
             "is_active": is_active,
             "status_id": status_id,
             "job_profile": {
+                "id": job_profile_id,
                 "name": jp_name
-            } if jp_name else None,
+            } if job_profile_id else None,
             "qualifications": qualifications,
             "skills": skills,
             "experiences": experiences,
             "languages": languages,
             "locations": locations,
-            "notice_period_id": notice_period_id,
-            "domains": [domain_id] if domain_id else []
+            "notice_period": {
+                "id": np_id,
+                "name": np_name
+            } if np_id else None,
+            "domain_knowledge": {
+                "id": domain_id,
+                "name": domain_name
+            } if domain_id else None
         }

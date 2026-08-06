@@ -18,7 +18,18 @@ from app.models.mssql.candidate import (
 from app.models.mssql.organization import (
     OrgJobProfileMst,
     OrgJobProfileQualificationDet,
-    JobProfileDomainKnowledgeDet
+    JobProfileDomainKnowledgeDet,
+    OrgCompanyMst,
+    OrgDepartmentMst,
+    OrgDesignationMst,
+    OrgLocationMst
+)
+from app.models.mssql.taxonomy import (
+    RecruitSkillMst,
+    LanguageMst,
+    RecruitDomainKnowledgeMst,
+    QualificationMst,
+    TransactionStatusMst
 )
 from app.models.mssql.vacancy import (
     RecruitVacancyRequest,
@@ -132,6 +143,17 @@ def test_job_profile_repository_fields_exist():
     assert hasattr(JobProfileDomainKnowledgeDet, "DomainKnowlgID")
     assert hasattr(JobProfileDomainKnowledgeDet, "JobProfileID")
     assert hasattr(JobProfileDomainKnowledgeDet, "JobProfileDomainKnowledgeDetIsActive")
+
+    # String names and taxonomy
+    assert hasattr(OrgLocationMst, "LocName")
+    assert hasattr(LanguageMst, "LanguageDesc")
+    assert hasattr(RecruitSkillMst, "SkillName")
+    assert hasattr(RecruitDomainKnowledgeMst, "DomainKnowlgName")
+    assert hasattr(QualificationMst, "QualificationName")
+    assert hasattr(TransactionStatusMst, "StatusDesc")
+    assert hasattr(OrgCompanyMst, "CompName")
+    assert hasattr(OrgDepartmentMst, "DeptName")
+    assert hasattr(OrgDesignationMst, "DesigName")
 
 
 def test_candidate_repository_contract():
