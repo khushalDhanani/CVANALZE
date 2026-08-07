@@ -3,7 +3,6 @@ import calendar
 import logging
 import re
 from datetime import datetime
-from typing import Any
 
 from dateutil import parser as dateutil_parser
 

@@ -10,7 +10,6 @@ from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
 from app.core.rule_config_manager import RuleConfigManager
 from app.prompts.optimized_match import build_optimized_match_prompt
-from app.repositories.config import ConfigRepository
 from app.repositories.job import JobRepository
 from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository

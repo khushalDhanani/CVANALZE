@@ -4,11 +4,8 @@ from sqlalchemy.orm import Session
 
 from pydantic import BaseModel
 
-from app.core.config import settings
 from app.core.database import get_postgres_app_db
 from app.core.logging import logger
-from app.repositories.config import ConfigRepository
-from app.repositories.config import ConfigRepository
 from app.services.configuration_service import ConfigurationService
 from app.core.rule_config_manager import UnifiedRuleConfig
 

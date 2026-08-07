@@ -4,11 +4,7 @@ from sqlalchemy import select
 
 from app.models.mssql.taxonomy import (
     RecruitDomainKnowledgeMst,
-    RecruitDomainKnowledgeDeptDet,
-    RecruitDomainKnowledgeSkillDet,
-    RecruitSkillMst,
-    RecruitSkillTypeMst,
-    TransactionStatusMst
+    RecruitSkillMst
 )
 
 class TaxonomySourceRepository:

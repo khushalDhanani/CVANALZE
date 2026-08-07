@@ -15,7 +15,7 @@ from app.services.dynamic_scoring_prefilter_service import (
     DynamicScoringAndPrefilterService,
 )
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
-from app.services.job_taxonomy import JobTaxonomy, TaxonomyClassifier
+from app.services.job_taxonomy import TaxonomyClassifier
 
 
 @dataclass

@@ -10,7 +10,6 @@ from typing import Any, ClassVar
 from sqlalchemy.orm import Session
 
 from app.core.cache import CacheInvalidator, vacancy_cache_manager
-from app.core.config import settings
 from app.core.database import MssqlReadSession
 
 from app.core.logging import logger

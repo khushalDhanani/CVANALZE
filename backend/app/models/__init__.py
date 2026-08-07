@@ -73,4 +73,5 @@ __all__ = [
     "AirisHistoricalBenchmark",
     "ValidationMetricsSnapshot",
     "HRDisagreementReview",
+    "RecruitCandidateMst",
 ]

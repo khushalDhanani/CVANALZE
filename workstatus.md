@@ -276,6 +276,37 @@ None. All tasks completed successfully.
 - `backend/app/services/dynamic_taxonomy_service.py`
 - `workstatus.md`
 
+## 2026-08-07: Phase 1 Codebase Import Audit Completed
+
+### Work Completed:
+- **Phase 1 Import Audit**: Ran `ruff check --select F401 app/` across the application core and cleaned up all 60 unreferenced imports across core services, models, and repositories.
+- **Model Exports**: Added `RecruitCandidateMst` to `__all__` in `app/models/__init__.py`.
+- **Linter Verification**: Verified `ruff check --select F401 app/` returns `All checks passed!`.
+- **Runtime & Test Verification**: Verified clean FastAPI initialization (`app.main`) and passed unit tests (`test_startup.py`, `test_dynamic_taxonomy_service.py`).
+
+### Files Modified:
+- `backend/app/models/__init__.py`
+- `backend/app/core/rule_config_manager.py`
+- `backend/app/services/dynamic_taxonomy_service.py`
+- `workstatus.md`
+
+
+## 2026-08-07: Architectural Retention Rules & Cleanup Boundaries
+
+### Decisions & Rules:
+1. **Core Compatibility Entry Points (KEEP)**:
+   - `backend/start_worker.py`: Critical worker launcher managing macOS PyTorch fork safety (`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`) and multithreaded RQ queue processing.
+   - `backend/main.py`: Compatibility re-export for `app.main:app` and CLI batch scanner.
+   - `backend/app/services/document_parser.py`: Essential compatibility façade re-exporting document conversion tools (`MarkdownGenerator`, `ResumeJsonExtractor`, `TextSanitizer`).
+
+2. **Legacy Migration Cluster (RETAIN UNTIL BOOTSTRAP CHECK)**:
+   - `backend/scripts/migrate_phase1_inventory.py`, `backend/app/core/rule_config.json`, and `backend/app/data/department_domains_seed.json` form a linked legacy inventory cluster.
+   - Retained as reference until final database bootstrap pipeline checks pass. Currently PostgreSQL `DepartmentDomainMaster` has 52 seeded rows.
+
+3. **Dependency Files (RETAIN)**:
+   - `requirements.txt`: Retained for backward compatibility with external deployment pipelines / CI runners that call `pip install -r requirements.txt`.
+
+
 
 
 

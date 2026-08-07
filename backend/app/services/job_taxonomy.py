@@ -1,6 +1,5 @@
 from __future__ import annotations
 # backend/app/services/job_taxonomy.py
-import functools
 import logging
 import re
 import threading
@@ -9,7 +8,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.core.rule_config_manager import RuleConfigManager
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.schemas.classification_types import MatchStatus
 

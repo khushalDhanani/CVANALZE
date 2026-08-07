@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.cache import master_data_cache_manager

@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from app.core.cache import config_cache_manager
 from app.core.database import PostgresAppSession
 from app.models.prompts import PromptTemplateMaster
-from app.core.config import settings
 from app.core.error_handlers import PromptError
 from app.core.logging import logger
 

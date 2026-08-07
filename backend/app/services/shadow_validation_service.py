@@ -3,9 +3,9 @@ import json
 from decimal import Decimal
 from datetime import datetime, timezone
 from pydantic.json import pydantic_encoder
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional
 
-from app.core.database import PostgresAppBase, PostgresAppSession, MssqlReadSession
+from app.core.database import PostgresAppSession, MssqlReadSession
 from app.models.validation import (
     ShadowValidationRun, ShadowValidationResult, ValidationMetricsSnapshot
 )

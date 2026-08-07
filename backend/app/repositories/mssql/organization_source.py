@@ -3,14 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.models.mssql.organization import (
-    OrgCompanyMst,
-    OrgLocationMst,
-    OrgMainDepartmentMst,
     OrgDepartmentMst,
-    OrgDesignationMst,
-    OrgJobProfileMst,
-    JobProfileDomainKnowledgeDet,
-    OrgJobProfileQualificationDet
+    OrgDesignationMst
 )
 
 class OrganizationSourceRepository:

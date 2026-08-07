@@ -326,7 +326,7 @@ class RuleConfigManager:
 
         try:
             from app.core.database import PostgresAppSession
-            from app.models.rules import RuleConfigProfile, RuleComponent, SystemRule, RuleCondition, RuleConditionValue, RuleThreshold, RulePenalty, RuleWeight
+            from app.models.rules import RuleConfigProfile, RuleComponent, SystemRule, RuleCondition
             from sqlalchemy.orm import selectinload
             
             with PostgresAppSession() as db:

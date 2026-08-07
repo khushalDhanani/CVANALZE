@@ -3,11 +3,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy.orm import Session
-from sqlalchemy import select, or_
 
 from app.core.cache import _REDIS_CLIENT, CacheIndex, cv_result_cache_manager
-from app.core.config import settings
 from app.core.cv_identity import CVIdentity, CVIdentityCollisionError
 from app.core.database import PostgresAppSession
 from app.core.logging import logger

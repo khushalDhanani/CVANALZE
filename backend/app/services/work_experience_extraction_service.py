@@ -1,7 +1,6 @@
 from __future__ import annotations
 import time
 import hashlib
-from typing import Optional
 
 from app.schemas.work_experience_extraction import (
     WorkExperienceExtractionRequest,

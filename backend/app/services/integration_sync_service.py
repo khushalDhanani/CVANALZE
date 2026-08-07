@@ -1,11 +1,9 @@
 import logging
 import json
 import hashlib
-from typing import Type, List, Optional
+from typing import Optional
 from datetime import datetime, timezone
-from sqlalchemy import select, func, and_
-from pydantic import BaseModel
-from pydantic.json import pydantic_encoder
+from sqlalchemy import func
 
 from app.core.database import MssqlReadSession, PostgresAppSession
 from app.models.integration import (

@@ -1,6 +1,5 @@
 from __future__ import annotations
-from sqlalchemy import Column, Integer, String, BigInteger, Boolean, DateTime, Date, Numeric, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, BigInteger, Boolean, DateTime, Numeric, ForeignKey
 from app.core.database import MssqlReadBase
 
 

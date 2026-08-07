@@ -1,13 +1,11 @@
 from __future__ import annotations
-import json
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from app.core.database import PostgresAppSession
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.domain import DepartmentDomainMaster
 
-from app.schemas.classification_types import NormalizedClassification
 
 logger = logging.getLogger("cv_analyzer")
 

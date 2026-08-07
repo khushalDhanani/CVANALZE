@@ -2,7 +2,6 @@ from __future__ import annotations
 import threading
 import time
 
-from app.core.cache import RedisCache
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
 from app.services.configuration_service import ConfigurationService

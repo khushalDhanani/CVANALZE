@@ -4,13 +4,11 @@ import re
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.database import PostgresAppSession, MssqlReadSession
+from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.domain import DepartmentDomainMaster
 from app.schemas.domain import DepartmentDomain
