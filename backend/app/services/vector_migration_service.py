@@ -1,6 +1,7 @@
 from __future__ import annotations
 import hashlib
 import json
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -14,6 +15,19 @@ from app.services.embedding_service import (
     get_candidate_embedding_metadata,
     save_candidate_embedding,
 )
+
+
+def _parse_dt(val: Any) -> datetime | None:
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        return val
+    try:
+        from dateutil.parser import parse
+        return parse(str(val))
+    except Exception:
+        return None
+
 
 
 class VectorDatabaseMigrationService:
