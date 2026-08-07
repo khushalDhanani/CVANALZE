@@ -27,19 +27,13 @@ class RecommendationService:
 
     @staticmethod
     def _is_strong_match(match: dict[str, Any], threshold: float) -> bool:
-        score = float(match.get("score") or match.get("overall_score") or 0.0)
-        classification = str(match.get("classification") or "").upper()
-        failures = match.get("mandatory_failures") or match.get("mandatory_fails") or []
-        has_domain_rejection = any(
-            isinstance(failure, dict) and failure.get("requirement_id") == "req_domain_mismatch"
-            for failure in failures
-        )
-        is_domain_rejected = match.get("domain_mismatch_capped") or match.get("is_cross_domain")
-        is_high_class = classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
-        return score >= threshold and is_high_class and not is_domain_rejected and not has_domain_rejection
+        from app.services.match_evaluators import VacancyFitEvaluator
+        return VacancyFitEvaluator.is_eligible_match(match, high_threshold=threshold)
 
     @classmethod
     def get_candidate_recommendations(cls, candidate_id: str) -> dict[str, Any]:
+        from app.services.match_evaluators import VacancyFitEvaluator, VacancyMatchStatus
+
         cid = candidate_id.strip()
         result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
         cv_key = result_filename.removesuffix(".json")
@@ -48,9 +42,36 @@ class RecommendationService:
         if not r:
             r = ResultRepository.read_result_by_filename(result_filename)
 
-        if not r or not isinstance(r, dict) or r.get("status") == "processing":
-            is_proc = isinstance(r, dict) and r.get("status") == "processing"
-            status_msg = "Analysis in progress..." if is_proc else "N/A"
+        all_jobs = JobRepository.get_all_jobs()
+        has_active_vacancies = bool(all_jobs)
+
+        raw_match = r.get("match_analysis") if isinstance(r, dict) else None
+        match_analysis = raw_match if isinstance(raw_match, dict) else {}
+        suitable_openings = match_analysis.get("suitable_openings") or []
+
+        scoring_config = ScoringConfig.load()
+        min_threshold = scoring_config.match_high_threshold
+
+        canonical_status = VacancyFitEvaluator.determine_candidate_match_status(
+            candidate_id=cv_key,
+            result_data=r,
+            vacancies_evaluated=suitable_openings,
+            has_active_vacancies=has_active_vacancies,
+            high_threshold=min_threshold,
+        )
+
+        if canonical_status in {
+            VacancyMatchStatus.ANALYSIS_NOT_AVAILABLE.value,
+            VacancyMatchStatus.PROCESSING.value,
+            VacancyMatchStatus.FAILED.value,
+        }:
+            if canonical_status == VacancyMatchStatus.PROCESSING.value:
+                status_msg = "Analysis in progress..."
+            elif canonical_status == VacancyMatchStatus.FAILED.value:
+                status_msg = "Analysis failed."
+            else:
+                status_msg = "N/A"
+
             return {
                 "candidate_id": cv_key,
                 "full_name": cv_key,
@@ -76,7 +97,7 @@ class RecommendationService:
                 "recommended_certifications": [],
                 "career_transitions": [],
                 "talent_pools": [],
-                "hiring_recommendation": "PROCESSING" if is_proc else "NO_STRONG_MATCH",
+                "hiring_recommendation": canonical_status,
                 "role_department_fit": status_msg,
                 "experience_assessment": status_msg,
                 "interview_focus_areas": [],
@@ -85,18 +106,13 @@ class RecommendationService:
                 "next_steps_for_interviewer": [],
             }
 
-        raw_match = r.get("match_analysis")
-        match_analysis = raw_match if isinstance(raw_match, dict) else {}
-        scoring_config = ScoringConfig.load()
-        min_threshold = scoring_config.match_high_threshold
-        suitable_openings = match_analysis.get("suitable_openings") or []
         eligible_openings = [
             opening
             for opening in suitable_openings
-            if isinstance(opening, dict) and cls._is_strong_match(opening, min_threshold)
+            if isinstance(opening, dict) and VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=min_threshold) in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}
         ]
         stored_best_match = match_analysis.get("best_match") or {}
-        if not eligible_openings and isinstance(stored_best_match, dict) and cls._is_strong_match(stored_best_match, min_threshold):
+        if not eligible_openings and isinstance(stored_best_match, dict) and VacancyFitEvaluator.classify_opening_fit(stored_best_match, high_threshold=min_threshold) in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}:
             eligible_openings = [stored_best_match]
         best_match = eligible_openings[0] if eligible_openings else {}
 
@@ -293,8 +309,11 @@ class RecommendationService:
         # 6. Hiring-focused Metrics
         suitable_roles = match_analysis.get("suitable_job_roles") or []
         industry_role = suitable_roles[0] if suitable_roles else None
-        if not best_vacancies:
-            hiring_rec = "NO_STRONG_MATCH"
+        if canonical_status == VacancyMatchStatus.NO_ACTIVE_VACANCIES.value:
+            hiring_rec = VacancyMatchStatus.NO_ACTIVE_VACANCIES.value
+            role_dept_fit = "No active vacancies available in system for evaluation."
+        elif canonical_status == VacancyMatchStatus.NO_STRONG_MATCH.value:
+            hiring_rec = VacancyMatchStatus.NO_STRONG_MATCH.value
             if primary_dept or prof_domain or suitable_roles:
                 dept_desc = primary_dept if primary_dept else "relevant industry"
                 domain_desc = f"{prof_domain} experience" if prof_domain else "technical capabilities"
@@ -305,16 +324,13 @@ class RecommendationService:
                 )
             else:
                 role_dept_fit = "N/A"
+        elif canonical_status == VacancyMatchStatus.POTENTIAL_MATCH.value:
+            hiring_rec = VacancyMatchStatus.POTENTIAL_MATCH.value
+            role_dept_fit = f"Potential alignment for {primary_dept or 'relevant'} roles based on {prof_domain or 'candidate'} experience."
         else:
-            if overall_confidence >= 85:
-                hiring_rec = "Highly Recommended"
-            elif overall_confidence >= min_threshold:
-                hiring_rec = "Recommended"
-            else:
-                hiring_rec = "Needs Further Review"
-
+            hiring_rec = VacancyMatchStatus.MATCHED.value
             role_dept_fit = (
-                f"Strong alignment for {primary_dept} roles based on {prof_domain} experience."
+                f"Strong alignment for {primary_dept or 'relevant'} roles based on {prof_domain or 'candidate'} experience."
             )
 
         # Generate Interview Focus Areas

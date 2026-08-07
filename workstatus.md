@@ -503,5 +503,35 @@ None. All tasks completed successfully.
 - `frontend/src/app/candidates/[id].tsx`
 - `backend/scripts/audit_db_integrity.py`
 - `backend/scripts/reprocess_all_cvs.py`
+
+### Canonical Vacancy Match Status Refactoring & Single Source of Truth
+**Date:** 2026-08-07
+**Status:** Completed
+
+**Work Completed:**
+- **Single Source of Truth (`VacancyFitEvaluator`)**:
+  - Defined `VacancyMatchStatus` enum (`MATCHED`, `POTENTIAL_MATCH`, `NO_STRONG_MATCH`, `NO_ACTIVE_VACANCIES`, `ANALYSIS_NOT_AVAILABLE`, `PROCESSING`, `FAILED`).
+  - Added `VacancyFitEvaluator.classify_opening_fit()` for canonical single-opening evaluation.
+  - Added `VacancyFitEvaluator.is_eligible_match()` for checking strong match eligibility.
+  - Added `VacancyFitEvaluator.determine_candidate_match_status()` as the canonical candidate-level match decision source based on `vacancy_fit_score`, `vacancy_match_status`, hierarchy validity, and rejection flags.
+- **`RecommendationService` Refactoring**:
+  - Removed duplicate/legacy `_is_strong_match()` logic and delegated decision making to `VacancyFitEvaluator`.
+  - Enforced that candidate-not-found or missing analysis NEVER returns `NO_STRONG_MATCH` (returns `ANALYSIS_NOT_AVAILABLE`).
+  - Enforced that empty active job database returns `NO_ACTIVE_VACANCIES`.
+  - Guaranteed `NO_STRONG_MATCH` means strictly: candidate analysis succeeded, active vacancies were evaluated, but none passed the fit criteria.
+- **`MatchService` Alignment**:
+  - Updated `MatchService` match filtering and active vacancy summary formatting to use `VacancyFitEvaluator` canonical status methods (`Genuine Match Found`, `POTENTIAL_MATCH`, `NO_STRONG_MATCH`, `NO_ACTIVE_VACANCIES`).
+- **Comprehensive Verification Suite**:
+  - Created `backend/tests/test_vacancy_match_status.py` verifying all 7 canonical states and evaluator/recommendation consistency. All unit tests pass 100%.
+
+**Files Modified:**
+- `backend/app/services/match_evaluators.py`
+- `backend/app/services/recommendation_service.py`
+- `backend/app/services/match_service.py`
+- `backend/tests/test_vacancy_match_status.py` [NEW]
+- `backend/tests/test_experience_role_fit_flow.py`
+- `backend/tests/test_ai_recommendations.py`
+- `backend/tests/test_main_department_classification.py`
 - `workstatus.md`
+
 

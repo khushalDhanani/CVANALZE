@@ -2,6 +2,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 from app.core.rule_config_manager import RuleConfigManager
@@ -875,11 +876,21 @@ class RecommendationEvaluator:
         )
 
 
+class VacancyMatchStatus(str, Enum):
+    MATCHED = "MATCHED"
+    POTENTIAL_MATCH = "POTENTIAL_MATCH"
+    NO_STRONG_MATCH = "NO_STRONG_MATCH"
+    NO_ACTIVE_VACANCIES = "NO_ACTIVE_VACANCIES"
+    ANALYSIS_NOT_AVAILABLE = "ANALYSIS_NOT_AVAILABLE"
+    PROCESSING = "PROCESSING"
+    FAILED = "FAILED"
+
+
 @dataclass
 class VacancyFitResults:
     vacancy_fit_score: float
     score_breakdown: Any  # VacancyFitScoreBreakdown
-    match_status: str  # "MATCHED" or "NO_STRONG_VACANCY_MATCH"
+    match_status: str  # "MATCHED", "POTENTIAL_MATCH", or "NO_STRONG_VACANCY_MATCH"
     reason: str
 
 
@@ -1038,4 +1049,116 @@ class VacancyFitEvaluator:
             match_status=match_status,
             reason=reason,
         )
+
+    @classmethod
+    def classify_opening_fit(
+        cls,
+        opening: dict[str, Any] | Any,
+        high_threshold: float = 70.0,
+        potential_threshold: float = 50.0,
+    ) -> str:
+        """
+        Canonical evaluator classification for an individual vacancy opening/match result.
+        Returns one of: 'MATCHED', 'POTENTIAL_MATCH', or 'NO_STRONG_MATCH'.
+        """
+        if not opening:
+            return VacancyMatchStatus.NO_STRONG_MATCH.value
+
+        if isinstance(opening, dict):
+            score = float(opening.get("vacancy_fit_score") or opening.get("score") or opening.get("overall_score") or 0.0)
+            status = str(opening.get("vacancy_match_status") or opening.get("match_status") or "").upper()
+            classification = str(opening.get("classification") or "").upper()
+            failures = opening.get("mandatory_failures") or opening.get("mandatory_fails") or []
+            has_domain_mismatch_req = any(
+                isinstance(f, dict) and f.get("requirement_id") == "req_domain_mismatch"
+                for f in failures
+            )
+            is_domain_rejected = bool(opening.get("domain_mismatch_capped") or opening.get("is_cross_domain") or has_domain_mismatch_req)
+            score_breakdown = opening.get("score_breakdown")
+            is_hierarchy_valid = True
+            if isinstance(score_breakdown, dict):
+                is_hierarchy_valid = score_breakdown.get("is_hierarchy_valid", True)
+            elif hasattr(score_breakdown, "is_hierarchy_valid"):
+                is_hierarchy_valid = getattr(score_breakdown, "is_hierarchy_valid", True)
+        else:
+            score = float(getattr(opening, "vacancy_fit_score", getattr(opening, "score", getattr(opening, "overall_score", 0.0))))
+            status = str(getattr(opening, "vacancy_match_status", getattr(opening, "match_status", ""))).upper()
+            classification = str(getattr(opening, "classification", "")).upper()
+            failures = getattr(opening, "mandatory_failures", [])
+            has_domain_mismatch_req = any(
+                getattr(f, "requirement_id", None) == "req_domain_mismatch" for f in failures
+            )
+            is_domain_rejected = bool(getattr(opening, "domain_mismatch_capped", False) or getattr(opening, "is_cross_domain", False) or has_domain_mismatch_req)
+            is_hierarchy_valid = getattr(getattr(opening, "score_breakdown", None), "is_hierarchy_valid", True)
+
+        # Check hard rejection / hierarchy mismatch
+        if is_domain_rejected or is_hierarchy_valid is False:
+            return VacancyMatchStatus.NO_STRONG_MATCH.value
+
+        is_high_class = classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"} if classification else True
+
+        if score >= high_threshold and is_high_class and status != "NO_STRONG_VACANCY_MATCH":
+            return VacancyMatchStatus.MATCHED.value
+        elif score >= potential_threshold:
+            return VacancyMatchStatus.POTENTIAL_MATCH.value
+        else:
+            return VacancyMatchStatus.NO_STRONG_MATCH.value
+
+    @classmethod
+    def is_eligible_match(
+        cls,
+        opening: dict[str, Any] | Any,
+        high_threshold: float = 70.0,
+    ) -> bool:
+        """Returns True if the opening is classified as a canonical MATCHED result."""
+        return cls.classify_opening_fit(opening, high_threshold=high_threshold) == VacancyMatchStatus.MATCHED.value
+
+    @classmethod
+    def determine_candidate_match_status(
+        cls,
+        candidate_id: str,
+        result_data: dict[str, Any] | None,
+        vacancies_evaluated: list[dict[str, Any] | Any] | None,
+        has_active_vacancies: bool = True,
+        high_threshold: float = 70.0,
+        potential_threshold: float = 50.0,
+    ) -> str:
+        """
+        Canonical source of truth for candidate-level match decision status.
+        Returns one of:
+          - ANALYSIS_NOT_AVAILABLE
+          - PROCESSING
+          - FAILED
+          - NO_ACTIVE_VACANCIES
+          - MATCHED
+          - POTENTIAL_MATCH
+          - NO_STRONG_MATCH
+        """
+        if result_data is None or not isinstance(result_data, dict):
+            return VacancyMatchStatus.ANALYSIS_NOT_AVAILABLE.value
+
+        proc_status = str(result_data.get("status") or "").lower()
+        if proc_status == "processing":
+            return VacancyMatchStatus.PROCESSING.value
+        if proc_status in {"failed", "error"}:
+            return VacancyMatchStatus.FAILED.value
+
+        if not has_active_vacancies:
+            return VacancyMatchStatus.NO_ACTIVE_VACANCIES.value
+
+        openings = vacancies_evaluated or []
+        if not openings:
+            return VacancyMatchStatus.NO_STRONG_MATCH.value
+
+        statuses = [
+            cls.classify_opening_fit(o, high_threshold=high_threshold, potential_threshold=potential_threshold)
+            for o in openings
+        ]
+
+        if VacancyMatchStatus.MATCHED.value in statuses:
+            return VacancyMatchStatus.MATCHED.value
+        elif VacancyMatchStatus.POTENTIAL_MATCH.value in statuses:
+            return VacancyMatchStatus.POTENTIAL_MATCH.value
+        else:
+            return VacancyMatchStatus.NO_STRONG_MATCH.value
 

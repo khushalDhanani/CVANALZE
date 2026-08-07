@@ -329,14 +329,13 @@ class MatchService:
         strengths = cand_profile.get("strengths", [])
         suitable_roles = cand_profile.get("suitable_job_roles", [])
 
+        from app.services.match_evaluators import VacancyFitEvaluator, VacancyMatchStatus
+
         strong_threshold = scoring_config.match_high_threshold
         eligible_matches = [
             match
             for match in evaluated_matches
-            if match.score >= strong_threshold
-            and match.classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
-            and not match.domain_mismatch_capped
-            and not any(f.requirement_id == "req_domain_mismatch" for f in match.mandatory_failures)
+            if VacancyFitEvaluator.is_eligible_match(match, high_threshold=strong_threshold)
         ]
         has_genuine_match = bool(eligible_matches)
 
@@ -349,6 +348,27 @@ class MatchService:
                 f"with an overall match score of {top_m.score}%. Key matching skills include {skills_str}."
             )
             best_match = top_m
+        elif evaluated_matches:
+            potential_matches = [
+                m for m in evaluated_matches
+                if VacancyFitEvaluator.classify_opening_fit(m, high_threshold=strong_threshold) == VacancyMatchStatus.POTENTIAL_MATCH.value
+            ]
+            if potential_matches:
+                top_p = potential_matches[0]
+                active_vacancy_summary = (
+                    f"POTENTIAL_MATCH: Candidate shows potential alignment with '{top_p.job_title}' "
+                    f"(Match Score: {top_p.score}%). Manual HR review recommended."
+                )
+                best_match = top_p
+            else:
+                active_vacancy_summary = (
+                    "NO_STRONG_MATCH: No suitable active vacancy found matching candidate domain/taxonomy profile "
+                    f"(Primary Domain: {professional_domain}). Manual HR review recommended."
+                )
+                best_match = None
+        elif not job_openings:
+            active_vacancy_summary = "NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation."
+            best_match = None
         else:
             active_vacancy_summary = (
                 "NO_STRONG_MATCH: No suitable active vacancy found matching candidate domain/taxonomy profile "
@@ -604,7 +624,7 @@ class MatchService:
             strengths=strengths,
             suitable_job_roles=roles,
             has_genuine_match=False,
-            active_vacancy_summary="NO_STRONG_MATCH: No suitable active vacancy found.",
+            active_vacancy_summary="NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation.",
             scoring_profile_code=scoring_config.profile_code if 'scoring_config' in locals() else None,
             scoring_profile_version=scoring_config.profile_version if 'scoring_config' in locals() else None,
             config_version=RuleConfigManager.get_config().version,

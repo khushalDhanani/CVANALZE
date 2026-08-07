@@ -169,7 +169,7 @@ def test_recommendation_service_no_forced_vacancy_and_main_department_integratio
     }
 
     with patch("app.repositories.result.ResultRepository.resolve_result", return_value=mock_result_payload), \
-         patch("app.repositories.job.JobRepository.get_all_jobs", return_value=[]):
+         patch("app.repositories.job.JobRepository.get_all_jobs", return_value=[{"id": 1, "title": "Other Job"}]):
 
         rec = RecommendationService.get_candidate_recommendations("test_cand_123")
 

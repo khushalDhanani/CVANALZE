@@ -60,4 +60,4 @@ def test_recommendation_service_fallback_keys():
     recs = RecommendationService.get_candidate_recommendations("non_existent_cv_key_9999")
     assert recs["experience_assessment"] == "N/A"
     assert recs["role_department_fit"] == "N/A"
-    assert recs["hiring_recommendation"] == "NO_STRONG_MATCH"
+    assert recs["hiring_recommendation"] == "ANALYSIS_NOT_AVAILABLE"

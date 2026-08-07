@@ -162,7 +162,7 @@ def test_no_strong_match_cannot_coexist_with_genuine_match_summary():
 
     with (
         patch("app.repositories.result.ResultRepository.read_result_by_filename", return_value=weak_result),
-        patch("app.repositories.job.JobRepository.get_all_jobs", return_value=[]),
+        patch("app.repositories.job.JobRepository.get_all_jobs", return_value=[{"id": 77, "title": "Unrelated Vacancy"}]),
         patch("app.services.recommendation_service.ScoringConfig.load", return_value=ScoringConfig(match_high_threshold=80.0)),
     ):
         recs = RecommendationService.get_candidate_recommendations("weak_candidate")
