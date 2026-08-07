@@ -2,6 +2,14 @@
 
 ## 1. Completed Work
 
+### Fresh Reset / Clean Start Audit & Command Pipeline (2026-08-07)
+- **Runtime Data Cleanup Audit**: Conducted zero-trust audit across PostgreSQL schemas (`public`, `cvai`, `integration`, `validation`), Redis server (DB 0), local disk caches (`.doc_cache`, `.embed_cache`, `.llm_cache`, `.processing_jobs`, `.locks`, `results`, `llm_cache.db`), and uploaded CV files (`*.pdf`, `*.docx`, `*.doc`).
+- **Master Data Preservation**: Verified and guaranteed 100% preservation of database schemas, master data (`DepartmentDomainMaster`, `domain_embeddings`, `vacancy_embeddings`, `cvai.designation_synonyms`, `cvai.designations`, `cvai.domains`, `cvai.job_families`, `cvai.prompt_templates`, `validation.airis_historical_benchmarks`), system configuration, and rule profiles.
+- **Automated Script & Documentation**:
+  - Created `backend/scripts/reset_runtime_data.py`: Idempotent script for truncating generated runtime tables, flushing Redis, clearing disk cache files, and running clean-state verification checks.
+  - Updated `run.md`: Added Section 6 `Fresh Reset / Clean Start` with exact, safe commands for stopping services, clearing runtime state, restarting services, verifying cleanliness, and processing a CV from scratch.
+- **Verification**: Executed the script and end-to-end CV processing test over clean state; verified zero leftover candidate/job state and 100% master taxonomy retention.
+
 ### Third-Pass Adversarial Audit & Zero-Trust Verification (2026-08-07)
 - **Database Reconciliation**: Fully reconciled all 15 rows in PostgreSQL `cvai.cv_results`: 11 valid fully parsed candidates, 1 key alias duplicate (`cv_gptsuifgr321345678o9p`), and 3 incomplete processing placeholders ($11 + 1 + 3 = 15$).
 - **Zero-Trust Audit Execution**: Executed `adversarial_audit_runner.py` auditing all 11 parsed candidates against all 107 active openings live without relying on pre-existing scores or labels.
