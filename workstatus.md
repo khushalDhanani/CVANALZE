@@ -2,6 +2,18 @@
 
 ## 1. Completed Work
 
+### Generic Embedding Schema & Cache Flow Audit & Repair (2026-08-07)
+- **Database Schema & Migration**: Created idempotent migration `017_add_embedding_source_metadata_columns.sql` (and rollback `017_add_embedding_source_metadata_columns_down.sql` with `DROP COLUMN IF EXISTS`), adding `source_snapshot` (`VARCHAR`), `source_watermark` (`TIMESTAMP WITH TIME ZONE`), and `freshness_status` (`VARCHAR DEFAULT 'FRESH'`) to PostgreSQL tables `candidate_embeddings` and `vacancy_embeddings`, perfectly matching SQLAlchemy models in `app/models/pg.py`.
+- **Exact Cache Lifecycle & Status Handling**:
+  - Implemented `EmbeddingCacheStatus` (`CACHE_HIT`, `CACHE_MISS`, `STALE_CACHE`).
+  - Implemented `get_candidate_embedding_with_status` and `get_vacancy_embedding_with_status`: Enforced PostgreSQL as single source of truth; missing PG row evicts orphan L2/L3 cache and returns `CACHE_MISS`.
+  - Content change detection compares `content_hash` (primary) and normalized UTC `source_watermark` (secondary). Stale state evicts cache and returns `STALE_CACHE`.
+  - Specific SQLSTATE codes (`42703` UndefinedColumn, `42P01` UndefinedTable) raise typed `EmbeddingSchemaError` with zero cache fallback. Connection failures raise `EmbeddingDatabaseConnectionError`.
+- **Strict DB Commit Order**: `save_candidate_embedding` and `save_vacancy_embedding` execute `upsert PG` → `commit PG` → **only after commit succeeds** `update L2/L3 cache`. On failure: `pg_db.rollback()` → re-raises exception (cache is never updated).
+- **Unit Test Suite & Verification**: Updated `backend/tests/test_candidate_embedding_cache.py` (7 tests passing 100%). Executed end-to-end verification passing all 7 runtime checks cleanly. Updated `run.md` with migration execution and dual-table schema verification commands.
+
+
+
 ### Fresh Reset / Clean Start Audit & Command Pipeline (2026-08-07)
 - **Runtime Data Cleanup Audit**: Conducted zero-trust audit across PostgreSQL schemas (`public`, `cvai`, `integration`, `validation`), Redis server (DB 0), local disk caches (`.doc_cache`, `.embed_cache`, `.llm_cache`, `.processing_jobs`, `.locks`, `results`, `llm_cache.db`), and uploaded CV files (`*.pdf`, `*.docx`, `*.doc`).
 - **Master Data Preservation**: Verified and guaranteed 100% preservation of database schemas, master data (`DepartmentDomainMaster`, `domain_embeddings`, `vacancy_embeddings`, `cvai.designation_synonyms`, `cvai.designations`, `cvai.domains`, `cvai.job_families`, `cvai.prompt_templates`, `validation.airis_historical_benchmarks`), system configuration, and rule profiles.

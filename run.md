@@ -146,11 +146,18 @@ kill -9 $(lsof -t -i:8081) 2>/dev/null || true
 #### Step 2: Clear Generated Database / Cache / Job Data
 > **WARNING**: The following commands purge generated runtime state (candidate analysis, background job queues, disk caches). They **DO NOT** remove database schema, master taxonomy, departments, designations, vacancies, domain embeddings, or configuration.
 
-1. **Truncate PostgreSQL Generated Tables**:
+1. **Run Pending Database Migrations**:
+```bash
+cd backend
+uv run python scripts/run_migrations.py
+```
+
+2. **Truncate PostgreSQL Generated Tables & Flush Embedding Cache**:
 ```bash
 cd backend
 uv run python -c "
 from app.core.database import postgres_app_engine
+from app.core.cache import embedding_cache_manager
 from sqlalchemy import text
 tables = [
     'public.cv_results', 'public.candidate_embeddings', 'public.department_alias_mappings',
@@ -165,16 +172,17 @@ with postgres_app_engine.connect() as conn:
         except Exception:
             pass
     conn.commit()
-print('PostgreSQL generated tables cleared.')
+embedding_cache_manager.clear()
+print('PostgreSQL generated tables and embedding_cache_manager L2/L3 cache cleared.')
 "
 ```
 
-2. **Flush Redis Cache & RQ Queues**:
+3. **Flush Redis Cache & RQ Queues**:
 ```bash
 redis-cli flushdb
 ```
 
-3. **Clear Local Disk Caches & Upload Artifacts**:
+4. **Clear Local Disk Caches & Upload Artifacts**:
 ```bash
 rm -f backend/llm_cache.db
 rm -rf uploads/.doc_cache/* uploads/.embed_cache/* uploads/.llm_cache/* uploads/.processing_jobs/* uploads/.locks/* uploads/results/* uploads/*.pdf uploads/*.docx uploads/*.doc 2>/dev/null || true
@@ -199,17 +207,28 @@ cd frontend
 npm start
 ```
 
-#### Step 4: Verify DB/Cache is Clean
+#### Step 4: Verify DB/Cache & Embedding Table Schema is Clean
 ```bash
 cd backend
 uv run python -c "
 from app.core.database import postgres_app_engine
-from sqlalchemy import text
+from app.core.cache import embedding_cache_manager
+from sqlalchemy import inspect, text
+
+inspector = inspect(postgres_app_engine)
+cand_cols = {c['name'] for c in inspector.get_columns('candidate_embeddings')}
+vac_cols = {c['name'] for c in inspector.get_columns('vacancy_embeddings')}
+req = {'source_snapshot', 'source_watermark', 'freshness_status'}
+
+assert req.issubset(cand_cols), f'candidate_embeddings missing: {req - cand_cols}'
+assert req.issubset(vac_cols), f'vacancy_embeddings missing: {req - vac_cols}'
+
 with postgres_app_engine.connect() as conn:
     cv_res = conn.execute(text('SELECT COUNT(*) FROM public.cv_results')).scalar()
     cand_emb = conn.execute(text('SELECT COUNT(*) FROM public.candidate_embeddings')).scalar()
     dept_dom = conn.execute(text('SELECT COUNT(*) FROM \"DepartmentDomainMaster\"')).scalar()
     print(f'Verification: cv_results={cv_res} (expect 0), candidate_embeddings={cand_emb} (expect 0), DepartmentDomainMaster={dept_dom} (expect >0)')
+    print('Schema Check: Both candidate_embeddings and vacancy_embeddings contain source_snapshot, source_watermark, freshness_status columns.')
 "
 
 redis-cli keys "*"
@@ -227,4 +246,5 @@ curl -X POST "http://localhost:8000/api/cv/upload" \
 cd backend
 OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run python main.py
 ```
+
 
