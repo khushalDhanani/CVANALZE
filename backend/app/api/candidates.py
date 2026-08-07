@@ -89,19 +89,23 @@ def get_candidate_detail(candidate_id: str):
     if not result:
         raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
 
-    if "experience_years" not in result or result.get("experience_years") is None:
-        from app.services.experience_calculator import ExperienceCalculator
+    from app.services.experience_calculator import ExperienceCalculator
 
-        resume_json = result.get("resume_json") or {}
-        cv_text = result.get("markdown") or result.get("text") or ""
-        stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
-        canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, cv_text, candidate_id=stem)
-        result["experience_years"] = canonical_exp["experience_years"]
-        result["seniority"] = canonical_exp["seniority"]
-        result["experience_summary"] = canonical_exp
-        result["work_experience"] = canonical_exp["normalized_employment"]
+    resume_json = result.get("resume_json") or {}
+    cv_text = result.get("markdown") or result.get("text") or ""
+    stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
+    canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, cv_text, candidate_id=stem)
+
+    result["experience_years"] = canonical_exp["experience_years"]
+    result["total_experience_years"] = canonical_exp["total_experience_years"]
+    result["total_experience_months"] = canonical_exp["total_experience_months"]
+    result["seniority"] = canonical_exp["seniority"]
+    result["experience_summary"] = canonical_exp
+    result["work_experience"] = canonical_exp["normalized_employment"]
+    result["experience_gap_analysis"] = canonical_exp.get("gap_analysis")
 
     return result
+
 
 
 @router.post("/{candidate_id}/reprocess", response_model=dict[str, Any])

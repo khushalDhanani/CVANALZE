@@ -406,9 +406,12 @@ async def process_cv_file(
                 "docling_duration_ms": docling_duration_ms,
                 "stage_durations_ms": stage_durations_ms,
                 "experience_years": calculated_exp,
+                "total_experience_years": calculated_exp,
+                "total_experience_months": int(round(calculated_exp * 12)),
                 "seniority": canonical_exp["seniority"],
                 "experience_summary": canonical_exp,
                 "work_experience": canonical_exp["normalized_employment"],
+                "experience_gap_analysis": canonical_exp.get("gap_analysis"),
                 "quality_metrics": quality_metrics,
                 "resume_json": resume_json,
                 "normalized_resume": normalized_resume.model_dump(mode="json"),
@@ -422,6 +425,7 @@ async def process_cv_file(
                 "dynamic_profile": None,
                 "match_analysis": match_analysis.model_dump(),
             }
+
 
             saved_path = await asyncio.to_thread(ResultRepository.atomic_save_result, result_filename, result_data)
             result_data["result_file_path"] = str(saved_path)

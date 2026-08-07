@@ -618,7 +618,9 @@ export default function CandidateDetailScreen() {
         <ExperienceTimelineCard
           analysis={(analysis as any)?.experience_gap_analysis || (recommendations as any)?.experience_gap_analysis || (data as any)?.experience_gap_analysis}
           experienceAssessment={recommendations?.experience_assessment || (data as any)?.experience_summary?.experience_assessment}
+          candidateData={data}
         />
+
 
         {/* AI Career Summary & Domain Insights */}
         {(analysis?.ai_career_summary || analysis?.recommended_department || analysis?.professional_domain) && (

@@ -27,17 +27,21 @@ export type {
 };
 
 interface ExperienceTimelineCardProps {
-  analysis?: ExperienceGapAnalysisData | null;
+  analysis?: ExperienceGapAnalysisData | any | null;
   experienceAssessment?: string | null;
+  totalExperienceYears?: number | null;
+  candidateData?: any | null;
 }
 
 export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   analysis,
   experienceAssessment,
+  totalExperienceYears,
+  candidateData,
 }) => {
   const [showUndated, setShowUndated] = useState(false);
 
-  if (!analysis && !experienceAssessment) return null;
+  if (!analysis && !experienceAssessment && !candidateData) return null;
 
   const summary = analysis?.summary;
   const events = analysis?.timeline_events || [];
@@ -45,6 +49,78 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   const canonicalJobs = analysis?.canonical_jobs || [];
   const hrIndicators = analysis?.hr_review_indicators || [];
   const hrObs = summary?.hr_observations || [];
+
+  const resolveCanonicalExperienceYears = (): number | null => {
+    if (typeof totalExperienceYears === 'number' && !isNaN(totalExperienceYears)) {
+      return totalExperienceYears;
+    }
+
+    if (typeof summary?.total_verified_years === 'number' && summary.total_verified_years > 0) {
+      return summary.total_verified_years;
+    }
+
+    const sources = [analysis, candidateData];
+    for (const src of sources) {
+      if (!src || typeof src !== 'object') continue;
+
+      if (typeof src.total_experience_years === 'number' && !isNaN(src.total_experience_years)) {
+        return src.total_experience_years;
+      }
+      if (typeof src.experience_years === 'number' && !isNaN(src.experience_years)) {
+        return src.experience_years;
+      }
+
+      const expSum = src.experience_summary;
+      if (expSum && typeof expSum === 'object') {
+        if (typeof expSum.authoritative_years === 'number' && !isNaN(expSum.authoritative_years)) {
+          return expSum.authoritative_years;
+        }
+        if (typeof expSum.experience_years === 'number' && !isNaN(expSum.experience_years)) {
+          return expSum.experience_years;
+        }
+        if (typeof expSum.stated_years === 'number' && !isNaN(expSum.stated_years)) {
+          return expSum.stated_years;
+        }
+      }
+
+      const qMetrics = src.quality_metrics;
+      if (qMetrics && typeof qMetrics === 'object' && typeof qMetrics.experience_years === 'number' && !isNaN(qMetrics.experience_years)) {
+        return qMetrics.experience_years;
+      }
+
+      const rJson = src.resume_json;
+      if (rJson && typeof rJson === 'object' && typeof rJson.total_experience_years === 'number' && !isNaN(rJson.total_experience_years)) {
+        return rJson.total_experience_years;
+      }
+    }
+
+    if (typeof summary?.total_verified_years === 'number' && !isNaN(summary.total_verified_years)) {
+      return summary.total_verified_years;
+    }
+
+    return null;
+  };
+
+  const canonicalYears = resolveCanonicalExperienceYears();
+
+  const formatDisplayExperience = (years: number | null): string => {
+    if (years === null || years === undefined) {
+      return 'N/A';
+    }
+    if (years === 0) {
+      return '0 years 0 months';
+    }
+    if (summary?.gross_display && summary.gross_display !== '0 years 0 months' && (summary?.total_verified_years === years || summary?.total_verified_years === 0)) {
+      return summary.gross_display;
+    }
+    const totalMonths = Math.round(years * 12);
+    const yearsPart = Math.floor(totalMonths / 12);
+    const monthsPart = totalMonths % 12;
+    return `${yearsPart} year${yearsPart !== 1 ? 's' : ''} ${monthsPart} month${monthsPart !== 1 ? 's' : ''}`;
+  };
+
+  const experienceDisplayText = formatDisplayExperience(canonicalYears);
+
 
   const formatEmpType = (type: string) => {
     if (!type) return 'Full-Time';
@@ -289,8 +365,10 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
               Total Experience
             </Text>
             <Text className="text-xs font-sans-bold text-text-primary">
-              {summary.total_verified_years > 0 ? `${summary.total_verified_years} Yrs` : summary.gross_display}
+              {experienceDisplayText}
             </Text>
+
+
           </View>
 
           <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">

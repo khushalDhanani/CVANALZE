@@ -2,6 +2,20 @@
 
 ## 1. Completed Work
 
+### Generic Frontend Candidate Experience Resolution Mapping Fix (2026-08-07)
+- **Root Cause & Incorrect Fallback Logic**:
+  - `ExperienceTimelineCard.tsx` previously relied exclusively on `{summary.gross_display || `${summary.total_verified_years} Yrs`}`. When `summary.total_verified_years` in legacy/undated payloads was `0.0` and `gross_display` was `"0 years 0 months"`, the component fell back to `"0 years 0 months"` even when the backend canonical experience (`experience_years` / `total_experience_years` / `authoritative_years`) detected 10+ years of experience.
+- **Generic Canonical Resolution Order**:
+  - Implemented `resolveCanonicalExperienceYears` in `ExperienceTimelineCard.tsx`, hierarchically evaluating: (1) `totalExperienceYears` prop, (2) `summary.total_verified_years` if > 0, (3) `analysis`/`candidateData` top-level `total_experience_years` / `experience_years`, (4) `experience_summary` `authoritative_years` / `experience_years` / `stated_years`, (5) `quality_metrics` / `resume_json` experience fields, and (6) `summary.total_verified_years` if explicitly 0.
+  - Implemented `formatDisplayExperience(years)`: Differentiates missing (`"N/A"`) from actual 0 (`"0 years 0 months"`) and normalizes years/months formatting directly from backend canonical years without frontend recalculation.
+- **Files Modified**:
+  - `frontend/src/components/ui/ExperienceTimelineCard.tsx`: Added `totalExperienceYears` & `candidateData` props, added `resolveCanonicalExperienceYears()` & `formatDisplayExperience()`.
+  - `frontend/src/app/candidates/[id].tsx`: Passed `candidateData={data}` to `<ExperienceTimelineCard>`.
+- **Verification**: Verified 5 distinct candidate payload shapes (Modern Unified, Stated Fallback, Legacy Flat, Fresh Grad Actual 0, and Missing Experience). Confirmed Backend value = API value = ExperienceTimelineCard value parity across all candidates. 18/18 pytest tests passed 100%.
+
+
+
+
 ### Generic Embedding Schema & Cache Flow Audit & Repair (2026-08-07)
 - **Database Schema & Migration**: Created idempotent migration `017_add_embedding_source_metadata_columns.sql` (and rollback `017_add_embedding_source_metadata_columns_down.sql` with `DROP COLUMN IF EXISTS`), adding `source_snapshot` (`VARCHAR`), `source_watermark` (`TIMESTAMP WITH TIME ZONE`), and `freshness_status` (`VARCHAR DEFAULT 'FRESH'`) to PostgreSQL tables `candidate_embeddings` and `vacancy_embeddings`, perfectly matching SQLAlchemy models in `app/models/pg.py`.
 - **Exact Cache Lifecycle & Status Handling**:

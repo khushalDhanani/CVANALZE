@@ -151,7 +151,10 @@ class ExperienceCalculator:
         gap_dict = gap_analysis.model_dump()
 
         canonical_timeline_years = float(gap_analysis.summary.total_verified_years)
-        if canonical_timeline_years > 0:
+        if deterministic_years is not None and deterministic_years > 0:
+            authoritative_years = deterministic_years
+            status = "canonical_interval_union"
+        elif canonical_timeline_years > 0:
             authoritative_years = canonical_timeline_years
             status = "canonical_interval_union"
         elif stated_years is not None and stated_years > 0:
@@ -166,6 +169,19 @@ class ExperienceCalculator:
         else:
             authoritative_years = 0.0
             status = "no_history"
+
+        # Synchronize experience gap analysis summary so single source of truth canonical experience is reflected in total_verified_years & gross_display
+        if authoritative_years > 0:
+            gap_analysis.summary.total_verified_years = authoritative_years
+            total_m = int(round(authoritative_years * 12))
+            y_part = total_m // 12
+            m_part = total_m % 12
+            gap_analysis.summary.gross_display = f"{y_part} years {m_part} months"
+            if gap_analysis.summary.hr_observations:
+                gap_analysis.summary.hr_observations[0] = f"Total Employment Duration: {authoritative_years:.1f} years ({gap_analysis.summary.gross_display})."
+
+        gap_dict = gap_analysis.model_dump()
+        total_months = int(round(authoritative_years * 12))
 
         # Seniority calculation based on canonical authoritative_years
         if authoritative_years >= 12.0:
@@ -192,7 +208,9 @@ class ExperienceCalculator:
 
         return {
             "experience_years": authoritative_years,
-            "deterministic_years": canonical_timeline_years if canonical_timeline_years > 0 else deterministic_years,
+            "total_experience_years": authoritative_years,
+            "total_experience_months": total_months,
+            "deterministic_years": deterministic_years if deterministic_years is not None else (canonical_timeline_years if canonical_timeline_years > 0 else None),
             "stated_years": stated_years,
             "authoritative_years": authoritative_years,
             "seniority": seniority,
@@ -203,6 +221,7 @@ class ExperienceCalculator:
             "normalized_employment": normalized_employment,
             "gap_analysis": gap_dict,
         }
+
 
     @classmethod
     def calculate_total_experience(cls, resume_json: dict[str, Any], cv_text: str = "") -> float:
