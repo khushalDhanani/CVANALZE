@@ -166,6 +166,12 @@ class TaxonomyRules(BaseModel):
     default_family: str = Field(..., min_length=1)
     vacancy_rules: list[VacancyTaxonomyRule] = Field(default_factory=list)
     candidate_rules: list[CandidateTaxonomyRule] = Field(default_factory=list)
+    
+    evidence_weight_experience: float = Field(default=5.0, ge=0.0)
+    evidence_weight_responsibilities: float = Field(default=3.0, ge=0.0)
+    evidence_weight_skills: float = Field(default=2.0, ge=0.0)
+    evidence_weight_summary: float = Field(default=1.5, ge=0.0)
+    evidence_weight_education: float = Field(default=1.0, ge=0.0)
 
 
 class DensityScoreTier(BaseModel):

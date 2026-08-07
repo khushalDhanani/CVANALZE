@@ -104,11 +104,28 @@ class CandidateDomainService:
             recommended_dept = industry_dept or prof_domain
             suitable_roles = [dyn_res.db_department_name] if dyn_res.db_department_name else []
         else:
-            dept_scores: list[tuple[int, DepartmentDomain]] = []
+            tax_rules = RuleConfigManager.get_taxonomy_rules()
+            w_exp = tax_rules.evidence_weight_experience
+            w_resp = tax_rules.evidence_weight_responsibilities
+            w_skills = tax_rules.evidence_weight_skills
+            
+            exp_text = " ".join(roles_list).lower()
+            resp_text = " ".join(projects_list).lower()
+            skills_text = " ".join(skills_set).lower()
+            
+            dept_scores: list[tuple[float, DepartmentDomain]] = []
             for matcher in repo.get_domain_matchers():
-                kw_matches = matcher.keyword_match_count(combined_text)
-                if kw_matches > 0:
-                    dept_scores.append((kw_matches, matcher.domain))
+                score = 0.0
+                score += matcher.keyword_match_count(combined_text) * 1.0
+                if exp_text:
+                    score += matcher.keyword_match_count(exp_text) * w_exp
+                if resp_text:
+                    score += matcher.keyword_match_count(resp_text) * w_resp
+                if skills_text:
+                    score += matcher.keyword_match_count(skills_text) * w_skills
+                    
+                if score > 0:
+                    dept_scores.append((score, matcher.domain))
 
             if dept_scores:
                 best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]

@@ -98,10 +98,10 @@ class Settings(BaseSettings):
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = ""
     OLLAMA_MODEL: str = "qwen3:4b"  # or qwen2.5:3b etc based on what's available
-    OLLAMA_REQUEST_TIMEOUT: float = 60.0
+    OLLAMA_REQUEST_TIMEOUT: float = 300.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0
-    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 60.0
+    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 300.0
     OLLAMA_EMBED_TIMEOUT_SECONDS: float = 30.0
     OLLAMA_UNLOAD_TIMEOUT_SECONDS: float = 10.0
     OLLAMA_MAX_RETRIES: int = 0
@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     OLLAMA_GENERATION_NUM_CTX: int = 4096
     OLLAMA_GENERATION_NUM_PREDICT: int = 1024
     OLLAMA_OPTIMIZED_NUM_PREDICT: int = 2048
-    PREFILTER_TOP_K: int = 5
+    PREFILTER_TOP_K: int = 60
     OPTIMIZED_PROMPT_VERSION: str = "3.5"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 
@@ -132,7 +132,7 @@ class Settings(BaseSettings):
     # Embedding Configuration
     EMBEDDING_ENABLED: bool = True
     EMBEDDING_MODEL: str = "nomic-embed-text"
-    SEMANTIC_RETRIEVAL_TOP_N: int = 50
+    SEMANTIC_RETRIEVAL_TOP_N: int = 150
     SIMILAR_CANDIDATE_THRESHOLD: float = 0.85
     SIMILAR_CANDIDATE_MAX_MATCHES: int = 5
 

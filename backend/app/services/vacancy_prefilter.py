@@ -214,7 +214,7 @@ class VacancyPreFilter:
         t0 = time.perf_counter()
         stage0_jobs = job_contexts
         if cand_ctx.cand_families and cand_ctx.cand_families != [RuleConfigManager.get_taxonomy_rules().default_family]:
-            compatible_jobs = [j for j in job_contexts if TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) or j.vac_tax_domain == cand_ctx.cand_domain]
+            compatible_jobs = [j for j in job_contexts if j.vac_tax_domain in ("Unknown", "Not Configured") or j.vac_family in ("Unknown", "Not Configured") or TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) or j.vac_tax_domain == cand_ctx.cand_domain]
             if compatible_jobs:
                 stage0_jobs = compatible_jobs
 

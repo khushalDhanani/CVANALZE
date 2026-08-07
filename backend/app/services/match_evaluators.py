@@ -22,10 +22,7 @@ from app.services.job_taxonomy import TaxonomyClassifier
 _EXPERIENCE_CLAUSE_RE = re.compile(
     r"\b\d+\s*\+?\s*(?:to\s*\d+\s*)?years?\b", re.IGNORECASE
 )
-_IT_VACANCY_RE = re.compile(
-    r"\b(cis|it\b|information\s*technology|software|developer|programmer|computer|flutter|dotnet|\.net|django|react|angular|node\.?js|frontend|front\s*end|backend|back\s*end|full\s*stack|devops|cloud|data\s*engineer|data\s*scientist|qa\s*automation|software\s*engineering)\b",
-    re.IGNORECASE,
-)
+
 _stop_phrases_cache: frozenset[str] | None = None
 
 
@@ -327,6 +324,43 @@ class RequirementEvaluator:
                 results.evidence_map[req_id] = ev
                 results.mandatory_failures.append(cls._create_failure(req_id, f"Min Experience: {min_exp} years", reason, penalty))
                 results.missing_criteria.append(f"Min Experience ({min_exp} years)")
+
+        # SENIORITY GATE: Reject overqualified candidates for junior roles
+        if max_exp is not None and context.candidate_experience is not None:
+            req_id = "req_seniority_gate"
+            vac_ev = f"Seniority Gate (Max Exp: {max_exp} yrs)"
+            seniority_buffer = 2.0 # Allow up to 2 years over qualification before hard rejecting
+            if context.candidate_experience <= (max_exp + seniority_buffer):
+                cv_ev = f"Candidate experience {context.candidate_experience} years is within allowable seniority bounds (max {max_exp} yrs + {seniority_buffer} yrs buffer)"
+                ev = cls._create_evidence(cv_ev, vac_ev)
+                results.mandatory_reqs.append(
+                    cls._create_requirement(
+                        req_id,
+                        f"Seniority Bound: {max_exp} years",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.SATISFIED,
+                        ev,
+                    )
+                )
+                results.evidence_map[req_id] = ev
+                results.matched_criteria.append(f"Seniority Gate (Max {max_exp} years)")
+            else:
+                cv_ev = f"Candidate experience {context.candidate_experience} years significantly exceeds maximum {max_exp} years"
+                reason = f"Candidate seniority level is fundamentally incompatible with the vacancy (overqualified by {context.candidate_experience - max_exp:.1f} years)."
+                ev = cls._create_evidence(cv_ev, vac_ev)
+                results.mandatory_reqs.append(
+                    cls._create_requirement(
+                        req_id,
+                        f"Seniority Bound: {max_exp} years",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.FAILED,
+                        ev,
+                        failure_reason=reason,
+                    )
+                )
+                results.evidence_map[req_id] = ev
+                results.mandatory_failures.append(cls._create_failure(req_id, f"Seniority Gate: Max {max_exp} years", reason, penalty))
+                results.missing_criteria.append(f"Seniority Gate (Max {max_exp} years)")
 
         # 4. Mandatory Education
         if education_req:
@@ -725,17 +759,15 @@ class CrossDomainGuardEvaluator:
 
         # Software/IT candidate matched to a clearly non-IT vacancy: apply the
         # cross-domain cap even when taxonomy domain/family metadata is missing
-        # ("Unknown"). Closes the dead-code gap where job_context computed
-        # is_non_it_job/has_software_req but no evaluator consumed them, so IT
-        # candidates (e.g. Utkarsh) were never capped against QC/Production roles.
+        # ("Unknown").
         if context.is_software_cand and not is_tax_compat:
-            vac_text = " ".join(
-                filter(
-                    None,
-                    [vac_tax_domain or "", vac_family or "", job_ctx.department or "", job_ctx.title or ""],
-                )
-            )
-            if not job_ctx.has_software_req and not _IT_VACANCY_RE.search(vac_text):
+            is_it_vacancy = False
+            if vac_tax_domain and vac_tax_domain != "Unknown":
+                is_it_vacancy = (vac_tax_domain.lower() == "information technology" or vac_tax_domain.lower() == "cis team")
+            elif job_ctx.department:
+                is_it_vacancy = (job_ctx.department.lower() == "cis team" or job_ctx.department.lower() == "information technology")
+                
+            if not job_ctx.has_software_req and not is_it_vacancy:
                 domain_mismatch = True
 
         final_score = initial_score

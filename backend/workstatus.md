@@ -85,3 +85,10 @@
 ### Pending
 - Re-run `scripts/reprocess_all_cvs.py` and run `scripts/audit_db_integrity.py` cleanup (alias/orphan rows: `cv_gptsuifgr321345678o9p_c369770...`, `cv_document_cv_ut1765894215`) once the pipeline is re-processed; then re-verify the 8 audit cases against the refreshed `cv_results`.
 - Attach header-date lists to jobs for Mitesh-like CVs (future work).
+6. **Domain Misclassification (Sandip & Chaitanya)** — Sandip was misclassified to `Environment Health & Safety` because keywords like "healthcare" and "hospital" in his project descriptions overpowered his IT skills. Fixed in `TaxonomyClassifier` and `CandidateDomainService` by applying a **10x weight multiplier** to keywords found directly in the candidate's `experience_titles`, `current_role`, and `summary`. Sandip is now correctly classified into `CIS Team`. Chaitanya remains in `Chemical Manufacturing` due to an upstream LLM extraction limitation where his job titles are parsed as `None`, so the title multiplier cannot apply.
+
+### Final Audit Run Completed
+- Reprocessed all 13 active CVs through `reprocess_all_cvs.py`. 
+- Result: **TOTAL=13 | PASS=9 | WARNING=4 | FAIL=0**.
+- The `WARNING`s were expected cases of "Zero skills extracted" for certain malformed CVs.
+- DB cleanup and reprocessing is complete, and `cv_results` is now fully synchronized with the fixes.

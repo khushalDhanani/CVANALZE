@@ -292,12 +292,38 @@ class TaxonomyClassifier:
                 )
 
         from app.repositories.department_domain import department_domain_repository
+        from app.core.rule_config_manager import RuleConfigManager
+        
+        tax_rules = RuleConfigManager.get_taxonomy_rules()
+        w_exp = tax_rules.evidence_weight_experience
+        w_skills = tax_rules.evidence_weight_skills
+        w_summary = tax_rules.evidence_weight_summary
+        w_edu = tax_rules.evidence_weight_education
+        
         combined_text = dto.normalized_full_text.lower()
+        exp_text = " ".join(dto.experience_titles).lower()
+        skills_text = " ".join(dto.skills).lower()
+        summary_text = dto.summary.lower() if dto.summary else ""
+        edu_text = " ".join(dto.education).lower()
+        
         dept_scores = []
         for matcher in department_domain_repository.get_domain_matchers():
-            kw_matches = matcher.keyword_match_count(combined_text)
-            if kw_matches > 0:
-                dept_scores.append((kw_matches, matcher.domain))
+            score = 0.0
+            
+            # Base text match
+            score += matcher.keyword_match_count(combined_text) * 1.0
+            
+            if exp_text:
+                score += matcher.keyword_match_count(exp_text) * w_exp
+            if skills_text:
+                score += matcher.keyword_match_count(skills_text) * w_skills
+            if summary_text:
+                score += matcher.keyword_match_count(summary_text) * w_summary
+            if edu_text:
+                score += matcher.keyword_match_count(edu_text) * w_edu
+                
+            if score > 0:
+                dept_scores.append((score, matcher.domain))
 
         if dept_scores:
             best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]

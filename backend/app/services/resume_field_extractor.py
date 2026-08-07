@@ -314,6 +314,11 @@ class ResumeFieldExtractor:
             "certifications": [line.lstrip("-• ").strip() for line in sections.get("certifications", []) if line.strip()],
             "quality_metrics": metrics or {},
         }
+        
+        # Zero-skill recovery fallback
+        if not result["skills"]["all_skills"]:
+            result["skills"] = cls._recover_skills_from_context(result["work_experience"], result["projects"])
+
         result["normalized"] = ResumeNormalizer.normalize(result, text).model_dump(mode="json")
         return result
 
@@ -612,6 +617,30 @@ class ResumeFieldExtractor:
                 seen.add(clean.lower())
                 deduplicated.append(clean)
         return {"categorized": categorized, "all_skills": deduplicated}
+
+    @classmethod
+    def _recover_skills_from_context(cls, work_experience: list[dict[str, Any]], projects: list[dict[str, Any]]) -> dict[str, Any]:
+        """Synthesize baseline skills from responsibilities and projects when a formal skills section is missing."""
+        recovered_skills: set[str] = set()
+        
+        # We look for Capitalized Words or common technical terms in bullet points
+        # to avoid dumping entire sentences into skills
+        def extract_terms(text: str) -> list[str]:
+            text = re.sub(r"[,;&|\.]+", " ", text)
+            # Find contiguous capitalized words (e.g., "Quality Control", "React Native", "Gas Chromatography")
+            # or known specific terms if they were lowercased
+            capitalized = re.findall(r"\b[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*\b", text)
+            return [t.strip() for t in capitalized if len(t) > 3 and not cls._is_junk_skill(t.lower())]
+
+        for exp in work_experience:
+            for resp in exp.get("responsibilities", []):
+                recovered_skills.update(extract_terms(resp))
+        for proj in projects:
+            if proj.get("description"):
+                recovered_skills.update(extract_terms(proj["description"]))
+                
+        deduped = sorted(list(recovered_skills))
+        return {"categorized": {"Recovered Context Skills": deduped} if deduped else {}, "all_skills": deduped}
 
     @staticmethod
     def _extract_projects(lines: list[str]) -> list[dict[str, Any]]:

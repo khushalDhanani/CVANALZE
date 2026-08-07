@@ -141,7 +141,9 @@ class ScoringEngine:
         missing = []
 
         assets = RuleConfigManager.get_term_matching_assets()
-        noise_words = assets["noise_words"]
+        noise_words = set(assets.get("noise_words", []))
+        noise_words.update(["general", "knowledge", "basic", "advanced", "good", "excellent", "working", "understanding", "hands-on", "familiarity", "experience", "skills", "ability"])
+        noise_words = list(noise_words)
         aliases = assets["aliases"]
 
         for term in terms:
