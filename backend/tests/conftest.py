@@ -91,3 +91,29 @@ def mock_prompt_service(monkeypatch, request):
         return "NO_SUITABLE_MATCH recommended_department MUST be selected from EVIDENCE CITATION"
         
     monkeypatch.setattr(PromptService, "_fetch_prompt_from_db", classmethod(mocked_fetch_prompt_from_db))
+
+
+@pytest.fixture(autouse=True)
+def cleanup_test_cv_results():
+    """Ensure test runs do not leave mock candidate records (Jane Doe/John Doe/test keys) in the active database or cache."""
+    yield
+    try:
+        from app.core.database import PostgresAppSession
+        from app.models.result import CVResult
+        from app.core.cache import cv_result_cache_manager
+        if PostgresAppSession is not None:
+            with PostgresAppSession() as db:
+                test_rows = db.query(CVResult).filter(
+                    (CVResult.cv_key.ilike('%candidate%')) |
+                    (CVResult.cv_key.ilike('%test%')) |
+                    (CVResult.full_name == 'Jane Doe') |
+                    (CVResult.full_name == 'John Doe')
+                ).all()
+                if test_rows:
+                    for r in test_rows:
+                        db.delete(r)
+                    db.commit()
+        cv_result_cache_manager.clear()
+    except Exception:
+        pass
+

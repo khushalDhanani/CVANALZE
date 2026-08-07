@@ -249,6 +249,22 @@ None. All tasks completed successfully.
 - `backend/app/services/vector_migration_service.py`
 - `workstatus.md`
 
+## 2026-08-07: Purge Test Candidate Entries (Jane Doe/John Doe) & Enforce Test Isolation
+
+### Root Cause:
+- Execution of unit test suites (`test_cv_idempotency.py`, `test_audit_fixes.py`, `test_frontend_polling_e2e.py`) persisted mock candidate records (`Jane Doe`, `John Doe`, `cv_candidate_*`, `cv_document_*test*`) into the PostgreSQL production/dev database table `cvai.cv_results` and disk cache without automatic post-test cleanup.
+- Consequently, `GET /api/candidates` returned these test records in the active UI candidate list.
+
+### Work Completed:
+- **Database & Cache Purge**: Removed 13 mock candidate rows (`Jane Doe`, `John Doe`, `cv_candidate_*`) from PostgreSQL `cvai.cv_results` and cleared Redis result cache and test JSON files.
+- **Automated Test Isolation**: Added `cleanup_test_cv_results` `autouse=True` fixture to `backend/tests/conftest.py` to automatically wipe any mock candidate entries created during pytest runs.
+- **Verification**: Verified that `ResultRepository.list_all_results()` now returns only genuine uploaded candidates (`SAKSHI YADAV`, `HARDIK R TAILOR`, `Utkarsh Patil`, `Gtworks`, `SHAHDAB SHAIKH`, etc.) with zero mock test entries.
+
+### Files Modified:
+- `backend/tests/conftest.py`
+- `workstatus.md`
+
+
 
 
 
