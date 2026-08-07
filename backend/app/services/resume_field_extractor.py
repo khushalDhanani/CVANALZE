@@ -331,7 +331,7 @@ class ResumeFieldExtractor:
                     current["company"] = company
                 continue
             if date_match:
-                if current.get("dates") or (current.get("responsibilities") and len(current.get("responsibilities", [])) > 1):
+                if current.get("dates"):
                     commit()
                 current["dates"] = date_match.group(0).strip(" ()")
                 possible_title = cls._DATE_RANGE.sub("", line).strip(" ()-|–—")
@@ -345,7 +345,12 @@ class ResumeFieldExtractor:
                     current["job_title"] = possible_title
                 continue
             if line.startswith(("-", "•")):
-                current.setdefault("responsibilities", []).append(line.lstrip("-• ").strip())
+                clean_bullet = line.lstrip("-• \uf0b7").strip()
+                desig_match = re.search(r"(?:designation|job\s+title|role)\s*[:\-]\s*(.+)$", clean_bullet, re.IGNORECASE)
+                if desig_match and desig_match.group(1).strip():
+                    current["job_title"] = desig_match.group(1).strip()
+                else:
+                    current.setdefault("responsibilities", []).append(clean_bullet)
             elif not current.get("job_title") and cls.is_valid_job_title(line):
                 current["job_title"] = line
             else:

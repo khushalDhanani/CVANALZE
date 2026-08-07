@@ -83,7 +83,7 @@ class MatchService:
             logger.warning("MatchService.analyze_single_cv: No job openings available for matching.")
             profiler.finish()
             profiler.log_summary()
-            return MatchService._empty_analysis(normalized_resume=normalized_resume)
+            return MatchService._empty_analysis(cv_text=cv_text, normalized_resume=normalized_resume)
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
@@ -408,23 +408,14 @@ class MatchService:
             ]
             
         if not has_genuine_match:
-            recommended_dept = None
-            professional_domain = None
             best_match = None
             top_level_match_status = MatchStatus.NO_SUITABLE_MATCH
-            cand_classification = NormalizedClassification(
-                db_department_id=None,
-                db_department_name=None,
-                db_designation_id=None,
-                db_designation_name=None,
-                industry_department=None,
-                industry_designation=None,
-                industry_domain=None,
-                match_status=MatchStatus.NO_SUITABLE_MATCH,
-                confidence=0.0,
-                match_source="NO_MATCH",
-                evidence=[]
-            )
+            if cand_classification:
+                cand_classification = cand_classification.model_copy(update={
+                    "match_status": MatchStatus.NO_SUITABLE_MATCH,
+                    "industry_department": cand_classification.industry_department or recommended_dept or None,
+                    "industry_domain": cand_classification.industry_domain or professional_domain or None,
+                })
         else:
             top_level_match_status = MatchStatus.DB_MATCH
 
@@ -543,9 +534,9 @@ class MatchService:
 
         return EnrichedCandidateAnalysis(
             match_status=MatchStatus.NO_SUITABLE_MATCH,
-            primary_department=None,
-            recommended_department=None,
-            professional_domain=None,
+            primary_department=industry_dept or None,
+            recommended_department=industry_dept or None,
+            professional_domain=industry_domain or None,
             strengths=strengths,
             suitable_job_roles=roles,
             has_genuine_match=False,

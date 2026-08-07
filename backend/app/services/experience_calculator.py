@@ -144,6 +144,8 @@ class ExperienceCalculator:
 
         stated_years = cls._extract_explicit_experience(cv_text)
 
+        quality_exp = float(resume_json.get("experience_years") or (resume_json.get("quality_metrics") or {}).get("experience_years") or 0.0)
+
         # Resolution hierarchy:
         if deterministic_years is not None and deterministic_years > 0:
             authoritative_years = deterministic_years
@@ -151,6 +153,9 @@ class ExperienceCalculator:
         elif stated_years is not None and stated_years > 0:
             authoritative_years = stated_years
             status = "stated_fallback"
+        elif quality_exp > 0:
+            authoritative_years = quality_exp
+            status = "quality_metrics_fallback"
         elif work_exp:
             authoritative_years = round(max(1.0, float(len(work_exp))), 1)
             status = "role_heuristic"
@@ -172,10 +177,11 @@ class ExperienceCalculator:
         else:
             seniority = "Entry Level"
 
+        seniority_label = seniority if seniority.endswith("Level") else f"{seniority} level"
         if authoritative_years > 0:
-            experience_assessment = f"Assessed as {seniority} level with {authoritative_years:.1f} years of verified experience."
+            experience_assessment = f"Assessed as {seniority_label} with {authoritative_years:.1f} years of verified experience."
         elif work_exp:
-            experience_assessment = f"Assessed as {seniority} level based on {len(work_exp)} documented employment role(s)."
+            experience_assessment = f"Assessed as {seniority_label} based on {len(work_exp)} documented employment role(s)."
         else:
             experience_assessment = "Assessed as Entry Level (No employment history documented)."
 
@@ -246,7 +252,8 @@ class ExperienceCalculator:
             # Cap end_date at current time
             end_date = min(end_date, datetime.now())
 
-            intervals.append((start_date, end_date))
+            if start_date and end_date:
+                intervals.append((start_date, end_date))
 
         return intervals
 
@@ -280,12 +287,15 @@ class ExperienceCalculator:
         if not cv_text:
             return None
 
-        search_text = cv_text[:2000].lower()
+        search_text = cv_text[:3000].lower()
 
-        # Regex to match: "total experience: 5.5 years", "experience - 4 yrs", "5+ years of experience"
+        # Regex to match: "total experience: 5.5 years", "experience - 4 yrs", "5+ years of experience", "with 13+ years of experience"
         patterns = [
             r"(?:total\s+)?(?:experience|exp)\s*(?:[:\-\|]|\s)\s*(\d{1,2}(?:\.\d{1,2})?)\+?\s*(?:years?|yrs?)",
-            r"(\d{1,2}(?:\.\d{1,2})?)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:total\s+)?(?:experience|exp)",
+            r"(\d{1,2}(?:\.\d{1,2})?)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:total\s+)?(?:experience|exp|in\b|expertise|field)",
+            r"(?:with|having)\s+(\d{1,2}(?:\.\d{1,2})?)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp|expertise)",
+            r"(?:experience|expertise)\s+of\s+(\d{1,2}(?:\.\d{1,2})?)\+?\s*(?:years?|yrs?)",
+            r"(\d{1,2}(?:\.\d{1,2})?)\+?\s*(?:years?|yrs?)\s+(?:experienced|working)",
         ]
 
         for p in patterns:

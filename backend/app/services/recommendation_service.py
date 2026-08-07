@@ -43,13 +43,13 @@ class RecommendationService:
         result_filename = f"{cid}.json" if not cid.endswith(".json") else cid
         cv_key = result_filename.removesuffix(".json")
 
-        r = ResultRepository.read_result_by_filename(result_filename)
+        r = ResultRepository.resolve_result(cid)
         if not r:
-            matches = ResultRepository.find_results_by_scan_id(cv_key)
-            if matches:
-                r = ResultRepository.read_result(matches[0])
+            r = ResultRepository.read_result_by_filename(result_filename)
 
         if not r or not isinstance(r, dict) or r.get("status") == "processing":
+            is_proc = isinstance(r, dict) and r.get("status") == "processing"
+            status_msg = "Analysis in progress..." if is_proc else "N/A"
             return {
                 "candidate_id": cv_key,
                 "full_name": cv_key,
@@ -64,7 +64,13 @@ class RecommendationService:
                 "recommended_certifications": [],
                 "career_transitions": [],
                 "talent_pools": [],
-                "hiring_recommendation": "NO_STRONG_MATCH",
+                "hiring_recommendation": "PROCESSING" if is_proc else "NO_STRONG_MATCH",
+                "role_department_fit": status_msg,
+                "experience_assessment": status_msg,
+                "interview_focus_areas": [],
+                "risk_flags": [],
+                "technical_vs_functional_fit": status_msg,
+                "next_steps_for_interviewer": [],
             }
 
         raw_match = r.get("match_analysis")
@@ -88,12 +94,14 @@ class RecommendationService:
         all_jobs = JobRepository.get_all_jobs()
         classification_data = match_analysis.get("classification") or {}
         industry_dept = None
+        industry_domain = None
         if isinstance(classification_data, dict):
-            industry_dept = classification_data.get("industry_department")
+            industry_dept = classification_data.get("industry_department") or classification_data.get("db_department_name")
+            industry_domain = classification_data.get("industry_domain")
 
-        raw_dept = best_match.get("department") or best_match.get("department_name") or ""
+        raw_dept = best_match.get("department") or best_match.get("department_name") or match_analysis.get("recommended_department") or match_analysis.get("primary_department") or industry_dept or ""
         primary_dept = str(raw_dept).title()
-        prof_domain = match_analysis.get("professional_domain") or industry_dept or ""
+        prof_domain = match_analysis.get("professional_domain") or industry_domain or ""
 
         # 1. Extract candidate skills (structured skills + fallback to work experience extraction)
         raw_cand_skills = resume_json.get("skills") or best_match.get("matched_skills") or []
@@ -262,7 +270,16 @@ class RecommendationService:
         industry_role = suitable_roles[0] if suitable_roles else None
         if not best_vacancies:
             hiring_rec = "NO_STRONG_MATCH"
-            role_dept_fit = "No strong active-vacancy match exists. Industry guidance is reported separately."
+            if primary_dept or prof_domain or suitable_roles:
+                dept_desc = primary_dept if primary_dept else "relevant industry"
+                domain_desc = f"{prof_domain} experience" if prof_domain else "technical capabilities"
+                roles_desc = f" ({', '.join(suitable_roles[:2])})" if suitable_roles else ""
+                role_dept_fit = (
+                    f"Candidate aligns with {dept_desc} roles{roles_desc} based on {domain_desc}. "
+                    "No active vacancy match currently open."
+                )
+            else:
+                role_dept_fit = "N/A"
         else:
             if overall_confidence >= 85:
                 hiring_rec = "Highly Recommended"

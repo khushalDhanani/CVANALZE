@@ -297,17 +297,30 @@ None. All tasks completed successfully.
 ## 2026-08-07: Architectural Retention Rules & Cleanup Boundaries
 
 ### Decisions & Rules:
-1. **Core Compatibility Entry Points (KEEP)**:
-   - `backend/start_worker.py`: Critical worker launcher managing macOS PyTorch fork safety (`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`) and multithreaded RQ queue processing.
-   - `backend/main.py`: Compatibility re-export for `app.main:app` and CLI batch scanner.
-   - `backend/app/services/document_parser.py`: Essential compatibility façade re-exporting document conversion tools (`MarkdownGenerator`, `ResumeJsonExtractor`, `TextSanitizer`).
 
-2. **Legacy Migration Cluster (RETAIN UNTIL BOOTSTRAP CHECK)**:
-   - `backend/scripts/migrate_phase1_inventory.py`, `backend/app/core/rule_config.json`, and `backend/app/data/department_domains_seed.json` form a linked legacy inventory cluster.
-   - Retained as reference until final database bootstrap pipeline checks pass. Currently PostgreSQL `DepartmentDomainMaster` has 52 seeded rows.
 
-3. **Dependency Files (RETAIN)**:
-   - `requirements.txt`: Retained for backward compatibility with external deployment pipelines / CI runners that call `pip install -r requirements.txt`.
+## 2026-08-07: Fix Experience & Seniority and Role & Dept Fit Data Flow
+
+### Root Causes Identified:
+1. **Destructive Domain Nullification (`MatchService.analyze_single_cv`)**: When `has_genuine_match` was `False`, `MatchService` was setting `recommended_department`, `professional_domain`, and candidate `classification` to `None`. This erased intrinsic candidate domain taxonomy context from saved results.
+2. **Missing Fit Guidance in Recommendations (`RecommendationService.get_candidate_recommendations`)**: `role_department_fit` was hardcoded to `"No strong active-vacancy match exists..."` when `best_vacancies` was empty, ignoring candidate domain/department evidence.
+3. **Experience Assessment Formatting & Parsing Fallbacks (`ExperienceCalculator`, `ResumeFieldExtractor`)**: `ExperienceCalculator` generated `"Assessed as Mid-Level level with..."` (double "level" word). Date parsing in `ResumeFieldExtractor` skipped bulleted date lines like `-  Duration :- 20/10/2020 to 06/07/2024` because bullet handling preceded date matching. Explicit experience regexes missed common phrases like `13+ years of experience`.
+4. **Missing Fallback Fields in Recommendations API**: Fallback response for processing/missing records omitted `experience_assessment` and `role_department_fit`, causing frontend rendering to evaluate `undefined` as `'N/A'`.
+
+### Work Completed:
+- **Match Service Domain Preservation**: Updated `MatchService.analyze_single_cv` and `_empty_analysis` to preserve candidate-level `recommended_department`, `professional_domain`, and `classification` when `has_genuine_match` is `False`.
+- **Role & Department Fit Reporting**: Overhauled `RecommendationService.get_candidate_recommendations` to construct evidence-based role/department fit strings (e.g. `"Candidate aligns with Production & Manufacturing roles (Production Engineer, Plant Operator) based on Chemical Manufacturing experience. No active vacancy match currently open."`) when no active vacancy matches.
+- **Experience Calculation & Date Extractor Enhancements**: Cleaned up seniority label formatting in `ExperienceCalculator` to avoid double "level" text. Enhanced `_extract_explicit_experience` regexes and `_extract_employment` bullet parsing in `ResumeFieldExtractor`. Added `quality_metrics` experience fallback.
+- **Targeted Test Coverage**: Added `tests/test_experience_role_fit_flow.py` (4 tests) validating clean seniority formatting, empty experience handling, candidate domain preservation when active vacancies don't match, and recommendation fallback key completeness. All 33 backend tests pass (100%).
+- **Sample CV Reprocessing**: Reprocessed all 13 stored CVs in PostgreSQL (`cv_results`). Verified that `experience_assessment` (e.g., `Assessed as Senior level with 7.8 years of verified experience.`) and `role_department_fit` are populated across all candidate profiles, and `N/A` appears only when data is genuinely unavailable.
+
+### Files Modified:
+- `backend/app/services/match_service.py`
+- `backend/app/services/recommendation_service.py`
+- `backend/app/services/experience_calculator.py`
+- `backend/app/services/resume_field_extractor.py`
+- `backend/tests/test_experience_role_fit_flow.py` [NEW]
+- `workstatus.md`
 
 
 
