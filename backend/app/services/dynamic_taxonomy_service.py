@@ -2,25 +2,15 @@ from __future__ import annotations
 # backend/app/services/dynamic_taxonomy_service.py
 import logging
 
-from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.core.database import PostgresAppSession
 from app.models.pg import DomainEmbedding
-from app.models.taxonomy import (
-    DesignationMaster,
-    DesignationSynonym,
-    JobFamilyMaster,
-)
-from app.services.domain_embedding_service import DomainEmbeddingService
 from app.services.embedding_service import EmbeddingService
 from app.schemas.classification_types import ClassificationEvidence, NormalizedClassification, MatchStatus
 from app.services.department_normalizer import DepartmentNormalizer
 
 logger = logging.getLogger("cv_analyzer")
-
-
-# Deprecated model retained for backward compatibility; new services use NormalizedClassification.
 
 
 class DynamicTaxonomyService:
