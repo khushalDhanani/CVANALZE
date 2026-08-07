@@ -16,4 +16,6 @@ export * from "./StepProgressCard";
 export * from "./FieldConfidenceView";
 export * from "./Breadcrumbs";
 export * from "./ExperienceTimelineCard";
+export * from "./OrganizationHierarchySelector";
+
 

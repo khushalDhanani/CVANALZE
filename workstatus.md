@@ -2,6 +2,24 @@
 
 ## 1. Completed Work
 
+### End-to-End Organization Hierarchy Audit & Refactoring (2026-08-07)
+- **Hierarchy Standard**: Verified and enforced exact 6-level MSSQL hierarchy: `OrgBusinessGroupMst` → `OrgCompanyMst` → `OrgLocationMst` → `OrgMainDepartmentMst` → `OrgDepartmentMst` → `OrgDesignationMst`.
+- **Extended Organization Repository (`OrganizationSourceRepository`)**: Added queries for Business Groups, Companies (filtered by BusinessGrpID), Locations (filtered by CompID), Main Departments, Departments (filtered by CompID & MainDeptID), and Designations (filtered by CompID, DeptID & MainDeptID). Implemented `validate_hierarchy()` to validate parent-child ID relationships so invalid combinations cannot be selected or recommended.
+- **REST APIs (`app/api/organization.py`)**: Implemented `/api/organization/business-groups`, `/companies`, `/locations`, `/main-departments`, `/departments`, `/designations`, `/hierarchy`, and `/validate`.
+- **Schema & Service Hierarchy Preservation**:
+  - `JobOpening` (`app/schemas/job.py`): Added `business_group_id`, `business_group_name`, `company_name_db`, `location_name_db`, `main_department_id`, `main_department_name`, `designation_id`, `designation_name`.
+  - `NormalizedClassification` (`app/schemas/classification_types.py`): Added `db_business_group_id`, `db_business_group_name`, `db_company_id`, `db_company_name`, `db_location_id`, `db_location_name`, `db_main_department_id`, `db_main_department_name`.
+  - `VacancyService`: Updated `map_to_job_requirement` to outer-join and resolve full 6-level hierarchy fields.
+  - `DynamicTaxonomyService`: Updated `_resolve_mssql_source_ids` to populate `db_company_id`, `db_company_name`, `db_main_department_id`, `db_main_department_name`. Candidate professional classification remains separate from Company/Location placement.
+  - `cache_warmer.py`: Added cache warming functions for all hierarchy levels.
+- **Frontend Cascading Selector & Screens**:
+  - Created `frontend/src/services/organizationService.ts` for hierarchy endpoints.
+  - Created reusable component `OrganizationHierarchySelector.tsx`: Implemented Business Group → Company → Location → Main Dept → Dept → Designation cascading selectors. When a parent changes, automatically clears invalid child selections and provides active validation feedback.
+  - Updated `frontend/src/app/vacancies/index.tsx` with hierarchy toggle and filter.
+  - Updated `frontend/src/app/vacancies/[id].tsx` with Organization Hierarchy Card.
+- **Verification**: Created `tests/test_organization_hierarchy.py` testing valid and invalid parent-child hierarchy combinations. All 57 unit tests in test suite passed 100%.
+
+
 ### Generic Frontend Candidate Experience Resolution Mapping Fix (2026-08-07)
 - **Root Cause & Incorrect Fallback Logic**:
   - `ExperienceTimelineCard.tsx` previously relied exclusively on `{summary.gross_display || `${summary.total_verified_years} Yrs`}`. When `summary.total_verified_years` in legacy/undated payloads was `0.0` and `gross_display` was `"0 years 0 months"`, the component fell back to `"0 years 0 months"` even when the backend canonical experience (`experience_years` / `total_experience_years` / `authoritative_years`) detected 10+ years of experience.

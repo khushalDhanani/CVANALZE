@@ -15,8 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { jobsService } from '@/services/jobsService';
 import { useJobs } from '@/hooks/useJobs';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { JobOpening, VacancyRecommendationsResponse } from '@/types/api';
-import { TextField, Card, Button, Badge, EmptyState, DenseRow, Breadcrumbs } from '@/components/ui';
+import { JobOpening, OrganizationSelection, VacancyRecommendationsResponse } from '@/types/api';
+import { TextField, Card, Button, Badge, EmptyState, DenseRow, Breadcrumbs, OrganizationHierarchySelector } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { COLORS } from '@/constants/colors';
 
@@ -29,6 +29,8 @@ export default function VacanciesScreen() {
   const [searchQuery, setSearchQuery] = useState<string>(params.query || '');
   const [filterDept, setFilterDept] = useState<string>(params.department || '');
   const [filterDomain, setFilterDomain] = useState<string>(params.domain || '');
+  const [orgSelection, setOrgSelection] = useState<OrganizationSelection>({});
+  const [showHierarchyFilter, setShowHierarchyFilter] = useState<boolean>(false);
   
   const [clearingCache, setClearingCache] = useState<boolean>(false);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
@@ -92,9 +94,18 @@ export default function VacanciesScreen() {
     const matchesQuery = query === '' || titleMatch || deptMatch || skillsMatch;
     const matchesDept = filterDept === '' || (job.department || '').toLowerCase() === filterDept.toLowerCase();
     const matchesDomain = filterDomain === '' || (job.domain || '').toLowerCase() === filterDomain.toLowerCase();
+
+    // Cascading Hierarchy ID Matching
+    const matchesBg = orgSelection.business_group_id == null || job.business_group_id === orgSelection.business_group_id;
+    const matchesComp = orgSelection.company_id == null || job.company_id === orgSelection.company_id;
+    const matchesLoc = orgSelection.location_id == null || job.location_id === orgSelection.location_id;
+    const matchesMainDept = orgSelection.main_department_id == null || job.main_department_id === orgSelection.main_department_id;
+    const matchesDeptId = orgSelection.department_id == null || job.department_id === orgSelection.department_id;
+    const matchesDesig = orgSelection.designation_id == null || job.designation_id === orgSelection.designation_id;
     
-    return matchesQuery && matchesDept && matchesDomain;
+    return matchesQuery && matchesDept && matchesDomain && matchesBg && matchesComp && matchesLoc && matchesMainDept && matchesDeptId && matchesDesig;
   });
+
 
   const formatRupees = (val: number) => {
     if (!val || val <= 0) return null;
@@ -257,25 +268,34 @@ export default function VacanciesScreen() {
             onChangeText={setSearchQuery}
             placeholder="Search by job title, department, or skill..."
           />
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <TextField
-                label="Department Filter"
-                value={filterDept}
-                onChangeText={setFilterDept}
-                placeholder="e.g. Engineering"
-              />
-            </View>
-            <View className="flex-1">
-              <TextField
-                label="Domain Filter"
-                value={filterDomain}
-                onChangeText={setFilterDomain}
-                placeholder="e.g. Software"
-              />
-            </View>
+          <View className="flex-row items-center justify-between">
+            <Pressable
+              onPress={() => setShowHierarchyFilter(!showHierarchyFilter)}
+              className="flex-row items-center gap-1.5 bg-primary/10 px-2.5 py-1.5 rounded border border-primary/20"
+            >
+              <Briefcase size={14} color={COLORS.primary} />
+              <Text className="text-xs font-sans-semibold text-primary">
+                {showHierarchyFilter ? 'Hide Organization Hierarchy Filter' : 'Filter by Organization Hierarchy'}
+              </Text>
+            </Pressable>
+            {Object.values(orgSelection).some((v) => v != null) && (
+              <Pressable
+                onPress={() => setOrgSelection({})}
+                className="bg-surface px-2 py-1 rounded border border-border"
+              >
+                <Text className="text-[11px] font-sans-medium text-danger">Reset Hierarchy Filter</Text>
+              </Pressable>
+            )}
           </View>
+
+          {showHierarchyFilter && (
+            <OrganizationHierarchySelector
+              value={orgSelection}
+              onChange={setOrgSelection}
+            />
+          )}
         </Card>
+
 
         {/* Loading state */}
         {loading ? (

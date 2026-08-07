@@ -222,6 +222,62 @@ export default function VacancyDetailScreen() {
           {/* Main Info Column */}
           <View className={`flex-1 ${isDesktop ? 'min-w-[400px]' : 'min-w-[100%]'}`}>
 
+            {/* Organization Hierarchy Card */}
+            <View className="bg-surface border border-border rounded-lg p-3 mb-3">
+              <Text className="text-[10px] font-sans-bold text-primary uppercase tracking-wider mb-2">
+                Organization Hierarchy Placement
+              </Text>
+              <View className="flex-row flex-wrap items-center gap-2">
+                <View className="bg-background border border-border px-2 py-1 rounded">
+                  <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Business Group</Text>
+                  <Text className="text-[11px] font-sans-semibold text-text-primary">
+                    {jobDetails.business_group_name || (jobDetails.business_group_id ? `ID #${jobDetails.business_group_id}` : 'Aether Group')}
+                  </Text>
+                </View>
+                <ChevronRight size={12} color={COLORS.textMuted} />
+
+                <View className="bg-background border border-border px-2 py-1 rounded">
+                  <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Company</Text>
+                  <Text className="text-[11px] font-sans-semibold text-text-primary">
+                    {jobDetails.company_name_db || jobDetails.company_name || 'Aether Industries'}
+                  </Text>
+                </View>
+                <ChevronRight size={12} color={COLORS.textMuted} />
+
+                <View className="bg-background border border-border px-2 py-1 rounded">
+                  <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Location</Text>
+                  <Text className="text-[11px] font-sans-semibold text-text-primary">
+                    {jobDetails.location_name_db || jobDetails.location_name || 'Headquarters'}
+                  </Text>
+                </View>
+                <ChevronRight size={12} color={COLORS.textMuted} />
+
+                <View className="bg-background border border-border px-2 py-1 rounded">
+                  <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Main Dept</Text>
+                  <Text className="text-[11px] font-sans-semibold text-text-primary">
+                    {jobDetails.main_department_name || (jobDetails.main_department_id ? `ID #${jobDetails.main_department_id}` : 'Operations')}
+                  </Text>
+                </View>
+                <ChevronRight size={12} color={COLORS.textMuted} />
+
+                <View className="bg-background border border-border px-2 py-1 rounded">
+                  <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Department</Text>
+                  <Text className="text-[11px] font-sans-semibold text-text-primary">
+                    {jobDetails.department_name || jobDetails.department || 'Engineering'}
+                  </Text>
+                </View>
+                <ChevronRight size={12} color={COLORS.textMuted} />
+
+                <View className="bg-primary/10 border border-primary/30 px-2 py-1 rounded">
+                  <Text className="text-[9px] font-sans-bold text-primary uppercase">Designation</Text>
+                  <Text className="text-[11px] font-sans-semibold text-primary">
+                    {jobDetails.designation_name || jobDetails.title}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+
             {/* Responsibilities */}
             {(jobDetails.job_description || jobDetails.responsibilities) && (
               <View className="bg-surface border border-border rounded-lg p-3 mb-3">

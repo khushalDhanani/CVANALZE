@@ -12,6 +12,7 @@ from app.api.cv import router as cv_router
 from app.api.domain_knowledge import router as domain_knowledge_router
 from app.api.jobs import router as jobs_router
 from app.api.master_data import router as master_data_router
+from app.api.organization import router as organization_router
 from app.api.performance import router as performance_router
 from app.api.experience_extraction import router as experience_extraction_router
 from app.api.recommendations import router as recommendations_router
@@ -90,6 +91,7 @@ for router in (
     talent_graph_router,
     recommendations_router,
     performance_router,
+    organization_router,
 ):
     app.include_router(router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")

@@ -40,6 +40,14 @@ class NormalizedClassification(BaseModel):
     The model also includes confidence, match status and supporting evidence.
     """
     # Raw DB identifiers (MUST be real MSSQL IDs; never PostgreSQL aliases)
+    db_business_group_id: Optional[int] = None
+    db_business_group_name: Optional[str] = None
+    db_company_id: Optional[int] = None
+    db_company_name: Optional[str] = None
+    db_location_id: Optional[int] = None
+    db_location_name: Optional[str] = None
+    db_main_department_id: Optional[int] = None
+    db_main_department_name: Optional[str] = None
     db_department_id: Optional[int] = None
     db_department_name: Optional[str] = None
     db_designation_id: Optional[int] = None

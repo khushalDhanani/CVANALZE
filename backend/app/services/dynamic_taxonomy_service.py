@@ -234,10 +234,30 @@ class DynamicTaxonomyService:
                         if dept:
                             dept_name = dept.DeptName
 
+                    comp_id = matched_desig.CompID
+                    comp_name = None
+                    if comp_id:
+                        from app.models.mssql.organization import OrgCompanyMst
+                        comp = session.query(OrgCompanyMst).filter(OrgCompanyMst.CompID == comp_id).first()
+                        if comp:
+                            comp_name = comp.CompName
+
+                    main_dept_id = matched_desig.MainDeptID
+                    main_dept_name = None
+                    if main_dept_id:
+                        from app.models.mssql.organization import OrgMainDepartmentMst
+                        main_dept = session.query(OrgMainDepartmentMst).filter(OrgMainDepartmentMst.MainDeptID == main_dept_id).first()
+                        if main_dept:
+                            main_dept_name = main_dept.DeptName
+
                     industry_dept = DepartmentNormalizer.normalize_department(dept_name)["industry_department"] if dept_name else None
                     industry_desig = DepartmentNormalizer.normalize_designation(matched_desig.DesigName)["industry_designation"]
 
                     return NormalizedClassification(
+                        db_company_id=comp_id,
+                        db_company_name=comp_name,
+                        db_main_department_id=main_dept_id,
+                        db_main_department_name=main_dept_name,
                         db_department_id=dept_id,
                         db_department_name=dept_name,
                         db_designation_id=matched_desig.DesigID,

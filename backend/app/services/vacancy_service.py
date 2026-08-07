@@ -6,11 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.core.logging import logger
 from app.models.mssql.organization import (
+    OrgBusinessGroupMst,
     OrgCompanyMst,
     OrgDepartmentMst,
     OrgDesignationMst,
     OrgJobProfileMst,
     OrgLocationMst,
+    OrgMainDepartmentMst,
 )
 from app.models.mssql.vacancy import RecruitVacancyRequest
 from app.schemas.job import JobOpening
@@ -112,10 +114,35 @@ class VacancyService:
         dept_name = vacancy.department.DeptName if vacancy.department else "Unknown Department"
         comp_name = vacancy.company.CompName if vacancy.company else "Unknown Company"
         loc_name = vacancy.location.LocName if vacancy.location else "Unknown Location"
+        desig_name = vacancy.designation.DesigName if vacancy.designation else None
 
         dept_id = vacancy.RequestForDeptID
         if dept_id is None and vacancy.job_profile:
             dept_id = vacancy.job_profile.DeptID
+
+        desig_id = vacancy.RequestForDesigID
+        if desig_id is None and vacancy.job_profile:
+            desig_id = vacancy.job_profile.DesigID
+
+        # Hierarchy resolution for Business Group & Main Department
+        biz_group_id = vacancy.company.BusinessGrpID if vacancy.company else None
+        biz_group_name = None
+        if biz_group_id is not None:
+            biz_grp = self.db.scalar(select(OrgBusinessGroupMst).where(OrgBusinessGroupMst.BusinessGrpID == biz_group_id))
+            if biz_grp:
+                biz_group_name = biz_grp.BusinessGrpName
+
+        main_dept_id = vacancy.RequestForMainDeptID
+        if main_dept_id is None and vacancy.department:
+            main_dept_id = vacancy.department.MainDeptID
+        if main_dept_id is None and vacancy.job_profile:
+            main_dept_id = vacancy.job_profile.MainDeptID
+
+        main_dept_name = None
+        if main_dept_id is not None:
+            main_dept = self.db.scalar(select(OrgMainDepartmentMst).where(OrgMainDepartmentMst.MainDeptID == main_dept_id))
+            if main_dept:
+                main_dept_name = main_dept.DeptName
 
         # Convert Decimals to float safely
         def _safe_float_db(val: Any) -> float | None:
@@ -160,10 +187,19 @@ class VacancyService:
             location_name=loc_name,
             vacancy_id=vacancy.VacancyRequestID,
             job_profile_id=vacancy.JobProfileID,
+            business_group_id=biz_group_id,
+            business_group_name=biz_group_name,
             company_id=vacancy.RequestForCompID,
+            company_name_db=comp_name,
+            location_id=vacancy.RequestForLocationID,
+            location_name_db=loc_name,
+            main_department_id=main_dept_id,
+            main_department_name=main_dept_name,
             department_id=dept_id,
             department_name=dept_name,
-            location_id=vacancy.RequestForLocationID,
+            designation_id=desig_id,
+            designation_name=desig_name,
             industry_title=industry_title_result.get("industry_designation"),
             industry_department=industry_dept_result.get("industry_department"),
         )
+

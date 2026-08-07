@@ -1,6 +1,7 @@
 from __future__ import annotations
 from sqlalchemy import Column, String, BigInteger, Boolean, DateTime, Numeric, ForeignKey
 from app.core.database import MssqlReadBase
+from app.models.mssql.taxonomy import OrgBusinessGroupMst
 
 
 class OrgCompanyMst(MssqlReadBase):

@@ -22,13 +22,21 @@ class JobOpening(BaseModel):
     education: str | None = Field(None, description="Required education background")
     certifications: str | None = Field(None, description="Required or preferred certifications")
 
-    # Live DB IDs
+    # Live DB IDs & Full Organization Hierarchy
     vacancy_id: int | None = Field(None, description="Live MSSQL VacancyRequestID")
     job_profile_id: int | None = Field(None, description="Live MSSQL JobProfileID")
+    business_group_id: int | None = Field(None, description="Live MSSQL BusinessGrpID")
+    business_group_name: str | None = Field(None, description="Live MSSQL BusinessGrpName")
     company_id: int | None = Field(None, description="Live MSSQL CompID")
+    company_name_db: str | None = Field(None, description="Live MSSQL CompName")
+    location_id: int | None = Field(None, description="Live MSSQL LocID")
+    location_name_db: str | None = Field(None, description="Live MSSQL LocName")
+    main_department_id: int | None = Field(None, description="Live MSSQL MainDeptID")
+    main_department_name: str | None = Field(None, description="Live MSSQL MainDeptName")
     department_id: int | None = Field(None, description="Live MSSQL DeptID")
     department_name: str | None = Field(None, description="Live MSSQL DeptName")
-    location_id: int | None = Field(None, description="Live MSSQL LocID")
+    designation_id: int | None = Field(None, description="Live MSSQL DesigID")
+    designation_name: str | None = Field(None, description="Live MSSQL DesigName")
 
     # Taxonomy Metadata
     domain: str | None = Field(None, description="Taxonomy Domain")

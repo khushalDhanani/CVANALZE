@@ -209,6 +209,9 @@ class CandidateSearchService:
                     pass
                 elif req_st != cand_status and req_st != "ALL":
                     continue
+            elif not is_complete_record:
+                continue
+
 
             location_val = r.get("location") or contact_info.get("location")
             job_title_val = r.get("job_title") or contact_info.get("job_title") or best_match.get("job_title")

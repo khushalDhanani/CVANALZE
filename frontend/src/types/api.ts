@@ -21,14 +21,77 @@ export interface JobOpening {
 
   vacancy_id?: number | null;
   job_profile_id?: number | null;
+  business_group_id?: number | null;
+  business_group_name?: string | null;
   company_id?: number | null;
+  company_name_db?: string | null;
+  location_id?: number | null;
+  location_name_db?: string | null;
+  main_department_id?: number | null;
+  main_department_name?: string | null;
   department_id?: number | null;
   department_name?: string | null;
-  location_id?: number | null;
+  designation_id?: number | null;
+  designation_name?: string | null;
 
   domain?: string | null;
   job_family?: string | null;
 }
+
+export interface BusinessGroupItem {
+  id: number;
+  name: string;
+}
+
+export interface CompanyItem {
+  id: number;
+  name: string;
+  code?: string;
+  business_group_id?: number;
+}
+
+export interface LocationItem {
+  id: number;
+  name: string;
+  code?: string;
+  company_id?: number;
+}
+
+export interface MainDepartmentItem {
+  id: number;
+  name: string;
+}
+
+export interface DepartmentItem {
+  id: number;
+  name: string;
+  company_id?: number;
+  main_department_id?: number;
+}
+
+export interface DesignationItem {
+  id: number;
+  name: string;
+  company_id?: number;
+  department_id?: number;
+  main_department_id?: number;
+}
+
+export interface OrganizationSelection {
+  business_group_id?: number | null;
+  company_id?: number | null;
+  location_id?: number | null;
+  main_department_id?: number | null;
+  department_id?: number | null;
+  designation_id?: number | null;
+}
+
+export interface HierarchyValidationResult {
+  is_valid: boolean;
+  errors: string[];
+  details: Record<string, any>;
+}
+
 
 export interface CVMatchRequest {
   cv_text: string;
