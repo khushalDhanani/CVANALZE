@@ -16,6 +16,10 @@ _TECH_LOCATION_BLACKLIST = {
     "angular", "vue", "redux", "mobx", "kotlin", "swift", "java",
     "firebase", "nodejs", "django", "fastapi", "springboot",
 }
+_TITLE_KEYWORD_SPLIT_RE = re.compile(
+    r"\s+(?=(?:Sr\.?|Jr\.?|Ex\w+tive|Officer|Incharge|In\s*[-\s]*charge|Supervisor|Manager|Engineer|Assistant|Technician|Analyst|Chemist|Specialist|Shift|Lead|Head|Operator|Trainee|Apprentice)\b)",
+    re.IGNORECASE,
+)
 
 
 class classproperty:
@@ -404,6 +408,23 @@ class ResumeFieldExtractor:
                         current["job_title"] = cells[0] or "Position"
                         current["company"] = cells[1] or "Organization"
                         current["dates"] = f"{cells[-2]} - {cells[-1]}"
+                    continue
+                # Two-cell tables: "| Company + Title | June 2018 - April 2025 |"
+                if len(cells) == 2:
+                    from app.services.date_interval_parser import DateIntervalParser
+
+                    d_match = cls._DATE_RANGE.search(cells[1])
+                    if d_match and cells[0] and cells[0] != "---":
+                        commit()
+                        combined = cells[0]
+                        split = _TITLE_KEYWORD_SPLIT_RE.split(combined, maxsplit=1)
+                        if len(split) == 2:
+                            company, title = split[0].strip(" -|–—"), split[1].strip(" -|–—")
+                        else:
+                            company, title = combined, "Position"
+                        current["company"] = company or "Organization"
+                        current["job_title"] = title
+                        current["dates"] = d_match.group(0).strip(" ()")
                     continue
             # Handle merged heading lines like "## IT Executive , BODAL CHEMICALS LTD, SAYKHA"
             if line.startswith(("##", "###")):

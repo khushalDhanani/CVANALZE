@@ -247,6 +247,20 @@ export default function CandidateDetailScreen() {
       {/* Left Column (Candidate Data) */}
       <View className="w-full md:w-[45%] lg:w-5/12 gap-4">
 
+        {/* Active Vacancy Summary Card */}
+        <Card className="p-3 border-border shadow-none">
+          <View className="flex-row items-center justify-between border-b border-border pb-2 mb-2">
+            <View className="flex-row items-center gap-1.5">
+              <Target size={14} color={analysis?.has_genuine_match ? COLORS.success : COLORS.warning} />
+              <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Active Vacancy Summary</Text>
+            </View>
+            <Badge label={analysis?.has_genuine_match ? 'Genuine Match' : 'No Match'} tone={analysis?.has_genuine_match ? 'success' : 'warning'} />
+          </View>
+          <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-warning/5 border border-warning/20'}`}>
+            <Text className="text-xs text-text-primary leading-5">{analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}</Text>
+          </View>
+        </Card>
+
         {/* Contact Info Card */}
         <Card className="p-3 gap-2 border-border shadow-none">
           <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider mb-1">Contact Information</Text>
@@ -322,20 +336,6 @@ export default function CandidateDetailScreen() {
               </View>
             </View>
           )}
-        </Card>
-
-        {/* Active Vacancy Summary Card */}
-        <Card className="p-3 border-border shadow-none">
-          <View className="flex-row items-center justify-between border-b border-border pb-2 mb-2">
-            <View className="flex-row items-center gap-1.5">
-              <Target size={14} color={analysis?.has_genuine_match ? COLORS.success : COLORS.warning} />
-              <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Active Vacancy Summary</Text>
-            </View>
-            <Badge label={analysis?.has_genuine_match ? 'Genuine Match' : 'No Match'} tone={analysis?.has_genuine_match ? 'success' : 'warning'} />
-          </View>
-          <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-warning/5 border border-warning/20'}`}>
-            <Text className="text-xs text-text-primary leading-5">{analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}</Text>
-          </View>
         </Card>
 
         {/* Candidate Skills */}

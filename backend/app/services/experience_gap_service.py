@@ -568,10 +568,15 @@ class ExperienceGapService:
                 precision = "month"
                 date_conf = "MONTH_ONLY"
 
-        # Localized bullet evidence date parsing (max 300 chars)
+        # Localized bullet evidence date parsing (max 300 chars). Only accept a
+        # bullet-derived interval when the bullets contain an explicit 4-digit
+        # year; otherwise bare tokens (e.g. "RAID-5") fabricated Jan-2000 dates.
         if not start_dt:
             combined_bullets = " ".join([str(r) for r in resps[:3]] + [str(e) for e in evidence[:2]])
-            if len(combined_bullets) <= 400:
+            if (
+                len(combined_bullets) <= 400
+                and re.search(r"\b(?:19\d{2}|20\d{2})\b", combined_bullets)
+            ):
                 inv = DateIntervalParser.parse_interval(combined_bullets)
                 if inv.start_date:
                     try:

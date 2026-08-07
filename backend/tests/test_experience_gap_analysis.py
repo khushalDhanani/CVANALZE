@@ -44,6 +44,40 @@ def test_experience_gap_analysis_dual_fact_education_covered():
     assert "Education Covered" in gap.description or "Education Period" in gap.description
 
 
+def test_bullet_evidence_without_explicit_year_is_not_parsed():
+    """Bullet evidence with no explicit year (e.g. 'RAID-5') must NOT fabricate a
+    Jan-2000 start date."""
+    start, end, is_current, precision, date_conf = ExperienceGapService._parse_job_dates_strict(
+        raw_dates="",
+        job={},
+        cv_text="IT Executive at BODAL CHEMICALS LTD. Handling system and network administration including RAID-5 storage configuration.",
+        company="BODAL CHEMICALS",
+        title="IT Executive",
+        resps=["Configuring RAID-5 storage", "Network administration"],
+        evidence=[],
+        ref_date=datetime.date(2026, 8, 7),
+    )
+    assert start is None
+    assert end is None
+    assert date_conf == "UNKNOWN"
+
+
+def test_bullet_evidence_with_explicit_year_is_parsed():
+    """Bullet evidence containing a real year range must still be parsed."""
+    start, end, is_current, precision, date_conf = ExperienceGapService._parse_job_dates_strict(
+        raw_dates="",
+        job={},
+        cv_text="Worked at ABC Pharma from Oct-2020 to Jul-2024.",
+        company="ABC Pharma",
+        title="Executive",
+        resps=["Managed production from Oct-2020 to Jul-2024"],
+        evidence=[],
+        ref_date=datetime.date(2026, 8, 7),
+    )
+    assert start == datetime.date(2020, 1, 1)
+    assert end == datetime.date(2024, 12, 31)
+
+
 def test_experience_gap_analysis_configurable_threshold():
     # Hiatus of 45 days: Under 60-day threshold, ignored. Under 30-day threshold, detected.
     resume_json = {

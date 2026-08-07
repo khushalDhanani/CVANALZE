@@ -67,6 +67,90 @@ def test_domain_mismatch_penalty_software_vs_plant(monkeypatch):
     assert any(f.requirement_id == "req_domain_mismatch" for f in match_result.mandatory_failures)
 
 
+def test_cross_domain_guard_caps_it_candidate_vs_non_it_vacancy_with_unknown_taxonomy():
+    """IT candidate matched to a QC vacancy with Unknown taxonomy metadata must be
+    capped — the guard flags computed in job_context must actually be consumed."""
+    from app.schemas.candidate_context import CandidateAnalysisContext
+    from app.schemas.job_context import JobEvaluationContext
+    from app.services.match_evaluators import CrossDomainGuardEvaluator
+
+    context = CandidateAnalysisContext(
+        cv_text="Software Engineer",
+        norm_text="software engineer flutter dart",
+        is_software_cand=True,
+        cand_tax_domain="Information Technology",
+        cand_families=["Software Engineering & Development"],
+        cand_primary_family="Software Engineering & Development",
+        cand_domain="IT",
+    )
+
+    qc_job = JobEvaluationContext.create(
+        {
+            "id": "1195",
+            "title": "Lab Assistant - I (QC)",
+            "department": "Quality Control Team",
+            "department_name": "Quality Control Team",
+            "required_skills": ["HPLC", "Laboratory knowledge", "Chemical analysis"],
+            "_precomputed_domain": "Unknown",
+            "_precomputed_job_family": "Unknown",
+        }
+    )
+
+    result = CrossDomainGuardEvaluator.evaluate(
+        context,
+        qc_job,
+        initial_score=85.0,
+        initial_domain_score=80.0,
+        reason_str="",
+        mandatory_failures=[],
+    )
+
+    assert result.is_domain_capped is True
+    assert result.final_score < 85.0
+    assert any(f.requirement_id == "req_domain_mismatch" for f in result.additional_mandatory_failures)
+
+
+def test_cross_domain_guard_does_not_cap_software_vacancy():
+    """A genuine software vacancy (has_software_req / IT department) must not be capped."""
+    from app.schemas.candidate_context import CandidateAnalysisContext
+    from app.schemas.job_context import JobEvaluationContext
+    from app.services.match_evaluators import CrossDomainGuardEvaluator
+
+    context = CandidateAnalysisContext(
+        cv_text="Software Engineer",
+        norm_text="software engineer flutter dart",
+        is_software_cand=True,
+        cand_tax_domain="Information Technology & Software",
+        cand_families=["Software Engineering & Development"],
+        cand_primary_family="Software Engineering & Development",
+        cand_domain="Information Technology & Software",
+    )
+
+    sw_job = JobEvaluationContext.create(
+        {
+            "id": "1334",
+            "title": "Software Developer",
+            "department": "CIS Team",
+            "department_name": "CIS Team",
+            "required_skills": [".NET", "SQL", "LINQ", "ADO.NET"],
+            "_precomputed_domain": "Unknown",
+            "_precomputed_job_family": "Unknown",
+        }
+    )
+
+    result = CrossDomainGuardEvaluator.evaluate(
+        context,
+        sw_job,
+        initial_score=90.0,
+        initial_domain_score=85.0,
+        reason_str="",
+        mandatory_failures=[],
+    )
+
+    assert result.is_domain_capped is False
+    assert result.final_score == 90.0
+
+
 @pytest.mark.asyncio
 async def test_no_suitable_active_vacancy_summary():
     software_cv = """

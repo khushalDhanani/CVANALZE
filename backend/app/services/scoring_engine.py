@@ -25,6 +25,7 @@ from app.services.match_evaluators import (
     CrossDomainGuardEvaluator,
     RecommendationEvaluator,
     RequirementEvaluator,
+    is_ignorable_requirement,
 )
 
 
@@ -140,19 +141,15 @@ class ScoringEngine:
         missing = []
 
         assets = RuleConfigManager.get_term_matching_assets()
-        stop_phrases = assets["stop_phrases"]
         noise_words = assets["noise_words"]
         aliases = assets["aliases"]
 
         for term in terms:
             term_clean = term.strip()
-            if not term_clean:
+            if not term_clean or is_ignorable_requirement(term):
                 continue
 
             term_lower = term_clean.lower()
-            if term_lower in stop_phrases:
-                matched.append(term)
-                continue
 
             pattern = cls._get_compiled_term_pattern(term_lower)
             if pattern.search(normalized_text):
@@ -171,17 +168,17 @@ class ScoringEngine:
                 if alt_matched:
                     continue
 
-            # Key Sub-token matching (stripping noise/filler words)
+            # Sub-token matching (stripping noise/filler words) is only used for
+            # SHORT skills (<= 3 meaningful tokens) and requires EVERY token to
+            # appear in the CV text. A single shared token must not fabricate a
+            # match for a longer phrase (e.g. "HPLC knowledge" is NOT proven by
+            # the word "knowledge" alone; "Plant Commission" requires both
+            # "plant" AND "commission").
             sub_tokens = [w for w in re.split(r"[\s,;/()\-_]+", term_lower) if w and w not in noise_words and len(w) > 1]
-            token_found = False
-            if sub_tokens:
-                for tok in sub_tokens:
-                    tok_pattern = cls._get_compiled_term_pattern(tok)
-                    if tok_pattern.search(normalized_text):
-                        matched.append(term)
-                        token_found = True
-                        break
-            if token_found:
+            if 1 <= len(sub_tokens) <= 3 and all(
+                cls._get_compiled_term_pattern(tok).search(normalized_text) for tok in sub_tokens
+            ):
+                matched.append(term)
                 continue
 
             missing.append(term)

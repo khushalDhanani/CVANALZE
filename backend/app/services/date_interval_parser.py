@@ -138,9 +138,20 @@ class DateIntervalParser:
             year = (2000 + yr_2digit) if yr_2digit <= 35 else (1900 + yr_2digit)
             return datetime(year=year, month=12, day=31), 0.70
 
-        # 8. Dateutil fuzzy fallback
+        # 8. Dateutil fuzzy fallback — only when the text contains an explicit
+        #    date anchor (month name or 2/4-digit year token). A bare token such
+        #    as "RAID-5" must NOT be interpreted as a date; that produced bogus
+        #    synthetic Jan-2000 intervals (2000-01-05 -> 2000-01-31).
         try:
+            anchor = re.search(
+                r"\b(?:19\d{2}|20\d{2}|\d{2})\b|\b[a-zà-ÿ]{3,10}\b", cleaned
+            )
+            if not anchor:
+                return None, 0.0
             parsed = dateutil_parser.parse(cleaned, fuzzy=True, default=datetime(2000, 1, 1))
+            # Reject when the year came from the 2000 sentinel default (no explicit year).
+            if parsed.year == 2000 and not re.search(r"\b(?:19\d{2}|20\d{2})\b", cleaned):
+                return None, 0.0
             if 1970 <= parsed.year <= datetime.now().year + 1:
                 day = calendar.monthrange(parsed.year, parsed.month)[1] if is_end_date else parsed.day
                 return datetime(year=parsed.year, month=parsed.month, day=day), 0.60

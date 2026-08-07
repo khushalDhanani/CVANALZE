@@ -99,3 +99,51 @@ def test_evaluate_job_match_with_custom_scoring_config():
         scoring_config=custom_config,
     )
     assert result.overall_score >= 0.0
+
+
+def test_sub_token_matching_requires_full_phrase_not_shared_token():
+    """A single shared token must not fabricate a match for a longer skill phrase."""
+
+    def extract(norm_text, terms):
+        return ScoringEngine._extract_term_matches(norm_text, terms)
+
+    # "HPLC knowledge" is NOT proven by the word "knowledge" alone
+    matched, missing = extract("I have knowledge of laboratory equipment", ["HPLC knowledge"])
+    assert matched == []
+    assert missing == ["HPLC knowledge"]
+
+    # "QA documentation & Audit" needs all three tokens
+    matched, missing = extract("Handled documentation and review", ["QA documentation & Audit"])
+    assert matched == []
+    assert missing == ["QA documentation & Audit"]
+
+    # "Plant Commission" needs BOTH "plant" and "commission"
+    matched, _ = extract("Plant Commission engineer", ["Plant Commission"])
+    assert matched == ["Plant Commission"]
+    matched, missing = extract("plant operations and maintenance", ["Plant Commission"])
+    assert matched == []
+    assert missing == ["Plant Commission"]
+
+
+def test_prose_experience_clauses_and_stop_phrases_are_skipped():
+    """JD-parsing artifacts (prose experience clauses, 'e.g' stop words) must be
+    neither matched nor failed, so they cannot fabricate evidence or penalize."""
+
+    # "2 to 3 years of experience in chemical plant." must not match on "experience"
+    matched, missing = ScoringEngine._extract_term_matches(
+        "worked in a chemical plant", ["2 to 3 years of experience in chemical plant."]
+    )
+    assert matched == []
+    assert missing == []
+
+    # "10 years of experience in API manufacturing" is a clause, not a skill
+    matched, missing = ScoringEngine._extract_term_matches(
+        "API manufacturing specialist", ["10 years of experience in API manufacturing"]
+    )
+    assert matched == []
+    assert missing == []
+
+    # Stop phrases ("e.g") must not auto-SATISFY
+    matched, missing = ScoringEngine._extract_term_matches("Skill: e.g", ["e.g"])
+    assert matched == []
+    assert missing == []

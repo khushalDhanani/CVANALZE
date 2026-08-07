@@ -19,6 +19,45 @@ from app.schemas.scoring_config import ScoringConfig
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.job_taxonomy import TaxonomyClassifier
 
+_EXPERIENCE_CLAUSE_RE = re.compile(
+    r"\b\d+\s*\+?\s*(?:to\s*\d+\s*)?years?\b", re.IGNORECASE
+)
+_IT_VACANCY_RE = re.compile(
+    r"\b(cis|it\b|information\s*technology|software|developer|programmer|computer|flutter|dotnet|\.net|django|react|angular|node\.?js|frontend|front\s*end|backend|back\s*end|full\s*stack|devops|cloud|data\s*engineer|data\s*scientist|qa\s*automation|software\s*engineering)\b",
+    re.IGNORECASE,
+)
+_stop_phrases_cache: frozenset[str] | None = None
+
+
+def _stop_phrases() -> frozenset[str]:
+    global _stop_phrases_cache
+    if _stop_phrases_cache is None:
+        _stop_phrases_cache = RuleConfigManager.get_term_matching_assets()["stop_phrases"]
+    return _stop_phrases_cache
+
+
+def is_ignorable_requirement(term: str | None) -> bool:
+    """True when a parsed JD requirement is a JD-parsing artifact rather than a
+    real, matchable skill: empty strings, stop words, prose/sentence fragments,
+    and generic years-of-experience clauses.
+
+    Such artifacts must be skipped (never FAIL, never fabricate a match) so they
+    neither penalize candidates nor inflate confidence.
+    """
+    if not term or not term.strip():
+        return True
+    term_clean = term.strip()
+    term_lower = term_clean.lower()
+    if term_lower in _stop_phrases():
+        return True
+    if _EXPERIENCE_CLAUSE_RE.search(term_lower):
+        return True
+    # Prose with an embedded sentence break is a JD parsing fragment.
+    if re.search(r"[.!?]\s+\S", term_clean):
+        return True
+    # Sentences (>= 6 words) are not skills.
+    return len(re.findall(r"[a-z0-9]+", term_lower)) >= 6
+
 
 def _has_relevant_experience(
     context: CandidateAnalysisContext,
@@ -189,6 +228,8 @@ class RequirementEvaluator:
         has_relevant_experience = _has_relevant_experience(context, job_ctx, matched_responsibilities)
 
         for skill in req_skills:
+            if is_ignorable_requirement(skill):
+                continue
             req_id = f"req_skill_{skill.lower().replace(' ', '_')}"
             vac_ev = f"Mandatory Skill Requirement: {skill}"
             if skill in matched_skills:
@@ -680,6 +721,21 @@ class CrossDomainGuardEvaluator:
         cand_domain = context.cand_domain or context.cand_tax_domain
         if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
             if cand_domain.strip().lower() != vac_tax_domain.strip().lower():
+                domain_mismatch = True
+
+        # Software/IT candidate matched to a clearly non-IT vacancy: apply the
+        # cross-domain cap even when taxonomy domain/family metadata is missing
+        # ("Unknown"). Closes the dead-code gap where job_context computed
+        # is_non_it_job/has_software_req but no evaluator consumed them, so IT
+        # candidates (e.g. Utkarsh) were never capped against QC/Production roles.
+        if context.is_software_cand and not is_tax_compat:
+            vac_text = " ".join(
+                filter(
+                    None,
+                    [vac_tax_domain or "", vac_family or "", job_ctx.department or "", job_ctx.title or ""],
+                )
+            )
+            if not job_ctx.has_software_req and not _IT_VACANCY_RE.search(vac_text):
                 domain_mismatch = True
 
         final_score = initial_score

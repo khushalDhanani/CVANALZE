@@ -39,3 +39,34 @@ def test_unspaced_hyphen_and_short_years():
     }
     years = ExperienceCalculator.calculate_total_experience(resume_json)
     assert 3.5 <= years <= 4.2
+
+
+def test_two_cell_markdown_table_extraction():
+    """'| Company + Title | Dates |' markdown tables must yield work experience rows."""
+    lines = [
+        "## WORK EXPERIENCE",
+        "| Cadila Pharmaceutical Ltd. Excutive of API Production | June 2018 - April 2025 |",
+        "| Unmark Remedies Ltd. Officer | July 2015 - May 2018 |",
+        "| Pravin lab Sr.Executive | Jan 2013 - June 2015 |",
+    ]
+
+    jobs = ResumeFieldExtractor._extract_employment(lines)
+    assert len(jobs) == 3
+    assert jobs[0]["company"] == "Cadila Pharmaceutical Ltd."
+    assert jobs[0]["job_title"] == "Excutive of API Production"
+    assert "June 2018" in jobs[0]["dates"]
+    assert jobs[2]["company"] == "Pravin lab"
+    assert jobs[2]["job_title"] == "Sr.Executive"
+
+
+def test_two_cell_markdown_table_skips_non_date_rows():
+    """Header/separator rows without dates must be ignored."""
+    lines = [
+        "| Organization | Tenure |",
+        "|---|---|",
+        "| Acme Ltd. Executive | Jan 2018 - Dec 2020 |",
+    ]
+    jobs = ResumeFieldExtractor._extract_employment(lines)
+    assert len(jobs) == 1
+    assert jobs[0]["company"] == "Acme Ltd."
+    assert jobs[0]["job_title"] == "Executive"
