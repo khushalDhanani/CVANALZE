@@ -217,4 +217,18 @@ None. All tasks completed successfully.
 - **Client Timeout Adjustment**: Increased `API_CONFIG.TIMEOUT_MS` from 30,000 ms to 60,000 ms in `frontend/src/constants/config.ts` to accommodate heavy initial LLM generation runs without client-side `AbortError` timeouts.
 - **Polling Error Resilience**: Refactored `pollCvStatus` in `frontend/src/hooks/useCvUpload.ts` to track `consecutiveErrors`. Single transient status check failures or network timeouts log a warning and allow subsequent poll attempts to retry up to 5 consecutive errors before marking the step as failed.
 
+## 2026-08-07: Resolve PostgreSQL Connection Startup Failure
+
+### Root Cause:
+- Application startup failed with `(psycopg2.OperationalError) connection to server at "localhost", port 5432 failed: Connection refused`.
+- The PostgreSQL `pgvector` docker container (`cv_analyzer_pgvector`) had stopped/exited, leaving port 5432 inactive on localhost.
+
+### Work Completed:
+- Restarted the PostgreSQL container `cv_analyzer_pgvector` via `docker start cv_analyzer_pgvector`.
+- Verified container health (`cv_analyzer_pgvector` listening on port `5432`).
+- Verified rule config loading via `RuleConfigManager.load_config(tenant_id=None)` successfully retrieving active rule configuration from PostgreSQL.
+
+### Files Modified:
+- `workstatus.md`
+
 

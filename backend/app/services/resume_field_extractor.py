@@ -18,12 +18,15 @@ class classproperty:
 
 class ResumeFieldExtractor:
     _SECTION_HEADING = re.compile(
-        r"^(?:#+|\*\*)\s*(SUMMARY|PROFILE SUMMARY|PROFILE|WORK EXPERIENCE|EXPERIENCE|EMPLOYMENT|EDUCATION|SKILLS|TECHNICAL SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|HOBBIES|CONTACT)\b",
+        r"^(?:#+|\*\*)\s*(SUMMARY|PROFILE SUMMARY|PROFILE|WORK EXPERIENCE|WORKING EXPERIENCE|PROFESSIONAL EXPERIENCE|PRACTICAL EXPOSURE|EXPERIENCE|EMPLOYMENT|EDUCATION|SKILLS|TECHNICAL SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|HOBBIES|CONTACT)\b",
         re.IGNORECASE,
     )
     _DATE_PART = (
         r"(?:"
-        r"(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?(?:\d{1,2}[,\s]+)?"
+        r"(?:\d{1,2}(?:st|nd|rd|th)?\s+)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?[,\s]+"
+        r"(?:19|20)\d{2}"
+        r"|(?:0?[1-9]|[12]\d|3[01])[/\.\-](?:0?[1-9]|1[0-2])[/\.\-](?:19|20)\d{2}"
+        r"|"
         r"(?:19|20)\d{2}"
         r"|(?:0?[1-9]|1[0-2])[/\.\-](?:19|20)\d{2}"
         r"|(?:19|20)\d{2}[/\.\-](?:0?[1-9]|1[0-2])"
@@ -35,7 +38,7 @@ class ResumeFieldExtractor:
         r"(?:"
         + _DATE_PART
         + r"|\b\d{2}\b"
-        + r"|\b(?:present|current|now|till date|to date|onwards|till now|currently|presently)\b"
+        + r"|\b(?:present|current|continue|continuing|ongoing|now|till date|to date|onwards|till now|currently|presently)\b"
         r")"
     )
     _DATE_RANGE = re.compile(
@@ -272,7 +275,7 @@ class ResumeFieldExtractor:
                 sections.setdefault(current, []).append(line)
                 continue
             heading = match.group(1).upper()
-            if "EXPERIENCE" in heading or "EMPLOYMENT" in heading:
+            if "EXPERIENCE" in heading or "EMPLOYMENT" in heading or "EXPOSURE" in heading:
                 current = "experience"
             elif "EDUCATION" in heading:
                 current = "education"
@@ -305,16 +308,32 @@ class ResumeFieldExtractor:
             if not line:
                 continue
             date_match = cls._DATE_RANGE.search(line)
+            if line.startswith("|") and line.endswith("|"):
+                cells = [cell.strip() for cell in line.strip("|").split("|")]
+                if len(cells) >= 4:
+                    from app.services.date_interval_parser import DateIntervalParser
+
+                    start_date, _ = DateIntervalParser.parse_date_point(cells[-2], is_end_date=False)
+                    end_date, _ = DateIntervalParser.parse_date_point(cells[-1], is_end_date=True)
+                    if start_date and (end_date or DateIntervalParser.is_present(cells[-1])):
+                        commit()
+                        current["job_title"] = cells[0] or "Position"
+                        current["company"] = cells[1] or "Organization"
+                        current["dates"] = f"{cells[-2]} - {cells[-1]}"
+                    continue
             if line.startswith(("##", "###")):
                 commit()
                 company = line.replace("#", "").strip()
+                if date_match:
+                    current["dates"] = date_match.group(0).strip(" ()")
+                    company = cls._DATE_RANGE.sub("", company).strip(" ()-|–—")
                 if cls.is_valid_company_name(company):
                     current["company"] = company
                 continue
             if date_match:
                 if current.get("dates") or (current.get("responsibilities") and len(current.get("responsibilities", [])) > 1):
                     commit()
-                current["dates"] = date_match.group(0)
+                current["dates"] = date_match.group(0).strip(" ()")
                 possible_title = cls._DATE_RANGE.sub("", line).strip(" ()-|–—")
                 title_company_match = re.match(r"(.+?)\s+at\s+(.+)$", possible_title, re.IGNORECASE)
                 if title_company_match:

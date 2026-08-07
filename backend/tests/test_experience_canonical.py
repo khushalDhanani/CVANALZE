@@ -97,3 +97,53 @@ def test_overlapping_and_same_month_roles():
     # Total unique active time: ~1.1 years
     assert 1.0 <= summary["experience_years"] <= 1.2
     assert summary["merged_intervals_count"] == 2
+
+
+def test_employment_table_multiple_roles_current_and_partial_dates(monkeypatch):
+    text = """
+## WORKING EXPERIENCE:
+| Position | Place | From | To |
+|---|---|---|---|
+| Lead Engineer | Alpha Ltd | August 2025 | Continue |
+| Engineer | Beta Ltd | 2021 | July 2025 |
+| Concurrent Consultant | Gamma Ltd | January 2023 | December 2023 |
+"""
+    jobs = ResumeFieldExtractor._extract_employment(text.strip().splitlines()[1:])
+
+    assert len(jobs) == 3
+    assert jobs[0]["dates"] == "August 2025 - Continue"
+
+    monkeypatch.setattr("app.services.date_interval_parser.datetime", _FixedDateTime)
+    monkeypatch.setattr("app.services.experience_calculator.datetime", _FixedDateTime)
+    summary = ExperienceCalculator.calculate_canonical_experience({"work_experience": jobs})
+
+    assert summary["experience_years"] == 5.6
+    assert summary["merged_intervals_count"] == 1
+    assert summary["normalized_employment"][0]["is_current"] is True
+    assert summary["normalized_employment"][1]["duration_months"] == 55
+
+
+class _FixedDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 8, 6)
+
+
+def test_full_numeric_dates_and_present_are_extracted_from_bullets(monkeypatch):
+    lines = [
+        "## Practical Exposure:",
+        "## Currently working at UPL Limited",
+        "- Date of joining - 09/03/2020 to till Date.",
+        "## ATUL LIMITED (29/10/2018 to 06/03/2020)",
+    ]
+    sections = ResumeFieldExtractor._split_sections(lines)
+    jobs = ResumeFieldExtractor._extract_employment(sections["experience"])
+
+    assert [job.get("dates") for job in jobs] == ["09/03/2020 to till Date", "29/10/2018 to 06/03/2020"]
+
+    monkeypatch.setattr("app.services.date_interval_parser.datetime", _FixedDateTime)
+    monkeypatch.setattr("app.services.experience_calculator.datetime", _FixedDateTime)
+    summary = ExperienceCalculator.calculate_canonical_experience({"work_experience": jobs})
+
+    assert summary["experience_years"] == 7.8
+    assert summary["merged_intervals_count"] == 2

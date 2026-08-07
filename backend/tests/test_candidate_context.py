@@ -1,4 +1,6 @@
 from app.schemas.candidate_context import CandidateAnalysisContext
+from app.schemas.analysis import OptimizedCandidateProfile
+from app.schemas.normalized_resume import NormalizedExperienceSummary, NormalizedResume
 from app.services.job_taxonomy import TaxonomyClassifier
 from app.services.match_evaluators import (
     CareerTransitionEvaluator,
@@ -29,6 +31,27 @@ def test_candidate_analysis_context_creation(monkeypatch):
     assert "IT & Software Services" in context.cand_tax_domain
     assert context.is_software_cand is True
     assert context.cand_primary_family is not None
+
+
+def test_deterministic_experience_remains_authoritative_over_llm_value(monkeypatch):
+    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("Operations", ("Operations",)))
+    normalized_resume = NormalizedResume(
+        experience=NormalizedExperienceSummary(
+            deterministic_years=7.8,
+            authoritative_years=7.8,
+            validation_status="date_only",
+        )
+    )
+    llm_profile = OptimizedCandidateProfile(relevant_experience_years=3.0)
+
+    context = CandidateAnalysisContext.create(
+        cv_text="Chemical production engineer",
+        normalized_resume=normalized_resume,
+        optimized_profile=llm_profile,
+        deterministic_experience=7.8,
+    )
+
+    assert context.candidate_experience == 7.8
 
 
 def test_taxonomy_classifier_caching():

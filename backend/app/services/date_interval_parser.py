@@ -22,7 +22,7 @@ class DateIntervalParser:
     PRESENT_KEYWORDS = {
         "present", "current", "now", "till date", "to date", "onwards",
         "till now", "currently", "presently", "actual", "heute", "aujourd'hui",
-        "date", "ongoing", "continuing",
+        "date", "ongoing", "continue", "continuing",
     }
 
     MONTH_MAP = {
@@ -185,7 +185,7 @@ class DateIntervalParser:
 
         duration_months = None
         if start_date and end_date:
-            months = (end_date.year - start_date.year) * 12 + end_date.month - start_date.month
+            months = (end_date.year - start_date.year) * 12 + end_date.month - start_date.month + 1
             duration_months = max(1, months)
 
         overall_conf = round((start_conf + end_conf) / 2.0, 2) if (start_date and end_date) else round(start_conf, 2)

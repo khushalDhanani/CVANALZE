@@ -7,13 +7,8 @@ if os.environ.get("OBJC_DISABLE_INITIALIZE_FORK_SAFETY") != "YES":
     os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
-import warnings
-
 from redis import Redis
-from rq import Queue, Worker
-
-# Suppress harmless leaked semaphore warnings from docling/pytorch inside RQ workers
-warnings.filterwarnings("ignore", category=UserWarning, module="multiprocessing.resource_tracker")
+from rq import Queue, SimpleWorker
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -26,7 +21,11 @@ def main():
 
     listen = [settings.RQ_QUEUE_NAME, "shadow_validation", "default"]
     queues = [Queue(name, connection=conn) for name in listen]
-    worker = Worker(queues, connection=conn)
+    # RQ's default Worker ends each forked workhorse with os._exit(), which skips
+    # Python finalizers used by docling/PyTorch and leaks their semaphores. The
+    # process is already dedicated to this queue, so execute jobs in-process and
+    # allow normal cleanup instead of merely suppressing resource_tracker output.
+    worker = SimpleWorker(queues, connection=conn)
     worker.work()
 
 

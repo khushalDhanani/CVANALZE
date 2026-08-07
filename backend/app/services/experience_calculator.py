@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from app.core.logging import logger
@@ -106,7 +106,7 @@ class ExperienceCalculator:
 
             # Handle present/current roles
             is_current = False
-            if raw_dates and re.search(r"\b(present|current|now|till date|onwards|till now|currently|presently)\b", str(raw_dates), re.IGNORECASE):
+            if raw_dates and re.search(r"\b(present|current|continue|continuing|ongoing|now|till date|onwards|till now|currently|presently)\b", str(raw_dates), re.IGNORECASE):
                 is_current = True
                 end_date = datetime.now()
             elif start_date and not end_date:
@@ -139,7 +139,7 @@ class ExperienceCalculator:
             )
 
         merged_intervals = cls._merge_intervals(valid_intervals)
-        total_days = sum((end - start).days for start, end in merged_intervals)
+        total_days = sum((end - start).days + 1 for start, end in merged_intervals)
         deterministic_years = round(total_days / 365.25, 1) if merged_intervals else None
 
         stated_years = cls._extract_explicit_experience(cv_text)
@@ -254,7 +254,7 @@ class ExperienceCalculator:
     def interval_duration_months(start_date: datetime, end_date: datetime) -> int:
         if end_date < start_date:
             return 0
-        months = (end_date.year - start_date.year) * 12 + end_date.month - start_date.month
+        months = (end_date.year - start_date.year) * 12 + end_date.month - start_date.month + 1
         return max(1, months)
 
     @classmethod
@@ -268,7 +268,7 @@ class ExperienceCalculator:
                 last_start, last_end = merged_intervals[-1]
                 current_start, current_end = interval
 
-                if current_start <= last_end:
+                if current_start <= last_end + timedelta(days=1):
                     # Overlap found, extend the last interval if necessary
                     merged_intervals[-1] = (last_start, max(last_end, current_end))
                 else:
