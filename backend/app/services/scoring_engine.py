@@ -286,6 +286,17 @@ class ScoringEngine:
             elif has_lexical:
                 retrieval_src = "keyword"
 
+        from app.services.match_evaluators import VacancyFitEvaluator
+        cand_hierarchy = kwargs.get("cand_hierarchy") or getattr(context, "cand_hierarchy", None)
+        fit_results = VacancyFitEvaluator.evaluate_fit(
+            context=context,
+            job=job_ctx,
+            cv_text=cv_text,
+            cand_hierarchy=cand_hierarchy,
+            comp_results=comp_results,
+            scoring_config=typed_scoring_config,
+        )
+
         return JobMatchResult(
             job_id=job_ctx.job_id,
             job_title=job_ctx.title,
@@ -296,8 +307,11 @@ class ScoringEngine:
             department_id=raw_job.get("department_id"),
             department_name=raw_job.get("department_name") or raw_job.get("department"),
             location_id=raw_job.get("location_id"),
-            score=guard_results.final_score,
-            overall_score=guard_results.final_score,
+            score=fit_results.vacancy_fit_score,
+            overall_score=fit_results.vacancy_fit_score,
+            vacancy_fit_score=fit_results.vacancy_fit_score,
+            score_breakdown=fit_results.score_breakdown,
+            vacancy_match_status=fit_results.match_status,
             classification=rec_results.classification,
             recommendation=rec_results.recommendation,
             role_score=safe_round(comp_results.role_score),

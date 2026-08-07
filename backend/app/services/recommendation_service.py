@@ -55,6 +55,17 @@ class RecommendationService:
                 "candidate_id": cv_key,
                 "full_name": cv_key,
                 "primary_department": "",
+                "main_department_id": None,
+                "main_department_name": "NO_STRONG_MAIN_DEPARTMENT_MATCH",
+                "main_department_confidence": 0.0,
+                "main_department_reasoning": status_msg,
+                "main_department_classification": {
+                    "main_department_id": None,
+                    "main_department_name": "NO_STRONG_MAIN_DEPARTMENT_MATCH",
+                    "confidence": 0.0,
+                    "reasoning": status_msg,
+                    "match_status": "NO_STRONG_MAIN_DEPARTMENT_MATCH",
+                },
                 "industry_role": None,
                 "strengths": [],
                 "overall_match_confidence": 0.0,
@@ -387,10 +398,37 @@ class RecommendationService:
             if qual.get("actionable_suggestion"):
                 next_steps.append(qual["actionable_suggestion"])
 
+        main_dept_cls = match_analysis.get("main_department_classification") or (
+            classification_data.get("main_department_classification") if isinstance(classification_data, dict) else {}
+        ) or {}
+        if not isinstance(main_dept_cls, dict) and hasattr(main_dept_cls, "model_dump"):
+            main_dept_cls = main_dept_cls.model_dump()
+        elif not isinstance(main_dept_cls, dict):
+            main_dept_cls = {}
+
+        hierarchy_cls = match_analysis.get("hierarchy_classification") or (
+            classification_data.get("hierarchy_classification") if isinstance(classification_data, dict) else {}
+        ) or {}
+        if not isinstance(hierarchy_cls, dict) and hasattr(hierarchy_cls, "model_dump"):
+            hierarchy_cls = hierarchy_cls.model_dump()
+        elif not isinstance(hierarchy_cls, dict):
+            hierarchy_cls = {}
+
+        main_dept_id = main_dept_cls.get("main_department_id")
+        main_dept_name = main_dept_cls.get("main_department_name") or "NO_STRONG_MAIN_DEPARTMENT_MATCH"
+        main_dept_conf = float(main_dept_cls.get("confidence") or 0.0)
+        main_dept_reason = main_dept_cls.get("reasoning") or "No main department classification reasoning provided."
+
         return {
             "candidate_id": cv_key,
             "full_name": extracted_name,
             "primary_department": primary_dept,
+            "main_department_id": main_dept_id,
+            "main_department_name": main_dept_name,
+            "main_department_confidence": main_dept_conf,
+            "main_department_reasoning": main_dept_reason,
+            "main_department_classification": main_dept_cls,
+            "hierarchy_classification": hierarchy_cls,
             "industry_role": industry_role,
             "strengths": strengths,
             "overall_match_confidence": overall_confidence,

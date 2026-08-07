@@ -873,3 +873,169 @@ class RecommendationEvaluator:
             confidence_val=confidence_val,
             reason_str=reason_str,
         )
+
+
+@dataclass
+class VacancyFitResults:
+    vacancy_fit_score: float
+    score_breakdown: Any  # VacancyFitScoreBreakdown
+    match_status: str  # "MATCHED" or "NO_STRONG_VACANCY_MATCH"
+    reason: str
+
+
+class VacancyFitEvaluator:
+    """
+    Evaluates candidate suitability against an open vacancy using structured hierarchy + semantic fit.
+
+    Weighted Scoring Dimensions:
+    1. Hierarchy Fit (25%): MainDeptID, DeptID, DesigID alignment
+    2. Designation/Role Fit (20%): Position title and job family alignment
+    3. Skills Fit (25%): Mandatory & preferred technical & functional skills
+    4. Experience Fit (15%): Total & relevant years of experience
+    5. Semantic Similarity (15%): Dense vector nomic-embed-text similarity score
+    """
+
+    @classmethod
+    def evaluate_fit(
+        cls,
+        context: CandidateAnalysisContext,
+        job: JobEvaluationContext,
+        cv_text: str = "",
+        cand_hierarchy: Any | None = None,
+        comp_results: Any | None = None,
+        scoring_config: Any | None = None,
+        threshold: float = 60.0,
+    ) -> VacancyFitResults:
+        from app.schemas.match import VacancyFitScoreBreakdown
+        from app.services.embedding_service import EmbeddingService
+
+        raw_job = job.raw_job or {}
+
+        # 1. Vacancy Hierarchy IDs
+        v_main_id = raw_job.get("main_department_id") if raw_job.get("main_department_id") is not None else raw_job.get("MainDeptID")
+        v_dept_id = raw_job.get("department_id") if raw_job.get("department_id") is not None else raw_job.get("DeptID")
+        v_desig_id = raw_job.get("designation_id") if raw_job.get("designation_id") is not None else raw_job.get("DesigID")
+
+        # Candidate Hierarchy IDs
+        c_main_id = getattr(cand_hierarchy.main_department, "id", None) if cand_hierarchy and hasattr(cand_hierarchy, "main_department") else None
+        c_dept_id = getattr(cand_hierarchy.department, "id", None) if cand_hierarchy and hasattr(cand_hierarchy, "department") else None
+        c_desig_id = getattr(cand_hierarchy.designation, "id", None) if cand_hierarchy and hasattr(cand_hierarchy, "designation") else None
+
+        # 1. Hierarchy Fit Score (0-100)
+        hierarchy_score = 0.0
+        hierarchy_mismatch = False
+
+        if v_main_id is None:
+            hierarchy_score = 70.0
+        elif c_main_id is not None and int(c_main_id) == int(v_main_id):
+            hierarchy_score = 60.0
+            if v_dept_id is not None and c_dept_id is not None and int(c_dept_id) == int(v_dept_id):
+                hierarchy_score = 80.0
+                if v_desig_id is not None and c_desig_id is not None and int(c_desig_id) == int(v_desig_id):
+                    hierarchy_score = 100.0
+        else:
+            hierarchy_score = 0.0
+            hierarchy_mismatch = True
+
+        is_valid_h = getattr(cand_hierarchy, "is_hierarchy_valid", True) if cand_hierarchy else True
+        if is_valid_h is False:
+            hierarchy_mismatch = True
+
+        hierarchy_penalty = 35.0 if hierarchy_mismatch else 0.0
+
+        # 2. Designation / Role Fit Score (0-100)
+        role_score = 0.0
+        if comp_results and hasattr(comp_results, "role_score"):
+            role_score = float(comp_results.role_score or 0.0)
+        else:
+            role_score = 50.0
+
+        # 3. Skills Fit Score (0-100)
+        skills_score = 0.0
+        if comp_results and hasattr(comp_results, "skills_score"):
+            skills_score = float(comp_results.skills_score or 0.0)
+        else:
+            skills_score = 50.0
+
+        # 4. Experience Fit Score (0-100)
+        experience_score = 0.0
+        if comp_results and hasattr(comp_results, "experience_score"):
+            experience_score = float(comp_results.experience_score or 0.0)
+        else:
+            cand_exp = context.candidate_experience or 0.0
+            min_exp = job.min_experience or 0.0
+            if cand_exp >= min_exp:
+                experience_score = 100.0
+            elif cand_exp >= (min_exp - 1.5):
+                experience_score = 65.0
+            else:
+                experience_score = max(0.0, (cand_exp / min_exp) * 50.0 if min_exp > 0 else 0.0)
+
+        # 5. Semantic Similarity Score (0-100)
+        semantic_score = 0.0
+        cand_text = f"Role: {context.current_role or ''}. Domain: {context.cand_tax_domain or ''}. Skills: {', '.join(context.cand_families)}. Summary: {cv_text[:300]}"
+        vac_text = f"Title: {job.title}. Department: {job.department}. Description: {job.description[:300]}"
+
+        cand_vector: list[float] | None = None
+        vac_vector: list[float] | None = None
+        try:
+            from app.core.config import settings
+            cand_vector = EmbeddingService.generate_embedding(cand_text, model_version=settings.EMBEDDING_MODEL, identifier=f"cand_fit_prof:{hash(cand_text)}")
+            vac_vector = EmbeddingService.generate_embedding(vac_text, model_version=settings.EMBEDDING_MODEL, identifier=f"vac_fit_prof:{job.job_id}:{hash(vac_text)}")
+        except Exception:
+            pass
+
+        if cand_vector and vac_vector:
+            sim = max(0.0, min(1.0, float(EmbeddingService.cosine_similarity(cand_vector, vac_vector))))
+            semantic_score = round(sim * 100.0, 1)
+        else:
+            semantic_score = float(getattr(comp_results, "responsibilities_score", 50.0) or 50.0)
+
+        # Weighted combination
+        w_hierarchy = 0.25
+        w_role = 0.20
+        w_skills = 0.25
+        w_exp = 0.15
+        w_semantic = 0.15
+
+        raw_fit_score = (
+            w_hierarchy * hierarchy_score +
+            w_role * role_score +
+            w_skills * skills_score +
+            w_exp * experience_score +
+            w_semantic * semantic_score
+        )
+
+        # Guardrail: High embedding similarity CANNOT override wrong department / invalid hierarchy
+        if hierarchy_mismatch:
+            final_fit_score = round(min(45.0, max(0.0, raw_fit_score - hierarchy_penalty)), 1)
+            match_status = "NO_STRONG_VACANCY_MATCH"
+            reason = f"Vacancy fit rejected ({final_fit_score:.1f}/100): Main Department or hierarchy mismatch."
+        elif raw_fit_score < threshold:
+            final_fit_score = round(raw_fit_score, 1)
+            match_status = "NO_STRONG_VACANCY_MATCH"
+            reason = f"Vacancy fit score ({final_fit_score:.1f}/100) below match threshold ({threshold:.1f})."
+        else:
+            final_fit_score = round(raw_fit_score, 1)
+            match_status = "MATCHED"
+            reason = f"Strong vacancy fit ({final_fit_score:.1f}/100): Valid hierarchy and skills alignment."
+
+        breakdown = VacancyFitScoreBreakdown(
+            hierarchy_score=round(hierarchy_score, 1),
+            designation_role_score=round(role_score, 1),
+            skills_score=round(skills_score, 1),
+            experience_score=round(experience_score, 1),
+            semantic_similarity_score=round(semantic_score, 1),
+            overall_fit_score=final_fit_score,
+            hierarchy_mismatch_penalty=round(hierarchy_penalty, 1),
+            is_hierarchy_valid=is_valid_h,
+            match_status=match_status,
+        )
+
+        return VacancyFitResults(
+            vacancy_fit_score=final_fit_score,
+            score_breakdown=breakdown,
+            match_status=match_status,
+            reason=reason,
+        )
+

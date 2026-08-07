@@ -145,6 +145,15 @@ class MatchService:
         from app.schemas.scoring_config import ScoringConfig
         scoring_config = ScoringConfig.load()
 
+        # Pre-compute hierarchy classification for vacancy scoring & hierarchy fit evaluation
+        hierarchy_res = DynamicTaxonomyService.classify_organization_hierarchy(
+            role_or_summary=candidate_context.current_role or "",
+            skills=list(candidate_context.cand_families),
+            domain=candidate_context.cand_tax_domain,
+            cv_text=cv_text,
+        )
+        candidate_context.cand_hierarchy = hierarchy_res
+
         # CONFIDENCE GATE CHECK (Phase 3)
         llm_skipped = False
         if filtered_job_contexts:
@@ -406,7 +415,21 @@ class MatchService:
                 )
                 for role in suitable_roles[:3]
             ]
-            
+
+        # Hierarchy-constrained organization classification: MainDept -> Dept -> Desig
+        hierarchy_res = candidate_context.cand_hierarchy or DynamicTaxonomyService.classify_organization_hierarchy(
+            role_or_summary=candidate_context.current_role or professional_domain or recommended_dept,
+            skills=list(candidate_context.cand_families),
+            domain=professional_domain,
+            cv_text=cv_text,
+        )
+        main_dept_res = DynamicTaxonomyService.classify_main_department(
+            role_or_summary=candidate_context.current_role or professional_domain or recommended_dept,
+            skills=list(candidate_context.cand_families),
+            domain=professional_domain,
+            cv_text=cv_text,
+        )
+
         if not has_genuine_match:
             best_match = None
             top_level_match_status = MatchStatus.NO_SUITABLE_MATCH
@@ -415,9 +438,28 @@ class MatchService:
                     "match_status": MatchStatus.NO_SUITABLE_MATCH,
                     "industry_department": cand_classification.industry_department or recommended_dept or None,
                     "industry_domain": cand_classification.industry_domain or professional_domain or None,
+                    "db_main_department_id": hierarchy_res.main_department.id,
+                    "db_main_department_name": hierarchy_res.main_department.name,
+                    "db_department_id": hierarchy_res.department.id,
+                    "db_department_name": hierarchy_res.department.name,
+                    "db_designation_id": hierarchy_res.designation.id,
+                    "db_designation_name": hierarchy_res.designation.name,
+                    "main_department_classification": main_dept_res,
+                    "hierarchy_classification": hierarchy_res,
                 })
         else:
             top_level_match_status = MatchStatus.DB_MATCH
+            if cand_classification:
+                cand_classification = cand_classification.model_copy(update={
+                    "db_main_department_id": hierarchy_res.main_department.id or cand_classification.db_main_department_id,
+                    "db_main_department_name": hierarchy_res.main_department.name or cand_classification.db_main_department_name,
+                    "db_department_id": hierarchy_res.department.id or cand_classification.db_department_id,
+                    "db_department_name": hierarchy_res.department.name or cand_classification.db_department_name,
+                    "db_designation_id": hierarchy_res.designation.id or cand_classification.db_designation_id,
+                    "db_designation_name": hierarchy_res.designation.name or cand_classification.db_designation_name,
+                    "main_department_classification": main_dept_res,
+                    "hierarchy_classification": hierarchy_res,
+                })
 
         from app.services.experience_gap_service import ExperienceGapService
         gap_analysis = ExperienceGapService.analyze_timeline(resume_json or {}, cv_text)
@@ -442,6 +484,7 @@ class MatchService:
             llm_skipped=llm_skipped,
             normalized_resume=normalized_resume,
             classification=cand_classification,
+            main_department_classification=main_dept_res,
             ai_career_suggestions=ai_career_suggestions,
             experience_gap_analysis=gap_analysis,
         )
@@ -539,6 +582,20 @@ class MatchService:
         from app.services.experience_gap_service import ExperienceGapService
         gap_analysis = ExperienceGapService.analyze_timeline({}, cv_text)
 
+        hierarchy_res = DynamicTaxonomyService.classify_organization_hierarchy(
+            role_or_summary=roles[0] if roles else industry_dept,
+            skills=[],
+            domain=industry_domain,
+            cv_text=cv_text,
+        )
+
+        main_dept_res = DynamicTaxonomyService.classify_main_department(
+            role_or_summary=roles[0] if roles else industry_dept,
+            skills=[],
+            domain=industry_domain,
+            cv_text=cv_text,
+        )
+
         return EnrichedCandidateAnalysis(
             match_status=MatchStatus.NO_SUITABLE_MATCH,
             primary_department=industry_dept or None,
@@ -562,6 +619,8 @@ class MatchService:
             best_match=best_match,
             suitable_openings=[],
             normalized_resume=normalized_resume,
+            main_department_classification=main_dept_res,
+            hierarchy_classification=hierarchy_res,
             ai_career_suggestions=ai_career_suggestions,
             experience_gap_analysis=gap_analysis,
         )

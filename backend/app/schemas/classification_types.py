@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Any, List, Optional
 from enum import Enum
 
 class MatchStatus(str, Enum):
@@ -34,6 +34,36 @@ class AISuggestion(BaseModel):
     evidence: List[ClassificationEvidence] = Field(default_factory=list, description="Evidence supporting the suggestion")
     missing_requirements: List[str] = Field(default_factory=list, description="What is needed to increase confidence")
 
+
+class MainDepartmentClassificationResult(BaseModel):
+    """Result of mapping a candidate profile to OrgMainDepartmentMst."""
+    main_department_id: Optional[int] = Field(None, description="Source of truth MSSQL MainDeptID")
+    main_department_name: str = Field(..., description="Official MainDeptName or 'NO_STRONG_MAIN_DEPARTMENT_MATCH'")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence score")
+    reasoning: str = Field(..., description="Short explanation of semantic mapping decision")
+    match_status: str = Field(..., description="MATCHED or NO_STRONG_MAIN_DEPARTMENT_MATCH")
+
+
+class HierarchyMatchNode(BaseModel):
+    """Details for a single level in the hierarchy resolution."""
+    id: Optional[int] = Field(None, description="Source of truth MSSQL ID")
+    name: str = Field(..., description="Entity name or NO_STRONG_*_MATCH")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
+    reasoning: str = Field(..., description="Short explanation of decision")
+    match_status: str = Field(..., description="MATCHED or NO_STRONG_*_MATCH")
+    top_k_candidates: List[dict[str, Any]] = Field(default_factory=list, description="Top-K candidate options evaluated")
+
+
+class HierarchyClassificationResult(BaseModel):
+    """Complete 3-level hierarchy classification result (MainDept -> Dept -> Desig)."""
+    main_department: HierarchyMatchNode
+    department: HierarchyMatchNode
+    designation: HierarchyMatchNode
+    is_hierarchy_valid: bool = Field(True, description="Whether parent-child hierarchy validation passed in MSSQL")
+    validation_errors: List[str] = Field(default_factory=list, description="Validation errors if hierarchy is invalid")
+    overall_confidence: float = Field(..., ge=0.0, le=1.0, description="Combined hierarchy confidence score")
+
+
 class NormalizedClassification(BaseModel):
     """Unified classification result that carries both raw DB identifiers and normalized industry labels.
 
@@ -66,3 +96,15 @@ class NormalizedClassification(BaseModel):
 
     # When no DB match, provide optional AI suggestion
     ai_career_suggestion: Optional[AISuggestion] = None
+
+    # Main Department classification result from OrgMainDepartmentMst
+    main_department_classification: Optional[MainDepartmentClassificationResult] = None
+
+    # Full 3-level hierarchy classification result (MainDept -> Dept -> Desig)
+    hierarchy_classification: Optional[HierarchyClassificationResult] = None
+
+
+NormalizedClassification.model_rebuild()
+
+
+

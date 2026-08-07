@@ -2,6 +2,25 @@
 
 ## 1. Completed Work
 
+### Vacancy Matching Upgrade: Structured Hierarchy + Semantic Fit (2026-08-07)
+- **Multi-Dimensional Weighted Scoring Engine (`VacancyFitEvaluator`)**:
+  - Implemented `VacancyFitEvaluator.evaluate_fit()` computing a weighted vacancy fit score across 5 key dimensions:
+    1. **Hierarchy Fit (25%)**: Compares Candidate Hierarchy IDs (`MainDeptID`, `DeptID`, `DesigID`) against Vacancy Hierarchy IDs.
+    2. **Designation/Role Fit (20%)**: Compares job title, role, and job family alignment.
+    3. **Skills Fit (25%)**: Evaluates mandatory and preferred skills satisfaction.
+    4. **Experience Fit (15%)**: Evaluates candidate experience against vacancy requirements.
+    5. **Semantic Similarity (15%)**: Dense vector cosine similarity via `EmbeddingService` (`nomic-embed-text`).
+- **Hierarchy Mismatch Capping Guardrail**:
+  - High embedding similarity CANNOT override an invalid or mismatched hierarchy. When a Main Department mismatch occurs or MSSQL parent-child validation fails, a 35.0 point penalty is applied and the final fit score is capped at $\le 45.0$ (below `threshold` 60.0), guaranteeing it returns `NO_STRONG_VACANCY_MATCH`.
+- **Schemas & Service Integration**:
+  - `VacancyFitScoreBreakdown` schema (`app/schemas/match.py`): Typed fields `hierarchy_score`, `designation_role_score`, `skills_score`, `experience_score`, `semantic_similarity_score`, `overall_fit_score`, `hierarchy_mismatch_penalty`, `is_hierarchy_valid`, `match_status`.
+  - `JobMatchResult`: Added `vacancy_fit_score`, `score_breakdown`, and `vacancy_match_status`.
+  - `CandidateAnalysisContext`: Extended with `cand_hierarchy` field to pre-compute candidate hierarchy once per CV evaluation.
+  - `ScoringEngine.evaluate_job_match()`: Integrated `VacancyFitEvaluator.evaluate_fit()` call.
+- **Test Coverage**:
+  - Created `tests/test_vacancy_fit_scoring.py` covering all 7 required scenarios: exact hierarchy match, partial hierarchy match, hierarchy mismatch, strong skills but wrong department, experience mismatch, semantic-only false positive, and strong overall match. All 27 total tests pass 100%.
+
+
 ### End-to-End Organization Hierarchy Audit & Refactoring (2026-08-07)
 - **Hierarchy Standard**: Verified and enforced exact 6-level MSSQL hierarchy: `OrgBusinessGroupMst` → `OrgCompanyMst` → `OrgLocationMst` → `OrgMainDepartmentMst` → `OrgDepartmentMst` → `OrgDesignationMst`.
 - **Extended Organization Repository (`OrganizationSourceRepository`)**: Added queries for Business Groups, Companies (filtered by BusinessGrpID), Locations (filtered by CompID), Main Departments, Departments (filtered by CompID & MainDeptID), and Designations (filtered by CompID, DeptID & MainDeptID). Implemented `validate_hierarchy()` to validate parent-child ID relationships so invalid combinations cannot be selected or recommended.

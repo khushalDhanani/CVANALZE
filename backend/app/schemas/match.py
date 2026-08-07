@@ -43,6 +43,19 @@ class MandatoryFailureDetails(BaseModel):
     score_impact: float = Field(default=0.0, description="Deduction or penalty applied to final score")
 
 
+class VacancyFitScoreBreakdown(BaseModel):
+    """Detailed score breakdown for structured hierarchy + semantic vacancy fit evaluation."""
+    hierarchy_score: float = Field(default=0.0, description="Hierarchy ID match score (MainDeptID, DeptID, DesigID) (0-100)")
+    designation_role_score: float = Field(default=0.0, description="Designation and role alignment score (0-100)")
+    skills_score: float = Field(default=0.0, description="Mandatory & preferred skills match score (0-100)")
+    experience_score: float = Field(default=0.0, description="Experience & seniority match score (0-100)")
+    semantic_similarity_score: float = Field(default=0.0, description="Dense vector nomic-embed-text similarity score (0-100)")
+    overall_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0-100)")
+    hierarchy_mismatch_penalty: float = Field(default=0.0, description="Penalty deduction applied for hierarchy mismatch")
+    is_hierarchy_valid: bool = Field(default=True, description="Whether MSSQL parent-child hierarchy validation passed")
+    match_status: str = Field(default="MATCHED", description="MATCHED or NO_STRONG_VACANCY_MATCH")
+
+
 class JobMatchResult(BaseModel):
     job_id: str = Field(..., description="Unique job opening ID")
     job_title: str = Field(..., description="Job position title")
@@ -58,6 +71,9 @@ class JobMatchResult(BaseModel):
 
     score: float = Field(..., description="Calculated suitability match score (0.0 - 100.0)")
     overall_score: float = Field(default=0.0, description="Deterministic two-stage overall score (0.0 - 100.0)")
+    vacancy_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0.0 - 100.0)")
+    score_breakdown: VacancyFitScoreBreakdown | None = Field(default=None, description="Structured score breakdown across hierarchy, skills, experience, role, and semantic fit")
+    vacancy_match_status: str = Field(default="MATCHED", description="MATCHED or NO_STRONG_VACANCY_MATCH")
     role_score: float = Field(default=0.0, description="Score based on job title and domain match")
     skills_score: float = Field(default=0.0, description="Score based on mandatory/preferred skills")
     experience_score: float = Field(default=0.0, description="Score based on experience match")

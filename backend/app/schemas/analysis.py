@@ -5,7 +5,13 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.schemas.experience_gap import ExperienceGapAnalysis
-from app.schemas.classification_types import AISuggestion, MatchStatus, NormalizedClassification
+from app.schemas.classification_types import (
+    AISuggestion,
+    MatchStatus,
+    NormalizedClassification,
+    MainDepartmentClassificationResult,
+    HierarchyClassificationResult,
+)
 from app.schemas.match import JobMatchResult
 from app.schemas.normalized_resume import NormalizedResume
 
@@ -170,6 +176,14 @@ class EnrichedCandidateAnalysis(BaseModel):
         default=None,
         description="Structured taxonomy classification with DB identifiers, industry labels, confidence, and evidence",
     )
+    main_department_classification: MainDepartmentClassificationResult | None = Field(
+        default=None,
+        description="Independent Main Department classification result from OrgMainDepartmentMst",
+    )
+    hierarchy_classification: HierarchyClassificationResult | None = Field(
+        default=None,
+        description="Full 3-level hierarchy classification result (MainDept -> Dept -> Desig)",
+    )
     ai_career_suggestions: list[AISuggestion] = Field(
         default_factory=list,
         description="AI career suggestions when no DB match found — clearly separated from verified DB matches",
@@ -231,3 +245,7 @@ class TrainingExample(BaseModel):
     hr_corrected_classification: str | None
     hr_feedback: str
     timestamp: str
+
+
+EnrichedCandidateAnalysis.model_rebuild()
+

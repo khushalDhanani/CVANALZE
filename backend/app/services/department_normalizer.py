@@ -44,9 +44,11 @@ class DepartmentNormalizer:
                 rows = session.query(DepartmentDomainMaster).all()
                 for row in rows:
                     # Use the Keywords column (comma‑separated) to map possible internal names to the domain label
-                    keywords = []
                     if row.Keywords:
-                        keywords = [kw.strip().lower() for kw in row.Keywords.split(',') if kw.strip()]
+                        if isinstance(row.Keywords, list):
+                            keywords = [str(kw).strip().lower() for kw in row.Keywords if str(kw).strip()]
+                        elif isinstance(row.Keywords, str):
+                            keywords = [kw.strip().lower() for kw in row.Keywords.split(',') if kw.strip()]
                     # If no keywords, fall back to using the DomainName itself as a possible key
                     if not keywords:
                         keywords = [row.DomainName.strip().lower()]

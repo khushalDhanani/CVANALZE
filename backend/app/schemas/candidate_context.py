@@ -38,6 +38,7 @@ class CandidateAnalysisContext:
     cand_primary_family: str | None = None
     domain_candidate_text: str = ""
     is_software_cand: bool = False
+    cand_hierarchy: Any | None = None
 
     @classmethod
     def create(
