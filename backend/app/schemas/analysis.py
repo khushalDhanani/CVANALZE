@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.schemas.experience_gap import ExperienceGapAnalysis
 from app.schemas.classification_types import AISuggestion, MatchStatus, NormalizedClassification
 from app.schemas.match import JobMatchResult
 from app.schemas.normalized_resume import NormalizedResume
@@ -188,6 +189,10 @@ class EnrichedCandidateAnalysis(BaseModel):
     source_snapshot: str | None = Field(
         default=None,
         description="A snapshot of the original source payload for auditing",
+    )
+    experience_gap_analysis: ExperienceGapAnalysis | None = Field(
+        default=None,
+        description="Dynamic Experience Gap Analysis for HR",
     )
 
 

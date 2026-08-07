@@ -283,11 +283,31 @@ class TaxonomyClassifier:
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             domain = dyn_res.industry_domain or "Unknown"
             family = dyn_res.industry_department or dyn_res.db_department_name or "Unknown"
+            if domain != "Unknown":
+                return TaxonomyClassification(
+                    domain=domain,
+                    job_family=family,
+                    compatible_families=(family,),
+                    matched_rule=f"dynamic:{dyn_res.match_source}",
+                )
+
+        from app.repositories.department_domain import department_domain_repository
+        combined_text = dto.normalized_full_text.lower()
+        dept_scores = []
+        for matcher in department_domain_repository.get_domain_matchers():
+            kw_matches = matcher.keyword_match_count(combined_text)
+            if kw_matches > 0:
+                dept_scores.append((kw_matches, matcher.domain))
+
+        if dept_scores:
+            best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             return TaxonomyClassification(
-                domain=domain,
-                job_family=family,
-                compatible_families=(family,),
-                matched_rule=f"dynamic:{dyn_res.match_source}",
+                domain=best_domain.domain_name,
+                job_family=best_domain.department_name,
+                compatible_families=(best_domain.department_name,),
+                matched_rule="domain_repository_keyword_fallback",
             )
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0

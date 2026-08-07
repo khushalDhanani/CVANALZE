@@ -2,6 +2,18 @@
 
 ## 1. Completed Work
 
+### Third-Pass Adversarial Audit & Zero-Trust Verification (2026-08-07)
+- **Database Reconciliation**: Fully reconciled all 15 rows in PostgreSQL `cvai.cv_results`: 11 valid fully parsed candidates, 1 key alias duplicate (`cv_gptsuifgr321345678o9p`), and 3 incomplete processing placeholders ($11 + 1 + 3 = 15$).
+- **Zero-Trust Audit Execution**: Executed `adversarial_audit_runner.py` auditing all 11 parsed candidates against all 107 active openings live without relying on pre-existing scores or labels.
+- **Cross-Domain & Taxonomy Fixes**:
+  - Enhanced `TaxonomyClassifier.classify_candidate_dto` with direct `department_domain_repository` keyword matching when dynamic resolution returns `Unknown`.
+  - Updated `CrossDomainGuardEvaluator.evaluate` to compare `cand_domain` against `vac_tax_domain` and enforce strict cross-domain mismatch penalties.
+  - Resolved circular stack recursion between `TaxonomyClassifier` and `CandidateDomainService` by using direct repository matchers in `_infer_roles_from_resume`.
+- **Verification Outcomes**:
+  - 100% zero severe cross-domain mismatches (e.g., Utkarsh Patil correctly matches `Software Developer @ CIS Team` 95.6% instead of `Lab Assistant - I (QC)`).
+  - 8 PASS, 3 WARNING (minor fallback score representation when Ollama offline), 0 FAIL.
+- **Walkthrough Artifact**: Created `walkthrough.md` detailing database reconciliation, candidate score matrix, 17 adversarial flaw checks, and consistency test results.
+
 ### PR 1 — Fix database contract
 - Added `MSSQL_READ_ONLY_URL` and `POSTGRES_APP_URL` to configuration and decoupled `DB_URL`/`PG_DB_URL`.
 - Enforced dual database requirements for production mode in `database.py`.
@@ -198,6 +210,33 @@ None. All tasks completed successfully.
 
 ### Files Modified:
 - `backend/app/models/domain.py`
+
+## 2026-08-07: Strict Second-Pass CV Matching Audit & Generic Architecture Repair
+
+### Work Completed:
+1. **Audit Suite Execution**: Audited all 13 local candidate CVs in PostgreSQL `cvai.cv_results` against all 107 active vacancies in MSSQL/PostgreSQL.
+2. **7 Generic Root Causes Fixed**:
+   - **SQL Parameter Truncation Leak (`backend/app/services/dynamic_taxonomy_service.py`)**: Sanitized and bounded input string length in `_resolve_mssql_source_ids` to eliminate SQL Server `pyodbc.DataError` string truncation exceptions.
+   - **Heading & PII Leakage into Candidate Current Role (`backend/app/schemas/candidate_context.py`)**: Added `is_valid_role` validation rejecting markdown headers (`##`), PII section titles, and candidate name tokens. Added experience fallback from `resume_json.total_experience_years` to prevent candidate experience erasure (e.g. 5.1 yrs exp resolving to 0.0 yrs).
+   - **Software Framework Weighting (`backend/app/services/candidate_domain_service.py`)**: Gave specialized framework terms (`Flutter`, `Dart`, `BLoC`, `.NET`, `C#`, `C++`, `Java`, `React`) precedence over generic web markup (`HTML`, `CSS`), preventing Flutter developers from misclassifying into Creative Team.
+   - **Classification Token Alias Support (`backend/app/services/recommendation_service.py` & `backend/app/services/match_service.py`)**: Expanded `_is_strong_match` and `eligible_matches` classification check to accept `{"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}`.
+   - **Dynamic Vacancy Domain Resolution in Cross-Domain Guard (`backend/app/services/match_evaluators.py`)**: Updated `CrossDomainGuardEvaluator` to resolve target vacancy domain dynamically from `DepartmentDomainRepository` when vacancy taxonomy domain is Unknown or empty, preventing IT software candidates from ranking high for Quality Control Lab Assistant roles.
+   - **PostgreSQL JSON Cache Disk Fallback (`backend/app/repositories/result.py`)**: Added disk file fallback check in `ResultRepository.read_result_by_filename` for test environments.
+   - **Safe Mock Handling (`backend/app/repositories/processing_job.py`)**: Added strict string type guards in `ProcessingJobRepository.save` to ensure hash encoding safe operations.
+
+3. **Reprocessing & Final Audit**: Reprocessed all 13 local candidate CVs through the complete pipeline. Verified that candidate matches resolve accurately (e.g., Utkarsh Patil -> Software Developer CIS Team @ 95.6% STRONG; Gtworks -> Flutter Developer CIS Team @ 98.5% STRONG; Chaitanya Rathod -> Senior Executive QA @ 95.1% STRONG).
+4. **Unit Test Verification**: Ran pytest test suite (`pytest tests/test_audit_fixes.py`), verifying 100% test pass rate (47/47 tests passing).
+
+### Files Modified:
+- `backend/app/services/dynamic_taxonomy_service.py`
+- `backend/app/schemas/candidate_context.py`
+- `backend/app/services/candidate_domain_service.py`
+- `backend/app/services/recommendation_service.py`
+- `backend/app/services/match_evaluators.py`
+- `backend/app/services/match_service.py`
+- `backend/app/repositories/result.py`
+- `backend/app/repositories/processing_job.py`
+- `backend/tests/test_audit_fixes.py`
 - `backend/app/repositories/department_domain.py`
 - `backend/app/data/department_domains_seed.json` [NEW]
 - `backend/scripts/seed_department_domains.py` [NEW]
@@ -317,14 +356,81 @@ None. All tasks completed successfully.
 ### Files Modified:
 - `backend/app/services/match_service.py`
 - `backend/app/services/recommendation_service.py`
-- `backend/app/services/experience_calculator.py`
-- `backend/app/services/resume_field_extractor.py`
-- `backend/tests/test_experience_role_fit_flow.py` [NEW]
+
+
+## 2026-08-07: Dynamic Experience Gap Analysis Engine & HR UI Component
+
+### Work Completed:
+- **Schemas & Data Models (`ExperienceGapAnalysis`)**: Created `app/schemas/experience_gap.py` defining `ExperienceGap`, `ExperienceTimelineSummary`, `ExperienceTimelineNode`, and `ExperienceGapAnalysis` with strict typing for dual-fact gap categories (`category="EMPLOYMENT_GAP"`), coverage status (`EDUCATION_COVERED`, `FREELANCE_COVERED`, `CONTRACT_COVERED`, `UNEXPLAINED`, `TIMELINE_UNCERTAINTY`), boundary reliability (`HIGH`, `MEDIUM`, `LOW`), and date confidence levels (`EXACT`, `MONTH_ONLY`, `YEAR_ONLY`, `UNKNOWN`).
+- **Dynamic Gap Analysis Engine (`ExperienceGapService`)**: Built `app/services/experience_gap_service.py` to sweep candidate employment timelines using configurable `gap_threshold_days` (default 60 days). Performs non-overlapping interval union for verified experience calculation, calculates `analysis_confidence` (0.0 to 1.0), and generates pure HR intelligence with zero impact on candidate vacancy match scores.
+- **Service Integration**: Connected `ExperienceGapService` into `ExperienceCalculator.calculate_canonical_experience`, `MatchService.analyze_single_cv`, and `RecommendationService.get_candidate_recommendations`.
+- **Frontend Timeline Component (`ExperienceTimelineCard`)**: Built `frontend/src/components/ui/ExperienceTimelineCard.tsx` rendering neutral terminology (`Employment Gap`, `Covered by Freelance`, `Education Period`, `Timeline Uncertain`), Date Confidence badges (`Exact`, `Month Only`, `Year Only`), Analysis Confidence score, KPI metrics, and neutral HR observations. Embedded component into `frontend/src/app/candidates/[id].tsx`.
+- **Targeted Unit Test Suite**: Updated `tests/test_experience_gap_analysis.py` covering dual-fact gap representation (`EMPLOYMENT_GAP` + `EDUCATION_COVERED`), configurable threshold (60 vs 30 days), date confidence classification, interval union calculation, and analysis confidence score (4 tests passing 100%).
+- **Database Reprocessing**: Reprocessed all 13 stored candidate CVs in PostgreSQL `cv_results` to calculate and save refined `experience_gap_analysis` metrics.
+
+### Files Created:
+- `backend/app/schemas/experience_gap.py`
+- `backend/app/services/experience_gap_service.py`
+
+
+## 2026-08-07: Frontend Single Source Timeline & Experience Timeline Card Refactor
+
+### Work Completed:
+- **TypeScript Schemas (`frontend/src/types/api.ts`)**: Added `EmploymentEntityResolution`, `ChildAssignmentItem`, `CanonicalJobItem`, `ExperienceGapItem`, `ExperienceTimelineNodeItem`, `ConcurrentRoleClusterItem`, `TimelineEventItem`, `ExperienceTimelineSummaryItem`, and `ExperienceGapAnalysisData`.
+- **Single Source of Truth (`ExperienceTimelineCard.tsx`)**: Refactored component to consume `experience_gap_analysis.timeline_events` and `summary` directly without recalculating experience, gaps, overlaps, or concurrency from raw CV data.
+- **Support for All Event & Sub-Role Types**:
+  - `EMPLOYMENT_PERIOD`: Normal employment periods.
+  - `CONCURRENT_CLUSTER`: Genuine independent concurrent employment periods.
+  - `EMPLOYMENT_GAP`: Red visual highlight for unexplained gaps (duration >= 3.0 mo).
+  - `TIMELINE_UNCERTAINTY`: Amber highlight for short gaps / date uncertainty.
+  - `COVERED_GAP`: Soft green/blue highlights for gaps covered by education, freelance, contract, or career transition.
+  - **Nested Parent-Child Sub-Roles**: Rendered internal sub-roles, deputations, promotions, and transfers (`child_assignments`) nested under parent employment cards.
+- **Undated Entries Drawer**: Placed undated entries in a separate collapsible drawer ("Undated Roles & Additional Details") to avoid polluting the chronological timeline.
+- **Removed "Verified" Wording**: Replaced UI labels with clean HR terminology ("Total Experience", "Total Duration").
+- **Backward Compatibility**: Added fallback support for legacy candidate records lacking `experience_gap_analysis`.
+
+### Files Modified:
+- `frontend/src/types/api.ts`
+- `frontend/src/components/ui/ExperienceTimelineCard.tsx`
 - `workstatus.md`
 
+### Strict End-To-End CV Timeline Audit & Fix (Chaitanya Rathod CV)
+**Date:** 2026-08-07
+**Status:** Completed
 
+**Work Completed:**
+- **Description Mapping for Entity Resolution**: Updated `ExperienceGapService` to inject the `description` string into the responsibilities list during Stage 1. This prevents critical context (like parent company names) from being lost when the LLM fractures job experiences.
+- **Smarter Fallback Titles**: Replaced hardcoded `"Position"` and `"Organization"` fallbacks with dynamic sub-role extraction (e.g. `REC Solar Pte. Ltd. - Singapore` instead of `Position`) for internal roles and deputations.
+- **Deep Parent Matching for Undated Deputations**: Enhanced `_build_canonical_jobs` to accept and process undated fragmented records, allowing them to accurately bind as `ChildAssignments` to parent canonical jobs instead of falling into a disconnected `undated_nodes` bucket.
+- **Database Synchronization**: Executed a backend reprocessing script to recalculate and persist the accurate `experience_gap_analysis` object directly to the PostgreSQL `cv_results` table, replacing the old, cached payload that was corrupting the UI.
 
+**Important Decisions:**
+- Relied on the frontend `ExperienceTimelineCard` to organically display the corrected backend structure (using `renderChildAssignment`) instead of adding candidate-specific hacks or independent recalculations to the frontend component.
 
+**Pending Work:**
+- Monitor incoming CV parsing extractions to ensure LLM fragmentation remains robust against edge cases.
 
+### Files Modified:
+- `backend/app/services/experience_gap_service.py`
+- `workstatus.md`
 
+## 3. Full Data-Driven CV Pipeline Audit & Fix
+
+### Audited Root Causes & Fixes Delivered
+- **RC-1 / RC-11 (Company ↔ Job Title Swap)**: Fixed `_extract_employment` in `resume_field_extractor.py` by adding `_looks_like_company` and `_looks_like_title` regex helpers and auto-correcting swapped title/company values.
+- **RC-2 (Heading-as-Name Parsing)**: Fixed `extract_candidate_name` and `_is_valid_name` to reject job title phrases (`Sr. Flutter Developer`, `Production Planning & Control`, `job.`), strip title suffixes from lines, and match compound email username tokens.
+- **RC-3 (Junk Skills Filtering)**: Added `_is_junk_skill` helper in `resume_field_extractor.py` to filter markdown headings (`## LANGUAGE`), dashes/punctuation (`---`), bullet prefixes (`:-`), and responsibility sentences (>80 chars).
+- **RC-4 (Bullet-Format Date Handling)**: Added bullet-level date and structured field parsing (`Duration :-`, `Organization :-`, `Designation :-`) to extract employment from bulleted CV layouts.
+- **RC-7 (Frontend Skills Crash)**: Updated `[id].tsx` candidate detail page to safely normalize `resume_json.skills` whether provided as `string[]` array or `{categorized: {...}, all_skills: [...]}` dict.
+- **RC-10 (Tech Term Location Rejection)**: Added mobile/web frameworks (`provider`, `getx`, `bloc`, `react`, `flutter`) to `_TECH_LOCATION_BLACKLIST` in `extract_location`.
+- **RC-12 (Empty Department/Domain Fallbacks)**: Added secondary fallbacks in `recommendation_service.py` to populate candidate `primary_department` and `professional_domain` from matching vacancies when domain profiling returns empty.
+- **RC-5 & RC-6 (DB Integrity & Cleanup)**: Purged duplicate/orphan DB records via `scripts/audit_db_integrity.py` and ingested missing disk CV files.
+
+### Files Modified
+- `backend/app/services/resume_field_extractor.py`
+- `backend/app/services/recommendation_service.py`
+- `frontend/src/app/candidates/[id].tsx`
+- `backend/scripts/audit_db_integrity.py`
+- `backend/scripts/reprocess_all_cvs.py`
+- `workstatus.md`
 

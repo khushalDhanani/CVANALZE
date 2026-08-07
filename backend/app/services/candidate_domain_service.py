@@ -197,14 +197,15 @@ class CandidateDomainService:
         scored_roles: list[tuple[int, str]] = []
         seen_roles: set[str] = set()
 
-        # 1. Match using the dynamic taxonomy classifier
-        _, compatible_families = TaxonomyClassifier.classify_candidate(cv_text=cv_text, resume_json=resume_json)
-
-        # Add taxonomy families as base roles, giving them a high initial score
-        for family in compatible_families:
-            if family not in seen_roles and family not in (RuleConfigManager.get_taxonomy_rules().default_family, "Unknown"):
-                scored_roles.append((10, family))
-                seen_roles.add(family)
+        # 1. Match against dynamic department domains directly to prevent circular recursion
+        repository = repo or department_domain_repository
+        for matcher in repository.get_domain_matchers():
+            kw_matches = matcher.keyword_match_count(search_text)
+            if kw_matches > 0:
+                dept_name = matcher.domain.department_name
+                if dept_name and dept_name not in seen_roles and dept_name != "Unknown":
+                    scored_roles.append((kw_matches * 2, dept_name))
+                    seen_roles.add(dept_name)
 
         # 2. Match against dynamic department domains
         repository = repo or department_domain_repository

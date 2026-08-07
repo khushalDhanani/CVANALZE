@@ -576,3 +576,132 @@ export interface TalentPoolsResponse {
   talent_pools: TalentPool[];
 }
 
+// ===== Experience Gap Analysis Types =====
+export type EmploymentEntityResolution =
+  | 'PARENT_EMPLOYMENT'
+  | 'INTERNAL_ROLE'
+  | 'DEPUTATION'
+  | 'PROMOTION_TRANSFER'
+  | 'INDEPENDENT_CONCURRENT_ROLE'
+  | 'DUPLICATE'
+  | 'INVALID_HEADING';
+
+export interface ChildAssignmentItem {
+  assignment_id: string;
+  title_or_subrole: string;
+  assignment_type: 'DEPUTATION' | 'PROMOTION' | 'TRANSFER' | 'INTERNAL_ASSIGNMENT' | 'SUB_ROLE' | string;
+  entity_resolution: EmploymentEntityResolution;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  details?: string[];
+}
+
+export interface CanonicalJobItem {
+  job_id: string;
+  parent_company: string;
+  primary_title: string;
+  employment_type: string;
+  entity_resolution: EmploymentEntityResolution;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  date_confidence?: 'EXACT' | 'MONTH_ONLY' | 'YEAR_ONLY' | 'UNKNOWN' | string;
+  responsibilities?: string[];
+  child_assignments?: ChildAssignmentItem[];
+}
+
+export interface ExperienceGapItem {
+  gap_id: string;
+  category?: 'EMPLOYMENT_GAP' | string;
+  coverage_status:
+    | 'UNEXPLAINED'
+    | 'EDUCATION_COVERED'
+    | 'FREELANCE_COVERED'
+    | 'CONTRACT_COVERED'
+    | 'CAREER_TRANSITION'
+    | 'TIMELINE_UNCERTAINTY'
+    | string;
+  boundary_reliability?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  start_date?: string | null;
+  end_date?: string | null;
+  duration_days: number;
+  duration_months: number;
+  preceding_role?: string | null;
+  following_role?: string | null;
+  description: string;
+  hr_review_indicator: boolean;
+  hr_review_reason?: string | null;
+}
+
+export interface ExperienceTimelineNodeItem {
+  record_id: string;
+  company: string;
+  job_title: string;
+  employment_type: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  precision?: string;
+  date_confidence?: 'EXACT' | 'MONTH_ONLY' | 'YEAR_ONLY' | 'UNKNOWN' | string;
+  responsibilities?: string[];
+}
+
+export interface ConcurrentRoleClusterItem {
+  cluster_id: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  roles_count: number;
+  child_nodes: ExperienceTimelineNodeItem[];
+}
+
+export interface TimelineEventItem {
+  event_id: string;
+  event_type:
+    | 'EMPLOYMENT_PERIOD'
+    | 'CONCURRENT_CLUSTER'
+    | 'EMPLOYMENT_GAP'
+    | 'COVERED_GAP'
+    | 'TIMELINE_UNCERTAINTY'
+    | string;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  node?: ExperienceTimelineNodeItem | null;
+  cluster?: ConcurrentRoleClusterItem | null;
+  gap?: ExperienceGapItem | null;
+}
+
+export interface ExperienceTimelineSummaryItem {
+  total_verified_years: number;
+  gross_display: string;
+  timeline_start_date?: string | null;
+  timeline_end_date?: string | null;
+  has_current_employment: boolean;
+  concurrent_roles_count: number;
+  total_employment_gaps_count: number;
+  unexplained_gaps_count: number;
+  significant_gaps_count: number;
+  total_gap_duration_months: number;
+  analysis_confidence: number;
+  timeline_uncertainty_score: number;
+  hr_review_required: boolean;
+  hr_observations?: string[];
+}
+
+export interface ExperienceGapAnalysisData {
+  summary?: ExperienceTimelineSummaryItem;
+  detected_gaps?: ExperienceGapItem[];
+  canonical_jobs?: CanonicalJobItem[];
+  timeline_nodes?: ExperienceTimelineNodeItem[];
+  undated_nodes?: ExperienceTimelineNodeItem[];
+  timeline_events?: TimelineEventItem[];
+  hr_review_indicators?: string[];
+}
+
+

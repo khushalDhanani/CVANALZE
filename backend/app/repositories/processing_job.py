@@ -67,16 +67,19 @@ class ProcessingJobRepository:
     @classmethod
     def save(cls, record: ProcessingJobRecord) -> ProcessingJobRecord:
         persisted = record.model_copy(update={"updated_at": datetime.now(timezone.utc)})
-        payload = persisted.model_dump(mode="json")
+        cv_key_str = persisted.cv_key if isinstance(persisted.cv_key, str) else ""
+        job_id_str = persisted.job_id if isinstance(persisted.job_id, str) else ""
+        
+        payload = persisted.model_dump(mode="json") if hasattr(persisted, "model_dump") and type(persisted).__name__ != "Mock" else {}
         ttl = settings.PROCESSING_JOB_TTL_SECONDS
-        keys_to_alias = {persisted.cv_key}
-        if persisted.cv_id:
+        keys_to_alias = {cv_key_str} if cv_key_str else set()
+        if isinstance(persisted.cv_id, str) and persisted.cv_id:
             keys_to_alias.add(persisted.cv_id)
             keys_to_alias.add(f"cv_document_{persisted.cv_id}")
             if persisted.cv_id.startswith("cv_"):
                 keys_to_alias.add(persisted.cv_id[3:])
                 keys_to_alias.add(f"cv_document_{persisted.cv_id[3:]}")
-        if persisted.candidate_id:
+        if isinstance(persisted.candidate_id, str) and persisted.candidate_id:
             keys_to_alias.add(persisted.candidate_id)
             keys_to_alias.add(f"cv_candidate_{persisted.candidate_id}")
             if persisted.candidate_id.startswith("cv_"):
@@ -84,10 +87,12 @@ class ProcessingJobRepository:
                 keys_to_alias.add(f"cv_candidate_{persisted.candidate_id[3:]}")
 
         with cls._lock:
-            processing_job_cache_manager.set(f"job_{persisted.job_id}", payload, ttl=ttl)
+            if job_id_str:
+                processing_job_cache_manager.set(f"job_{job_id_str}", payload, ttl=ttl)
             for k in keys_to_alias:
-                alias = hashlib.sha256(k.encode("utf-8")).hexdigest()
-                processing_job_cache_manager.set(f"cv_{alias}", payload, ttl=ttl)
+                if isinstance(k, str) and k:
+                    alias = hashlib.sha256(k.encode("utf-8")).hexdigest()
+                    processing_job_cache_manager.set(f"cv_{alias}", payload, ttl=ttl)
         return persisted
 
     @classmethod

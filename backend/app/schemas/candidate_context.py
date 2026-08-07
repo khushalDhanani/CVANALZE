@@ -60,6 +60,13 @@ class CandidateAnalysisContext:
         exp_years = deterministic_experience if deterministic_experience is not None else normalized_experience
         if exp_years is None:
             exp_years = candidate_experience
+        if exp_years is None and isinstance(resume_json, dict):
+            raw_exp = resume_json.get("total_experience_years") or resume_json.get("experience_years")
+            if raw_exp is not None:
+                try:
+                    exp_years = float(raw_exp)
+                except (ValueError, TypeError):
+                    pass
 
         if optimized_profile:
             profile_parts.extend(
@@ -102,18 +109,40 @@ class CandidateAnalysisContext:
         if not current_role and normalized_resume and normalized_resume.employment:
             current_role = normalized_resume.employment[0].job_title.normalized_value
 
+        cand_name_clean = ""
+        if isinstance(resume_json, dict):
+            raw_cand_name = resume_json.get("name") or resume_json.get("candidate_name") or ""
+            if isinstance(raw_cand_name, str):
+                cand_name_clean = raw_cand_name.strip().lower()
+
+        denied_roles = {
+            "personal details", "personal details:", "objective", "summary", "profile",
+            "education", "skills", "technical skills", "experience", "work experience",
+            "key achievements", "achievements", "certifications", "contact information",
+            "projects", "declarations", "declaration", "hobbies", "languages"
+        }
+
+        def is_valid_role(r: str) -> bool:
+            if not r or len(r.strip()) < 2:
+                return False
+            clean = r.strip().lower()
+            if clean in denied_roles or clean.endswith(":") or clean in cand_name_clean:
+                return False
+            if cand_name_clean and len(cand_name_clean) > 3 and cand_name_clean in clean:
+                return False
+            return True
+
+        if current_role and not is_valid_role(current_role):
+            current_role = None
+
         if not current_role:
             m = re.search(
-                r"(?:current\s*role|position|title)\s*:\s*([^\n]+)",
+                r"(?:current\s*role|position|designation|job\s*title)\s*:\s*([^\n]+)",
                 cv_text,
                 re.IGNORECASE,
             )
-            if m:
+            if m and is_valid_role(m.group(1)):
                 current_role = m.group(1).strip()
-            else:
-                m_header = re.search(r"##\s*([^\n]+)", cv_text)
-                if m_header:
-                    current_role = m_header.group(1).strip()
 
         # Text normalization inline (mirrors ScoringEngine._normalize_text)
         raw_combined = " ".join(filter(None, profile_parts))

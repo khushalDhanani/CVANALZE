@@ -15,4 +15,5 @@ export * from "./StatCard";
 export * from "./StepProgressCard";
 export * from "./FieldConfidenceView";
 export * from "./Breadcrumbs";
+export * from "./ExperienceTimelineCard";
 

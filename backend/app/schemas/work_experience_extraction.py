@@ -23,6 +23,7 @@ class WorkExperienceConfig(BaseModel):
     year_only_end_policy: Literal["manual_review", "exclude", "include"] = "manual_review"
     month_only_start_policy: Literal["first_day"] = "first_day"
     month_only_end_policy: Literal["last_day"] = "last_day"
+    gap_threshold_days: int = Field(default=60, ge=1, description="Minimum days of employment hiatus to classify as an employment gap (default 60 days)")
     minimum_record_confidence: float = Field(default=0.60, ge=0.0, le=1.0)
     human_review_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
 

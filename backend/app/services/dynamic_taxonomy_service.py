@@ -190,7 +190,18 @@ class DynamicTaxonomyService:
 
     @classmethod
     def _resolve_mssql_source_ids(cls, term: str) -> NormalizedClassification | None:
-        clean_term = term.strip().lower()
+        if not term or not term.strip():
+            return None
+
+        # Sanitize term: take first line and cap length to max 200 chars to avoid SQL Server truncation errors
+        first_line = term.strip().splitlines()[0].strip()
+        if len(first_line) > 200:
+            first_line = first_line[:200].strip()
+
+        if not first_line or len(first_line) < 2:
+            return None
+
+        clean_term = first_line.lower()
 
         from app.core.database import MssqlReadSession
         if MssqlReadSession is None:
@@ -211,7 +222,7 @@ class DynamicTaxonomyService:
                         matched_desig = partial_matches[0]
                     elif len(partial_matches) > 1:
                         # Ambiguity rejection: if partial match gives multiple distinct designations, reject
-                        logger.warning(f"[DYNAMIC_TAXONOMY] Ambiguous partial MSSQL match for '{term}', rejecting.")
+                        logger.warning(f"[DYNAMIC_TAXONOMY] Ambiguous partial MSSQL match for '{clean_term}', rejecting.")
                         return None
                             
                 if matched_desig:

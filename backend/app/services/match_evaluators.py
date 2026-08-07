@@ -659,6 +659,14 @@ class CrossDomainGuardEvaluator:
         guard_params = RuleConfigManager.get_match_rules().cross_domain_guard
 
         vac_tax_domain, vac_family = job_ctx.vac_tax_domain, job_ctx.vac_family
+        if (not vac_tax_domain or vac_tax_domain == "Unknown") and job_ctx.department:
+            from app.repositories.department_domain import department_domain_repository
+            dept_clean = job_ctx.department.strip().lower()
+            for dom in department_domain_repository.get_all_domains():
+                if dom.department_name and dom.department_name.strip().lower() == dept_clean:
+                    vac_tax_domain = dom.domain_name
+                    break
+
         is_tax_compat = TaxonomyClassifier.are_families_compatible(context.cand_families, vac_family)
 
         domain_mismatch = False
@@ -669,11 +677,10 @@ class CrossDomainGuardEvaluator:
                 is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
                 if not is_compat or (score is not None and score < 0.4):
                     domain_mismatch = True
-        elif vac_family in (None, "Unknown") and context.cand_tax_domain and vac_tax_domain:
-            if context.cand_tax_domain != "Unknown" and vac_tax_domain != "Unknown":
-                if context.cand_tax_domain != vac_tax_domain:
-                    if context.candidate_experience and context.candidate_experience >= 1.0:
-                        domain_mismatch = True
+        cand_domain = context.cand_domain or context.cand_tax_domain
+        if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
+            if cand_domain.strip().lower() != vac_tax_domain.strip().lower():
+                domain_mismatch = True
 
         final_score = initial_score
         domain_score = initial_domain_score

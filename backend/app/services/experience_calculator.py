@@ -146,10 +146,14 @@ class ExperienceCalculator:
 
         quality_exp = float(resume_json.get("experience_years") or (resume_json.get("quality_metrics") or {}).get("experience_years") or 0.0)
 
-        # Resolution hierarchy:
-        if deterministic_years is not None and deterministic_years > 0:
-            authoritative_years = deterministic_years
-            status = "corroborated" if stated_years and abs(deterministic_years - stated_years) <= 1.5 else "date_only"
+        from app.services.experience_gap_service import ExperienceGapService
+        gap_analysis = ExperienceGapService.analyze_timeline(resume_json, cv_text)
+        gap_dict = gap_analysis.model_dump()
+
+        canonical_timeline_years = float(gap_analysis.summary.total_verified_years)
+        if canonical_timeline_years > 0:
+            authoritative_years = canonical_timeline_years
+            status = "canonical_interval_union"
         elif stated_years is not None and stated_years > 0:
             authoritative_years = stated_years
             status = "stated_fallback"
@@ -163,7 +167,7 @@ class ExperienceCalculator:
             authoritative_years = 0.0
             status = "no_history"
 
-        # Seniority calculation
+        # Seniority calculation based on canonical authoritative_years
         if authoritative_years >= 12.0:
             seniority = "Executive / Director"
         elif authoritative_years >= 8.0:
@@ -178,6 +182,7 @@ class ExperienceCalculator:
             seniority = "Entry Level"
 
         seniority_label = seniority if seniority.endswith("Level") else f"{seniority} level"
+
         if authoritative_years > 0:
             experience_assessment = f"Assessed as {seniority_label} with {authoritative_years:.1f} years of verified experience."
         elif work_exp:
@@ -187,7 +192,7 @@ class ExperienceCalculator:
 
         return {
             "experience_years": authoritative_years,
-            "deterministic_years": deterministic_years,
+            "deterministic_years": canonical_timeline_years if canonical_timeline_years > 0 else deterministic_years,
             "stated_years": stated_years,
             "authoritative_years": authoritative_years,
             "seniority": seniority,
@@ -196,6 +201,7 @@ class ExperienceCalculator:
             "merged_intervals_count": len(merged_intervals),
             "unparsed_dates": unparsed_dates,
             "normalized_employment": normalized_employment,
+            "gap_analysis": gap_dict,
         }
 
     @classmethod

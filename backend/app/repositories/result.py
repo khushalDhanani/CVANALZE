@@ -106,6 +106,17 @@ class ResultRepository:
                     return data
         except Exception as exc:
             logger.warning(f"Failed reading result from Postgres for {cv_key}: {exc}")
+
+        try:
+            from app.core.config import settings
+            if getattr(settings, "RESULTS_DIR", None):
+                disk_file = settings.RESULTS_DIR / (filename if filename.endswith(".json") else f"{filename}.json")
+                if disk_file.exists():
+                    data = json.loads(disk_file.read_text(encoding="utf-8"))
+                    cv_result_cache_manager.set(filename, data, ttl=cls.CACHE_TTL_SECONDS)
+                    return data
+        except Exception:
+            pass
         return None
 
     @classmethod

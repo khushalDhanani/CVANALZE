@@ -325,7 +325,7 @@ class MatchService:
             match
             for match in evaluated_matches
             if match.score >= strong_threshold
-            and match.classification == "HIGH"
+            and match.classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
             and not match.domain_mismatch_capped
             and not any(f.requirement_id == "req_domain_mismatch" for f in match.mandatory_failures)
         ]
@@ -419,6 +419,9 @@ class MatchService:
         else:
             top_level_match_status = MatchStatus.DB_MATCH
 
+        from app.services.experience_gap_service import ExperienceGapService
+        gap_analysis = ExperienceGapService.analyze_timeline(resume_json or {}, cv_text)
+
         result = EnrichedCandidateAnalysis(
             match_status=top_level_match_status,
             primary_department=recommended_dept,
@@ -440,6 +443,7 @@ class MatchService:
             normalized_resume=normalized_resume,
             classification=cand_classification,
             ai_career_suggestions=ai_career_suggestions,
+            experience_gap_analysis=gap_analysis,
         )
 
         # Cache the match result for instant repeat searches
@@ -532,6 +536,9 @@ class MatchService:
             for role in roles[:3]
         ]
 
+        from app.services.experience_gap_service import ExperienceGapService
+        gap_analysis = ExperienceGapService.analyze_timeline({}, cv_text)
+
         return EnrichedCandidateAnalysis(
             match_status=MatchStatus.NO_SUITABLE_MATCH,
             primary_department=industry_dept or None,
@@ -556,6 +563,7 @@ class MatchService:
             suitable_openings=[],
             normalized_resume=normalized_resume,
             ai_career_suggestions=ai_career_suggestions,
+            experience_gap_analysis=gap_analysis,
         )
 
     @staticmethod

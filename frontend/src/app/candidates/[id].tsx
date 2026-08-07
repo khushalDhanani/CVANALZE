@@ -12,7 +12,7 @@ import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
 import { matchService } from '@/services/matchService';
 import { CandidateRecommendationsResponse, CVUploadResponse } from '@/types/api';
-import { Card, Button, Badge, DenseRow, FieldConfidenceView, Breadcrumbs } from '@/components/ui';
+import { Card, Button, Badge, DenseRow, FieldConfidenceView, Breadcrumbs, ExperienceTimelineCard } from '@/components/ui';
 import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
@@ -339,16 +339,22 @@ export default function CandidateDetailScreen() {
         </Card>
 
         {/* Candidate Skills */}
-        {(data?.resume_json?.skills || []).length > 0 && (
-          <Card className="p-3 gap-2 border-border shadow-none">
-            <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Skills</Text>
-            <View className="flex-row flex-wrap gap-1">
-              {data!.resume_json!.skills!.map((skill: string, idx: number) => (
-                <Badge key={idx} label={skill} tone="neutral" />
-              ))}
-            </View>
-          </Card>
-        )}
+        {(() => {
+          const rawSkills = data?.resume_json?.skills;
+          const skillsList: string[] = Array.isArray(rawSkills)
+            ? rawSkills.filter((s: any) => typeof s === 'string' && s.trim())
+            : (rawSkills?.all_skills || []).filter((s: any) => typeof s === 'string' && s.trim());
+          return skillsList.length > 0 ? (
+            <Card className="p-3 gap-2 border-border shadow-none">
+              <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Skills</Text>
+              <View className="flex-row flex-wrap gap-1">
+                {skillsList.map((skill: string, idx: number) => (
+                  <Badge key={idx} label={skill} tone="neutral" />
+                ))}
+              </View>
+            </Card>
+          ) : null;
+        })()}
 
         {/* Suitable Openings */}
         {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
@@ -607,6 +613,12 @@ export default function CandidateDetailScreen() {
             )}
           </Card>
         ) : null}
+
+        {/* Experience Timeline & Gaps Section */}
+        <ExperienceTimelineCard
+          analysis={(analysis as any)?.experience_gap_analysis || (recommendations as any)?.experience_gap_analysis || (data as any)?.experience_gap_analysis}
+          experienceAssessment={recommendations?.experience_assessment || (data as any)?.experience_summary?.experience_assessment}
+        />
 
         {/* AI Career Summary & Domain Insights */}
         {(analysis?.ai_career_summary || analysis?.recommended_department || analysis?.professional_domain) && (

@@ -35,7 +35,8 @@ class RecommendationService:
             for failure in failures
         )
         is_domain_rejected = match.get("domain_mismatch_capped") or match.get("is_cross_domain")
-        return score >= threshold and classification == "HIGH" and not is_domain_rejected and not has_domain_rejection
+        is_high_class = classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
+        return score >= threshold and is_high_class and not is_domain_rejected and not has_domain_rejection
 
     @classmethod
     def get_candidate_recommendations(cls, candidate_id: str) -> dict[str, Any]:
@@ -99,9 +100,22 @@ class RecommendationService:
             industry_dept = classification_data.get("industry_department") or classification_data.get("db_department_name")
             industry_domain = classification_data.get("industry_domain")
 
-        raw_dept = best_match.get("department") or best_match.get("department_name") or match_analysis.get("recommended_department") or match_analysis.get("primary_department") or industry_dept or ""
-        primary_dept = str(raw_dept).title()
+        if eligible_openings and best_match:
+            raw_dept = best_match.get("department") or best_match.get("department_name") or match_analysis.get("recommended_department") or match_analysis.get("primary_department") or industry_dept or ""
+        else:
+            raw_dept = ""
+        primary_dept = str(raw_dept).title() if raw_dept else ""
         prof_domain = match_analysis.get("professional_domain") or industry_domain or ""
+
+        # Secondary fallback: derive dept/domain from suitable_openings if primary chain is empty
+        if not primary_dept.strip() and eligible_openings:
+            for eo in eligible_openings:
+                fallback_dept = eo.get("department") or eo.get("department_name") or ""
+                if fallback_dept:
+                    primary_dept = str(fallback_dept).title()
+                    break
+        if not prof_domain.strip() and primary_dept:
+            prof_domain = primary_dept
 
         # 1. Extract candidate skills (structured skills + fallback to work experience extraction)
         raw_cand_skills = resume_json.get("skills") or best_match.get("matched_skills") or []
@@ -391,6 +405,7 @@ class RecommendationService:
             "interview_focus_areas": interview_focus_areas,
             "risk_flags": risk_flags,
             "experience_assessment": experience_assessment,
+            "experience_gap_analysis": canonical_exp.get("gap_analysis"),
             "technical_vs_functional_fit": tech_vs_func,
             "next_steps_for_interviewer": next_steps,
             "actionable_suggestions": next_steps,
