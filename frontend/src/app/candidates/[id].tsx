@@ -28,6 +28,7 @@ import {
   VacancyFitScoreBreakdownCard,
   getCanonicalMatchStatusMeta,
   normalizeCanonicalMatchStatus,
+  resolveVacancyFitScore,
 } from '@/components/ui/VacancyMatchStatusBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
@@ -152,8 +153,17 @@ export default function CandidateDetailScreen() {
 
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       let pollCount = 0;
+      let errorCount = 0;
       pollTimerRef.current = setInterval(async () => {
         pollCount++;
+        
+        if (pollCount >= 40) {
+          stopTimers();
+          setIsReprocessing(false);
+          setReprocessError('Reprocessing timed out (TIMED_OUT). Please try again.');
+          return;
+        }
+
         try {
           const statusRes: any = await cvService.getCvStatus(id);
           const statusStr = statusRes.status;
@@ -165,13 +175,13 @@ export default function CandidateDetailScreen() {
           if (statusStr === 'FAILED') {
             stopTimers();
             setIsReprocessing(false);
-            setReprocessError(msg || 'Reprocessing failed.');
+            setReprocessError(msg || 'Reprocessing failed (FAILED).');
             return;
           }
 
           const isTerminated =
             statusStr === 'COMPLETED' || statusStr === 'NEW_CV' || statusStr === 'REPROCESSED' ||
-            pct >= 100 || statusRes.is_complete || pollCount >= 40 ||
+            pct >= 100 || statusRes.is_complete ||
             (statusStr !== 'processing' && (statusRes.match_analysis || statusRes.text || statusRes.markdown));
 
           if (isTerminated) {
@@ -199,7 +209,16 @@ export default function CandidateDetailScreen() {
             updated[nextIdx] = 'active';
             return updated;
           });
-        } catch (err: any) { }
+          
+          errorCount = 0;
+        } catch (err: any) {
+          errorCount++;
+          if (errorCount >= 3) {
+            stopTimers();
+            setIsReprocessing(false);
+            setReprocessError(err.message || 'Connection lost during polling (CONNECTION_LOST).');
+          }
+        }
       }, 1500);
 
     } catch (err: any) {
@@ -242,24 +261,24 @@ export default function CandidateDetailScreen() {
   // -------------------------------------------------------------
 
   const renderOverviewTab = () => (
-    <View className="flex-row gap-4 flex-wrap md:flex-nowrap">
+    <View className="flex-row flex-wrap gap-4 md:flex-nowrap">
       {/* Left Column (Candidate Data) */}
       <View className="w-full md:w-[45%] lg:w-5/12 gap-4">
 
         {/* Active Vacancy Summary Card */}
-        <Card className="p-3 border-border shadow-none gap-2">
-          <View className="flex-row items-center justify-between border-b border-border pb-2 mb-1">
+        <Card className="gap-2 p-3 shadow-none border-border">
+          <View className="flex-row items-center justify-between pb-2 mb-1 border-b border-border">
             <View className="flex-row items-center gap-1.5">
               <Target size={14} color={analysis?.has_genuine_match ? COLORS.success : COLORS.warning} />
-              <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Active Vacancy Summary</Text>
+              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Active Vacancy Summary</Text>
             </View>
             <VacancyMatchStatusBadge
               status={analysis?.match_status || (analysis?.has_genuine_match ? 'MATCHED' : (analysis?.active_vacancy_summary?.includes('NO_ACTIVE_VACANCIES') ? 'NO_ACTIVE_VACANCIES' : 'NO_STRONG_MATCH'))}
-              score={bestMatch?.vacancy_fit_score != null ? bestMatch.vacancy_fit_score : (bestMatch?.overall_score || bestMatch?.score)}
+              score={resolveVacancyFitScore(bestMatch)}
             />
           </View>
           <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-surface border border-border'}`}>
-            <Text className="text-xs text-text-primary leading-5">{analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}</Text>
+            <Text className="text-xs leading-5 text-text-primary">{analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}</Text>
           </View>
 
           {/* Render canonical score breakdown if available on best match */}
@@ -273,19 +292,19 @@ export default function CandidateDetailScreen() {
         </Card>
 
         {/* Contact Info Card */}
-        <Card className="p-3 gap-2 border-border shadow-none">
-          <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider mb-1">Contact Information</Text>
+        <Card className="gap-2 p-3 shadow-none border-border">
+          <Text className="mb-1 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Contact Information</Text>
           <View className="flex-row items-center gap-2">
             <Mail size={14} color={COLORS.textMuted} />
-            <Text className="text-sm font-sans text-text-primary">{data?.email || "—"}</Text>
+            <Text className="font-sans text-sm text-text-primary">{data?.email || "—"}</Text>
           </View>
           <View className="flex-row items-center gap-2">
             <Phone size={14} color={COLORS.textMuted} />
-            <Text className="text-sm font-sans text-text-primary">{data?.phone || "—"}</Text>
+            <Text className="font-sans text-sm text-text-primary">{data?.phone || "—"}</Text>
           </View>
           <View className="flex-row items-center gap-2">
             <MapPin size={14} color={COLORS.textMuted} />
-            <Text className="text-sm font-sans text-text-primary">
+            <Text className="font-sans text-sm text-text-primary">
               {data?.location || data?.resume_json?.contact_info?.location || "—"}
             </Text>
           </View>
@@ -296,8 +315,8 @@ export default function CandidateDetailScreen() {
           (data?.resume_json?.work_experience && data.resume_json.work_experience.length > 0) ||
           (data?.resume_json?.experience && data.resume_json.experience.length > 0) ||
           (data?.normalized_resume?.employment && data.normalized_resume.employment.length > 0)) && (
-            <Card className="p-3 gap-3 border-border shadow-none">
-              <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Experience</Text>
+            <Card className="gap-3 p-3 shadow-none border-border">
+              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Experience</Text>
               {(
                 data?.work_experience ||
                 data?.resume_json?.work_experience ||
@@ -313,9 +332,9 @@ export default function CandidateDetailScreen() {
                   : (exp.company || exp.company_name || 'Organization');
                 const dates = exp.interval?.raw_value || exp.dates || exp.duration || 'N/A';
                 return (
-                  <View key={idx} className="border-l-2 border-border pl-3 pb-3">
+                  <View key={idx} className="pb-3 pl-3 border-l-2 border-border">
                     <Text className="text-xs font-sans-bold text-text-primary">{title}</Text>
-                    <Text className="text-xs font-sans text-text-muted">{company} • {dates}</Text>
+                    <Text className="font-sans text-xs text-text-muted">{company} • {dates}</Text>
                   </View>
                 );
               })}
@@ -331,8 +350,8 @@ export default function CandidateDetailScreen() {
 
 
         {/* Education & Certs */}
-        <Card className="p-3 gap-3 border-border shadow-none">
-          <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Education</Text>
+        <Card className="gap-3 p-3 shadow-none border-border">
+          <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Education</Text>
           {(data?.resume_json?.education || []).length > 0 ? (
             data!.resume_json!.education!.slice(0, 3).map((edu: any, idx: number) => (
               <View key={idx}>
@@ -363,8 +382,8 @@ export default function CandidateDetailScreen() {
             ? rawSkills.filter((s: any) => typeof s === 'string' && s.trim())
             : (rawSkills?.all_skills || []).filter((s: any) => typeof s === 'string' && s.trim());
           return skillsList.length > 0 ? (
-            <Card className="p-3 gap-2 border-border shadow-none">
-              <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Skills</Text>
+            <Card className="gap-2 p-3 shadow-none border-border">
+              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Skills</Text>
               <View className="flex-row flex-wrap gap-1">
                 {skillsList.map((skill: string, idx: number) => (
                   <Badge key={idx} label={skill} tone="neutral" />
@@ -378,11 +397,11 @@ export default function CandidateDetailScreen() {
         {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
           analysis.suitable_openings.map((match: any, idx: number) => {
             const rawStatus = match.vacancy_match_status || match.match_status || match.classification;
-            const fitScore = match.vacancy_fit_score != null ? match.vacancy_fit_score : (match.overall_score || match.score || 0);
+            const fitScore = resolveVacancyFitScore(match);
             const isTop = idx === 0 && (rawStatus === 'MATCHED' || rawStatus === 'HIGH');
             return (
               <Card key={idx} className={`p-3 border-primary/40 shadow-none gap-2 ${idx > 0 ? 'mt-3 opacity-90 border-border' : ''}`}>
-                <View className="flex-row justify-between items-start">
+                <View className="flex-row items-start justify-between">
                   <View className="flex-1 pr-2">
                     <View className="flex-row items-center gap-1.5 mb-1">
                       <Award size={14} color={isTop ? COLORS.primary : COLORS.textMuted} />
@@ -411,9 +430,9 @@ export default function CandidateDetailScreen() {
                 ) : null}
 
                 {match.llm_reason ? (
-                  <View className="bg-primary/5 p-2 mt-1 rounded border border-primary/10">
-                    <Text className="text-xs text-text-primary leading-4 font-sans-bold mb-1">AI Reasoning:</Text>
-                    <Text className="text-xs text-text-primary leading-4">{match.llm_reason}</Text>
+                  <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
+                    <Text className="mb-1 text-xs leading-4 text-text-primary font-sans-bold">AI Reasoning:</Text>
+                    <Text className="text-xs leading-4 text-text-primary">{match.llm_reason}</Text>
                   </View>
                 ) : null}
 
@@ -429,8 +448,8 @@ export default function CandidateDetailScreen() {
                 )}
 
                 {(match.recommendation && !match.llm_reason) ? (
-                  <View className="bg-primary/5 p-2 mt-1 rounded border border-primary/10">
-                    <Text className="text-xs text-text-primary leading-4">💡 {match.recommendation}</Text>
+                  <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
+                    <Text className="text-xs leading-4 text-text-primary">💡 {match.recommendation}</Text>
                   </View>
                 ) : null}
 
@@ -450,19 +469,19 @@ export default function CandidateDetailScreen() {
             );
           })
         ) : bestMatch && analysis?.has_genuine_match ? (
-          <Card className="p-3 border-primary/40 shadow-none gap-2">
-            <View className="flex-row justify-between items-start">
+          <Card className="gap-2 p-3 shadow-none border-primary/40">
+            <View className="flex-row items-start justify-between">
               <View className="flex-1 pr-2">
                 <View className="flex-row items-center gap-1.5 mb-1">
                   <Award size={14} color={COLORS.primary} />
-                  <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">Top Job Match</Text>
+                  <Text className="text-xs tracking-wider uppercase font-sans-bold text-primary">Top Job Match</Text>
                 </View>
                 <Text className="text-sm font-sans-bold text-text-primary">{bestMatch.job_title}</Text>
                 <Text className="text-[11px] font-sans-medium text-text-muted">{bestMatch.department_name}</Text>
               </View>
               <VacancyMatchStatusBadge
                 status={bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification}
-                score={bestMatch.vacancy_fit_score != null ? bestMatch.vacancy_fit_score : (bestMatch.overall_score || bestMatch.score || 0)}
+                score={resolveVacancyFitScore(bestMatch)}
               />
             </View>
 
@@ -477,8 +496,8 @@ export default function CandidateDetailScreen() {
             ) : null}
 
             {bestMatch.recommendation ? (
-              <View className="bg-primary/5 p-2 mt-1 rounded border border-primary/10">
-                <Text className="text-xs text-text-primary leading-4">💡 {bestMatch.recommendation}</Text>
+              <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
+                <Text className="text-xs leading-4 text-text-primary">💡 {bestMatch.recommendation}</Text>
               </View>
             ) : null}
             <View className="flex-row justify-end mt-2">
@@ -498,10 +517,10 @@ export default function CandidateDetailScreen() {
 
         {/* Unsuitable Openings — Manual Review Required */}
         {analysis?.unsuitable_openings && analysis.unsuitable_openings.length > 0 && (
-          <Card className="p-3 border-warning/30 shadow-none gap-2 bg-warning/5">
+          <Card className="gap-2 p-3 shadow-none border-warning/30 bg-warning/5">
             <View className="flex-row items-center gap-1.5 mb-1 border-b border-warning/20 pb-2">
               <AlertTriangle size={14} color={COLORS.warning} />
-              <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
+              <Text className="text-xs tracking-wider uppercase font-sans-bold text-warning">
                 Manual Review Required ({analysis.unsuitable_openings.length})
               </Text>
             </View>
@@ -509,13 +528,13 @@ export default function CandidateDetailScreen() {
               These vacancies scored below the suitability threshold. HR review is recommended before any decision.
             </Text>
             {analysis.unsuitable_openings.map((match: any, idx: number) => (
-              <View key={idx} className="flex-row justify-between items-center p-2 bg-background border border-border rounded">
+              <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
                 <View className="flex-1 pr-2">
                   <Text className="text-xs font-sans-bold text-text-primary">{match.job_title}</Text>
                   <Text className="text-[10px] text-text-muted">{match.department_name || match.department}</Text>
                 </View>
                 <View className="flex-row items-center gap-2">
-                  <ScoreBadge score={match.overall_score || match.score || 0} classification={match.classification} />
+                  <ScoreBadge score={resolveVacancyFitScore(match) ?? 0} classification={match.classification} />
                   <Button
                     label="Review"
                     variant="ghost"
@@ -533,11 +552,11 @@ export default function CandidateDetailScreen() {
 
         {/* Similar Candidates (pgvector) */}
         {data?.similar_candidates && data.similar_candidates.length > 0 && (
-          <Card className="p-3 border-border shadow-none gap-2">
-            <View className="flex-row items-center justify-between border-b border-border pb-2 mb-1">
+          <Card className="gap-2 p-3 shadow-none border-border">
+            <View className="flex-row items-center justify-between pb-2 mb-1 border-b border-border">
               <View className="flex-row items-center gap-1.5">
                 <Users size={14} color={COLORS.primary} />
-                <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Similar Candidates</Text>
+                <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Similar Candidates</Text>
               </View>
               <Badge label={`${data.similar_candidates.length} Profiles`} tone="info" />
             </View>
@@ -545,9 +564,9 @@ export default function CandidateDetailScreen() {
               {data.similar_candidates.map((sim: any, idx: number) => {
                 const simScore = Math.round((sim.similarity_score || sim.score || 0) * 100);
                 return (
-                  <View key={idx} className="flex-row justify-between items-center p-2 bg-background border border-border rounded">
+                  <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
                     <View>
-                      <Text className="text-xs font-sans-bold text-text-primary cursor-pointer" onPress={() => router.push(`/candidates/${encodeURIComponent(sim.candidate_id || sim.id)}` as any)}>
+                      <Text className="text-xs cursor-pointer font-sans-bold text-text-primary" onPress={() => router.push(`/candidates/${encodeURIComponent(sim.candidate_id || sim.id)}` as any)}>
                         {sim.full_name || sim.filename || sim.candidate_id}
                       </Text>
                       <Text className="text-[10px] text-text-muted">{sim.primary_department ? `Dept: ${sim.primary_department}` : 'Vector Match'}</Text>
@@ -561,9 +580,9 @@ export default function CandidateDetailScreen() {
         )}
 
         {/* Resume Extracted Text */}
-        <Card className="p-0 border-border shadow-none overflow-hidden">
-          <View className="flex-row justify-between items-center p-3 border-b border-border bg-background">
-            <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Extracted CV Text</Text>
+        <Card className="p-0 overflow-hidden shadow-none border-border">
+          <View className="flex-row items-center justify-between p-3 border-b border-border bg-background">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Extracted CV Text</Text>
             <Button
               label={showFullText ? 'Collapse' : 'Expand Full'}
               variant="ghost"
@@ -585,12 +604,12 @@ export default function CandidateDetailScreen() {
 
         {/* Recommendation Engine */}
         {recommendationsLoading ? (
-          <Card className="p-3 border-info/30 shadow-none items-center justify-center py-8">
+          <Card className="items-center justify-center p-3 py-8 shadow-none border-info/30">
             <ActivityIndicator size="small" color={COLORS.info} />
-            <Text className="text-xs font-sans text-text-muted mt-2">Running Hiring Intelligence...</Text>
+            <Text className="mt-2 font-sans text-xs text-text-muted">Running Hiring Intelligence...</Text>
           </Card>
         ) : recommendationsError ? (
-          <Card className="p-3 bg-danger/5 border-danger/30 shadow-none gap-1">
+          <Card className="gap-1 p-3 shadow-none bg-danger/5 border-danger/30">
             <View className="flex-row items-center justify-between">
               <Text className="text-xs font-sans-bold text-danger">Hiring Intelligence Error</Text>
               <VacancyMatchStatusBadge status="FAILED" />
@@ -598,11 +617,11 @@ export default function CandidateDetailScreen() {
             <Text className="text-xs text-danger">{recommendationsError}</Text>
           </Card>
         ) : recommendations ? (
-          <Card className="p-3 border-info/40 shadow-none gap-3">
-            <View className="flex-row justify-between items-center pb-2 border-b border-border">
+          <Card className="gap-3 p-3 shadow-none border-info/40">
+            <View className="flex-row items-center justify-between pb-2 border-b border-border">
               <View className="flex-row items-center gap-1.5">
                 <Sparkles size={14} color={COLORS.info} />
-                <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Hiring Intelligence</Text>
+                <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Hiring Intelligence</Text>
               </View>
               <VacancyMatchStatusBadge
                 status={recommendations.hiring_recommendation}
@@ -623,13 +642,13 @@ export default function CandidateDetailScreen() {
             </View>
 
             {recommendations.risk_flags && recommendations.risk_flags.length > 0 && (
-              <View className="bg-danger/5 p-2 border border-danger/20 rounded">
+              <View className="p-2 border rounded bg-danger/5 border-danger/20">
                 <View className="flex-row items-center gap-1 mb-1">
                   <AlertTriangle size={12} color={COLORS.danger} />
                   <Text className="text-[10px] font-sans-bold text-danger uppercase">Risk Flags</Text>
                 </View>
                 {recommendations.risk_flags.map((flag, idx) => (
-                  <Text key={idx} className="text-xs text-danger leading-4">• {flag}</Text>
+                  <Text key={idx} className="text-xs leading-4 text-danger">• {flag}</Text>
                 ))}
               </View>
             )}
@@ -665,14 +684,14 @@ export default function CandidateDetailScreen() {
 
         {/* AI Career Summary & Domain Insights */}
         {(analysis?.ai_career_summary || analysis?.recommended_department || analysis?.professional_domain) && (
-          <Card className="p-3 border-border shadow-none gap-3">
+          <Card className="gap-3 p-3 shadow-none border-border">
             <View className="flex-row items-center gap-1.5 border-b border-border pb-2">
               <CpuIcon size={14} color={COLORS.textMuted} />
-              <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">AI Domain Analysis</Text>
+              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">AI Domain Analysis</Text>
             </View>
 
             {analysis?.ai_career_summary ? (
-              <Text className="text-xs font-sans text-text-primary leading-5 mb-2">{analysis.ai_career_summary}</Text>
+              <Text className="mb-2 font-sans text-xs leading-5 text-text-primary">{analysis.ai_career_summary}</Text>
             ) : null}
 
             <View className="flex-row items-center justify-between">
@@ -684,8 +703,8 @@ export default function CandidateDetailScreen() {
               <Text className="text-xs font-sans-bold text-text-primary">{analysis?.professional_domain || "N/A"}</Text>
             </View>
             {analysis?.suitable_job_roles && (
-              <View className="mt-2 border-t border-border pt-2">
-                <Text className="text-xs font-sans-medium text-text-muted mb-1">Suitable Job Roles:</Text>
+              <View className="pt-2 mt-2 border-t border-border">
+                <Text className="mb-1 text-xs font-sans-medium text-text-muted">Suitable Job Roles:</Text>
                 <View className="flex-row flex-wrap gap-1">
                   {analysis.suitable_job_roles.map((role: string, idx: number) => (
                     <Badge key={idx} label={role} tone="neutral" />
@@ -694,8 +713,8 @@ export default function CandidateDetailScreen() {
               </View>
             )}
             {recommendations?.talent_pools && (
-              <View className="mt-2 border-t border-border pt-2">
-                <Text className="text-xs font-sans-medium text-text-muted mb-1">Assigned Talent Pools:</Text>
+              <View className="pt-2 mt-2 border-t border-border">
+                <Text className="mb-1 text-xs font-sans-medium text-text-muted">Assigned Talent Pools:</Text>
                 <View className="flex-row flex-wrap gap-1">
                   {recommendations.talent_pools.map((pool: string, idx: number) => (
                     <Badge key={idx} label={pool} tone="success" />
@@ -704,7 +723,7 @@ export default function CandidateDetailScreen() {
               </View>
             )}
             {recommendations?.related_skills && (
-              <View className="mt-2 border-t border-border pt-2">
+              <View className="pt-2 mt-2 border-t border-border">
                 <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider mb-1">Semantically Related Skills:</Text>
                 <View className="flex-row flex-wrap gap-1">
                   {recommendations.related_skills.map((skill, idx) => (
@@ -737,25 +756,25 @@ export default function CandidateDetailScreen() {
       )}
 
       {reprocessError && (
-        <Card className="bg-danger/10 border-danger/30 p-3 flex-row items-center justify-between">
-          <View className="flex-row items-center gap-2 flex-1 pr-2">
+        <Card className="flex-row items-center justify-between p-3 bg-danger/10 border-danger/30">
+          <View className="flex-row items-center flex-1 gap-2 pr-2">
             <AlertCircle size={14} color={COLORS.danger} />
-            <Text className="text-xs font-sans-medium text-danger flex-1">{reprocessError}</Text>
+            <Text className="flex-1 text-xs font-sans-medium text-danger">{reprocessError}</Text>
           </View>
           <Button label="Retry" variant="secondary" size="sm" onPress={() => setReprocessModalVisible(true)} />
         </Card>
       )}
 
-      <Card className="p-3 border-border shadow-none">
-        <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider mb-2">Processing Metadata</Text>
+      <Card className="p-3 shadow-none border-border">
+        <Text className="mb-2 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Processing Metadata</Text>
         <View className="gap-2">
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Filename:</Text>
-            <Text className="text-xs font-mono text-text-primary">{data?.filename || data?.id}</Text>
+            <Text className="font-mono text-xs text-text-primary">{data?.filename || data?.id}</Text>
           </View>
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Analyzed At:</Text>
-            <Text className="text-xs font-mono text-text-primary">{formattedParsedAt}</Text>
+            <Text className="font-mono text-xs text-text-primary">{formattedParsedAt}</Text>
           </View>
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Extraction Method:</Text>
@@ -763,7 +782,7 @@ export default function CandidateDetailScreen() {
           </View>
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Pages:</Text>
-            <Text className="text-xs font-mono text-text-primary">{data?.page_count || 1}</Text>
+            <Text className="font-mono text-xs text-text-primary">{data?.page_count || 1}</Text>
           </View>
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Status:</Text>
@@ -787,16 +806,16 @@ export default function CandidateDetailScreen() {
         ]}
       />
       {/* 1. Header Area (Compact & Sticky) */}
-      <View className="bg-white border-b border-border shadow-sm z-10 px-4 py-3">
+      <View className="z-10 px-4 py-3 bg-white border-b shadow-sm border-border">
         <View className="flex-row items-start justify-between">
 
           {/* Left Side: Back Button & High-Level Identity */}
-          <View className="flex-row gap-3 flex-1">
+          <View className="flex-row flex-1 gap-3">
             <Pressable onPress={handleBack} className="mt-1">
               <ArrowLeft size={16} color={COLORS.textMuted} />
             </Pressable>
-            <View className="flex-row gap-3 items-center flex-1 pr-4">
-              <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
+            <View className="flex-row items-center flex-1 gap-3 pr-4">
+              <View className="items-center justify-center w-10 h-10 rounded-full bg-primary/10">
                 <UserCheck size={18} color={COLORS.primary} />
               </View>
               <View>
@@ -822,19 +841,19 @@ export default function CandidateDetailScreen() {
               </View>
             ) : null}
             {data?.experience_years != null ? (
-              <View className="items-center px-3 py-1 bg-background border border-border rounded">
+              <View className="items-center px-3 py-1 border rounded bg-background border-border">
                 <Text className="text-[10px] text-text-muted uppercase font-sans-bold">Experience</Text>
                 <Text className="text-xs font-sans-bold text-text-primary">{data.experience_years} Yrs • {data.seniority || 'Assessed'}</Text>
               </View>
             ) : null}
             {bestMatch?.overall_score != null ? (
-              <View className="items-center px-3 py-1 bg-background border border-border rounded">
+              <View className="items-center px-3 py-1 border rounded bg-background border-border">
                 <Text className="text-[10px] text-text-muted uppercase font-sans-bold">AI Match</Text>
                 <Text className="text-xs font-sans-bold text-primary">{Math.round(bestMatch.overall_score)}%</Text>
               </View>
             ) : null}
             <View className="flex-row gap-2">
-              <View className="h-8 rounded-md overflow-hidden bg-secondary">
+              <View className="h-8 overflow-hidden rounded-md bg-secondary">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -844,7 +863,7 @@ export default function CandidateDetailScreen() {
                   disabled={isReanalyzing || isReprocessing}
                 />
               </View>
-              <View className="w-8 h-8 rounded-md overflow-hidden bg-secondary border border-border">
+              <View className="w-8 h-8 overflow-hidden border rounded-md bg-secondary border-border">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -860,7 +879,7 @@ export default function CandidateDetailScreen() {
       </View>
 
       {/* 2. Tab Navigation */}
-      <View className="bg-white border-b border-border px-4 flex-row gap-4 overflow-x-auto">
+      <View className="flex-row gap-4 px-4 overflow-x-auto bg-white border-b border-border">
         {[
           { id: 'overview', label: 'Overview', icon: <Activity size={14} color={activeTab === 'overview' ? COLORS.primary : COLORS.textMuted} /> },
           { id: 'timeline', label: 'Timeline', icon: <Layers size={14} color={activeTab === 'timeline' ? COLORS.primary : COLORS.textMuted} /> },
@@ -881,12 +900,12 @@ export default function CandidateDetailScreen() {
       {/* 3. Main Content Area */}
       <ScrollView className="flex-1 px-4 py-4">
         {loading && !isReprocessing ? (
-          <View className="flex-1 justify-center items-center py-16">
+          <View className="items-center justify-center flex-1 py-16">
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text className="text-xs font-sans text-text-muted mt-2">Loading profile dashboard...</Text>
+            <Text className="mt-2 font-sans text-xs text-text-muted">Loading profile dashboard...</Text>
           </View>
         ) : error || !data ? (
-          <Card className="bg-danger/10 border-danger/30 p-4">
+          <Card className="p-4 bg-danger/10 border-danger/30">
             <Text className="text-xs font-sans-medium text-danger">{error || 'Candidate record not found.'}</Text>
           </Card>
         ) : (
@@ -912,9 +931,9 @@ export default function CandidateDetailScreen() {
       )}
 
       <Modal animationType="fade" transparent={true} visible={reprocessModalVisible} onRequestClose={() => setReprocessModalVisible(false)}>
-        <View className="flex-1 justify-center items-center bg-black/60 px-4">
-          <Card className="w-full max-w-md bg-surface p-4 border-border gap-3">
-            <View className="flex-row items-center justify-between border-b border-border pb-2">
+        <View className="items-center justify-center flex-1 px-4 bg-black/60">
+          <Card className="w-full max-w-md gap-3 p-4 bg-surface border-border">
+            <View className="flex-row items-center justify-between pb-2 border-b border-border">
               <View className="flex-row items-center gap-2">
                 <RefreshCw size={16} color={COLORS.primary} />
                 <Text className="text-sm font-sans-bold text-text-primary">Re-run CV Analysis</Text>
@@ -923,7 +942,7 @@ export default function CandidateDetailScreen() {
                 <X size={16} color={COLORS.textMuted} />
               </Pressable>
             </View>
-            <Text className="text-xs font-sans text-text-primary leading-5">
+            <Text className="font-sans text-xs leading-5 text-text-primary">
               Are you sure you want to re-run analysis for <Text className="font-sans-bold">{data?.filename || scanId}</Text>?
             </Text>
             <View className="bg-warning/10 p-2.5 rounded-md border border-warning/30">

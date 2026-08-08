@@ -9,7 +9,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { CandidateSummary } from '@/types/api';
 import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl, FieldConfidenceView, Breadcrumbs } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
-import { VacancyMatchStatusBadge, normalizeCanonicalMatchStatus } from '@/components/ui/VacancyMatchStatusBadge';
+import { VacancyMatchStatusBadge, normalizeCanonicalMatchStatus, resolveVacancyFitScore } from '@/components/ui/VacancyMatchStatusBadge';
 import { COLORS } from '@/constants/colors';
 
 export default function CandidateListScreen() {
@@ -171,7 +171,7 @@ export default function CandidateListScreen() {
 
     const isDomainCapped = Boolean(item.best_match?.domain_mismatch_capped);
     const matchStatus = item.best_match?.vacancy_match_status || item.best_match?.match_status || item.best_match?.classification;
-    const matchScore = item.best_match?.vacancy_fit_score != null ? item.best_match.vacancy_fit_score : item.best_match?.score;
+    const matchScore = resolveVacancyFitScore(item.best_match);
 
     return (
       <View className="mb-2">

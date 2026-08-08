@@ -7,6 +7,7 @@
 import {
   normalizeCanonicalMatchStatus,
   getCanonicalMatchStatusMeta,
+  resolveVacancyFitScore,
 } from '../components/ui/VacancyMatchStatusBadge';
 import { CanonicalVacancyMatchStatus } from '../types/api';
 
@@ -60,6 +61,7 @@ test('3. NO_STRONG_MATCH: normalizes canonical NO_STRONG_MATCH and legacy LOW/NO
   assertEquals(normalizeCanonicalMatchStatus('LOW'), 'NO_STRONG_MATCH');
   assertEquals(normalizeCanonicalMatchStatus('NO_STRONG_VACANCY_MATCH'), 'NO_STRONG_MATCH');
   assertEquals(normalizeCanonicalMatchStatus('NEEDS FURTHER REVIEW'), 'NO_STRONG_MATCH');
+  assertEquals(normalizeCanonicalMatchStatus('NO_SUITABLE_MATCH'), 'NO_STRONG_MATCH');
 });
 
 test('4. NO_ACTIVE_VACANCIES: normalizes NO_ACTIVE_VACANCIES cleanly', () => {
@@ -170,6 +172,11 @@ test('15. Frontend does NOT recalculate status from score thresholds', () => {
   assertEquals(metaMatched.status, 'MATCHED');
   assertEquals(metaMatched.tone, 'success');
   assertEquals(metaMatched.label, 'MATCHED');
+});
+
+test('16. resolveVacancyFitScore falls back to overall_score when vacancy_fit_score is explicitly zero', () => {
+  const match = { vacancy_fit_score: 0.0, overall_score: 76.4, score: 76.4 };
+  assertEquals(resolveVacancyFitScore(match), 76.4);
 });
 
 // -------------------------------------------------------------

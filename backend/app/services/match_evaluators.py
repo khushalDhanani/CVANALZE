@@ -1002,6 +1002,7 @@ class VacancyFitEvaluator:
         j_dept = getattr(job, "department", "") or ""
         vac_desc = str(raw_j.get("description") or " ".join(resps) or j_title)
         vac_text = f"Title: {j_title}. Department: {j_dept}. Description: {vac_desc[:300]}"
+        cand_text = str(getattr(context, "domain_candidate_text", None) or cv_text or "")
 
         cand_vector: list[float] | None = None
         vac_vector: list[float] | None = None
@@ -1068,6 +1069,17 @@ class VacancyFitEvaluator:
         )
 
     @classmethod
+    def _parse_score_value(cls, value: Any) -> float | None:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
+
+    @classmethod
     def classify_opening_fit(
         cls,
         opening: dict[str, Any] | Any,
@@ -1081,8 +1093,20 @@ class VacancyFitEvaluator:
         if not opening:
             return VacancyMatchStatus.NO_STRONG_MATCH.value
 
+        def _resolve_score(src: Any, fallback1: Any = None, fallback2: Any = None) -> float:
+            score = cls._parse_score_value(src)
+            if score is None or score == 0.0:
+                score = cls._parse_score_value(fallback1)
+            if score is None or score == 0.0:
+                score = cls._parse_score_value(fallback2)
+            return float(score or 0.0)
+
         if isinstance(opening, dict):
-            score = float(opening.get("vacancy_fit_score") or opening.get("score") or opening.get("overall_score") or 0.0)
+            score = _resolve_score(
+                opening.get("vacancy_fit_score"),
+                opening.get("score"),
+                opening.get("overall_score"),
+            )
             status = str(opening.get("vacancy_match_status") or opening.get("match_status") or "").upper()
             classification = str(opening.get("classification") or "").upper()
             failures = opening.get("mandatory_failures") or opening.get("mandatory_fails") or []
@@ -1098,7 +1122,11 @@ class VacancyFitEvaluator:
             elif hasattr(score_breakdown, "is_hierarchy_valid"):
                 is_hierarchy_valid = getattr(score_breakdown, "is_hierarchy_valid", True)
         else:
-            score = float(getattr(opening, "vacancy_fit_score", getattr(opening, "score", getattr(opening, "overall_score", 0.0))))
+            score = _resolve_score(
+                getattr(opening, "vacancy_fit_score", None),
+                getattr(opening, "score", None),
+                getattr(opening, "overall_score", None),
+            )
             status = str(getattr(opening, "vacancy_match_status", getattr(opening, "match_status", ""))).upper()
             classification = str(getattr(opening, "classification", "")).upper()
             failures = getattr(opening, "mandatory_failures", [])

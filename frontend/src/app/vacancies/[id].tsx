@@ -136,7 +136,7 @@ export default function VacancyDetailScreen() {
 
   if (loadingDetails) {
     return (
-      <SafeAreaView className="flex-1 bg-background justify-center items-center">
+      <SafeAreaView className="items-center justify-center flex-1 bg-background">
         <ActivityIndicator size="small" color={COLORS.primary} />
       </SafeAreaView>
     );
@@ -144,8 +144,8 @@ export default function VacancyDetailScreen() {
 
   if (!jobDetails) {
     return (
-      <SafeAreaView className="flex-1 bg-background justify-center items-center">
-        <Text className="text-xs font-sans-medium text-text-muted mb-4">Vacancy not found.</Text>
+      <SafeAreaView className="items-center justify-center flex-1 bg-background">
+        <Text className="mb-4 text-xs font-sans-medium text-text-muted">Vacancy not found.</Text>
         <Pressable onPress={() => router.back()} className="px-3 py-1.5 bg-surface border border-border rounded">
           <Text className="text-text-primary font-sans-medium text-[11px]">Back</Text>
         </Pressable>
@@ -162,17 +162,17 @@ export default function VacancyDetailScreen() {
         ]}
       />
       {/* Compact Hero Header */}
-      <View className="bg-surface border-b border-border px-4 py-3">
+      <View className="px-4 py-3 border-b bg-surface border-border">
         <View className="flex-row items-start justify-between mb-2">
-          <View className="flex-row items-center gap-2 flex-1 pr-4">
-            <Pressable onPress={handleBack} className="p-1 active:bg-background rounded">
+          <View className="flex-row items-center flex-1 gap-2 pr-4">
+            <Pressable onPress={handleBack} className="p-1 rounded active:bg-background">
               <ArrowLeft size={16} color={COLORS.textPrimary} />
             </Pressable>
             <View className="bg-success/10 px-1.5 py-0.5 rounded border border-success/20">
               <Text className="text-[9px] font-sans-bold text-success uppercase">Active</Text>
             </View>
             <Text className="text-[10px] font-sans-medium text-text-muted">#{jobDetails.id}</Text>
-            <Text className="text-base font-sans-bold text-text-primary leading-5 flex-shrink" numberOfLines={1}>
+            <Text className="flex-shrink text-base leading-5 font-sans-bold text-text-primary" numberOfLines={1}>
               {jobDetails.title}
             </Text>
           </View>
@@ -223,12 +223,12 @@ export default function VacancyDetailScreen() {
           <View className={`flex-1 ${isDesktop ? 'min-w-[400px]' : 'min-w-[100%]'}`}>
 
             {/* Organization Hierarchy Card */}
-            <View className="bg-surface border border-border rounded-lg p-3 mb-3">
+            <View className="p-3 mb-3 border rounded-lg bg-surface border-border">
               <Text className="text-[10px] font-sans-bold text-primary uppercase tracking-wider mb-2">
                 Organization Hierarchy Placement
               </Text>
               <View className="flex-row flex-wrap items-center gap-2">
-                <View className="bg-background border border-border px-2 py-1 rounded">
+                <View className="px-2 py-1 border rounded bg-background border-border">
                   <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Business Group</Text>
                   <Text className="text-[11px] font-sans-semibold text-text-primary">
                     {jobDetails.business_group_name || (jobDetails.business_group_id ? `ID #${jobDetails.business_group_id}` : 'Aether Group')}
@@ -236,7 +236,7 @@ export default function VacancyDetailScreen() {
                 </View>
                 <ChevronRight size={12} color={COLORS.textMuted} />
 
-                <View className="bg-background border border-border px-2 py-1 rounded">
+                <View className="px-2 py-1 border rounded bg-background border-border">
                   <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Company</Text>
                   <Text className="text-[11px] font-sans-semibold text-text-primary">
                     {jobDetails.company_name_db || jobDetails.company_name || 'Aether Industries'}
@@ -244,7 +244,7 @@ export default function VacancyDetailScreen() {
                 </View>
                 <ChevronRight size={12} color={COLORS.textMuted} />
 
-                <View className="bg-background border border-border px-2 py-1 rounded">
+                <View className="px-2 py-1 border rounded bg-background border-border">
                   <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Location</Text>
                   <Text className="text-[11px] font-sans-semibold text-text-primary">
                     {jobDetails.location_name_db || jobDetails.location_name || 'Headquarters'}
@@ -252,7 +252,7 @@ export default function VacancyDetailScreen() {
                 </View>
                 <ChevronRight size={12} color={COLORS.textMuted} />
 
-                <View className="bg-background border border-border px-2 py-1 rounded">
+                <View className="px-2 py-1 border rounded bg-background border-border">
                   <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Main Dept</Text>
                   <Text className="text-[11px] font-sans-semibold text-text-primary">
                     {jobDetails.main_department_name || (jobDetails.main_department_id ? `ID #${jobDetails.main_department_id}` : 'Operations')}
@@ -260,7 +260,7 @@ export default function VacancyDetailScreen() {
                 </View>
                 <ChevronRight size={12} color={COLORS.textMuted} />
 
-                <View className="bg-background border border-border px-2 py-1 rounded">
+                <View className="px-2 py-1 border rounded bg-background border-border">
                   <Text className="text-[9px] font-sans-bold text-text-muted uppercase">Department</Text>
                   <Text className="text-[11px] font-sans-semibold text-text-primary">
                     {jobDetails.department_name || jobDetails.department || 'Engineering'}
@@ -268,7 +268,7 @@ export default function VacancyDetailScreen() {
                 </View>
                 <ChevronRight size={12} color={COLORS.textMuted} />
 
-                <View className="bg-primary/10 border border-primary/30 px-2 py-1 rounded">
+                <View className="px-2 py-1 border rounded bg-primary/10 border-primary/30">
                   <Text className="text-[9px] font-sans-bold text-primary uppercase">Designation</Text>
                   <Text className="text-[11px] font-sans-semibold text-primary">
                     {jobDetails.designation_name || jobDetails.title}
@@ -280,8 +280,8 @@ export default function VacancyDetailScreen() {
 
             {/* Responsibilities */}
             {(jobDetails.job_description || jobDetails.responsibilities) && (
-              <View className="bg-surface border border-border rounded-lg p-3 mb-3">
-                <View className="flex-row items-center justify-between border-b border-border/50 pb-2 mb-2">
+              <View className="p-3 mb-3 border rounded-lg bg-surface border-border">
+                <View className="flex-row items-center justify-between pb-2 mb-2 border-b border-border/50">
                   <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">Role Details</Text>
                 </View>
                 {jobDetails.job_description && (
@@ -298,8 +298,8 @@ export default function VacancyDetailScreen() {
             )}
 
             {/* Qualifications */}
-            <View className="bg-surface border border-border rounded-lg p-3 mb-3">
-              <View className="flex-row items-center justify-between border-b border-border/50 pb-2 mb-2">
+            <View className="p-3 mb-3 border rounded-lg bg-surface border-border">
+              <View className="flex-row items-center justify-between pb-2 mb-2 border-b border-border/50">
                 <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider">Qualifications</Text>
               </View>
 
@@ -348,14 +348,14 @@ export default function VacancyDetailScreen() {
 
           {/* AI Intelligence Column */}
           <View className={`flex-1 ${isDesktop ? 'min-w-[350px] max-w-[500px]' : 'min-w-[100%]'}`}>
-            <View className="bg-surface border border-info/30 rounded-lg p-3">
+            <View className="p-3 border rounded-lg bg-surface border-info/30">
               <View className="flex-row items-center gap-1.5 border-b border-border/50 pb-2 mb-2">
                 <Sparkles size={12} color={COLORS.info} />
                 <Text className="text-[10px] font-sans-bold text-info uppercase tracking-wider">AI Intelligence</Text>
               </View>
 
               {loadingRec ? (
-                <View className="py-6 items-center justify-center">
+                <View className="items-center justify-center py-6">
                   <ActivityIndicator size="small" color={COLORS.info} />
                 </View>
               ) : recData ? (
@@ -372,10 +372,10 @@ export default function VacancyDetailScreen() {
                           <Pressable
                             key={idx}
                             onPress={() => router.push(`/candidates/${cand.candidate_id}`)}
-                            className="bg-background border border-border rounded p-2 flex-row items-center justify-between active:bg-surface-hover"
+                            className="flex-row items-center justify-between p-2 border rounded bg-background border-border active:bg-surface-hover"
                           >
-                            <View className="flex-row items-center gap-2 flex-1 pr-2">
-                              <View className="w-6 h-6 rounded bg-primary/10 items-center justify-center">
+                            <View className="flex-row items-center flex-1 gap-2 pr-2">
+                              <View className="items-center justify-center w-6 h-6 rounded bg-primary/10">
                                 <Text className="text-[10px] font-sans-bold text-primary">
                                   {(cand.full_name || 'U').charAt(0).toUpperCase()}
                                 </Text>

@@ -47,6 +47,9 @@ export function normalizeCanonicalMatchStatus(
   if (s === 'NO_ACTIVE_VACANCIES') {
     return 'NO_ACTIVE_VACANCIES';
   }
+  if (s === 'NO_SUITABLE_MATCH') {
+    return 'NO_STRONG_MATCH';
+  }
   if (s === 'ANALYSIS_NOT_AVAILABLE' || s === 'ANALYSIS UNAVAILABLE' || s === 'N/A') {
     return 'ANALYSIS_NOT_AVAILABLE';
   }
@@ -152,6 +155,24 @@ export function getCanonicalMatchStatusMeta(
   }
 }
 
+export function resolveVacancyFitScore(match?: any): number | undefined {
+  if (!match) return undefined;
+
+  const scoreCandidates = [match.vacancy_fit_score, match.overall_score, match.score];
+  for (const candidate of scoreCandidates) {
+    if (candidate != null && candidate !== 0) {
+      return Number(candidate);
+    }
+  }
+
+  // If all known scores are zero but at least one is present, return the explicit 0.
+  if (match.vacancy_fit_score != null || match.overall_score != null || match.score != null) {
+    return Number(match.vacancy_fit_score ?? match.overall_score ?? match.score);
+  }
+
+  return undefined;
+}
+
 interface VacancyMatchStatusBadgeProps {
   status?: string | null;
   score?: number | null;
@@ -222,7 +243,7 @@ export function VacancyFitScoreBreakdownCard({
       <View className="flex-row items-center justify-between border-b border-border/60 pb-1.5">
         <View className="flex-row items-center gap-1.5">
           <Layers size={13} color={COLORS.primary} />
-          <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
+          <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">
             Canonical Fit Breakdown
           </Text>
         </View>
@@ -257,7 +278,7 @@ export function VacancyFitScoreBreakdownCard({
 
       {/* Hierarchy Mismatch & Rejection Penalty Warning */}
       {(!isValidHierarchy || penaltyVal > 0) && (
-        <View className="bg-danger/10 border border-danger/30 rounded p-2 gap-1 mt-1">
+        <View className="gap-1 p-2 mt-1 border rounded bg-danger/10 border-danger/30">
           <View className="flex-row items-center gap-1.5">
             <ShieldAlert size={12} color={COLORS.danger} />
             <Text className="text-[10px] font-sans-bold text-danger uppercase tracking-wider">

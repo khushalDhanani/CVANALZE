@@ -4,7 +4,7 @@ import { Award, AlertTriangle, CpuIcon, User } from 'lucide-react-native';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Badge } from './Badge';
-import { VacancyMatchStatusBadge, VacancyFitScoreBreakdownCard } from './VacancyMatchStatusBadge';
+import { VacancyMatchStatusBadge, VacancyFitScoreBreakdownCard, resolveVacancyFitScore } from './VacancyMatchStatusBadge';
 import { ComponentScoreBar } from './ComponentScoreBar';
 import { COLORS } from '@/constants/colors';
 import { JobMatchScore, MandatoryFailure } from '@/types/api';
@@ -36,7 +36,7 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
   );
 
   const matchStatus = bestMatch.vacancy_match_status || bestMatch.match_status || bestMatch.classification;
-  const fitScore = bestMatch.vacancy_fit_score != null ? bestMatch.vacancy_fit_score : (bestMatch.overall_score || bestMatch.score || 0);
+  const fitScore = resolveVacancyFitScore(bestMatch);
 
   return (
     <Card className="border-primary/40 shadow-sm gap-3">

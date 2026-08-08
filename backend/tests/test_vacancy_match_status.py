@@ -53,6 +53,50 @@ def test_vacancy_fit_evaluator_classify_opening_fit():
     assert VacancyFitEvaluator.classify_opening_fit(rejected_op, high_threshold=70.0) == "NO_STRONG_MATCH"
 
 
+def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero_fit_score_for_objects():
+    class DummyOpening:
+        vacancy_fit_score = 0.0
+        score = 76.4
+        overall_score = 76.4
+        vacancy_match_status = "MATCHED"
+        classification = "MEDIUM"
+
+    opening = DummyOpening()
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+
+
+def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero_fit_score_for_dicts():
+    opening = {
+        "vacancy_fit_score": 0.0,
+        "score": 76.4,
+        "overall_score": 76.4,
+        "vacancy_match_status": "MATCHED",
+        "classification": "MEDIUM",
+    }
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+
+
+def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero_fit_score_for_string_values():
+    opening = {
+        "vacancy_fit_score": "0.0",
+        "score": "76.4",
+        "overall_score": "76.4",
+        "vacancy_match_status": "MATCHED",
+        "classification": "MEDIUM",
+    }
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+
+
+def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_fit_score_missing():
+    opening = {
+        "score": 76.4,
+        "overall_score": 76.4,
+        "vacancy_match_status": "MATCHED",
+        "classification": "MEDIUM",
+    }
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+
+
 def test_determine_candidate_match_status_all_7_states():
     dummy_vacancies = [{"id": 1, "title": "Software Developer"}]
 
