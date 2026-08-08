@@ -248,6 +248,12 @@ class OllamaLLMService:
                 validation_ms=validation_ms,
             )
 
+        prompt_chars = len(normalized_prompt)
+        logger.info(
+            f"[OLLAMA] operation={operation} model='{model}' status=CALLING "
+            f"prompt_chars={prompt_chars} estimated_tokens={max(1, prompt_chars // 4)}"
+        )
+        llm_started = time.perf_counter()
         try:
             transport_result = OllamaTransport.generate(
                 operation=operation,
@@ -255,7 +261,13 @@ class OllamaLLMService:
                 parser=parse,
             )
         except OllamaError as exc:
-            logger.error(f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK error={type(exc).__name__}")
+            duration_ms = round((time.perf_counter() - llm_started) * 1000.0, 2)
+            logger.error(
+                f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK "
+                f"error={type(exc).__name__} duration_ms={duration_ms} prompt_chars={prompt_chars}"
+            )
+            if profiler:
+                profiler.metrics.ollama_request_ms = duration_ms
             return None
 
         generation = transport_result.value
@@ -265,6 +277,16 @@ class OllamaLLMService:
             profiler.metrics.model_inference_ms = inference_ms
             profiler.metrics.token_count = generation.envelope.eval_count
             profiler.metrics.json_validation_ms = generation.validation_ms
+            profiler.metrics.prompt_output_tokens = generation.envelope.eval_count
+            profiler.metrics.prompt_input_tokens = generation.envelope.prompt_eval_count or profiler.metrics.prompt_input_tokens
+
+        logger.info(
+            f"[OLLAMA] operation={operation} model='{model}' status=SUCCESS "
+            f"duration_ms={transport_result.duration_ms} "
+            f"input_tokens={generation.envelope.prompt_eval_count} "
+            f"output_tokens={generation.envelope.eval_count} "
+            f"inference_ms={inference_ms}"
+        )
 
         LLMCacheRepository.save_cached_entry(
             resolved_cache_key,

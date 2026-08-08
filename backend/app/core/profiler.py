@@ -59,7 +59,8 @@ class PipelineProfiler:
 
     def log_summary(self) -> None:
         m = self.finish()
-        llm_time_ms = m.ollama_request_ms + m.model_inference_ms
+        # ollama_request_ms is now written on both success and failure (OllamaError), so this is always accurate
+        llm_time_ms = m.ollama_request_ms
         cache_str = f"HITS={m.cache_hits}, MISSES={m.cache_misses}"
         logger.info("=== CV Analysis & Matching Pipeline Profile ===")
         logger.info(
@@ -67,6 +68,11 @@ class PipelineProfiler:
             f"CandContext={m.candidate_context_ms} | VacContext={m.vacancy_context_ms} | "
             f"ScoringTotal={m.scoring_ms} (Req:{m.evaluator_requirement_ms}, Trans:{m.evaluator_transition_ms}, "
             f"Comp:{m.evaluator_component_ms}, Guard:{m.evaluator_cross_domain_ms}, Rec:{m.evaluator_recommendation_ms}) | "
-            f"LLM={llm_time_ms} | Total={m.total_execution_ms}"
+            f"LLM={llm_time_ms} (Inference:{m.model_inference_ms}) | Total={m.total_execution_ms}"
         )
-        logger.info(f"[TELEMETRY] Vacancies: Raw={m.vacancies_before_filtering} -> Filtered={m.vacancies_after_filtering} | Cache: {cache_str} | Total Time={m.total_execution_ms}ms")
+        logger.info(
+            f"[TELEMETRY] Vacancies: Raw={m.vacancies_before_filtering} -> Filtered={m.vacancies_after_filtering} "
+            f"-> LLM={m.prompt_vacancy_count} | "
+            f"Prompt: chars={m.prompt_input_chars} input_tokens={m.prompt_input_tokens} output_tokens={m.prompt_output_tokens} | "
+            f"Cache: {cache_str} | Total Time={m.total_execution_ms}ms"
+        )

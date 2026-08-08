@@ -102,6 +102,10 @@ class PipelineStageMetrics(BaseModel):
     prompt_construction_ms: float = 0.0
     token_count: int = 0
     context_char_count: int = 0
+    prompt_vacancy_count: int = 0
+    prompt_input_chars: int = 0
+    prompt_input_tokens: int = 0
+    prompt_output_tokens: int = 0
     ollama_request_ms: float = 0.0
     model_inference_ms: float = 0.0
     json_validation_ms: float = 0.0

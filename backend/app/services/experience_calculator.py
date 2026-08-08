@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Any
 
+from app.core.config import settings
 from app.core.logging import logger
 from app.services.date_interval_parser import DateIntervalParser
 
@@ -340,7 +341,10 @@ class ExperienceCalculator:
         if not cv_text:
             return None
 
-        search_text = cv_text[:4000].lower()
+        # Search over configurable prefix to catch explicit experience statements.
+        # EXPERIENCE_KEYWORD_SEARCH_CHARS defaults to 20000 to cover long CVs without
+        # missing declarations that appear later in the document.
+        search_text = cv_text[:settings.EXPERIENCE_KEYWORD_SEARCH_CHARS].lower()
 
         # Regex patterns covering "Work experience (6+ Years)", "Total experience: 5.5 years", "13+ years of experience", etc.
         patterns = [

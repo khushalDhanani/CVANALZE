@@ -7,13 +7,16 @@ from threading import Lock
 from typing import Any
 
 from docling.datamodel.base_models import DocumentStream
-from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling_pp_ocrv6 import PPOCRv6Options
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
 from app.core.config import settings
 from app.core.logging import logger
 from app.services.resume_text_normalizer import ResumeTextNormalizer
 from app.services.upload_service import UploadService
+
+_OCR_ENGINE = "PP-OCRv6-Medium"
 
 
 class MarkdownResult:
@@ -66,7 +69,9 @@ class MarkdownResult:
 def _init_fast_converter() -> DocumentConverter:
     options = PdfPipelineOptions()
     options.do_ocr = False
+    options.allow_external_plugins = True
     options.do_table_structure = settings.DOCUMENT_TABLE_STRUCTURE_ENABLED
+    logger.info(f"[OCR_INIT] Fast converter: engine=docling_fast, do_ocr=False, allow_external_plugins=True")
     return DocumentConverter(format_options={"pdf": PdfFormatOption(pipeline_options=options)})
 
 
@@ -74,7 +79,9 @@ def _init_ocr_converter() -> DocumentConverter:
     options = PdfPipelineOptions()
     options.do_ocr = True
     options.do_table_structure = settings.DOCUMENT_TABLE_STRUCTURE_ENABLED
-    options.ocr_options = RapidOcrOptions(force_full_page_ocr=True)
+    options.allow_external_plugins = True
+    options.ocr_options = PPOCRv6Options(force_full_page_ocr=True)
+    logger.info(f"[OCR_INIT] OCR converter: engine={_OCR_ENGINE}, ocr=enabled, allow_external_plugins=True, force_full_page=True")
     return DocumentConverter(format_options={"pdf": PdfFormatOption(pipeline_options=options)})
 
 
@@ -229,12 +236,31 @@ class DocumentConversionService:
             "fast_docling_chars": fast_length,
             "fast_docling_ms": fast_duration_ms,
             "ocr_decision": ocr_decision,
+            "ocr_engine": _OCR_ENGINE if ocr_applied else "none",
             "ocr_chars": len(ocr_text),
             "ocr_ms": ocr_duration_ms,
             "final_char_count": len(clean_text),
             "parser_used": parser_used,
         }
-        logger.info(f"[STAGE 5: FINAL TEXT] '{filename}': type={pdf_type}, parser={parser_used}, chars={len(clean_text)}")
+        # Content-loss detection: warn if final extraction is significantly shorter than native text.
+        # This can indicate OCR/Docling failed to recover content from a hybrid/scanned PDF.
+        content_loss_detected = False
+        if native_char_count > 200 and len(clean_text) < native_char_count * 0.5:
+            content_loss_detected = True
+            logger.warning(
+                f"[CONTENT_LOSS] '{filename}': final_chars={len(clean_text)} is <50% of native_chars={native_char_count}. "
+                f"parser={parser_used}, pdf_type={pdf_type}, ocr_applied={ocr_applied}. "
+                "Check if Docling/OCR dropped content. Verify extraction is complete."
+            )
+
+        logger.info(
+            f"[EXTRACTION_TELEMETRY] '{filename}': "
+            f"native_chars={native_char_count} docling_chars={fast_length} "
+            f"ocr_chars={len(ocr_text)} final_chars={len(clean_text)} "
+            f"content_loss_detected={content_loss_detected} "
+            f"parser={parser_used} pdf_type={pdf_type}"
+        )
+        logger.info(f"[STAGE 5: FINAL TEXT] '{filename}': type={pdf_type}, parser={parser_used}, ocr_engine={_OCR_ENGINE if ocr_applied else 'none'}, chars={len(clean_text)}")
         return MarkdownResult(
             markdown=clean_text,
             page_count=page_count,
@@ -243,7 +269,11 @@ class DocumentConversionService:
             pdf_type=pdf_type,
             parser_used=parser_used,
             ocr_decision=ocr_decision,
-            stage_metrics=metrics,
+            stage_metrics={
+                **metrics,
+                "content_loss_detected": content_loss_detected,
+                "llm_chars": None,  # Set later by LLM prompt builder — not extraction concern
+            },
         )
 
     @classmethod
@@ -280,24 +310,32 @@ class DocumentConversionService:
     def _convert_ocr(filename: str, content: bytes) -> tuple[str, float, Any]:
         started = time.perf_counter()
         try:
+            logger.info(f"[STAGE 3: OCR START] '{filename}': engine={_OCR_ENGINE}, status=RUNNING")
             result = _get_ocr_converter().convert(DocumentStream(name=filename, stream=BytesIO(content)))
             document = result.document if result else None
             text = document.export_to_markdown().strip() if document else ""
-            return text, round((time.perf_counter() - started) * 1000.0, 2), document
+            page_count = len(document.pages) if document and getattr(document, "pages", None) else 0
+            duration = round((time.perf_counter() - started) * 1000.0, 2)
+            logger.info(f"[STAGE 4: OCR DONE] '{filename}': engine={_OCR_ENGINE}, chars={len(text)}, pages={page_count}, duration={duration}ms")
+            return text, duration, document
         except Exception as exc:
             duration = round((time.perf_counter() - started) * 1000.0, 2)
-            logger.warning(f"[STAGE 4: OCR EXECUTION] Warning for '{filename}': {exc}. Fallback to native.")
+            logger.warning(f"[STAGE 4: OCR EXECUTION] '{filename}': engine={_OCR_ENGINE}, status=FAILED, error={exc}, fallback=native, duration={duration}ms")
             return "", duration, None
 
     @staticmethod
     def _ocr_decision(extension: str, pdf_type: str, fast_length: int, native_length: int) -> str:
         if extension != "pdf":
-            return "SKIPPED_NON_PDF"
-        if pdf_type in ("TEXT_PDF", "HYBRID_PDF") and (fast_length >= 50 or native_length >= 50):
-            return "SKIPPED_TEXT_PRESENT"
-        if fast_length >= settings.AUTO_OCR_MIN_TEXT_CHARS or native_length >= settings.AUTO_OCR_MIN_TEXT_CHARS:
-            return "SKIPPED_SUFFICIENT_TEXT"
-        return "INVOKED_SPARSE_TEXT"
+            decision = "SKIPPED_NON_PDF"
+        elif pdf_type in ("TEXT_PDF", "HYBRID_PDF") and (fast_length >= 50 or native_length >= 50):
+            decision = "SKIPPED_TEXT_PRESENT"
+        elif fast_length >= settings.AUTO_OCR_MIN_TEXT_CHARS or native_length >= settings.AUTO_OCR_MIN_TEXT_CHARS:
+            decision = "SKIPPED_SUFFICIENT_TEXT"
+        else:
+            decision = "INVOKED_SPARSE_TEXT"
+        ocr_enabled = decision == "INVOKED_SPARSE_TEXT"
+        logger.info(f"[OCR_DECISION] type={pdf_type}, fast_chars={fast_length}, native_chars={native_length}, decision={decision}, ocr_enabled={ocr_enabled}, engine={_OCR_ENGINE if ocr_enabled else 'none'}")
+        return decision
 
     @staticmethod
     def _recover_structured_headings(raw_text: str, document: Any) -> str:

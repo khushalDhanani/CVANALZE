@@ -186,14 +186,46 @@ class MatchService:
         llm_matches_map = {}
 
         if not llm_skipped:
-            # 4. Prompt Construction & Token Count
+            # 4. Reduce LLM input to Top-N by deterministic score (full scoring already computed above).
+            # pre_llm_matches is sorted desc by score; use that ordering to select Top-N for LLM enrichment.
+            llm_top_n = settings.LLM_TOP_N
+            if pre_llm_matches:
+                # Build job_id→JobEvaluationContext lookup for O(1) access
+                jc_by_id = {jc.job_id: jc for jc in filtered_job_contexts}
+                llm_vacancies = []
+                for pm in pre_llm_matches[:llm_top_n]:
+                    jc = jc_by_id.get(pm.job_id)
+                    if jc is not None:
+                        llm_vacancies.append(jc)
+            else:
+                # Fallback: no deterministic scores available, use prefilter RRF score
+                llm_vacancies = sorted(
+                    filtered_job_contexts,
+                    key=lambda jc: jc.raw_job.get("_prefilter_score", 0.0) if isinstance(jc.raw_job, dict) else 0.0,
+                    reverse=True,
+                )[:llm_top_n]
+            llm_vacancy_dicts = [jc.raw_job for jc in llm_vacancies]
+
+            # 5. Prompt Construction & Token Count
             with profiler.time_stage("prompt_construction"):
-                prompt, token_est, char_count = build_optimized_match_prompt(cv_text, filtered_vacancies)
+                prompt, token_est, char_count, vacancy_count = build_optimized_match_prompt(cv_text, llm_vacancy_dicts)
                 profiler.metrics.token_count = token_est
                 profiler.metrics.context_char_count = char_count
+                profiler.metrics.prompt_vacancy_count = vacancy_count
+                profiler.metrics.prompt_input_chars = char_count
+                profiler.metrics.prompt_input_tokens = token_est
 
-            # Compute version-aware cache key
-            filtered_vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in filtered_vacancies]
+            full_cv_chars = len(cv_text)
+            llm_cv_chars = min(full_cv_chars, settings.LLM_CV_MAX_CHARS)
+            logger.info(
+                f"[LLM_INPUT] doc={document_hash[:12]}... "
+                f"full_cv_chars={full_cv_chars} llm_chars={llm_cv_chars} "
+                f"vacancies_prefiltered={len(filtered_job_contexts)} "
+                f"vacancies_sent_to_llm={vacancy_count} prompt_chars={char_count} estimated_tokens={token_est}"
+            )
+
+            # Compute version-aware cache key (use llm vacancies for more precise keying)
+            filtered_vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in llm_vacancy_dicts]
             cache_key = LLMCacheRepository.compute_composite_hash(
                 document_hash=document_hash,
                 candidate_id=candidate_id,

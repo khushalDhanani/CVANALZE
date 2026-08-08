@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+from app.core.config import settings
 
 PROMPT_VERSION = "1.0"
 
@@ -8,6 +9,8 @@ def build_profile_extraction_prompt(cv_text: str) -> str:
     """
     Builds a strict JSON-only prompt for Qwen to extract a DynamicCandidateProfile
     from CV text without any hardcoded assumptions.
+    NOTE: cv_text is truncated here for LLM prompt size only — full text is stored and
+    used for all non-LLM steps (parsing, scoring, storage, experience calculation).
     """
     structured_input = {
         "task_instructions": (
@@ -26,7 +29,8 @@ def build_profile_extraction_prompt(cv_text: str) -> str:
             "10. For every extracted field, there must be corresponding evidence in the CV. If no evidence exists, omit the field or set it to empty. "
             "11. Never use generic terms like 'strong communication skills' unless the CV explicitly mentions them."
         ),
-        "candidate_cv_markdown": cv_text[:7500],
+        # LLM prompt only: truncated for context-window fit. Full CV stored separately.
+        "candidate_cv_markdown": cv_text[:settings.LLM_PROFILE_MAX_CHARS],
     }
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)

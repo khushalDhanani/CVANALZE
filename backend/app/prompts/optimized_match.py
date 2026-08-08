@@ -20,14 +20,14 @@ def _clean_cv_text(cv_text: str) -> str:
     return cleaned
 
 
-def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str, Any]]) -> tuple[str, int, int]:
+def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str, Any]]) -> tuple[str, int, int, int]:
     """
     Builds a single, compact JSON prompt for Qwen to extract candidate profile,
     classify vacancy requirements, extract dual evidence, and perform semantic evaluation.
 
-    Returns: (prompt_str, estimated_token_count, char_count)
+    Returns: (prompt_str, estimated_token_count, char_count, vacancy_count)
     """
-    cleaned_cv = _clean_cv_text(cv_text)[:7500]
+    cleaned_cv = _clean_cv_text(cv_text)[:settings.LLM_CV_MAX_CHARS]
 
     compact_vacancies = []
     for vac in filtered_vacancies:
@@ -85,7 +85,9 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
         }
     )
 
+    vacancy_count = len(compact_vacancies)
     char_count = len(prompt)
     token_estimate = max(1, char_count // 4)
 
-    return prompt, token_estimate, char_count
+    return prompt, token_estimate, char_count, vacancy_count
+
