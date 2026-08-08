@@ -170,11 +170,17 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     content_type = retained_upload.detected_content_type
     raw_bytes = retained_upload.content
 
-    # Invalidate and delete all cache entries for this CV
+    # Invalidate and delete all cache entries and legacy aliases for this CV
     cv_result_cache_manager.delete(result_filename)
     cv_result_cache_manager.delete_by_pattern(f"*{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*cv_{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*CV_{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*cv_document_{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*cv_candidate_{cv_key}*")
+    CacheInvalidator.invalidate_candidate(cv_key)
     if cv_hash:
         CacheInvalidator.invalidate_cv(cv_hash)
+
 
     # Unlink old result file on disk to ensure fresh reprocessing
     disk_path = settings.RESULTS_DIR / result_filename

@@ -42,7 +42,15 @@ class CacheKey:
             return ""
         sorted_items = sorted(self.components.items())
         raw = "|".join(f"{k}={v}" for k, v in sorted_items)
-        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        doc_hash = self.components.get("doc_hash")
+        cand_id = self.components.get("cand_id")
+        if doc_hash:
+            return f"doc_{doc_hash}_{digest}"
+        elif cand_id:
+            return f"cand_{cand_id}_{digest}"
+        return digest
+
 
     @classmethod
     def for_llm_match(
@@ -714,8 +722,7 @@ class CacheInvalidator:
         for key in keys:
             match_result_cache_manager.delete(key)
         CacheIndex.remove("match_by_doc", doc_hash)
-        if not keys:
-            match_result_cache_manager.delete_by_pattern(f"*{doc_hash}*")
+        match_result_cache_manager.delete_by_pattern(f"*{doc_hash}*")
 
     @classmethod
     def _invalidate_match_results_by_candidate(cls, candidate_id: str) -> None:
@@ -723,8 +730,8 @@ class CacheInvalidator:
         for key in keys:
             match_result_cache_manager.delete(key)
         CacheIndex.remove("match_by_cand", candidate_id)
-        if not keys:
-            match_result_cache_manager.delete_by_pattern(f"*{candidate_id}*")
+        match_result_cache_manager.delete_by_pattern(f"*{candidate_id}*")
+
 
 
 _redis_cache = RedisCache(key_prefix="")

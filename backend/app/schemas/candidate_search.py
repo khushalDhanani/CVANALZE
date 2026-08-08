@@ -23,7 +23,9 @@ class CandidateSearchRequest(BaseModel):
 
 class CandidateSearchResultItem(BaseModel):
     id: str = Field(..., description="Candidate record ID / cv_key")
+    result_generation_id: str | None = Field(None, description="Canonical generation ID of candidate result")
     filename: str = Field(..., description="Original CV filename")
+
     full_name: str | None = Field(None, description="Candidate full name")
     email: str | None = Field(None, description="Candidate email address")
     phone: str | None = Field(None, description="Candidate phone number")
@@ -41,10 +43,14 @@ class CandidateSearchResultItem(BaseModel):
     is_scanned: bool = Field(False, description="Whether document was scanned PDF")
     ocr_applied: bool = Field(False, description="Whether OCR was applied")
     primary_department: str | None = Field(None, description="Primary matching department")
+    experience_years: float | None = Field(None, description="Total experience in years")
+    gross_display: str | None = Field(None, description="Formatted gross experience text")
+    experience_state: str | None = Field(None, description="Canonical experience calculation state (CALCULATED, CLAIMED, etc)")
     similarity_score: float | None = Field(
         None,
         description="Semantic vector similarity score (0.0 to 1.0) when query is supplied",
     )
+
     search_mode: str = Field("keyword", description="Search execution mode: 'semantic' or 'keyword'")
     best_match: dict[str, Any] | None = Field(None, description="Best job match evaluation summary")
 

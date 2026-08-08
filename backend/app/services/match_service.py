@@ -208,7 +208,8 @@ class MatchService:
 
             # 5. Prompt Construction & Token Count
             with profiler.time_stage("prompt_construction"):
-                prompt, token_est, char_count, vacancy_count = build_optimized_match_prompt(cv_text, llm_vacancy_dicts)
+                prompt, token_est, char_count = build_optimized_match_prompt(cv_text, llm_vacancy_dicts)
+                vacancy_count = len(llm_vacancy_dicts)
                 profiler.metrics.token_count = token_est
                 profiler.metrics.context_char_count = char_count
                 profiler.metrics.prompt_vacancy_count = vacancy_count
@@ -543,12 +544,18 @@ class MatchService:
             experience_gap_analysis=gap_analysis,
         )
 
-        # Cache the match result for instant repeat searches
-        match_result_cache_manager.set(match_cache_key, result.model_dump())
-        CacheIndex.add("match_by_doc", document_hash, match_cache_key)
-        if candidate_id:
-            CacheIndex.add("match_by_cand", candidate_id, match_cache_key)
-        logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
+        # Cache the match result for instant repeat searches if worker generation is current
+        from app.repositories.result import ResultRepository
+        cv_key_stem = str(candidate_id or document_hash)
+        if ResultRepository.is_generation_current(cv_key_stem, incoming_generation="", resource="match_result"):
+            match_result_cache_manager.set(match_cache_key, result.model_dump())
+            CacheIndex.add("match_by_doc", document_hash, match_cache_key)
+            if candidate_id:
+                CacheIndex.add("match_by_cand", candidate_id, match_cache_key)
+            logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
+        else:
+            logger.warning(f"[STALE_GENERATION_WRITE_REJECTED] resource=match_result doc={document_hash[:12]}")
+
 
         if getattr(settings, "SHADOW_MODE_ENABLED", False) and candidate_id:
             from app.services.shadow_validation_service import ShadowValidationService

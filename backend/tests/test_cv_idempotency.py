@@ -15,10 +15,19 @@ def clear_caches():
         doc_cache_manager,
         embedding_cache_manager,
     )
+    from app.core.database import PostgresAppSession
+    from app.models.result import CVResult
 
     cv_result_cache_manager.clear()
     doc_cache_manager.clear()
     embedding_cache_manager.clear()
+    try:
+        with PostgresAppSession() as session:
+            session.query(CVResult).delete()
+            session.commit()
+    except Exception:
+        pass
+
 
 
 @pytest.fixture

@@ -64,9 +64,14 @@ async def get_cv_lock(cv_key: str):
         finally:
             if redis_lock:
                 try:
-                    redis_lock.release()
+                    is_owned = True
+                    if hasattr(redis_lock, "owned") and callable(redis_lock.owned):
+                        is_owned = redis_lock.owned()
+                    if is_owned:
+                        redis_lock.release()
                 except Exception as rel_err:
-                    logger.warning(f"Redis lock release warning for '{cv_key}': {rel_err}")
+                    logger.debug(f"Redis lock release debug for '{cv_key}': {rel_err}")
+
 
 
 def get_stable_cv_key(
@@ -94,8 +99,13 @@ async def process_cv_file(
     result_filename = f"{cv_key}.json"
     identity_metadata = identity.to_metadata()
     legacy_cv_keys = [identity.legacy_key]
+    run_now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+    result_generation_id = f"gen_{run_now_ts}_{cv_hash[:8]}"
+    generation_sequence = ResultRepository.fetch_next_generation_sequence()
 
     async with get_cv_lock(cv_key):
+
+
         current_stage = "initialization"
         t_pipeline_start = asyncio.get_event_loop().time()
         stage_durations_ms: dict[str, float] = {}
@@ -182,10 +192,14 @@ async def process_cv_file(
 
             # Helper to save interim status
             async def _save_interim_status(progress: int, stage: str):
+                now_iso = datetime.now(timezone.utc).isoformat()
                 interim_data = {
                     "id": cv_key,
                     "scan_id": cv_key,
+                    "result_generation_id": result_generation_id,
+                    "generation_sequence": generation_sequence,
                     "status": "processing",
+
                     "progress": progress,
                     "stage": stage,
                     "filename": filename,
@@ -195,7 +209,11 @@ async def process_cv_file(
                     "cv_hash": cv_hash,
                     "identity": identity_metadata,
                     "legacy_cv_keys": legacy_cv_keys,
+                    "created_at": existing_data.get("created_at") if existing_data and existing_data.get("created_at") else now_iso,
+                    "updated_at": now_iso,
                 }
+
+
                 try:
                     await asyncio.to_thread(
                         ResultRepository.atomic_save_result,
@@ -366,6 +384,11 @@ async def process_cv_file(
             result_data = {
                 "id": cv_key,
                 "scan_id": cv_key,
+                "result_generation_id": result_generation_id,
+                "generation_sequence": generation_sequence,
+                "document_hash": cv_hash,
+
+
                 "parsed_at": now_iso,
                 "candidate_id": identity.candidate_id,
                 "cv_id": identity.cv_id,
@@ -392,8 +415,12 @@ async def process_cv_file(
                 "name_extraction_source": name_extraction_source,
                 "parser_version": settings.EXTRACTION_PARSER_VERSION,
                 "schema_version": settings.EXTRACTION_SCHEMA_VERSION,
+                "experience_version": getattr(settings, "EXPERIENCE_CALCULATOR_VERSION", "2.0.0"),
+                "taxonomy_version": getattr(settings, "TAXONOMY_VERSION", "1.5.0"),
+                "matching_version": getattr(settings, "MATCHING_VERSION", "2.1.0"),
                 "created_at": created_at,
                 "updated_at": updated_at,
+
                 "scanned_at": now_iso,
                 "status": "COMPLETED",
                 "original_status": status,

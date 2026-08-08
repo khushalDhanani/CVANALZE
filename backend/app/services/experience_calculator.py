@@ -341,10 +341,9 @@ class ExperienceCalculator:
         if not cv_text:
             return None
 
-        # Search over configurable prefix to catch explicit experience statements.
-        # EXPERIENCE_KEYWORD_SEARCH_CHARS defaults to 20000 to cover long CVs without
-        # missing declarations that appear later in the document.
-        search_text = cv_text[:settings.EXPERIENCE_KEYWORD_SEARCH_CHARS].lower()
+        # Scan 100% of full cv_text (no slicing). Note: explicit claims are fallback/validation ONLY
+        # and never replace timeline-based calculation in calculate_canonical_experience.
+        search_text = cv_text.lower()
 
         # Regex patterns covering "Work experience (6+ Years)", "Total experience: 5.5 years", "13+ years of experience", etc.
         patterns = [

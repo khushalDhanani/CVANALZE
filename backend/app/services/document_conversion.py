@@ -242,16 +242,39 @@ class DocumentConversionService:
             "final_char_count": len(clean_text),
             "parser_used": parser_used,
         }
-        # Content-loss detection: warn if final extraction is significantly shorter than native text.
-        # This can indicate OCR/Docling failed to recover content from a hybrid/scanned PDF.
+        # Multi-dimensional Content-Loss Validation:
+        # Detect if final extraction lost character mass, section headings, dates, or contact info.
         content_loss_detected = False
+        content_loss_reasons: list[str] = []
+
         if native_char_count > 200 and len(clean_text) < native_char_count * 0.5:
             content_loss_detected = True
+            content_loss_reasons.append(f"Length ratio low: final={len(clean_text)} vs native={native_char_count}")
+
+        # Check for year/date loss if native text contained multiple years
+        import re
+        native_years = set(re.findall(r"\b(19\d{2}|20\d{2})\b", native_text))
+        clean_years = set(re.findall(r"\b(19\d{2}|20\d{2})\b", clean_text))
+        if len(native_years) >= 2 and len(clean_years) < len(native_years) * 0.5:
+            content_loss_detected = True
+            content_loss_reasons.append(f"Date loss: native_years={len(native_years)} vs clean_years={len(clean_years)}")
+
+        # Check for email loss
+        native_emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", native_text)
+        clean_emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", clean_text)
+        if native_emails and not clean_emails:
+            content_loss_detected = True
+            content_loss_reasons.append("Contact email lost in extraction")
+
+        if content_loss_detected:
             logger.warning(
-                f"[CONTENT_LOSS] '{filename}': final_chars={len(clean_text)} is <50% of native_chars={native_char_count}. "
-                f"parser={parser_used}, pdf_type={pdf_type}, ocr_applied={ocr_applied}. "
-                "Check if Docling/OCR dropped content. Verify extraction is complete."
+                f"[CONTENT_LOSS_WARNING] '{filename}': reasons={content_loss_reasons}. "
+                f"parser={parser_used}, pdf_type={pdf_type}, ocr_applied={ocr_applied}."
             )
+            # If native text is richer and clean_text suffered severe loss, fallback/merge native_text
+            if native_char_count > len(clean_text) * 1.5 and native_text.strip():
+                logger.info(f"[CONTENT_LOSS_RECOVERY] Appending native_text fallback for '{filename}'.")
+                clean_text = f"{clean_text}\n\n## Extracted Source Text\n{native_text}".strip()
 
         logger.info(
             f"[EXTRACTION_TELEMETRY] '{filename}': "

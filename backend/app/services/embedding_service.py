@@ -169,7 +169,35 @@ class EmbeddingService:
 
         t0 = time.perf_counter()
         try:
-            embedding = cls._call_ollama_embed(model, text)
+            # For short texts (<= 3000 chars), single embed call.
+            # For long texts (> 3000 chars), split into ~2000-char overlapping chunks and compute mean-pooled vector.
+            if len(text) <= 3000:
+                embedding = cls._call_ollama_embed(model, text)
+            else:
+                chunks: list[str] = []
+                chunk_size, overlap = 2000, 200
+                start = 0
+                while start < len(text):
+                    end = min(start + chunk_size, len(text))
+                    chunk = text[start:end].strip()
+                    if chunk:
+                        chunks.append(chunk)
+                    if end == len(text):
+                        break
+                    start += chunk_size - overlap
+
+                chunk_embeddings = cls._call_ollama_batch_embed(model, chunks) if chunks else None
+                if chunk_embeddings and any(c for c in chunk_embeddings if c):
+                    valid_vecs = [c for c in chunk_embeddings if c]
+                    dim = len(valid_vecs[0])
+                    mean_vec = [sum(vec[i] for vec in valid_vecs) / len(valid_vecs) for i in range(dim)]
+                    norm = math.sqrt(sum(v * v for v in mean_vec))
+                    embedding = [v / norm for v in mean_vec] if norm > 0 else mean_vec
+                    logger.info(f"[EMBEDDING_AGGREGATED] Pooled {len(valid_vecs)} chunks for {len(text)} chars (hash='{content_hash[:12]}...')")
+                else:
+                    # Fallback to single call on first 3000 chars if batch embed returns None
+                    embedding = cls._call_ollama_embed(model, text[:3000])
+
             duration_ms = (time.perf_counter() - t0) * 1000.0
 
             with cls._metrics_lock:

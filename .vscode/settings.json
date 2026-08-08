@@ -1,0 +1,42 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "uv": true,
+        "command": true,
+        "/^command -v pytest; python3 -m pytest backend/tests/test_generation_consistency\\.py -q$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -c \"import sqlalchemy; from sqlalchemy import Column, Integer, text; from sqlalchemy\\.orm import declarative_base; Base=declarative_base\\(\\); class Foo\\(Base\\): __tablename__='foo'; id=Column\\(Integer, primary_key=True\\); x=Column\\(Integer, server_default=text\\(\\\\\"nextval\\('x'\\)\\\\\"\\)\\); engine=sqlalchemy\\.create_engine\\('sqlite:///:memory:'\\); Base\\.metadata\\.create_all\\(engine\\); print\\('created'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -m py_compile backend/app/repositories/result\\.py backend/app/models/result\\.py backend/app/core/database\\.py backend/tests/test_generation_consistency\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -m pip install --user pytest pytest-asyncio -q$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -m pytest backend/tests/test_generation_consistency\\.py -q$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 -m pip install --user pgvector -q && python3 -m pip install --user pytest pytest-asyncio -q && python3 - <<'PY'\nimport sqlalchemy\nfrom sqlalchemy import Column, Integer, text\nfrom sqlalchemy\\.orm import declarative_base\nBase = declarative_base\\(\\)\nclass Foo\\(Base\\):\n    __tablename__ = 'foo'\n    id = Column\\(Integer, primary_key=True\\)\n    x = Column\\(Integer, server_default=text\\(\"nextval\\('x'\\)\"\\)\\)\nengine = sqlalchemy\\.create_engine\\('sqlite:///:memory:'\\)\nBase\\.metadata\\.create_all\\(engine\\)\nprint\\('sqlite create_all ok'\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend && python3 -m pytest tests/test_generation_consistency\\.py -q$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -m pip install python-dateutil pytest$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -m pytest tests/test_generation_consistency\\.py -q$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

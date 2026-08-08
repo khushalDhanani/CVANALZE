@@ -1,40 +1,49 @@
 # Work Status
 
 ## Last Completed Task
-**CV Extraction Content Protection & Integrity Audit**
+**Final Generation-Safety & Cache-Consistency Hardening Pass**
 
-### Key Protections & Integrity Enforcements
+### Key Fixes & Architecture Updates
 
-1. **Extraction Text Integrity**:
-   - `raw_extracted_text` and `clean_text` (stored in JSON DB and cache) remain 100% complete and un-truncated regardless of CV length (>15,000+ chars).
-   - `LLM_CV_MAX_CHARS` (4,000) & `LLM_PROFILE_MAX_CHARS` (7,500) apply ONLY to LLM prompt construction, never to parsing, storage, skills, education, dates, or experience calculation.
+1. **Broadened Canonical `payload_checksum` (`app/repositories/result.py`)**:
+   - Implemented `_extract_canonical_business_payload(data)` covering all canonical CV business fields: `work_experience`, `experience_summary`, `total_experience_months`, `experience_years`, `experience_state`, `gross_display`, `experience_gap_analysis`, `department`, `domain`, `designation`, `candidate_analysis`, `vacancy_matches`, `recommendations`, canonical contact info, version metadata, `document_hash`, `result_generation_id`.
+   - Uses deterministic `json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)` digest generation.
+   - Added unit test `test_checksum_sensitivity_to_business_fields` proving changing domain, gaps, work experience, designation, or vacancy matches changes the checksum.
 
-2. **Upstream Truncation Fixes**:
-   - Replaced hardcoded `cv_text[:4000]` in `ExperienceCalculator._extract_explicit_experience` with `settings.EXPERIENCE_KEYWORD_SEARCH_CHARS` (20,000), guaranteeing explicit experience declarations past char 4000 in long multi-page CVs are detected.
-   - Replaced hardcoded `cv_text[:7500]` in `build_profile_extraction_prompt` with `settings.LLM_PROFILE_MAX_CHARS`.
+2. **Monotonic Generation Ordering (`app/models/result.py`, `app/repositories/result.py`)**:
+   - Added `generation_sequence` (`BigInteger`) column to `CVResult` model and `cv_results` PostgreSQL table via automatic `ALTER TABLE cv_results ADD COLUMN IF NOT EXISTS generation_sequence BIGINT` DDL in `init_db()`.
+   - Replaces timestamp string extraction with authoritative sequence ordering check (`incoming_sequence < stored_sequence -> reject write`).
 
-3. **Content Loss Detection & Telemetry**:
-   - Added content-loss check in `DocumentConversionService`: flags a warning if `final_chars` < 50% of `native_char_count` (detects dropped content in hybrid/scanned PDFs).
-   - Added `[EXTRACTION_TELEMETRY]` logging: `native_chars`, `docling_chars`, `ocr_chars`, `final_chars`, `content_loss_detected`.
-   - Added `[LLM_INPUT]` logging: `full_cv_chars`, `llm_chars`, `vacancies_sent_to_llm`, `prompt_chars`, `estimated_tokens`.
+3. **Stale Worker Guards Across ALL Derived Outputs (`app/repositories/result.py`, `app/services/match_service.py`)**:
+   - Implemented `ResultRepository.is_generation_current(cv_key, incoming_generation, incoming_sequence, resource=...)`.
+   - Protected PostgreSQL `cv_results`, Redis `cv_result`, and `match_result` cache writes.
+   - Outputs structured rejection log: `[STALE_GENERATION_WRITE_REJECTED] resource=... incoming_generation=... current_generation=...`.
 
-4. **Deterministic Ranking for LLM Top-N**:
-   - `MatchService` selects Top-N vacancies for LLM enrichment based on full `pre_llm_matches` deterministic scores (already sorted desc), ensuring the best rule-based matches are sent to Qwen.
+4. **8-Field Redis ↔ PostgreSQL Parity (`app/repositories/result.py`)**:
+   - Enforced parity across all 8 metadata fields (`result_generation_id`, `generation_sequence`, `schema_version`, `document_hash`, `experience_version`, `taxonomy_version`, `matching_version`, `payload_checksum`).
+   - Emits structured log: `[RESULT_PARITY] cv_key=... redis_generation=... db_generation=... redis_seq=... db_seq=... redis_checksum=... db_checksum=... action=HIT|REHYDRATE`.
 
-5. **Reverted Context Window**:
-   - Reverted `OLLAMA_GENERATION_NUM_CTX` back to 4096 (prompt fits comfortably within ~2,250 tokens).
+5. **Frontend UI Rendering Contract & Regression Test (`frontend/src/app/candidates/[id].tsx`, `frontend/src/__tests__/canonicalFrontendRendering.test.mjs`)**:
+   - Prioritized top-level canonical `data.work_experience` in candidate detail view.
+   - Created Node test suite confirming object field sanitization, experience display, match info extraction, and generation metadata preservation.
 
 ### Files Changed
 
 | File | Changes |
 |------|---------|
-| `app/core/config.py` | Reverted `OLLAMA_GENERATION_NUM_CTX=4096`. Added `LLM_PROFILE_MAX_CHARS=7500`, `EMBEDDING_CV_MAX_CHARS=8000`, `EXPERIENCE_KEYWORD_SEARCH_CHARS=20000`. |
-| `app/services/experience_calculator.py` | Used `settings.EXPERIENCE_KEYWORD_SEARCH_CHARS` (20,000) for explicit experience statement regex search instead of 4,000. |
-| `app/prompts/profile_extraction.py` | Used `settings.LLM_PROFILE_MAX_CHARS` for prompt formatting. |
-| `app/services/vacancy_prefilter.py` | Used `settings.EMBEDDING_CV_MAX_CHARS` (8,000) for vector embedding generation. |
-| `app/services/document_conversion.py` | Added content-loss detection logic & `[EXTRACTION_TELEMETRY]` logging (`native_chars`, `docling_chars`, `ocr_chars`, `final_chars`, `content_loss_detected`). |
-| `app/services/match_service.py` | Selected `LLM_TOP_N=12` based on `pre_llm_matches` deterministic scores; added `full_cv_chars` vs `llm_chars` to `[LLM_INPUT]` log. |
-| `tests/test_cv_extraction_integrity.py` | Added 25 unit tests verifying truncation is LLM-only, long CVs (>15k chars) are preserved, experience search works past 4k chars, and content-loss triggers correctly. |
+| `app/models/result.py` | Added `generation_sequence` (`BigInteger`) column to `CVResult` SQLAlchemy model. |
+| `app/core/database.py` | Added `ALTER TABLE cv_results ADD COLUMN IF NOT EXISTS generation_sequence BIGINT` DDL execution in `init_db()`. |
+| `app/repositories/result.py` | Implemented `_extract_canonical_business_payload`, broadened `compute_payload_checksum`, added `is_generation_current`, and 8-field `[RESULT_PARITY]` logger. |
+| `app/services/cv_service.py` | Added `generation_sequence` to pipeline run state, interim status updates, and final result payloads. |
+| `app/services/match_service.py` | Protected `match_result` cache writes with `ResultRepository.is_generation_current`. |
+| `tests/test_generation_consistency.py` | Added checksum sensitivity tests and stale worker derived cache write rejection tests. |
+| `frontend/src/app/candidates/[id].tsx` | Prioritized top-level canonical `data.work_experience` timeline rendering. |
+| `frontend/src/__tests__/canonicalFrontendRendering.test.mjs` | Created Node test suite for frontend sanitization, experience display, match info extraction, and generation metadata preservation. |
 
-### Verification Status
-- **Automated Tests**: 25/25 passed in `tests/test_cv_extraction_integrity.py`.
+### Verification
+- **Backend Test Suite (`uv run pytest tests/ -v`)**: **489 / 489 PASSED** (0 failures, 1 warning, 10.82s).
+- **Frontend Test Suite (`node src/__tests__/canonicalFrontendRendering.test.mjs`)**: **4 / 4 PASSED** (0 failures, 0.08s).
+
+
+
+

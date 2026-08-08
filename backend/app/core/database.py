@@ -81,9 +81,9 @@ def get_postgres_app_db():
 def init_db():
     if postgres_app_engine is not None:
         try:
-            # We need to run CREATE EXTENSION IF NOT EXISTS vector
             with postgres_app_engine.connect() as conn:
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                conn.execute(text("CREATE SEQUENCE IF NOT EXISTS cv_results_generation_seq START WITH 1 INCREMENT BY 1"))
                 conn.commit()
 
             PostgresAppBase.metadata.create_all(bind=postgres_app_engine)
@@ -91,6 +91,8 @@ def init_db():
             import logging
 
             logging.getLogger(__name__).warning(f"Could not initialize PG tables: {exc}")
+
+
 
 
 def run_auto_migrations():

@@ -89,7 +89,11 @@ class Settings(BaseSettings):
     EXTRACTION_TIMEOUT_SECONDS: float = 300.0
     EXTRACTION_PARSER_VERSION: str = "1.0.0"
     EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
+    EXPERIENCE_CALCULATOR_VERSION: str = "2.0.0"
+    TAXONOMY_VERSION: str = "1.5.0"
+    MATCHING_VERSION: str = "2.1.0"
     AUTO_OCR_MIN_TEXT_CHARS: int = 100
+
     DOCUMENT_PARSER_WORKERS: int = 1
     DOCUMENT_TABLE_STRUCTURE_ENABLED: bool = True
     PREFER_NATIVE_TEXT_EXTRACTION: bool = False
@@ -124,9 +128,7 @@ class Settings(BaseSettings):
     PREFILTER_TOP_K: int = 60
     LLM_TOP_N: int = 12
     LLM_CV_MAX_CHARS: int = 4000          # Truncation for optimized_match prompt ONLY
-    LLM_PROFILE_MAX_CHARS: int = 7500     # Truncation for profile_extraction prompt ONLY
-    EMBEDDING_CV_MAX_CHARS: int = 8000    # Chars fed to embedding model (not storage)
-    EXPERIENCE_KEYWORD_SEARCH_CHARS: int = 20000  # Chars searched for explicit experience statements
+    LLM_PROFILE_MAX_CHARS: int = 7500     # Budget cap for section-aware profile_extraction prompt
     OPTIMIZED_PROMPT_VERSION: str = "3.5"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 

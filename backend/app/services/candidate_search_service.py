@@ -156,10 +156,17 @@ class CandidateSearchService:
                     continue
 
             # Experience Range Filter
-            quality_metrics = r.get("quality_metrics") or {}
-            cand_exp = quality_metrics.get("experience_years")
+            cand_exp = r.get("experience_years")
+            if cand_exp is None:
+                cand_exp = r.get("total_experience_years")
+            if cand_exp is None:
+                cand_exp = (r.get("experience_summary") or {}).get("experience_years")
+            if cand_exp is None:
+                quality_metrics = r.get("quality_metrics") or {}
+                cand_exp = quality_metrics.get("experience_years")
             if cand_exp is None:
                 cand_exp = r.get("candidate_experience")
+
 
             if request.min_experience is not None:
                 if cand_exp is not None and cand_exp < request.min_experience:
@@ -254,7 +261,9 @@ class CandidateSearchService:
             items.append(
                 CandidateSearchResultItem(
                     id=r.get("id") or cv_key,
+                    result_generation_id=r.get("result_generation_id"),
                     filename=r.get("filename") or f"{cv_key}.pdf",
+
                     full_name=extracted_name if (extracted_name and extracted_name.lower() != "unknown candidate") else None,
                     email=email if email else None,
                     phone=phone if phone else None,

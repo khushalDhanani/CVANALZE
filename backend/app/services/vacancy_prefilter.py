@@ -50,7 +50,7 @@ class CandidateSearchContext:
             cv_embedding = get_candidate_embedding(cv_hash)
             if cv_embedding is None:
                 try:
-                    cv_embedding = EmbeddingService.generate_embedding(cv_text[:settings.EMBEDDING_CV_MAX_CHARS], settings.EMBEDDING_MODEL)
+                    cv_embedding = EmbeddingService.generate_embedding(cv_text, settings.EMBEDDING_MODEL)
                 except (RuntimeError, ValueError, AttributeError, KeyError) as e:
                     logger.warning(f"[PREFILTER] CV embedding generation failed: {e}")
                     cv_embedding = None

@@ -292,19 +292,25 @@ export default function CandidateDetailScreen() {
         </Card>
 
         {/* Experience Timeline */}
-        {((data?.resume_json?.work_experience && data.resume_json.work_experience.length > 0) ||
+        {((data?.work_experience && data.work_experience.length > 0) ||
+          (data?.resume_json?.work_experience && data.resume_json.work_experience.length > 0) ||
           (data?.resume_json?.experience && data.resume_json.experience.length > 0) ||
           (data?.normalized_resume?.employment && data.normalized_resume.employment.length > 0)) && (
             <Card className="p-3 gap-3 border-border shadow-none">
               <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">Experience</Text>
               {(
+                data?.work_experience ||
                 data?.resume_json?.work_experience ||
                 data?.resume_json?.experience ||
                 data?.normalized_resume?.employment ||
                 []
               ).slice(0, 5).map((exp: any, idx: number) => {
-                const title = exp.job_title?.normalized_value || exp.job_title || 'Untitled Role';
-                const company = exp.company?.normalized_value || exp.company || exp.company_name || 'Organization';
+                const title = typeof exp.job_title === 'object'
+                  ? (exp.job_title?.normalized_value || exp.job_title?.raw_value || 'Untitled Role')
+                  : (exp.job_title || exp.role || 'Untitled Role');
+                const company = typeof exp.company === 'object'
+                  ? (exp.company?.normalized_value || exp.company?.raw_value || 'Organization')
+                  : (exp.company || exp.company_name || 'Organization');
                 const dates = exp.interval?.raw_value || exp.dates || exp.duration || 'N/A';
                 return (
                   <View key={idx} className="border-l-2 border-border pl-3 pb-3">
@@ -314,14 +320,15 @@ export default function CandidateDetailScreen() {
                 );
               })}
               {(
-                (data?.resume_json?.work_experience || data?.resume_json?.experience || data?.normalized_resume?.employment || []).length > 5
+                (data?.work_experience || data?.resume_json?.work_experience || data?.resume_json?.experience || data?.normalized_resume?.employment || []).length > 5
               ) && (
                   <Text className="text-[10px] text-primary font-sans-medium cursor-pointer" onPress={() => setShowFullText(true)}>
-                    + {(data?.resume_json?.work_experience || data?.resume_json?.experience || data?.normalized_resume?.employment || []).length - 5} more roles
+                    + {(data?.work_experience || data?.resume_json?.work_experience || data?.resume_json?.experience || data?.normalized_resume?.employment || []).length - 5} more roles
                   </Text>
                 )}
             </Card>
           )}
+
 
         {/* Education & Certs */}
         <Card className="p-3 gap-3 border-border shadow-none">
@@ -649,10 +656,11 @@ export default function CandidateDetailScreen() {
 
         {/* Experience Timeline & Gaps Section */}
         <ExperienceTimelineCard
-          analysis={(analysis as any)?.experience_gap_analysis || (recommendations as any)?.experience_gap_analysis || (data as any)?.experience_gap_analysis}
-          experienceAssessment={recommendations?.experience_assessment || (data as any)?.experience_summary?.experience_assessment}
+          analysis={(data as any)?.experience_gap_analysis || (data as any)?.experience_summary?.gap_analysis || (analysis as any)?.experience_gap_analysis || (recommendations as any)?.experience_gap_analysis}
+          experienceAssessment={(data as any)?.experience_summary?.experience_assessment || recommendations?.experience_assessment}
           candidateData={data}
         />
+
 
 
         {/* AI Career Summary & Domain Insights */}
