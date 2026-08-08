@@ -166,10 +166,11 @@ class MatchService:
                         llm_match=None,
                         scoring_config=scoring_config,
                         context=candidate_context,
+                        cand_hierarchy=candidate_context.cand_hierarchy,
                     )
                     pre_llm_matches.append(pre_llm_match)
                 except Exception as e:
-                    logger.error(f"Error in rule-based matching for job {job_context.job_id}: {e}")
+                    logger.error(f"Error in rule-based matching for job {job_context.job_id}: {e}", exc_info=True)
 
             pre_llm_matches.sort(key=lambda m: m.score, reverse=True)
             if pre_llm_matches:
@@ -240,6 +241,7 @@ class MatchService:
                         llm_match=llm_match,
                         scoring_config=scoring_config,
                         context=candidate_context,
+                        cand_hierarchy=candidate_context.cand_hierarchy,
                     )
 
                     # Wrap into EnrichedJobMatchResult
@@ -293,7 +295,7 @@ class MatchService:
                     )
                     evaluated_matches.append(enriched_match)
                 except Exception as e:
-                    logger.error(f"Error in LLM-enriched matching for job {job.get('id') or job.get('vacancy_id')}: {e}")
+                    logger.error(f"Error in LLM-enriched matching for job {job.get('id') or job.get('vacancy_id')}: {e}", exc_info=True)
 
             evaluated_matches.sort(key=lambda m: m.score, reverse=True)
 

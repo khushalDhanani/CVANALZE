@@ -152,8 +152,9 @@ def test_no_strong_match_cannot_coexist_with_genuine_match_summary():
                     "vacancy_id": 77,
                     "job_title": "Unrelated Vacancy",
                     "department": "Rejected Department",
-                    "score": 77.3,
-                    "classification": "HIGH",
+                    "score": 35.0,
+                    "classification": "LOW",
+                    "vacancy_match_status": "NO_STRONG_VACANCY_MATCH",
                 }
             ],
         },

@@ -9,6 +9,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { CandidateSummary } from '@/types/api';
 import { Card, DenseRow, TextField, Badge, Button, EmptyState, SegmentedControl, FieldConfidenceView, Breadcrumbs } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
+import { VacancyMatchStatusBadge, normalizeCanonicalMatchStatus } from '@/components/ui/VacancyMatchStatusBadge';
 import { COLORS } from '@/constants/colors';
 
 export default function CandidateListScreen() {
@@ -18,8 +19,8 @@ export default function CandidateListScreen() {
   const { candidates, loading, error, searchMode, refreshCandidates } = useCandidates();
 
   const [searchQuery, setSearchQuery] = useState<string>(params.query || '');
-  const [filterClassification, setFilterClassification] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED'>(
-    (params.classification as any) || 'ALL'
+  const [filterClassification, setFilterClassification] = useState<string>(
+    params.classification || 'ALL'
   );
   const [filterDept, setFilterDept] = useState<string>(params.department || '');
   const [filterLocation, setFilterLocation] = useState<string>(params.location || '');
@@ -89,13 +90,14 @@ export default function CandidateListScreen() {
 
   const filteredCandidates = (candidates || []).filter((cand) => {
     if (!cand) return false;
-    const candClassification = cand.best_match?.classification;
-    const matchClassification =
-      filterClassification === 'ALL' ||
-      (filterClassification === 'UNMATCHED' && !candClassification) ||
-      candClassification === filterClassification;
+    const rawStatus = cand.best_match?.vacancy_match_status || cand.best_match?.match_status || cand.best_match?.classification;
+    const canonicalStatus = normalizeCanonicalMatchStatus(rawStatus);
 
-    return matchClassification;
+    if (filterClassification === 'ALL') return true;
+    if (filterClassification === 'UNMATCHED') {
+      return canonicalStatus === 'NO_STRONG_MATCH' || canonicalStatus === 'NO_ACTIVE_VACANCIES' || !rawStatus;
+    }
+    return canonicalStatus === filterClassification;
   });
 
   const renderCandidateRow = ({ item }: { item: CandidateSummary }) => {
@@ -168,6 +170,8 @@ export default function CandidateListScreen() {
     );
 
     const isDomainCapped = Boolean(item.best_match?.domain_mismatch_capped);
+    const matchStatus = item.best_match?.vacancy_match_status || item.best_match?.match_status || item.best_match?.classification;
+    const matchScore = item.best_match?.vacancy_fit_score != null ? item.best_match.vacancy_fit_score : item.best_match?.score;
 
     return (
       <View className="mb-2">
@@ -176,11 +180,11 @@ export default function CandidateListScreen() {
           subtitle={subtitleNode}
           onPress={() => handleOpenCandidateDetail(item.id)}
           trailing={
-            item.best_match?.score != null ? (
+            item.best_match ? (
               <View className="items-end gap-1">
-                <ScoreBadge
-                  score={item.best_match.score}
-                  classification={item.best_match.classification || 'LOW'}
+                <VacancyMatchStatusBadge
+                  status={matchStatus}
+                  score={matchScore}
                 />
                 {isDomainCapped && (
                   <Badge label="Cross-domain match — score capped" tone="warning" />
@@ -240,13 +244,13 @@ export default function CandidateListScreen() {
           <SegmentedControl
             options={[
               { value: 'ALL', label: 'All Matches' },
-              { value: 'HIGH', label: 'High' },
-              { value: 'MEDIUM', label: 'Medium' },
-              { value: 'LOW', label: 'Low' },
+              { value: 'MATCHED', label: 'Matched' },
+              { value: 'POTENTIAL_MATCH', label: 'Potential' },
+              { value: 'NO_STRONG_MATCH', label: 'No Strong Match' },
               { value: 'UNMATCHED', label: 'Unmatched' }
             ]}
             value={filterClassification}
-            onChange={(val) => setFilterClassification(val as 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNMATCHED')}
+            onChange={(val) => setFilterClassification(val)}
           />
           <View className="flex-row gap-3">
             <View className="flex-1">

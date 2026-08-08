@@ -139,6 +139,27 @@ export interface RequirementEvaluation {
   failure_reason?: string | null;
 }
 
+export type CanonicalVacancyMatchStatus =
+  | 'MATCHED'
+  | 'POTENTIAL_MATCH'
+  | 'NO_STRONG_MATCH'
+  | 'NO_ACTIVE_VACANCIES'
+  | 'ANALYSIS_NOT_AVAILABLE'
+  | 'PROCESSING'
+  | 'FAILED';
+
+export interface VacancyFitScoreBreakdown {
+  hierarchy_score: number;
+  designation_role_score: number;
+  skills_score: number;
+  experience_score: number;
+  semantic_similarity_score: number;
+  overall_fit_score: number;
+  hierarchy_mismatch_penalty: number;
+  is_hierarchy_valid: boolean;
+  match_status: string;
+}
+
 export interface ComponentBreakdown {
   role: number;
   skills: number;
@@ -162,6 +183,9 @@ export interface JobMatchScore {
   location_id?: number | null;
   overall_score: number;
   score?: number;
+  vacancy_fit_score?: number | null;
+  vacancy_match_status?: CanonicalVacancyMatchStatus | string | null;
+  score_breakdown?: VacancyFitScoreBreakdown | null;
   role_score: number;
   skills_score: number;
   experience_score: number;
@@ -244,7 +268,9 @@ export interface EnrichedCandidateAnalysis {
   rejection_policy_note: string;
   llm_model_used?: string;
   llm_skipped?: boolean;
-  match_status?: string;
+  match_status?: CanonicalVacancyMatchStatus | string | null;
+  hiring_recommendation?: CanonicalVacancyMatchStatus | string | null;
+  normalized_resume?: any;
 }
 
 export interface OptimizedCandidateProfile {
@@ -422,10 +448,14 @@ export interface CandidateSummary {
   primary_department?: string | null;
   similarity_score?: number | null;
   search_mode?: string;
+  match_status?: CanonicalVacancyMatchStatus | string | null;
   best_match?: {
     job_title?: string;
     department?: string;
     score?: number;
+    vacancy_fit_score?: number | null;
+    vacancy_match_status?: CanonicalVacancyMatchStatus | string | null;
+    match_status?: CanonicalVacancyMatchStatus | string | null;
     classification?: string;
     recommendation?: string;
     domain_mismatch_capped?: boolean;
@@ -502,7 +532,7 @@ export interface CandidateRecommendationsResponse {
   missing_qualifications?: MissingQualification[];
   recommended_certifications?: string[];
   talent_pools?: string[];
-  hiring_recommendation?: 'Highly Recommended' | 'Recommended' | 'Potential Fit' | 'Needs Further Review' | 'HIRE' | 'CONSIDER' | 'REJECT';
+  hiring_recommendation?: CanonicalVacancyMatchStatus | 'Highly Recommended' | 'Recommended' | 'Potential Fit' | 'Needs Further Review' | 'HIRE' | 'CONSIDER' | 'REJECT' | string;
   role_department_fit?: string;
   interview_focus_areas?: string[];
   risk_flags?: string[];

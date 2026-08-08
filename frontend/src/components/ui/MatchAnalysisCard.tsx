@@ -4,7 +4,7 @@ import { Award, AlertTriangle, CpuIcon, User } from 'lucide-react-native';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Badge } from './Badge';
-import { ScoreBadge } from './ScoreBadge';
+import { VacancyMatchStatusBadge, VacancyFitScoreBreakdownCard } from './VacancyMatchStatusBadge';
 import { ComponentScoreBar } from './ComponentScoreBar';
 import { COLORS } from '@/constants/colors';
 import { JobMatchScore, MandatoryFailure } from '@/types/api';
@@ -34,6 +34,9 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
     (bestMatch.mandatory_failures || []).some((f: any) => f.requirement_id === 'req_domain_mismatch') ||
     (bestMatch.mandatory_fails || []).some((f: any) => (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')
   );
+
+  const matchStatus = bestMatch.vacancy_match_status || bestMatch.match_status || bestMatch.classification;
+  const fitScore = bestMatch.vacancy_fit_score != null ? bestMatch.vacancy_fit_score : (bestMatch.overall_score || bestMatch.score || 0);
 
   return (
     <Card className="border-primary/40 shadow-sm gap-3">
@@ -73,14 +76,23 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
             </Text>
           )}
         </View>
-        <ScoreBadge
-          score={bestMatch.overall_score || bestMatch.score || 0}
-          classification={bestMatch.classification || 'LOW'}
+        <VacancyMatchStatusBadge
+          status={matchStatus}
+          score={fitScore}
         />
       </View>
 
+      {/* Canonical Fit Score Breakdown if available */}
+      {bestMatch.score_breakdown ? (
+        <VacancyFitScoreBreakdownCard
+          breakdown={bestMatch.score_breakdown}
+          penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
+          rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
+        />
+      ) : null}
+
       {/* Cross-Domain Guard Explainability Banner */}
-      {isDomainCapped && (
+      {isDomainCapped && !bestMatch.score_breakdown && (
         <Card className="bg-warning/10 border-warning/30 p-3 gap-1">
           <View className="flex-row items-center gap-1.5">
             <AlertTriangle size={14} color={COLORS.warning} />

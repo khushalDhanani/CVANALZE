@@ -289,7 +289,7 @@ export default function CvMatchScreen() {
                 {activeTab === 'file' && scanId && (
                   <Button
                     label="Force Re-analyze"
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onPress={() => forceReanalyze(scanId)}
                     disabled={uploading}

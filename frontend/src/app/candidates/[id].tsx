@@ -12,9 +12,23 @@ import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
 import { matchService } from '@/services/matchService';
 import { CandidateRecommendationsResponse, CVUploadResponse } from '@/types/api';
-import { Card, Button, Badge, DenseRow, FieldConfidenceView, Breadcrumbs, ExperienceTimelineCard } from '@/components/ui';
-import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
+import {
+  Card,
+  Button,
+  Badge,
+  DenseRow,
+  FieldConfidenceView,
+  Breadcrumbs,
+  ExperienceTimelineCard,
+  ComponentScoreBar,
+} from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
+import {
+  VacancyMatchStatusBadge,
+  VacancyFitScoreBreakdownCard,
+  getCanonicalMatchStatusMeta,
+  normalizeCanonicalMatchStatus,
+} from '@/components/ui/VacancyMatchStatusBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -221,22 +235,7 @@ export default function CandidateDetailScreen() {
     ? new Date(rawTimestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : 'N/A';
 
-  const formatHiringRecLabel = (rec: string | undefined) => {
-    if (!rec) return 'Needs Further Review';
-    if (rec === 'HIRE') return 'Highly Recommended';
-    if (rec === 'CONSIDER') return 'Potential Fit';
-    if (rec === 'REJECT') return 'Needs Further Review';
-    return rec;
-  };
-
-  const getHiringRecTone = (rec: string | undefined) => {
-    const formatted = formatHiringRecLabel(rec);
-    if (formatted === 'Highly Recommended') return 'success';
-    if (formatted === 'Recommended') return 'info';
-    if (formatted === 'Potential Fit') return 'warning';
-    if (formatted === 'Needs Further Review') return 'danger';
-    return 'neutral';
-  };
+  const hiringMeta = getCanonicalMatchStatusMeta(recommendations?.hiring_recommendation);
 
   // -------------------------------------------------------------
   // TAB RENDERERS
@@ -248,17 +247,29 @@ export default function CandidateDetailScreen() {
       <View className="w-full md:w-[45%] lg:w-5/12 gap-4">
 
         {/* Active Vacancy Summary Card */}
-        <Card className="p-3 border-border shadow-none">
-          <View className="flex-row items-center justify-between border-b border-border pb-2 mb-2">
+        <Card className="p-3 border-border shadow-none gap-2">
+          <View className="flex-row items-center justify-between border-b border-border pb-2 mb-1">
             <View className="flex-row items-center gap-1.5">
               <Target size={14} color={analysis?.has_genuine_match ? COLORS.success : COLORS.warning} />
               <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Active Vacancy Summary</Text>
             </View>
-            <Badge label={analysis?.has_genuine_match ? 'Genuine Match' : 'No Match'} tone={analysis?.has_genuine_match ? 'success' : 'warning'} />
+            <VacancyMatchStatusBadge
+              status={analysis?.match_status || (analysis?.has_genuine_match ? 'MATCHED' : (analysis?.active_vacancy_summary?.includes('NO_ACTIVE_VACANCIES') ? 'NO_ACTIVE_VACANCIES' : 'NO_STRONG_MATCH'))}
+              score={bestMatch?.vacancy_fit_score != null ? bestMatch.vacancy_fit_score : (bestMatch?.overall_score || bestMatch?.score)}
+            />
           </View>
-          <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-warning/5 border border-warning/20'}`}>
+          <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-surface border border-border'}`}>
             <Text className="text-xs text-text-primary leading-5">{analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}</Text>
           </View>
+
+          {/* Render canonical score breakdown if available on best match */}
+          {bestMatch?.score_breakdown ? (
+            <VacancyFitScoreBreakdownCard
+              breakdown={bestMatch.score_breakdown}
+              penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
+              rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
+            />
+          ) : null}
         </Card>
 
         {/* Contact Info Card */}
@@ -359,27 +370,36 @@ export default function CandidateDetailScreen() {
         {/* Suitable Openings */}
         {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
           analysis.suitable_openings.map((match: any, idx: number) => {
-            const matchLabel = match.classification === 'HIGH'
-              ? (idx === 0 ? 'Top Job Match' : 'Strong Match')
-              : 'Potential Match';
-            const isTop = idx === 0 && match.classification === 'HIGH';
+            const rawStatus = match.vacancy_match_status || match.match_status || match.classification;
+            const fitScore = match.vacancy_fit_score != null ? match.vacancy_fit_score : (match.overall_score || match.score || 0);
+            const isTop = idx === 0 && (rawStatus === 'MATCHED' || rawStatus === 'HIGH');
             return (
               <Card key={idx} className={`p-3 border-primary/40 shadow-none gap-2 ${idx > 0 ? 'mt-3 opacity-90 border-border' : ''}`}>
                 <View className="flex-row justify-between items-start">
-                  <View className="flex-1">
+                  <View className="flex-1 pr-2">
                     <View className="flex-row items-center gap-1.5 mb-1">
                       <Award size={14} color={isTop ? COLORS.primary : COLORS.textMuted} />
                       <Text className={`text-xs font-sans-bold uppercase tracking-wider ${isTop ? 'text-primary' : 'text-text-muted'}`}>
-                        {matchLabel}
+                        {isTop ? 'Top Job Match' : 'Evaluated Match'}
                       </Text>
                     </View>
                     <Text className="text-sm font-sans-bold text-text-primary">{match.job_title}</Text>
                     <Text className="text-[11px] font-sans-medium text-text-muted">{match.department_name || match.department}</Text>
                   </View>
-                  <ScoreBadge score={match.overall_score || match.score || 0} classification={match.classification} />
+                  <VacancyMatchStatusBadge
+                    status={rawStatus}
+                    score={fitScore}
+                  />
                 </View>
 
-                {match.component_scores ? (
+                {/* Score Breakdown if present */}
+                {match.score_breakdown ? (
+                  <VacancyFitScoreBreakdownCard
+                    breakdown={match.score_breakdown}
+                    penalty={match.score_breakdown.hierarchy_mismatch_penalty}
+                    rejectionReason={match.domain_mismatch_reason || match.reason}
+                  />
+                ) : match.component_scores ? (
                   <ComponentScoreBar scores={match.component_scores} />
                 ) : null}
 
@@ -425,7 +445,7 @@ export default function CandidateDetailScreen() {
         ) : bestMatch && analysis?.has_genuine_match ? (
           <Card className="p-3 border-primary/40 shadow-none gap-2">
             <View className="flex-row justify-between items-start">
-              <View className="flex-1">
+              <View className="flex-1 pr-2">
                 <View className="flex-row items-center gap-1.5 mb-1">
                   <Award size={14} color={COLORS.primary} />
                   <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">Top Job Match</Text>
@@ -433,10 +453,19 @@ export default function CandidateDetailScreen() {
                 <Text className="text-sm font-sans-bold text-text-primary">{bestMatch.job_title}</Text>
                 <Text className="text-[11px] font-sans-medium text-text-muted">{bestMatch.department_name}</Text>
               </View>
-              <ScoreBadge score={bestMatch.overall_score || bestMatch.score || 0} classification={bestMatch.classification} />
+              <VacancyMatchStatusBadge
+                status={bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification}
+                score={bestMatch.vacancy_fit_score != null ? bestMatch.vacancy_fit_score : (bestMatch.overall_score || bestMatch.score || 0)}
+              />
             </View>
 
-            {bestMatch.component_scores ? (
+            {bestMatch.score_breakdown ? (
+              <VacancyFitScoreBreakdownCard
+                breakdown={bestMatch.score_breakdown}
+                penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
+                rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
+              />
+            ) : bestMatch.component_scores ? (
               <ComponentScoreBar scores={bestMatch.component_scores} />
             ) : null}
 
@@ -554,7 +583,11 @@ export default function CandidateDetailScreen() {
             <Text className="text-xs font-sans text-text-muted mt-2">Running Hiring Intelligence...</Text>
           </Card>
         ) : recommendationsError ? (
-          <Card className="p-3 bg-danger/5 border-danger/30 shadow-none">
+          <Card className="p-3 bg-danger/5 border-danger/30 shadow-none gap-1">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-xs font-sans-bold text-danger">Hiring Intelligence Error</Text>
+              <VacancyMatchStatusBadge status="FAILED" />
+            </View>
             <Text className="text-xs text-danger">{recommendationsError}</Text>
           </Card>
         ) : recommendations ? (
@@ -564,9 +597,9 @@ export default function CandidateDetailScreen() {
                 <Sparkles size={14} color={COLORS.info} />
                 <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">Hiring Intelligence</Text>
               </View>
-              <Badge
-                label={formatHiringRecLabel(recommendations.hiring_recommendation)}
-                tone={getHiringRecTone(recommendations.hiring_recommendation)}
+              <VacancyMatchStatusBadge
+                status={recommendations.hiring_recommendation}
+                score={recommendations.overall_match_confidence}
               />
             </View>
 
@@ -774,9 +807,9 @@ export default function CandidateDetailScreen() {
             {/* Hiring Recommendation Badge placed prominently */}
             {recommendations && !recommendationsLoading && recommendations.hiring_recommendation ? (
               <View className="hidden md:flex">
-                <Badge
-                  label={formatHiringRecLabel(recommendations.hiring_recommendation)}
-                  tone={getHiringRecTone(recommendations.hiring_recommendation)}
+                <VacancyMatchStatusBadge
+                  status={recommendations.hiring_recommendation}
+                  score={recommendations.overall_match_confidence}
                 />
               </View>
             ) : null}

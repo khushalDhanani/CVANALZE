@@ -199,6 +199,7 @@ class ScoringEngine:
         llm_match: OptimizedVacancyMatch | None = None,
         scoring_config: dict[str, float] | ScoringConfig | None = None,
         context: CandidateAnalysisContext | None = None,
+        cand_hierarchy: Any | None = None,
     ) -> JobMatchResult:
         if context is None:
             context = CandidateAnalysisContext.create(
@@ -287,12 +288,12 @@ class ScoringEngine:
                 retrieval_src = "keyword"
 
         from app.services.match_evaluators import VacancyFitEvaluator
-        cand_hierarchy = kwargs.get("cand_hierarchy") or getattr(context, "cand_hierarchy", None)
+        resolved_cand_hierarchy = cand_hierarchy if cand_hierarchy is not None else getattr(context, "cand_hierarchy", None)
         fit_results = VacancyFitEvaluator.evaluate_fit(
             context=context,
             job=job_ctx,
             cv_text=cv_text,
-            cand_hierarchy=cand_hierarchy,
+            cand_hierarchy=resolved_cand_hierarchy,
             comp_results=comp_results,
             scoring_config=typed_scoring_config,
         )
@@ -307,8 +308,8 @@ class ScoringEngine:
             department_id=raw_job.get("department_id"),
             department_name=raw_job.get("department_name") or raw_job.get("department"),
             location_id=raw_job.get("location_id"),
-            score=fit_results.vacancy_fit_score,
-            overall_score=fit_results.vacancy_fit_score,
+            score=guard_results.final_score,
+            overall_score=guard_results.final_score,
             vacancy_fit_score=fit_results.vacancy_fit_score,
             score_breakdown=fit_results.score_breakdown,
             vacancy_match_status=fit_results.match_status,

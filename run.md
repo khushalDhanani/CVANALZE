@@ -51,7 +51,12 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml down
 
 ## 3. Running Locally (Without Docker)
 
-Before starting local services, ensure Redis and Ollama are running on your host machine:
+Before starting local services, ensure PostgreSQL (pgvector), Redis, and Ollama are running on your host machine:
+
+- **PostgreSQL (`pgvector`) Server**:
+  ```bash
+  docker compose up -d pgvector
+  ```
 
 - **Redis Server**:
   ```bash

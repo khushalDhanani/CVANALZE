@@ -21,7 +21,8 @@ class DateIntervalParser:
     PRESENT_KEYWORDS = {
         "present", "current", "now", "till date", "to date", "onwards",
         "till now", "currently", "presently", "actual", "heute", "aujourd'hui",
-        "date", "ongoing", "continue", "continuing",
+        "date", "ongoing", "continue", "continuing", "in progress", "active",
+        "till present", "to present", "till current",
     }
 
     MONTH_MAP = {
@@ -41,7 +42,7 @@ class DateIntervalParser:
     }
 
     RANGE_SPLIT_REGEX = re.compile(
-        r"(?:\s*(?:[–—~]|->|\bto\b|\btill\b|\buntil\b|\bthrough\b|\bbis\b|\ba\b)\s*|\s+-\s*|(?<=\d{4})-(?=\d{2,4}))",
+        r"(?:\s*(?:[–—~]|->|\bto\b|\btill\b|\buntil\b|\bthrough\b|\bbis\b|\ba\b)\s*|\s*[-–—]\s*|(?<=\d{4})-(?=\d{2,4})|(?<=\d{2}/\d{4})-(?=\d{2}/\d{4}))",
         re.IGNORECASE,
     )
 
@@ -53,7 +54,7 @@ class DateIntervalParser:
         return any(re.search(rf"\b{re.escape(kw)}\b", cleaned) for kw in cls.PRESENT_KEYWORDS)
 
     @classmethod
-    def parse_date_point(cls, date_str: str, is_end_date: bool = False) -> tuple[datetime | None, float]:
+    def parse_date_point(cls, date_str: str, is_end_date: bool = False, ref_date: datetime | None = None) -> tuple[datetime | None, float]:
         """
         Parse a single date point string (start or end date).
         Returns (datetime, confidence).
@@ -61,10 +62,12 @@ class DateIntervalParser:
         if not date_str:
             return None, 0.0
 
+        target_ref = ref_date or datetime.now()
         cleaned = date_str.strip().lower()
+        cleaned = re.sub(r"^(?:from|since|starting|as of)\s+", "", cleaned).strip(" ()[],'\"")
 
         if cls.is_present(cleaned):
-            return datetime.now(), 1.0
+            return target_ref, 1.0
 
         # 1. Full ISO date YYYY-MM-DD or DD/MM/YYYY
         m = re.search(r"\b(19\d{2}|20\d{2})[/\.\-](0?[1-9]|1[0-2])[/\.\-](0?[1-9]|[12]\d|3[01])\b", cleaned)
@@ -97,8 +100,8 @@ class DateIntervalParser:
             day = calendar.monthrange(year, month)[1] if is_end_date else 1
             return datetime(year=year, month=month, day=day), 0.95
 
-        # 4. Month Name + YYYY (e.g. "Jan 2020", "January 2020", "Enero 2020")
-        m = re.search(r"\b([a-zà-ÿ]{3,10})\.?\s+(19\d{2}|20\d{2})\b", cleaned)
+        # 4. Month Name + YYYY (e.g. "Jan 2020", "January 2020", "Jan. 2020", "Enero 2020")
+        m = re.search(r"\b([a-zà-ÿ]{3,10})\.?\s*,?\s*(19\d{2}|20\d{2})\b", cleaned)
         if m:
             month_str = m.group(1).rstrip(".")
             year = int(m.group(2))
@@ -131,7 +134,15 @@ class DateIntervalParser:
             day = 31 if is_end_date else 1
             return datetime(year=year, month=month, day=day), 0.80
 
-        # 7. 2-digit year (for end dates like "21" in "2018 - 21")
+        # 7. 2-digit year (for end dates like "21" in "2018 - 21" or "04/20")
+        m_2d_month = re.search(r"\b(0?[1-9]|1[0-2])[/\.\-](\d{2})\b", cleaned)
+        if m_2d_month:
+            yr_2digit = int(m_2d_month.group(2))
+            year = (2000 + yr_2digit) if yr_2digit <= 35 else (1900 + yr_2digit)
+            month = int(m_2d_month.group(1))
+            day = calendar.monthrange(year, month)[1] if is_end_date else 1
+            return datetime(year=year, month=month, day=day), 0.85
+
         m = re.search(r"\b(\d{2})\b", cleaned)
         if m and is_end_date:
             yr_2digit = int(m.group(1))
@@ -139,9 +150,7 @@ class DateIntervalParser:
             return datetime(year=year, month=12, day=31), 0.70
 
         # 8. Dateutil fuzzy fallback — only when the text contains an explicit
-        #    date anchor (month name or 2/4-digit year token). A bare token such
-        #    as "RAID-5" must NOT be interpreted as a date; that produced bogus
-        #    synthetic Jan-2000 intervals (2000-01-05 -> 2000-01-31).
+        #    date anchor (month name or 2/4-digit year token).
         try:
             anchor = re.search(
                 r"\b(?:19\d{2}|20\d{2}|\d{2})\b|\b[a-zà-ÿ]{3,10}\b", cleaned
@@ -152,7 +161,7 @@ class DateIntervalParser:
             # Reject when the year came from the 2000 sentinel default (no explicit year).
             if parsed.year == 2000 and not re.search(r"\b(?:19\d{2}|20\d{2})\b", cleaned):
                 return None, 0.0
-            if 1970 <= parsed.year <= datetime.now().year + 1:
+            if 1970 <= parsed.year <= (ref_date or datetime.now()).year + 1:
                 day = calendar.monthrange(parsed.year, parsed.month)[1] if is_end_date else parsed.day
                 return datetime(year=parsed.year, month=parsed.month, day=day), 0.60
         except (ValueError, OverflowError):
@@ -161,37 +170,47 @@ class DateIntervalParser:
         return None, 0.0
 
     @classmethod
-    def parse_interval(cls, raw_value: str | None) -> NormalizedDateInterval:
+    def parse_interval(cls, raw_value: str | None, ref_date: datetime | None = None) -> NormalizedDateInterval:
         """
         Parse raw date string into typed NormalizedDateInterval with confidence and evidence.
         """
         if not raw_value or not raw_value.strip():
             return NormalizedDateInterval(confidence=0.0)
 
-        cleaned = raw_value.strip()
+        target_ref = ref_date or datetime.now()
+        cleaned = raw_value.strip().strip("()[]")
         parts = cls.RANGE_SPLIT_REGEX.split(cleaned.lower(), maxsplit=1)
 
         start_date, start_conf = None, 0.0
         end_date, end_conf = None, 0.0
         is_current = cls.is_present(cleaned)
 
-        if len(parts) >= 2 and parts[0] != parts[1]:
-            start_date, start_conf = cls.parse_date_point(parts[0], is_end_date=False)
-            end_date, end_conf = cls.parse_date_point(parts[1], is_end_date=True)
+        if len(parts) >= 2 and parts[0].strip() != parts[1].strip():
+            start_date, start_conf = cls.parse_date_point(parts[0], is_end_date=False, ref_date=target_ref)
+            end_date, end_conf = cls.parse_date_point(parts[1], is_end_date=True, ref_date=target_ref)
+            if not is_current:
+                is_current = cls.is_present(parts[1])
 
         if not start_date:
-            start_date, start_conf = cls.parse_date_point(cleaned, is_end_date=False)
+            start_date, start_conf = cls.parse_date_point(cleaned, is_end_date=False, ref_date=target_ref)
             if not is_current:
-                end_date, end_conf = cls.parse_date_point(cleaned, is_end_date=True)
+                end_date, end_conf = cls.parse_date_point(cleaned, is_end_date=True, ref_date=target_ref)
+
+        # Handle "Since May 2020" or "From 2019" without explicit end date
+        if start_date and not end_date:
+            if is_current or re.search(r"\b(?:since|from|starting|as of)\b", cleaned.lower()):
+                is_current = True
+                end_date = target_ref
+                end_conf = 1.0
 
         if start_date and is_current and not end_date:
-            end_date = datetime.now()
+            end_date = target_ref
             end_conf = 1.0
 
         if start_date and end_date:
             if end_date < start_date:
                 end_date = start_date
-            end_date = min(end_date, datetime.now())
+            end_date = min(end_date, target_ref)
 
         duration_months = None
         if start_date and end_date:

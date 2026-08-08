@@ -96,6 +96,8 @@ def get_candidate_detail(candidate_id: str):
     stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
     canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, cv_text, candidate_id=stem)
 
+    result["experience_state"] = canonical_exp["experience_state"]
+    result["gross_display"] = canonical_exp["gross_display"]
     result["experience_years"] = canonical_exp["experience_years"]
     result["total_experience_years"] = canonical_exp["total_experience_years"]
     result["total_experience_months"] = canonical_exp["total_experience_months"]

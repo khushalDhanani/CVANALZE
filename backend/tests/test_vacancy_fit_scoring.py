@@ -293,6 +293,7 @@ def test_7_strong_overall_match(sample_candidate_context, sample_cand_hierarchy)
     comp_results.role_score = 95.0
     comp_results.skills_score = 95.0
     comp_results.experience_score = 100.0
+    comp_results.responsibilities_score = 90.0
 
     def mock_embed(text, *args, **kwargs):
         return [0.9, 0.1, 0.0]

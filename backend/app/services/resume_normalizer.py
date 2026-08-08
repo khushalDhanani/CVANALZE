@@ -51,9 +51,8 @@ class ResumeNormalizer:
         employment = [cls._normalize_employment(item) for item in resume_json.get("work_experience") or []]
         skills_data = resume_json.get("skills") or {}
         raw_skills = skills_data.get("all_skills") or [] if isinstance(skills_data, dict) else skills_data
-        deterministic_intervals = ExperienceCalculator.extract_intervals(resume_json)
-        deterministic_years = ExperienceCalculator.calculate_total_experience(resume_json, cv_text) if deterministic_intervals else None
-        stated_years = ExperienceCalculator._extract_explicit_experience(cv_text)
+        
+        canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, cv_text)
 
         return NormalizedResume(
             contact=NormalizedContact(
@@ -63,7 +62,7 @@ class ResumeNormalizer:
             skills=cls._normalize_skills(raw_skills),
             education=[cls._normalize_education(item) for item in resume_json.get("education") or []],
             employment=employment,
-            experience=cls._experience_summary(deterministic_years, stated_years, len(deterministic_intervals)),
+            experience=cls._experience_summary_from_canonical(canonical_exp),
         )
 
     @staticmethod
@@ -199,33 +198,30 @@ class ResumeNormalizer:
         return DateIntervalParser.parse_interval(raw_value)
 
     @staticmethod
-    def _experience_summary(
-        deterministic_years: float | None,
-        stated_years: float | None,
-        interval_count: int,
-    ) -> NormalizedExperienceSummary:
-        if deterministic_years is not None:
-            status = "corroborated"
-            if stated_years is None:
-                status = "date_only"
-            elif abs(deterministic_years - stated_years) > 1.5:
-                status = "stated_value_conflicts"
-            evidence = [f"{interval_count} dated employment interval(s)"]
-            if stated_years is not None:
-                evidence.append(f"CV states {stated_years} years")
-            return NormalizedExperienceSummary(
-                deterministic_years=deterministic_years,
-                stated_years=stated_years,
-                authoritative_source="employment_dates",
-                validation_status=status,
-                evidence=evidence,
-            )
+    def _experience_summary_from_canonical(canonical_exp: dict[str, Any]) -> NormalizedExperienceSummary:
+        state = canonical_exp.get("experience_state") or "UNKNOWN"
+        det_years = canonical_exp.get("deterministic_years")
+        stated_years = canonical_exp.get("stated_years")
+        auth_years = canonical_exp.get("authoritative_years")
+        gross_display = canonical_exp.get("gross_display") or ""
+        total_m = canonical_exp.get("total_experience_months")
+        
+        evidence = []
+        if det_years is not None:
+            evidence.append(f"{canonical_exp.get('merged_intervals_count', 1)} dated interval(s) ({det_years:.1f} yrs)")
+        if stated_years is not None:
+            evidence.append(f"CV states {stated_years} years")
+
         return NormalizedExperienceSummary(
-            deterministic_years=None,
+            experience_state=state,
+            gross_display=gross_display,
+            deterministic_years=det_years,
             stated_years=stated_years,
-            authoritative_source="none",
-            validation_status="stated_only_unverified" if stated_years is not None else "unavailable",
-            evidence=[f"CV states {stated_years} years"] if stated_years is not None else [],
+            authoritative_years=auth_years,
+            total_experience_months=total_m,
+            authoritative_source="canonical_calculator",
+            validation_status=state,
+            evidence=evidence,
         )
 
     @classmethod

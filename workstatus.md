@@ -1,8 +1,63 @@
-# Work Status: CV Analyzer Database Architecture Refactoring
+### CV Matching Flow Audit — Read-Only (2026-08-08)
+- **Task**: Audited the complete CV matching pipeline from source code without modifications.
+- **Files Read**: `match_service.py`, `match_evaluators.py`, `scoring_engine.py`, `dynamic_taxonomy_service.py`, `scoring_config.py`, `rule_config_manager.py`, `vacancy_prefilter.py`, `config.py`.
+- **Deliverable**: `cv_matching_flow_audit.md` artifact covering vacancy match rules, main department classification, hierarchy-constrained dept/desig logic, and 8 identified issues.
+- **Key Findings**:
+  1. `cand_text` NameError bug in `VacancyFitEvaluator.evaluate_fit()` — semantic similarity (15% weight) silently broken.
+  2. Two competing scoring systems (8-component vs 5-dimension) running in parallel.
+  3. MSSQL hierarchy validation never executes (no `db_session` passed at call sites).
+  4. Hardcoded semantic map covers only 8 of 26 main departments.
+  5. Redundant `classify_main_department()` call; hierarchy classification runs twice.
+  6. Vacancy hierarchy IDs not used to populate classification when match succeeds.
+  7. Sub-department/designation embedding profiles are minimal (just ID + name).
+  8. `is_eligible_match` vs `classify_opening_fit` default threshold mismatch (80 vs 70).
+- **No files modified.**
 
-## 1. Completed Work
+### Production Regression Fix: LLM-Enriched Matching NameError (2026-08-08)
+- **Root Cause Analysis**:
+  - In `ScoringEngine.evaluate_job_match` (`backend/app/services/scoring_engine.py`), the function signature declared explicit parameters without `**kwargs`.
+  - Line 291 referenced `kwargs.get("cand_hierarchy")`, which raised a `NameError: name 'kwargs' is not defined` whenever `evaluate_job_match` was called in the LLM-enriched matching loop (`MatchService.analyze_single_cv`).
+  - In addition, exception logging in `match_service.py` was caught without `exc_info=True`, and `cand_hierarchy` was not propagated explicitly through the call chain.
+- **Applied Fixes**:
+  - **Explicit Parameter Definition**: Added `cand_hierarchy: Any | None = None` to `ScoringEngine.evaluate_job_match` parameter signature.
+  - **Removed Illegal `kwargs` Call**: Replaced `kwargs.get("cand_hierarchy")` with `resolved_cand_hierarchy = cand_hierarchy if cand_hierarchy is not None else getattr(context, "cand_hierarchy", None)`.
+  - **Explicit Propagation in `MatchService.analyze_single_cv`**: Passed `cand_hierarchy=candidate_context.cand_hierarchy` explicitly in both rule-based pre-scoring (`pre_llm_matches`) and LLM-enriched post-scoring (`evaluated_matches`).
+  - **Improved Exception Traceability**: Updated exception handlers in `MatchService.analyze_single_cv` to log full stack traces with `exc_info=True`.
+  - **Vacancy Isolation**: Verified that an exception in one faulty vacancy is logged without corrupting or stopping the candidate matching results for other valid vacancies.
+- **Regression Test Suite**:
+  - Created `backend/tests/test_llm_enriched_matching_regression.py` testing:
+    1. `test_1_llm_enriched_matching_no_nameerror`: Verifies `evaluate_job_match` executes cleanly with both `llm_match=None` (rule-based) and `llm_match` (LLM-enriched), confirming `NameError` is eliminated.
+    2. `test_2_multiple_vacancies_score_independently`: Verifies multiple vacancies score independently under LLM-enriched evaluation.
+    3. `test_3_faulty_vacancy_does_not_destroy_other_matches`: Verifies a faulty vacancy in a batch does not destroy the matching pipeline for valid vacancies.
+  - Verification: 52/52 tests passing (100% success rate) across all matching, vacancy fit, hierarchy, and regression suites.
 
-### Vacancy Matching Upgrade: Structured Hierarchy + Semantic Fit (2026-08-07)
+### Canonical Vacancy Match Status Frontend Alignment (2026-08-08)
+- **Single Canonical Source of Truth**:
+  - Frontend strictly aligns with backend `vacancy_match_status` as single authoritative source of truth.
+  - Eliminated arbitrary frontend score threshold calculations (e.g. `score >= 70 ? 'HIGH' : ...`).
+  - Implemented support for all 7 canonical states: `MATCHED`, `POTENTIAL_MATCH`, `NO_STRONG_MATCH`, `NO_ACTIVE_VACANCIES`, `ANALYSIS_NOT_AVAILABLE`, `PROCESSING`, and `FAILED`.
+- **Reusable Canonical Status Helper & Component (`VacancyMatchStatusBadge.tsx`)**:
+  - `normalizeCanonicalMatchStatus()`: Normalizes canonical statuses and legacy aliases (`HIGH`, `MEDIUM`, `LOW`, `NO_STRONG_VACANCY_MATCH`, `HIRE`, `CONSIDER`, `REJECT`, `IN_PROGRESS`, `ERROR`).
+  - `getCanonicalMatchStatusMeta()`: Resolves `status`, `label`, `tone` (`success`, `warning`, `neutral`, `danger`, `info`), `icon`, `description`, `isProcessing`, and `isError`.
+  - `<VacancyMatchStatusBadge />`: Renders canonical badge, activity indicator for processing, and optional rounded fit score without threshold recalculation.
+  - `<VacancyFitScoreBreakdownCard />`: Renders 5-dimension score breakdown (Hierarchy 25%, Role 20%, Skills 25%, Experience 15%, Semantic 15%) and rejection reasons/penalties for HR visibility.
+- **Views Aligned**:
+  - `frontend/src/app/candidates/index.tsx`: Filters and row badges updated to use canonical statuses.
+  - `frontend/src/app/candidates/[id].tsx`: Hiring Intelligence, Active Vacancy Summary, and Evaluated Match cards updated to use `VacancyMatchStatusBadge`, `VacancyFitScoreBreakdownCard`, and canonical hiring recommendation.
+  - `frontend/src/components/ui/MatchAnalysisCard.tsx`: Uses canonical status badge and renders `score_breakdown` when available.
+  - `frontend/src/components/ui/ScoreBadge.tsx`: Refactored to delegate to canonical status meta without calculating custom thresholds.
+- **Verification & Test Suite**:
+  - Created `frontend/src/__tests__/canonicalVacancyMatchStatus.test.ts` and `frontend/src/__tests__/run_tests.mjs` verifying all 7 canonical statuses, legacy normalization, and score-independence (15/15 tests passed 100%).
+  - Verified `npx tsc --noEmit` compiles with 0 errors across the entire frontend.
+
+### Canonical Vacancy Match Status Backend Refactoring (2026-08-07)
+- **Canonical Decision Source (`VacancyFitEvaluator`)**:
+  - Defined `VacancyMatchStatus` enum in `match_evaluators.py` with 7 canonical states.
+  - Implemented `VacancyFitEvaluator.classify_opening_fit()`, `is_eligible_match()`, and `determine_candidate_match_status()`.
+  - Removed duplicate/legacy `_is_strong_match()` logic from `RecommendationService`.
+  - Ensured missing candidate analysis returns `ANALYSIS_NOT_AVAILABLE` and empty active vacancies return `NO_ACTIVE_VACANCIES`.
+- **Verification**: Created `backend/tests/test_vacancy_match_status.py` (23/23 tests passed 100%).
+
 - **Multi-Dimensional Weighted Scoring Engine (`VacancyFitEvaluator`)**:
   - Implemented `VacancyFitEvaluator.evaluate_fit()` computing a weighted vacancy fit score across 5 key dimensions:
     1. **Hierarchy Fit (25%)**: Compares Candidate Hierarchy IDs (`MainDeptID`, `DeptID`, `DesigID`) against Vacancy Hierarchy IDs.

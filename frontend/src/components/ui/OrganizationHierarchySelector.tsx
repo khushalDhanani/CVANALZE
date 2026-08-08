@@ -291,7 +291,7 @@ export function OrganizationHierarchySelector({
       {/* 4. Main Department */}
       {renderSelectorRow(
         'Main Department',
-        <Layers size={12} color={COLORS.secondary} />,
+        <Layers size={12} color={COLORS.info} />,
         mainDepartments,
         value.main_department_id,
         handleMainDeptChange,
@@ -311,7 +311,7 @@ export function OrganizationHierarchySelector({
       {/* 6. Designation */}
       {renderSelectorRow(
         'Designation',
-        <Award size={12} color={COLORS.accent} />,
+        <Award size={12} color={COLORS.primary} />,
         designations,
         value.designation_id,
         handleDesignationChange,

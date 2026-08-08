@@ -68,7 +68,6 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
             <Badge
               label={`Domain: ${professional_domain}`}
               tone="info"
-              icon={<Briefcase size={10} color={COLORS.info} />}
             />
           )}
           {!!recommended_department && (

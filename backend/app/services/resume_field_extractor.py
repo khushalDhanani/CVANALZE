@@ -32,7 +32,7 @@ class classproperty:
 
 class ResumeFieldExtractor:
     _SECTION_HEADING = re.compile(
-        r"^(?:#+|\*\*)\s*(SUMMARY|PROFILE SUMMARY|PROFILE|WORK EXPERIENCE|WORKING EXPERIENCE|PROFESSIONAL EXPERIENCE|PRACTICAL EXPOSURE|EXPERIENCE|EMPLOYMENT|EDUCATION|SKILLS|TECHNICAL SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|HOBBIES|CONTACT)\b",
+        r"^(?:#+|\*\*|[-•*]|\d+\.?)?\s*(SUMMARY|PROFILE\s+SUMMARY|PROFESSIONAL\s+SUMMARY|EXECUTIVE\s+SUMMARY|CAREER\s+OBJECTIVE|OBJECTIVE|PROFILE|WORK\s+EXPERIENCE|WORKING\s+EXPERIENCE|PROFESSIONAL\s+EXPERIENCE|PRACTICAL\s+EXPOSURE|EXPERIENCE\s+SUMMARY|EMPLOYMENT\s+HISTORY|CAREER\s+HISTORY|WORK\s+HISTORY|PROFESSIONAL\s+BACKGROUND|EXPERIENCE\s+HIGHLIGHTS|RELEVANT\s+EXPERIENCE|PROJECTS?\s*&\s*EXPERIENCE|EXPERIENCE|EMPLOYMENT|EDUCATION|ACADEMIC\s+BACKGROUND|ACADEMICS|SKILLS|TECHNICAL\s+SKILLS|CORE\s+COMPETENCIES|KEY\s+SKILLS|PROJECTS|PROJECT\s+WORK|CERTIFICATIONS|CERTIFICATES|LANGUAGES|HOBBIES|CONTACT|PERSONAL\s+DETAILS)\b",
         re.IGNORECASE,
     )
     _DATE_PART = (
@@ -52,13 +52,13 @@ class ResumeFieldExtractor:
         r"(?:"
         + _DATE_PART
         + r"|\b\d{2}\b"
-        + r"|\b(?:present|current|continue|continuing|ongoing|now|till date|to date|onwards|till now|currently|presently)\b"
+        + r"|\b(?:present|current|continue|continuing|ongoing|now|till date|to date|onwards|till now|currently|presently|in progress|active)\b"
         r")"
     )
     _DATE_RANGE = re.compile(
         r"(?:\b|_|\()"
         + _DATE_PART
-        + r"\s*(?:[\-–—~/]|->|\bto\b|\btill\b|\buntil\b)\s*"
+        + r"\s*(?:[\-–—~/]|->|\bto\b|\btill\b|\buntil\b|\bthrough\b)\s*"
         + _END_PART
         + r"(?:\b|_|\))",
         re.IGNORECASE,
@@ -286,6 +286,13 @@ class ResumeFieldExtractor:
         logger.info(f"[NAME_EXTRACTION] Extracted '{name}' (confidence={name_confidence:.2f}, level='{confidence_level}', source='{name_source}')")
 
         sections = cls._split_sections(text_lines)
+        exp_lines = sections.get("experience", [])
+        extracted_exp = cls._extract_employment(exp_lines)
+        if not extracted_exp and sections.get("general"):
+            gen_lines = sections.get("general", [])
+            if any(cls._DATE_RANGE.search(line) for line in gen_lines):
+                extracted_exp = cls._extract_employment(gen_lines)
+
         result = {
             "contact_info": {
                 "name": name,
@@ -307,9 +314,9 @@ class ResumeFieldExtractor:
                 "extraction_source": name_source,
             },
             "summary": "\n".join(sections.get("summary", [])).strip(),
-            "work_experience": cls._extract_employment(sections.get("experience", [])),
-            "education": cls._extract_education(sections.get("education", [])),
-            "skills": cls._extract_skills(sections.get("skills", [])),
+            "work_experience": extracted_exp,
+            "education": cls._extract_education(sections.get("education", []) or text_lines),
+            "skills": cls._extract_skills(sections.get("skills", []) or text_lines),
             "projects": cls._extract_projects(sections.get("projects", [])),
             "certifications": [line.lstrip("-• ").strip() for line in sections.get("certifications", []) if line.strip()],
             "quality_metrics": metrics or {},
@@ -332,17 +339,17 @@ class ResumeFieldExtractor:
                 sections.setdefault(current, []).append(line)
                 continue
             heading = match.group(1).upper()
-            if "EXPERIENCE" in heading or "EMPLOYMENT" in heading or "EXPOSURE" in heading:
+            if "EXPERIENCE" in heading or "EMPLOYMENT" in heading or "EXPOSURE" in heading or "CAREER" in heading or "WORK HISTORY" in heading:
                 current = "experience"
-            elif "EDUCATION" in heading:
+            elif "EDUCATION" in heading or "ACADEMIC" in heading:
                 current = "education"
-            elif "SKILL" in heading:
+            elif "SKILL" in heading or "COMPETENC" in heading:
                 current = "skills"
             elif "PROJECT" in heading:
                 current = "projects"
-            elif "SUMMARY" in heading or "PROFILE" in heading:
+            elif "SUMMARY" in heading or "PROFILE" in heading or "OBJECTIVE" in heading:
                 current = "summary"
-            elif "CERTIFICATION" in heading:
+            elif "CERTIFICATION" in heading or "CERTIFICATE" in heading:
                 current = "certifications"
             else:
                 current = heading.lower()
@@ -391,7 +398,11 @@ class ResumeFieldExtractor:
 
         def commit() -> None:
             nonlocal current
-            if current.get("company") or current.get("job_title") or current.get("responsibilities"):
+            has_dates = bool(current.get("dates"))
+            has_title = bool(current.get("job_title") and cls.is_valid_job_title(str(current.get("job_title"))))
+            has_company = bool(current.get("company") and (cls.is_valid_company_name(str(current.get("company"))) or cls._looks_like_company(str(current.get("company")))))
+            
+            if has_dates or (has_title and has_company) or (has_title and current.get("responsibilities")):
                 cls._fix_company_title_swap(current)
                 jobs.append(current)
             current = {}
@@ -498,16 +509,19 @@ class ResumeFieldExtractor:
                             current["dates"] = bullet_date.group(0).strip(" ()")
                         continue
                 current.setdefault("responsibilities", []).append(clean_bullet)
-            elif not current.get("job_title") and cls.is_valid_job_title(line):
-                # Check if the free line is actually a company name
-                if cls._looks_like_company(line) and not cls._looks_like_title(line):
-                    if not current.get("company"):
-                        current["company"] = line
-                else:
-                    current["job_title"] = line
             else:
-                # Check if free line is a company name (e.g. "Resonent TechnoLabs Pvt Ltd, Surat")
-                if not current.get("company") and cls._looks_like_company(line):
+                if current.get("dates") and (cls.is_valid_job_title(line) or cls._looks_like_company(line) or cls.is_valid_company_name(line)):
+                    commit()
+
+                if not current.get("job_title") and cls.is_valid_job_title(line):
+                    if cls._looks_like_company(line) and not cls._looks_like_title(line):
+                        if not current.get("company"):
+                            current["company"] = line
+                        else:
+                            current["job_title"] = line
+                    else:
+                        current["job_title"] = line
+                elif not current.get("company") and (cls._looks_like_company(line) or cls.is_valid_company_name(line)):
                     current["company"] = line
                 else:
                     current["description"] = " ".join(filter(None, (current.get("description"), line)))

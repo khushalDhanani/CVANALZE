@@ -17,5 +17,7 @@ export * from "./FieldConfidenceView";
 export * from "./Breadcrumbs";
 export * from "./ExperienceTimelineCard";
 export * from "./OrganizationHierarchySelector";
+export * from "./ComponentScoreBar";
+export * from "./VacancyMatchStatusBadge";
 
 

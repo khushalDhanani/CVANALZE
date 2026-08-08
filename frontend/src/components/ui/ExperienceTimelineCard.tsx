@@ -50,24 +50,29 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   const hrIndicators = analysis?.hr_review_indicators || [];
   const hrObs = summary?.hr_observations || [];
 
+  const rawState =
+    candidateData?.experience_state ||
+    candidateData?.experience_summary?.experience_state ||
+    candidateData?.validation_status ||
+    summary?.validation_status;
+
   const resolveCanonicalExperienceYears = (): number | null => {
     if (typeof totalExperienceYears === 'number' && !isNaN(totalExperienceYears)) {
       return totalExperienceYears;
     }
 
-    if (typeof summary?.total_verified_years === 'number' && summary.total_verified_years > 0) {
-      return summary.total_verified_years;
-    }
-
-    const sources = [analysis, candidateData];
+    const sources = [candidateData, analysis];
     for (const src of sources) {
       if (!src || typeof src !== 'object') continue;
 
+      if (typeof src.experience_years === 'number' && !isNaN(src.experience_years)) {
+        return src.experience_years;
+      }
       if (typeof src.total_experience_years === 'number' && !isNaN(src.total_experience_years)) {
         return src.total_experience_years;
       }
-      if (typeof src.experience_years === 'number' && !isNaN(src.experience_years)) {
-        return src.experience_years;
+      if (typeof src.authoritative_years === 'number' && !isNaN(src.authoritative_years)) {
+        return src.authoritative_years;
       }
 
       const expSum = src.experience_summary;
@@ -87,11 +92,6 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
       if (qMetrics && typeof qMetrics === 'object' && typeof qMetrics.experience_years === 'number' && !isNaN(qMetrics.experience_years)) {
         return qMetrics.experience_years;
       }
-
-      const rJson = src.resume_json;
-      if (rJson && typeof rJson === 'object' && typeof rJson.total_experience_years === 'number' && !isNaN(rJson.total_experience_years)) {
-        return rJson.total_experience_years;
-      }
     }
 
     if (typeof summary?.total_verified_years === 'number' && !isNaN(summary.total_verified_years)) {
@@ -103,16 +103,32 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
 
   const canonicalYears = resolveCanonicalExperienceYears();
 
+  const experienceState =
+    rawState ||
+    (canonicalYears !== null && canonicalYears > 0 ? 'CALCULATED' : (canonicalYears === 0 ? 'ZERO_CONFIRMED' : 'UNKNOWN'));
+
   const formatDisplayExperience = (years: number | null): string => {
+    const rawGross =
+      candidateData?.gross_display ||
+      candidateData?.experience_summary?.gross_display ||
+      summary?.gross_display;
+
+    if (rawGross && rawGross.trim().length > 0) {
+      return rawGross;
+    }
+
+    if (experienceState === 'UNKNOWN') {
+      return 'Experience Present (Dates Unparseable)';
+    }
+
     if (years === null || years === undefined) {
       return 'N/A';
     }
-    if (years === 0) {
+
+    if (years === 0 || experienceState === 'ZERO_CONFIRMED') {
       return '0 years 0 months';
     }
-    if (summary?.gross_display && summary.gross_display !== '0 years 0 months' && (summary?.total_verified_years === years || summary?.total_verified_years === 0)) {
-      return summary.gross_display;
-    }
+
     const totalMonths = Math.round(years * 12);
     const yearsPart = Math.floor(totalMonths / 12);
     const monthsPart = totalMonths % 12;
@@ -233,7 +249,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
 
   const renderRoleNode = (node: ExperienceTimelineNodeItem, isNested = false, overrideKey?: string | number) => {
     // Find canonical job matching this node if available to display nested child assignments
-    const canonJob = canonicalJobs.find((cj) => cj.job_id === node.record_id || cj.parent_company === node.company);
+    const canonJob = canonicalJobs.find((cj: CanonicalJobItem) => cj.job_id === node.record_id || cj.parent_company === node.company);
     const childAssignments = canonJob?.child_assignments || [];
 
     return (
@@ -274,7 +290,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
             <Text className="text-[10px] font-sans-bold text-text-muted uppercase">
               Internal Assignments & Sub-Roles ({childAssignments.length})
             </Text>
-            {childAssignments.map((asg, idx) => renderChildAssignment(asg, idx))}
+            {childAssignments.map((asg: any, idx: number) => renderChildAssignment(asg, idx))}
           </View>
         )}
       </View>
@@ -400,7 +416,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
               HR Review Indicators
             </Text>
           </View>
-          {hrIndicators.map((ind, idx) => (
+          {hrIndicators.map((ind: string, idx: number) => (
             <Text key={idx} className="text-xs text-text-primary leading-4">
               • {ind}
             </Text>
@@ -416,7 +432,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
           </Text>
 
           <View className="pl-2 border-l-2 border-border/40 gap-2 my-1">
-            {events.map((evt, idx) => {
+            {events.map((evt: TimelineEventItem, idx: number) => {
               if (evt.event_type === 'EMPLOYMENT_PERIOD' && evt.node) {
                 return renderRoleNode(evt.node, false, evt.event_id || `evt-${idx}`);
               }
@@ -442,7 +458,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
                       Candidate held multiple roles/deputations concurrently during this period ({cluster.duration_months} mo):
                     </Text>
 
-                    {cluster.child_nodes.map((cNode, cIdx) => renderRoleNode(cNode, true, `cluster-${evt.event_id}-${cIdx}`))}
+                    {cluster.child_nodes.map((cNode: ExperienceTimelineNodeItem, cIdx: number) => renderRoleNode(cNode, true, `cluster-${evt.event_id}-${cIdx}`))}
                   </View>
                 );
               }
@@ -490,7 +506,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
             Canonical Employment History ({canonicalJobs.length})
           </Text>
           <View className="pl-2 border-l-2 border-border/40 gap-2 my-1">
-            {canonicalJobs.map((cj, idx) => renderCanonicalJob(cj, idx))}
+            {canonicalJobs.map((cj: CanonicalJobItem, idx: number) => renderCanonicalJob(cj, idx))}
           </View>
         </View>
       ) : null}
@@ -510,7 +526,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
 
           {showUndated && (
             <View className="mt-2 gap-1.5 pl-1">
-              {undated.map((uNode, idx) => renderRoleNode(uNode, true, `undated-${idx}`))}
+              {undated.map((uNode: ExperienceTimelineNodeItem, idx: number) => renderRoleNode(uNode, true, `undated-${idx}`))}
             </View>
           )}
         </View>
@@ -522,7 +538,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
           <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-1">
             HR Observations
           </Text>
-          {hrObs.map((obs, idx) => (
+          {hrObs.map((obs: string, idx: number) => (
             <View key={idx} className="flex-row items-center gap-1.5">
               <CheckCircle2 size={12} color={COLORS.success} />
               <Text className="text-xs text-text-primary leading-4">{obs}</Text>

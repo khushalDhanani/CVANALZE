@@ -272,6 +272,9 @@ class CandidateSearchService:
                     is_scanned=r.get("is_scanned", False),
                     ocr_applied=r.get("ocr_applied", False),
                     primary_department=match_analysis.get("primary_department"),
+                    experience_years=cand_exp,
+                    gross_display=r.get("gross_display") or (r.get("experience_summary") or {}).get("gross_display"),
+                    experience_state=r.get("experience_state") or (r.get("experience_summary") or {}).get("experience_state"),
                     similarity_score=sim_score,
                     search_mode=search_mode,
                     best_match={

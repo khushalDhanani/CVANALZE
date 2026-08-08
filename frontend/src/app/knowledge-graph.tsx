@@ -120,7 +120,7 @@ export default function KnowledgeGraphScreen() {
                 <StatCard label="Total Nodes" value={analytics.graph_summary.total_graph_nodes} tone="info" />
                 <StatCard label="Total Edges" value={analytics.graph_summary.total_graph_edges} tone="success" />
                 <StatCard label="Tracked Skills" value={analytics.graph_summary.total_skills_tracked} tone="warning" />
-                <StatCard label="Candidates" value={analytics.graph_summary.total_candidates} tone="primary" />
+                <StatCard label="Candidates" value={analytics.graph_summary.total_candidates} tone="info" />
               </View>
               
               <View className="grid grid-cols-1 md:grid-cols-2 gap-4">

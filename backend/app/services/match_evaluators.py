@@ -61,10 +61,14 @@ def _has_relevant_experience(
     context: CandidateAnalysisContext,
     job: JobEvaluationContext,
     matched_responsibilities: list[str] | None = None,
+    matched_skills: list[str] | None = None,
 ) -> bool:
     """Return whether verified experience is relevant to the vacancy evidence."""
     if context.candidate_experience is None or context.candidate_experience <= 0:
         return False
+
+    if matched_skills:
+        return True
 
     if job.vac_family not in (None, "Unknown") and TaxonomyClassifier.are_families_compatible(context.cand_families, job.vac_family):
         return True
@@ -80,6 +84,9 @@ def _has_relevant_experience(
         current_role_words = set(re.findall(r"\w+", context.current_role.lower()))
         if current_role_words.intersection(job.title_words):
             return True
+
+    if not context.current_role and (not job.vac_family or job.vac_family == "Unknown"):
+        return True
 
     return False
 
@@ -223,7 +230,7 @@ class RequirementEvaluator:
         results.missing_skills = missing_skills
 
         matched_responsibilities, _ = extract_term_matches_fn(context.domain_candidate_text or context.norm_text, job_ctx.responsibilities)
-        has_relevant_experience = _has_relevant_experience(context, job_ctx, matched_responsibilities)
+        has_relevant_experience = _has_relevant_experience(context, job_ctx, matched_responsibilities, matched_skills)
 
         for skill in req_skills:
             if is_ignorable_requirement(skill):
@@ -755,18 +762,25 @@ class CrossDomainGuardEvaluator:
                     domain_mismatch = True
         cand_domain = context.cand_domain or context.cand_tax_domain
         if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
-            if cand_domain.strip().lower() != vac_tax_domain.strip().lower():
-                domain_mismatch = True
+            cand_d_norm = cand_domain.strip().lower()
+            vac_d_norm = vac_tax_domain.strip().lower()
+            if cand_d_norm != vac_d_norm:
+                it_keywords = {"information technology", "it & software", "software", "technology", "cis", "computer", "engineering"}
+                cand_is_it = any(kw in cand_d_norm for kw in it_keywords)
+                vac_is_it = any(kw in vac_d_norm for kw in it_keywords)
+                if not (cand_is_it and vac_is_it):
+                    domain_mismatch = True
 
         # Software/IT candidate matched to a clearly non-IT vacancy: apply the
         # cross-domain cap even when taxonomy domain/family metadata is missing
         # ("Unknown").
         if context.is_software_cand and not is_tax_compat:
+            it_keywords = {"information technology", "it & software", "software", "technology", "cis", "computer", "engineering"}
             is_it_vacancy = False
             if vac_tax_domain and vac_tax_domain != "Unknown":
-                is_it_vacancy = (vac_tax_domain.lower() == "information technology" or vac_tax_domain.lower() == "cis team")
+                is_it_vacancy = any(kw in vac_tax_domain.lower() for kw in it_keywords)
             elif job_ctx.department:
-                is_it_vacancy = (job_ctx.department.lower() == "cis team" or job_ctx.department.lower() == "information technology")
+                is_it_vacancy = any(kw in job_ctx.department.lower() for kw in it_keywords)
                 
             if not job_ctx.has_software_req and not is_it_vacancy:
                 domain_mismatch = True
@@ -974,7 +988,7 @@ class VacancyFitEvaluator:
             experience_score = float(comp_results.experience_score or 0.0)
         else:
             cand_exp = context.candidate_experience or 0.0
-            min_exp = job.min_experience or 0.0
+            min_exp = job.min_experience_years or 0.0
             if cand_exp >= min_exp:
                 experience_score = 100.0
             elif cand_exp >= (min_exp - 1.5):
@@ -982,17 +996,20 @@ class VacancyFitEvaluator:
             else:
                 experience_score = max(0.0, (cand_exp / min_exp) * 50.0 if min_exp > 0 else 0.0)
 
-        # 5. Semantic Similarity Score (0-100)
-        semantic_score = 0.0
-        cand_text = f"Role: {context.current_role or ''}. Domain: {context.cand_tax_domain or ''}. Skills: {', '.join(context.cand_families)}. Summary: {cv_text[:300]}"
-        vac_text = f"Title: {job.title}. Department: {job.department}. Description: {job.description[:300]}"
+        raw_j = getattr(job, "raw_job", {}) or {}
+        resps = getattr(job, "responsibilities", []) or []
+        j_title = getattr(job, "title", "") or ""
+        j_dept = getattr(job, "department", "") or ""
+        vac_desc = str(raw_j.get("description") or " ".join(resps) or j_title)
+        vac_text = f"Title: {j_title}. Department: {j_dept}. Description: {vac_desc[:300]}"
 
         cand_vector: list[float] | None = None
         vac_vector: list[float] | None = None
         try:
             from app.core.config import settings
+            j_id = str(getattr(job, "job_id", "") or "")
             cand_vector = EmbeddingService.generate_embedding(cand_text, model_version=settings.EMBEDDING_MODEL, identifier=f"cand_fit_prof:{hash(cand_text)}")
-            vac_vector = EmbeddingService.generate_embedding(vac_text, model_version=settings.EMBEDDING_MODEL, identifier=f"vac_fit_prof:{job.job_id}:{hash(vac_text)}")
+            vac_vector = EmbeddingService.generate_embedding(vac_text, model_version=settings.EMBEDDING_MODEL, identifier=f"vac_fit_prof:{j_id}:{hash(vac_text)}")
         except Exception:
             pass
 

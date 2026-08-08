@@ -46,8 +46,12 @@ class NormalizedContact(BaseModel):
 
 
 class NormalizedExperienceSummary(BaseModel):
+    experience_state: str = "UNKNOWN"
+    gross_display: str = ""
     deterministic_years: float | None = Field(default=None, ge=0.0)
     stated_years: float | None = Field(default=None, ge=0.0)
+    authoritative_years: float | None = Field(default=None, ge=0.0)
+    total_experience_months: int | None = Field(default=None, ge=0)
     authoritative_source: str = "none"
     validation_status: str = "unavailable"
     evidence: list[str] = Field(default_factory=list)
