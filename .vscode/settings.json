@@ -65,6 +65,7 @@
         "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 - <<'PY'\nimport json\nfrom app\\.services\\.match_evaluators import VacancyFitEvaluator\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f:\n    data=json\\.load\\(f\\)\nopening=data\\['match_analysis'\\]\\['unsuitable_openings'\\]\\[0\\]\nprint\\('score extract', float\\(opening\\.get\\('vacancy_fit_score'\\) or opening\\.get\\('score'\\) or opening\\.get\\('overall_score'\\) or 0\\.0\\)\\)\nprint\\('classification', VacancyFitEvaluator\\.classify_opening_fit\\(opening, high_threshold=70\\.0, potential_threshold=50\\.0\\)\\)\nprint\\('status', opening\\.get\\('vacancy_match_status'\\)\\)\nprint\\('domain mismatch capped', opening\\.get\\('domain_mismatch_capped'\\)\\)\nPY$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "docker compose": true
     }
 }

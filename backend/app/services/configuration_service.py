@@ -455,7 +455,8 @@ class ConfigurationService:
     @classmethod
     def _broadcast_invalidation(cls, tenant_id: Optional[str] = None):
         """Notify all workers to reload configuration."""
-        client = RedisCache._get_client()
+        from app.core.cache import _REDIS_CLIENT
+        client = _REDIS_CLIENT
         if client:
             message = tenant_id if tenant_id else "GLOBAL"
             try:

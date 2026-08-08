@@ -104,7 +104,7 @@ services:
   migrate-postgres:
     build: ./backend
     profiles: ["tools"]
-    command: ["python", "scripts/run_migrations.py", "--dialect", "postgres"]
+    command: ["python", "scripts/run_migrations.py"]
     environment: *backend-environment
     depends_on:
       pgvector:
