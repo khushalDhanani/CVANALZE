@@ -8,11 +8,16 @@ import {
 export function useMatchConfig() {
   const [config, setConfig] = useState<MatchEngineConfigResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [updating, setUpdating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchConfig = useCallback(async () => {
-    setLoading(true);
+  const fetchConfig = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await configService.getMatchConfig();
@@ -21,6 +26,7 @@ export function useMatchConfig() {
       setError(err.message || 'Failed to fetch match engine configuration');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -49,9 +55,10 @@ export function useMatchConfig() {
   return {
     config,
     loading,
+    refreshing,
     updating,
     error,
-    refreshConfig: fetchConfig,
+    refreshConfig: () => fetchConfig(true),
     updateConfig,
   };
 }

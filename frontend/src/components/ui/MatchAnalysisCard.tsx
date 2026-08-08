@@ -1,18 +1,20 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { Award, AlertTriangle, CpuIcon, User } from 'lucide-react-native';
+import { Award, AlertTriangle, AlertCircle, CpuIcon, User, CheckCircle2, Sparkles, XCircle, Lightbulb } from 'lucide-react-native';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Badge } from './Badge';
 import { VacancyMatchStatusBadge, VacancyFitScoreBreakdownCard, resolveVacancyFitScore } from './VacancyMatchStatusBadge';
 import { ComponentScoreBar } from './ComponentScoreBar';
 import { COLORS } from '@/constants/colors';
-import { JobMatchScore, MandatoryFailure } from '@/types/api';
+import { JobMatchScore } from '@/types/api';
 
-interface MatchAnalysisCardProps {
-  bestMatch: JobMatchScore | any;
+export interface MatchAnalysisCardProps {
+  bestMatch?: JobMatchScore | null;
   candidateName?: string | null;
   onReviewPress?: () => void;
+  className?: string;
+  testID?: string;
 }
 
 const getRetrievalBadge = (source?: string) => {
@@ -24,10 +26,27 @@ const getRetrievalBadge = (source?: string) => {
   return { label: source, tone: 'neutral' as const };
 };
 
-export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: MatchAnalysisCardProps) {
-  if (!bestMatch) return null;
+export function MatchAnalysisCard({
+  bestMatch,
+  candidateName,
+  onReviewPress,
+  className = '',
+  testID,
+}: MatchAnalysisCardProps) {
+  if (!bestMatch) {
+    return (
+      <Card testID={testID} className={`p-5 items-center justify-center gap-2 border-border/80 ${className}`}>
+        <AlertCircle size={22} color={COLORS.textMuted} />
+        <Text className="text-sm font-sans-bold text-text-primary">No Suitable Vacancy Match Found</Text>
+        <Text className="text-xs font-sans text-text-muted text-center max-w-sm">
+          None of the active vacancies met the minimum threshold criteria for this candidate's profile.
+        </Text>
+      </Card>
+    );
+  }
+
   const retrievalBadge = getRetrievalBadge(bestMatch.retrieval_source);
-  const resolvedName = candidateName || bestMatch.full_name || bestMatch.candidate_name;
+  const resolvedName = candidateName || (bestMatch as any).full_name || (bestMatch as any).candidate_name;
 
   const isDomainCapped = Boolean(
     bestMatch.domain_mismatch_capped ||
@@ -35,11 +54,11 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
     (bestMatch.mandatory_fails || []).some((f: any) => (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')
   );
 
-  const matchStatus = bestMatch.vacancy_match_status || bestMatch.match_status || bestMatch.classification;
+  const matchStatus = bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification;
   const fitScore = resolveVacancyFitScore(bestMatch);
 
   return (
-    <Card className="border-primary/40 shadow-sm gap-3">
+    <Card testID={testID} className={`border-primary/40 shadow-sm gap-3.5 ${className}`}>
       {!!resolvedName && (
         <View className="flex-row items-center gap-2 pb-2 border-b border-border/50">
           <View className="w-6 h-6 rounded-full bg-primary/10 items-center justify-center">
@@ -51,6 +70,7 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
           </View>
         </View>
       )}
+
       <View className="flex-row justify-between items-start">
         <View className="flex-1 pr-2">
           <View className="flex-row items-center gap-2 mb-1 flex-wrap">
@@ -93,17 +113,17 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
 
       {/* Cross-Domain Guard Explainability Banner */}
       {isDomainCapped && !bestMatch.score_breakdown && (
-        <Card className="bg-warning/10 border-warning/30 p-3 gap-1">
+        <View className="bg-warning/10 border border-warning/30 rounded-md p-3 gap-1">
           <View className="flex-row items-center gap-1.5">
             <AlertTriangle size={14} color={COLORS.warning} />
             <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
               Cross-domain match — score capped
             </Text>
           </View>
-          <Text className="text-xs font-sans text-warning/90 leading-4">
+          <Text className="text-xs font-sans text-warning leading-4">
             {bestMatch.domain_mismatch_reason || "The candidate's primary background conflicts with the target vacancy department. Suitability score has been automatically capped to prevent false-positive matches."}
           </Text>
-        </Card>
+        </View>
       )}
 
       {/* Ranking reason */}
@@ -117,17 +137,17 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
 
       {/* LLM Reason if available */}
       {!!bestMatch.llm_reason && (
-        <Card className="bg-info/10 border-info/30 p-3">
+        <View className="bg-info/10 border border-info/30 rounded-md p-3">
           <View className="flex-row items-center gap-1.5 mb-1">
-            <AlertTriangle size={14} color={COLORS.info} />
+            <Sparkles size={14} color={COLORS.info} />
             <Text className="text-xs font-sans-bold text-info">
-              LLM Reasoning & Synthesis:
+              AI Reasoning & Synthesis:
             </Text>
           </View>
-          <Text className="text-xs font-sans text-info">
+          <Text className="text-xs font-sans text-info leading-5">
             {bestMatch.llm_reason}
           </Text>
-        </Card>
+        </View>
       )}
 
       {/* Mandatory Failures & Missing Criteria */}
@@ -160,7 +180,7 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
         if (failureList.length === 0) return null;
 
         return (
-          <Card className="bg-danger/10 border-danger/30 p-3 gap-1.5">
+          <View className="bg-danger/10 border border-danger/30 rounded-md p-3 gap-1.5">
             <View className="flex-row items-center gap-1.5 mb-1">
               <CpuIcon size={14} color={COLORS.danger} />
               <Text className="text-xs font-sans-bold text-danger">
@@ -175,7 +195,7 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
                 </Text>
               </View>
             ))}
-          </Card>
+          </View>
         );
       })()}
 
@@ -190,10 +210,13 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
         }
 
         return (
-          <View className="gap-2 mt-2">
+          <View className="gap-2 mt-1">
             {matched.length > 0 && (
-              <View>
-                <Text className="text-xs font-sans-bold text-success mb-1">✓ Matched Skills</Text>
+              <View className="gap-1">
+                <View className="flex-row items-center gap-1">
+                  <CheckCircle2 size={12} color={COLORS.success} />
+                  <Text className="text-xs font-sans-bold text-success">Matched Skills</Text>
+                </View>
                 <View className="flex-row flex-wrap gap-1.5">
                   {matched.map((s: string, i: number) => (
                     <View key={i} className="bg-success/10 border border-success/30 px-2 py-0.5 rounded-md">
@@ -205,8 +228,11 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
             )}
             
             {inferred.length > 0 && (
-              <View>
-                <Text className="text-xs font-sans-bold text-info mb-1">✨ Inferred Skills</Text>
+              <View className="gap-1">
+                <View className="flex-row items-center gap-1">
+                  <Sparkles size={12} color={COLORS.info} />
+                  <Text className="text-xs font-sans-bold text-info">Inferred Skills</Text>
+                </View>
                 <View className="flex-row flex-wrap gap-1.5">
                   {inferred.map((s: string, i: number) => (
                     <View key={i} className="bg-info/10 border border-info/30 px-2 py-0.5 rounded-md">
@@ -218,11 +244,14 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
             )}
 
             {missing.length > 0 && (
-              <View>
-                <Text className="text-xs font-sans-bold text-text-muted mb-1">✗ Missing Skills</Text>
+              <View className="gap-1">
+                <View className="flex-row items-center gap-1">
+                  <XCircle size={12} color={COLORS.textMuted} />
+                  <Text className="text-xs font-sans-bold text-text-muted">Missing Skills</Text>
+                </View>
                 <View className="flex-row flex-wrap gap-1.5">
                   {missing.map((s: string, i: number) => (
-                    <View key={i} className="bg-surface-elevated border border-border/60 px-2 py-0.5 rounded-md">
+                    <View key={i} className="bg-surface border border-border px-2 py-0.5 rounded-md">
                       <Text className="text-[10px] font-sans text-text-muted">{s}</Text>
                     </View>
                   ))}
@@ -235,7 +264,7 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
 
       {/* Component Breakdown */}
       {!!bestMatch.component_scores && (
-        <View>
+        <View className="pt-2 border-t border-border/50">
           <Text className="text-xs font-sans-bold text-text-muted mb-1">
             Sub-Score Breakdown:
           </Text>
@@ -245,9 +274,10 @@ export function MatchAnalysisCard({ bestMatch, candidateName, onReviewPress }: M
 
       {/* Recommendation */}
       {!!bestMatch.recommendation && (
-        <View className="bg-background p-2.5 rounded-md border border-border">
-          <Text className="text-xs font-sans text-text-primary">
-            💡 {bestMatch.recommendation}
+        <View className="bg-background p-2.5 rounded-md border border-border flex-row items-start gap-2">
+          <Lightbulb size={14} color={COLORS.primary} className="mt-0.5" />
+          <Text className="text-xs font-sans text-text-primary flex-1 leading-5">
+            {bestMatch.recommendation}
           </Text>
         </View>
       )}

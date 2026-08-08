@@ -9,48 +9,48 @@ import { useJobs } from '@/hooks/useJobs';
 import { useCandidates } from '@/hooks/useCandidates';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { LlmHealthResponse, SystemHealthResponse } from '@/types/api';
-import { Card, DenseRow, Badge, Button, StatCard, Breadcrumbs } from '@/components/ui';
+import {
+  Card,
+  DenseRow,
+  Badge,
+  Button,
+  StatCard,
+  Breadcrumbs,
+  EmptyState,
+  ResponsiveStatGrid,
+  ResponsiveFieldGrid,
+  StatusBanner,
+} from '@/components/ui';
 import { COLORS } from '@/constants/colors';
+import { BRAND } from '@/constants/brand';
 
 export default function HomeScreen() {
   usePageTitle('Dashboard | AIRIS');
   const router = useRouter();
-  const { jobs, loading: jobsLoading } = useJobs();
-  const { candidates, loading: candidatesLoading } = useCandidates();
+  const { jobs, loading: jobsLoading, error: jobsError } = useJobs();
+  const { candidates, loading: candidatesLoading, error: candidatesError } = useCandidates();
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
   const [llmHealth, setLlmHealth] = useState<LlmHealthResponse | null>(null);
   const [healthLoading, setHealthLoading] = useState<boolean>(true);
+  const [healthError, setHealthError] = useState<boolean>(false);
 
   const fetchHealth = async () => {
     setHealthLoading(true);
+    setHealthError(false);
     try {
       const [sysRes, llmRes] = await Promise.all([
-        apiClient.get<SystemHealthResponse>('/health').catch(() => ({
-          status: 'offline',
-          version: '1.0.0',
-          database: 'offline',
-          pg_database: 'offline',
-          ollama_llm: 'offline',
-        })),
-        matchService.getLlmHealth().catch(() => ({
-          status: 'offline',
-          message: 'Backend server offline (Start server at http://localhost:8000)',
-        })),
+        apiClient.get<SystemHealthResponse>('/health').catch(() => null),
+        matchService.getLlmHealth().catch(() => null),
       ]);
       setHealth(sysRes);
       setLlmHealth(llmRes);
+      if (!sysRes && !llmRes) {
+        setHealthError(true);
+      }
     } catch (err) {
-        setHealth({
-        status: 'offline',
-        version: '1.0.0',
-        database: 'offline',
-        pg_database: 'offline',
-        ollama_llm: 'offline',
-      });
-      setLlmHealth({
-        status: 'offline',
-        message: 'Backend server offline',
-      });
+      setHealth(null);
+      setLlmHealth(null);
+      setHealthError(true);
     } finally {
       setHealthLoading(false);
     }
@@ -60,206 +60,289 @@ export default function HomeScreen() {
     fetchHealth();
   }, []);
 
-  const uniqueJobs = Array.from(new Map(jobs.map(j => {
-    const title = (j as any).VacancyTitle || (j as any).title;
-    return [title, j];
-  })).values());
+  // Deduplicate by stable ID rather than title alone
+  const uniqueJobs = Array.from(
+    new Map(
+      jobs.map((j) => {
+        const id = (j as any).id || (j as any).VacancyID || (j as any).vacancy_id || (j as any).title;
+        return [id, j];
+      })
+    ).values()
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[]} />
-      <ScrollView className="flex-1 px-3">
-        <View className="gap-4 py-4">
+      <ScrollView className="flex-1 px-3" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="gap-5 py-4">
 
           {/* Hero Section */}
-          <View className="bg-primary rounded-md p-3 border border-primary shadow-sm" style={{ elevation: 1 }}>
+          <View className="bg-primary rounded-lg p-4 border border-primary shadow-sm" style={{ elevation: 1 }}>
             <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-row items-center gap-2">
-                <View className="w-8 h-8 rounded-md bg-surface/20 items-center justify-center">
-                  <CpuIcon size={18} color={COLORS.textInverse} />
+              <View className="flex-row items-center gap-2.5">
+                <View className="w-9 h-9 rounded-md bg-surface/20 items-center justify-center">
+                  <CpuIcon size={20} color={COLORS.textInverse} />
                 </View>
                 <Text className="text-xl font-sans-bold text-text-inverse tracking-wide">
-                  CAP
+                  {BRAND.name}
                 </Text>
               </View>
-              <Badge label={`v${health?.version || '1.0.0'}`} tone="info" />
+              {health?.version ? (
+                <Badge label={`v${health.version}`} tone="info" />
+              ) : healthLoading ? (
+                <Badge label="Checking..." tone="neutral" />
+              ) : healthError || health?.status === 'offline' ? (
+                <Badge label="Offline" tone="warning" />
+              ) : null}
             </View>
-            <Text className="text-text-inverse opacity-90 text-sm font-sans">
-              AI-powered CV extraction, job vacancy matching, and intelligent batch candidate screening.
+            <Text className="text-text-inverse opacity-90 text-sm font-sans leading-5">
+              {BRAND.tagline}
             </Text>
           </View>
 
           {/* Quick Stats Grid */}
-          <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <ResponsiveStatGrid minCardWidth={160} gap={12}>
             <StatCard
               label="Active Vacancies"
-              value={jobsLoading ? undefined : jobs.length}
-              sublabel="Cached in-memory"
+              value={jobsLoading ? undefined : jobsError ? 'Unavailable' : jobs.length}
+              sublabel={jobsError ? 'Failed to fetch directory' : 'Current active vacancies'}
               loading={jobsLoading}
+              tone={jobsError ? 'danger' : 'neutral'}
             />
             <StatCard
               label="LLM Engine"
-              value={llmHealth?.status === 'online' ? 'ONLINE' : 'BYPASS'}
-              sublabel={llmHealth?.model_configured || 'Confidence Gated'}
-              tone={llmHealth?.status === 'online' ? 'success' : 'warning'}
+              value={
+                healthLoading
+                  ? undefined
+                  : llmHealth?.status === 'online'
+                  ? 'ONLINE'
+                  : llmHealth?.status === 'disabled'
+                  ? 'DISABLED'
+                  : 'OFFLINE'
+              }
+              sublabel={
+                healthLoading
+                  ? 'Checking engine...'
+                  : llmHealth?.status === 'online'
+                  ? llmHealth.model_configured || 'Connected'
+                  : llmHealth?.status === 'disabled'
+                  ? 'LLM Reasoning Disabled'
+                  : 'Backend Unreachable'
+              }
+              loading={healthLoading}
+              tone={
+                healthLoading
+                  ? 'neutral'
+                  : llmHealth?.status === 'online'
+                  ? 'success'
+                  : llmHealth?.status === 'disabled'
+                  ? 'info'
+                  : 'danger'
+              }
             />
             <StatCard
               label="MSSQL Primary DB"
-              value={health?.database?.toUpperCase() || 'ONLINE'}
-              sublabel="Relational Store"
-              tone={health?.database === 'online' ? 'success' : 'neutral'}
+              value={
+                healthLoading
+                  ? undefined
+                  : health?.database === 'online'
+                  ? 'ONLINE'
+                  : 'OFFLINE'
+              }
+              sublabel={healthLoading ? 'Checking DB...' : 'Relational Store'}
+              loading={healthLoading}
+              tone={
+                healthLoading
+                  ? 'neutral'
+                  : health?.database === 'online'
+                  ? 'success'
+                  : 'danger'
+              }
             />
             <StatCard
               label="pgvector DB"
-              value={health?.pg_database?.toUpperCase() || 'ONLINE'}
-              sublabel="PostgreSQL Vectors"
-              tone={health?.pg_database === 'online' ? 'success' : 'warning'}
+              value={
+                healthLoading
+                  ? undefined
+                  : health?.pg_database === 'online'
+                  ? 'ONLINE'
+                  : 'OFFLINE'
+              }
+              sublabel={healthLoading ? 'Checking vectors...' : 'PostgreSQL Vectors'}
+              loading={healthLoading}
+              tone={
+                healthLoading
+                  ? 'neutral'
+                  : health?.pg_database === 'online'
+                  ? 'success'
+                  : 'warning'
+              }
             />
-          </View>
+          </ResponsiveStatGrid>
 
           {/* Action Shortcuts */}
-          <View>
-            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide pt-4 pb-1">
+          <View className="gap-2">
+            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide">
               Quick Workflows
             </Text>
-            <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <ResponsiveFieldGrid minItemWidth={280} gap={10}>
               <DenseRow
-                className="h-full"
                 title="Single CV Match & Upload"
                 subtitle="Upload PDF/Docx or paste CV text for instant evaluation"
                 onPress={() => router.push('/cv-match')}
                 trailing={
-                  <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-1">
-                    <FileText size={16} color={COLORS.primary} />
+                  <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
+                    <FileText size={15} color={COLORS.primary} />
                   </View>
                 }
               />
               <DenseRow
-                className="h-full"
                 title="Candidate Directory"
                 subtitle="Browse, search, and review all parsed candidate profiles"
                 onPress={() => router.push('/candidates')}
                 trailing={
-                  <View className="w-9 h-9 rounded-full bg-info/10 items-center justify-center mr-1">
-                    <Users size={16} color={COLORS.info} />
+                  <View className="w-8 h-8 rounded-full bg-info/10 items-center justify-center">
+                    <Users size={15} color={COLORS.info} />
                   </View>
                 }
               />
               <DenseRow
-                className="h-full"
                 title="Job Openings Directory"
                 subtitle="View active job requirements, skills, and clear cache"
                 onPress={() => router.push('/vacancies')}
                 trailing={
-                  <View className="w-9 h-9 rounded-full bg-success/10 items-center justify-center mr-1">
-                    <FolderIcon size={16} color={COLORS.success} />
+                  <View className="w-8 h-8 rounded-full bg-success/10 items-center justify-center">
+                    <FolderIcon size={15} color={COLORS.success} />
                   </View>
                 }
               />
               <DenseRow
-                className="h-full"
                 title="Batch Processing"
                 subtitle="Evaluate candidates against vacancies with WebSocket progress"
                 onPress={() => router.push('/batch')}
                 trailing={
-                  <View className="w-9 h-9 rounded-full bg-warning/10 items-center justify-center mr-1">
-                    <Plus size={16} color={COLORS.warning} />
+                  <View className="w-8 h-8 rounded-full bg-warning/10 items-center justify-center">
+                    <Plus size={15} color={COLORS.warning} />
                   </View>
                 }
               />
               <DenseRow
-                className="h-full"
                 title="Engine Weight Config"
                 subtitle="Tune role, skills, domain weights & failure penalties"
                 onPress={() => router.push('/config')}
                 trailing={
-                  <View className="w-9 h-9 rounded-full bg-info/10 items-center justify-center mr-1">
-                    <SlidersIcon size={16} color={COLORS.info} />
+                  <View className="w-8 h-8 rounded-full bg-info/10 items-center justify-center">
+                    <SlidersIcon size={15} color={COLORS.info} />
                   </View>
                 }
               />
-            </View>
+            </ResponsiveFieldGrid>
           </View>
 
-
-          {/* System Health Detailed Box */}
           {/* Needs Attention Panel */}
-          <View>
-            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide pt-4 pb-1">
+          <View className="gap-2">
+            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide">
               Needs Attention
             </Text>
-            <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <StatCard
-                label="Unreviewed"
-                value={candidates.filter(c => !c.best_match?.classification).length}
-                tone={candidates.filter(c => !c.best_match?.classification).length > 0 ? 'warning' : 'neutral'}
+            {candidatesError ? (
+              <StatusBanner
+                tone="danger"
+                title="Candidate Telemetry Unavailable"
+                message={candidatesError}
               />
-              <StatCard
-                label="OCR Warnings"
-                value={candidates.filter(c => c.ocr_applied).length}
-                tone={candidates.filter(c => c.ocr_applied).length > 0 ? 'info' : 'neutral'}
-              />
-              <StatCard
-                label="Failed Parses"
-                value={candidates.filter(c => c.page_count === 0).length}
-                tone={candidates.filter(c => c.page_count === 0).length > 0 ? 'danger' : 'neutral'}
-              />
-            </View>
+            ) : (
+              <ResponsiveStatGrid minCardWidth={140} gap={12}>
+                <StatCard
+                  label="Unreviewed"
+                  value={candidatesLoading ? undefined : candidates.filter((c) => !c.best_match?.classification).length}
+                  loading={candidatesLoading}
+                  tone={candidates.filter((c) => !c.best_match?.classification).length > 0 ? 'warning' : 'neutral'}
+                />
+                <StatCard
+                  label="OCR Warnings"
+                  value={candidatesLoading ? undefined : candidates.filter((c) => c.ocr_applied).length}
+                  loading={candidatesLoading}
+                  tone={candidates.filter((c) => c.ocr_applied).length > 0 ? 'info' : 'neutral'}
+                />
+                <StatCard
+                  label="Failed Parses"
+                  value={candidatesLoading ? undefined : candidates.filter((c) => c.page_count === 0).length}
+                  loading={candidatesLoading}
+                  tone={candidates.filter((c) => c.page_count === 0).length > 0 ? 'danger' : 'neutral'}
+                />
+              </ResponsiveStatGrid>
+            )}
           </View>
 
           {/* Recent Activity */}
-          <View>
-            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide pt-4 pb-1">
+          <View className="gap-2">
+            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide">
               Recent Activity
             </Text>
-            <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {candidatesLoading ? (
-                <ActivityIndicator size="small" />
-              ) : candidates.slice(0, 4).map((cand, i) => (
-                <DenseRow
-                  className="h-full"
-                  key={`${cand.id}-${i}`}
-                  title={cand.filename || 'Unknown CV'}
-                  subtitle={cand.best_match?.job_title || 'Parsed recently'}
-                  onPress={() => router.push(`/candidates/${encodeURIComponent(cand.id)}` as any)}
-                />
-              ))}
-              {candidates.length === 0 && !candidatesLoading && (
-                <Text className="text-xs font-sans text-text-muted">No recent activity.</Text>
-              )}
-            </View>
+            {candidatesLoading ? (
+              <View className="py-6 items-center justify-center">
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            ) : candidatesError ? (
+              <StatusBanner
+                tone="danger"
+                title="Recent Activity Unavailable"
+                message={candidatesError}
+              />
+            ) : candidates.length === 0 ? (
+              <EmptyState variant="compact" title="No recent activity" subtitle="Uploaded CVs will appear here" />
+            ) : (
+              <ResponsiveFieldGrid minItemWidth={280} gap={10}>
+                {candidates.slice(0, 4).map((cand, i) => (
+                  <DenseRow
+                    key={`${cand.id}-${i}`}
+                    title={cand.filename || 'Unknown CV'}
+                    subtitle={cand.best_match?.job_title || 'Parsed recently'}
+                    onPress={() => router.push(`/candidates/${encodeURIComponent(cand.id)}` as any)}
+                  />
+                ))}
+              </ResponsiveFieldGrid>
+            )}
           </View>
 
           {/* Top Vacancies */}
-          <View>
-            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide pt-4 pb-1">
+          <View className="gap-2">
+            <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide">
               Top Vacancies
             </Text>
-            <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {jobsLoading ? (
-                <ActivityIndicator size="small" />
-              ) : uniqueJobs.slice(0, 4).map((job, i) => (
-                <DenseRow
-                  className="h-full"
-                  key={(job as any).VacancyID || (job as any).id || i}
-                  title={(job as any).VacancyTitle || (job as any).title || 'Unknown'}
-                  subtitle={(job as any).DepartmentName || (job as any).department || 'General'}
-                  onPress={() => {
-                    const vId = (job as any).id || (job as any).VacancyID;
-                    router.push(vId ? `/vacancies/${vId}` as any : `/vacancies`);
-                  }}
-                />
-              ))}
-              {jobs.length === 0 && !jobsLoading && (
-                <Text className="text-xs font-sans text-text-muted">No active vacancies.</Text>
-              )}
-            </View>
+            {jobsLoading ? (
+              <View className="py-6 items-center justify-center">
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            ) : jobsError ? (
+              <StatusBanner
+                tone="danger"
+                title="Vacancy Directory Unavailable"
+                message={jobsError}
+              />
+            ) : uniqueJobs.length === 0 ? (
+              <EmptyState variant="compact" title="No active vacancies" subtitle="Created job openings will appear here" />
+            ) : (
+              <ResponsiveFieldGrid minItemWidth={280} gap={10}>
+                {uniqueJobs.slice(0, 4).map((job, i) => (
+                  <DenseRow
+                    key={(job as any).VacancyID || (job as any).id || i}
+                    title={(job as any).VacancyTitle || (job as any).title || 'Unknown'}
+                    subtitle={(job as any).DepartmentName || (job as any).department || 'General'}
+                    onPress={() => {
+                      const vId = (job as any).id || (job as any).VacancyID;
+                      router.push(vId ? (`/vacancies/${vId}` as any) : `/vacancies`);
+                    }}
+                  />
+                ))}
+              </ResponsiveFieldGrid>
+            )}
           </View>
 
           {/* System Health Detailed Box */}
-          <View className="mb-4">
-            <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide pt-4 pb-1">
+          <View className="gap-2">
+            <View className="flex-row justify-between items-center">
+              <Text className="text-[11px] font-sans-semibold text-text-faint uppercase tracking-wide">
                 System Health & Services
               </Text>
               <Button
@@ -270,71 +353,72 @@ export default function HomeScreen() {
                 disabled={healthLoading}
               />
             </View>
-            <View className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <ResponsiveFieldGrid minItemWidth={280} gap={10}>
               <DenseRow
-                className="h-full"
                 title="FastAPI Server"
                 trailing={
                   <Badge
-                    label={health?.status === 'offline' ? 'Offline (Start Server)' : 'Operational'}
-                    tone={health?.status === 'offline' ? 'warning' : 'success'}
+                    label={healthLoading ? 'Checking...' : health?.status === 'offline' || healthError ? 'Offline (Start Server)' : 'Operational'}
+                    tone={healthLoading ? 'neutral' : health?.status === 'offline' || healthError ? 'warning' : 'success'}
                   />
                 }
               />
               <DenseRow
-                className="h-full"
                 title="MSSQL Primary DB"
                 trailing={
                   <Badge
-                    label={health?.database === 'offline' ? 'Offline' : 'Operational'}
-                    tone={health?.database === 'offline' ? 'warning' : 'success'}
+                    label={healthLoading ? 'Checking...' : health?.database === 'offline' || healthError ? 'Offline' : 'Operational'}
+                    tone={healthLoading ? 'neutral' : health?.database === 'offline' || healthError ? 'warning' : 'success'}
                   />
                 }
               />
               <DenseRow
-                className="h-full"
                 title="PostgreSQL (Vector DB)"
                 trailing={
                   <Badge
-                    label={health?.pg_database === 'offline' ? 'Offline' : 'Operational'}
-                    tone={health?.pg_database === 'offline' ? 'warning' : 'success'}
+                    label={healthLoading ? 'Checking...' : health?.pg_database === 'offline' || healthError ? 'Offline' : 'Operational'}
+                    tone={healthLoading ? 'neutral' : health?.pg_database === 'offline' || healthError ? 'warning' : 'success'}
                   />
                 }
               />
               <DenseRow
-                className="h-full"
                 title="Ollama LLM Model"
                 trailing={
                   <Badge
                     label={
-                      llmHealth?.status === 'online'
+                      healthLoading
+                        ? 'Checking...'
+                        : llmHealth?.status === 'online'
                         ? llmHealth.model_configured || 'Connected'
                         : llmHealth?.status === 'disabled'
-                          ? 'Disabled (Confidence Gated)'
-                          : 'Offline'
+                        ? 'Disabled (Confidence Gated)'
+                        : 'Offline'
                     }
                     tone={
-                      llmHealth?.status === 'online'
+                      healthLoading
+                        ? 'neutral'
+                        : llmHealth?.status === 'online'
                         ? 'success'
                         : llmHealth?.status === 'disabled'
-                          ? 'info'
-                          : 'warning'
+                        ? 'info'
+                        : 'warning'
                     }
                   />
                 }
               />
               <DenseRow
-                className="h-full"
                 title="Available LLMs"
                 subtitle={
-                  llmHealth?.status === 'online'
+                  healthLoading
+                    ? 'Probing Ollama engine...'
+                    : llmHealth?.status === 'online'
                     ? llmHealth.available_models?.join(', ') || 'None found'
                     : llmHealth?.status === 'disabled'
-                      ? 'Bypass (Fast-Track Rule Engine)'
-                      : 'Ollama Unreachable'
+                    ? 'Bypass (Fast-Track Rule Engine)'
+                    : 'Ollama Unreachable'
                 }
               />
-            </View>
+            </ResponsiveFieldGrid>
           </View>
         </View>
       </ScrollView>

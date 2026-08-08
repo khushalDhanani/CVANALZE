@@ -138,8 +138,8 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   const experienceDisplayText = formatDisplayExperience(canonicalYears);
 
 
-  const formatEmpType = (type: string) => {
-    if (!type) return 'Full-Time';
+  const formatEmpType = (type?: string | null): string => {
+    if (!type || type.trim().length === 0) return 'Not specified';
     switch (type.toLowerCase()) {
       case 'full_time':
         return 'Full-Time';

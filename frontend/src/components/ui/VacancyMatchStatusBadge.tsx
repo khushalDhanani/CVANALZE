@@ -255,23 +255,23 @@ export function VacancyFitScoreBreakdownCard({
       {/* 5-Dimension Grid */}
       <View className="flex-row flex-wrap gap-2">
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[9px] font-sans text-text-muted">Hierarchy (25%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Hierarchy (25%)</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.hierarchy_score}%</Text>
         </View>
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[9px] font-sans text-text-muted">Role / Title (20%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Role / Title (20%)</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.designation_role_score}%</Text>
         </View>
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[9px] font-sans text-text-muted">Skills (25%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Skills (25%)</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.skills_score}%</Text>
         </View>
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[9px] font-sans text-text-muted">Experience (15%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Experience (15%)</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.experience_score}%</Text>
         </View>
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[9px] font-sans text-text-muted">Semantic (15%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Semantic (15%)</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.semantic_similarity_score}%</Text>
         </View>
       </View>

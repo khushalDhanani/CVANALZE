@@ -11,10 +11,13 @@ module.exports = {
           dark: "#3730A3",
         },
         surface: "#FFFFFF",
+        "surface-elevated": "#FFFFFF",
+        "surface-hover": "#F3F4F6",
         background: "#F8F9FB",
         border: "#E5E7EB",
         text: {
           primary: "#111827",
+          secondary: "#4B5563",
           muted: "#6B7280",
           faint: "#9CA3AF",
           inverse: "#FFFFFF",
@@ -23,6 +26,12 @@ module.exports = {
         warning: "#D97706",
         danger: "#DC2626",
         info: "#2563EB",
+        category: {
+          blue: "#3B82F6",
+          purple: "#8B5CF6",
+          teal: "#14B8A6",
+          indigo: "#6366F1",
+        },
       },
       fontFamily: {
         sans: ["Inter_400Regular"],

@@ -7,6 +7,7 @@ export function useBatchProgress() {
   const [progress, setProgress] = useState<BatchProgressMessage | null>(null);
   const [result, setResult] = useState<BatchMatchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [wsDisconnected, setWsDisconnected] = useState<boolean>(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   const startBatch = useCallback(async (limit: number = 10) => {
@@ -14,6 +15,7 @@ export function useBatchProgress() {
     setError(null);
     setProgress(null);
     setResult(null);
+    setWsDisconnected(false);
 
     // Connect progress websocket
     wsRef.current = batchService.connectProgressWebSocket(
@@ -22,6 +24,7 @@ export function useBatchProgress() {
       },
       (err) => {
         console.warn('WebSocket progress warning:', err);
+        setWsDisconnected(true);
       }
     );
 
@@ -52,6 +55,7 @@ export function useBatchProgress() {
     progress,
     result,
     error,
+    wsDisconnected,
     startBatch,
   };
 }

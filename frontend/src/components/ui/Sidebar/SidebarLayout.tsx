@@ -1,29 +1,12 @@
-import { View, Text, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { Slot, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Search, Briefcase, Layers, Settings, Users, X, BarChart3, Database, GitBranch, BookOpen } from 'lucide-react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { COLORS } from '@/constants/colors';
+import { BRAND } from '@/constants/brand';
 
-type SidebarNavItem = {
-  name: string;
-  route: any; // using any for route string to bypass strict typing
-  icon: React.ElementType;
-};
-
-const NAV_ITEMS: SidebarNavItem[] = [
-  { name: 'Home', route: '/', icon: Home },
-  { name: 'Match', route: '/cv-match', icon: Search },
-  { name: 'Candidates', route: '/candidates', icon: Users },
-  { name: 'Jobs', route: '/vacancies', icon: Briefcase },
-  { name: 'Batch', route: '/batch', icon: Layers },
-  { name: 'Analytics', route: '/analytics', icon: BarChart3 },
-  { name: 'Knowledge Graph', route: '/knowledge-graph', icon: GitBranch },
-  { name: 'Domain Explorer', route: '/domain-explorer', icon: BookOpen },
-  { name: 'Training Data', route: '/training-data', icon: Database },
-  { name: 'Config', route: '/config', icon: Settings },
-];
-
+import { NAV_ITEMS } from '@/constants/navigation';
 
 export function SidebarLayout() {
   const { width } = useWindowDimensions();
@@ -34,14 +17,24 @@ export function SidebarLayout() {
   const isMobile = width < 768;
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
 
-  // Sync drawer state with screen size changes
-  if (!isMobile && !drawerOpen) setDrawerOpen(true);
+  // Sync drawer state cleanly with screen size changes without render-time side effects
+  useEffect(() => {
+    if (isMobile) {
+      setDrawerOpen(false);
+    } else {
+      setDrawerOpen(true);
+    }
+  }, [isMobile]);
 
   const closeDrawer = () => {
     if (isMobile) setDrawerOpen(false);
   };
 
-  const handleSelect = (route: any) => {
+  const handleSelect = (route: any, isActive: boolean) => {
+    if (isActive) {
+      closeDrawer();
+      return;
+    }
     router.push(route);
     closeDrawer();
   };
@@ -53,6 +46,7 @@ export function SidebarLayout() {
         <Pressable
           className="absolute inset-0 bg-black/50 z-40"
           onPress={closeDrawer}
+          accessibilityLabel="Close navigation drawer backdrop"
         />
       )}
 
@@ -62,16 +56,28 @@ export function SidebarLayout() {
           className={`bg-surface border-r border-border z-50 ${isMobile ? 'absolute left-0 top-0 bottom-0 w-64' : 'w-64'}`}
           style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         >
-          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-            <Text className="text-base font-sans-semibold text-text-primary">AIRIS</Text>
+          {/* Fixed Header */}
+          <View className="flex-row items-center justify-between px-4 py-3.5 border-b border-border">
+            <Text className="text-base font-sans-bold text-text-primary tracking-wide">{BRAND.name}</Text>
             {isMobile && (
-              <Pressable onPress={closeDrawer} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Close sidebar">
+              <Pressable
+                onPress={closeDrawer}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                className="p-1"
+                accessibilityRole="button"
+                accessibilityLabel="Close navigation menu"
+              >
                 <X size={20} color={COLORS.textMuted} />
               </Pressable>
             )}
           </View>
 
-          <View className="flex-1 py-4 gap-2 px-3">
+          {/* Scrollable Nav Container for short phones / landscape */}
+          <ScrollView
+            className="flex-1 px-3 py-3"
+            contentContainerStyle={{ gap: 6 }}
+            showsVerticalScrollIndicator={false}
+          >
             {NAV_ITEMS.map((item) => {
               const isActive = item.route === '/' 
                 ? (pathname === '/' || pathname === '') 
@@ -81,24 +87,29 @@ export function SidebarLayout() {
               return (
                 <Pressable
                   key={item.route}
-                  onPress={() => handleSelect(item.route)}
-                  className={`flex-row items-center gap-3 px-3 py-2 rounded-md ${isActive ? 'bg-primary/10' : 'active:bg-background'
-                    }`}
+                  onPress={() => handleSelect(item.route, isActive)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={item.name}
+                  className={`flex-row items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md ${
+                    isActive ? 'bg-primary/10' : 'active:bg-background'
+                  }`}
                 >
                   <Icon size={20} color={isActive ? COLORS.primary : COLORS.textMuted} />
                   <Text
-                    className={`text-sm ${isActive
+                    className={`text-sm ${
+                      isActive
                         ? 'font-sans-semibold text-primary'
                         : 'font-sans text-text-muted'
-                      }`}
+                    }`}
                   >
                     {item.name}
                   </Text>
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
         </View>
       )}
 
@@ -106,11 +117,11 @@ export function SidebarLayout() {
       <View className="flex-1 relative">
         <Slot />
 
-        {/* Mobile menu toggle (if needed, this can be managed within headers inside Slot screens, but here is a simple toggle just in case) */}
+        {/* Mobile menu floating toggle button */}
         {isMobile && !drawerOpen && (
           <Pressable
             onPress={() => setDrawerOpen(true)}
-            className="absolute bottom-6 right-6 bg-primary rounded-full p-3 shadow-lg z-50"
+            className="absolute bottom-6 right-6 bg-primary rounded-full p-3.5 shadow-lg z-50 min-h-[48px] min-w-[48px] items-center justify-center"
             style={{ elevation: 5 }}
             accessibilityRole="button"
             accessibilityLabel="Open navigation menu"

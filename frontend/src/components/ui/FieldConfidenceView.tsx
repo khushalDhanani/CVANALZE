@@ -36,7 +36,20 @@ export function FieldConfidenceView({
   const displayText = isPresent ? value!.trim() : (fallbackLabel || `${formattedName} not detected`);
 
   const normalizedTier = (tier || '').toUpperCase();
-  const isUnverified = isPresent && (normalizedTier === 'LOW' || normalizedTier === 'MEDIUM');
+
+  const getTierBadge = () => {
+    if (!isPresent) return null;
+    if (normalizedTier === 'HIGH') {
+      return <Badge label="High confidence" tone="info" />;
+    }
+    if (normalizedTier === 'MEDIUM') {
+      return <Badge label="Medium confidence" tone="warning" />;
+    }
+    if (normalizedTier === 'LOW') {
+      return <Badge label="Low confidence" tone="danger" />;
+    }
+    return null;
+  };
 
   return (
     <View className={`flex-row items-center gap-1.5 flex-wrap ${className}`}>
@@ -50,9 +63,7 @@ export function FieldConfidenceView({
           {displayText}
         </Text>
       )}
-      {isUnverified && (
-        <Badge label="Unverified" tone="warning" />
-      )}
+      {getTierBadge()}
     </View>
   );
 }

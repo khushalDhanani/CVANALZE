@@ -36,6 +36,9 @@ export interface JobOpening {
 
   domain?: string | null;
   job_family?: string | null;
+  status?: string | null;
+  is_active?: boolean | null;
+  vacancy_status?: string | null;
 }
 
 export interface BusinessGroupItem {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import {
   UploadCloud,
   FileCheck,
@@ -15,66 +15,13 @@ import {
   MinusCircle,
 } from 'lucide-react-native';
 import { COLORS } from '@/constants/colors';
+import { PIPELINE_CAPABILITIES, PipelineCapabilityStage } from '@/constants/capabilities';
+import { Button } from './Button';
 
-export interface ProcessingStep {
-  id: string;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ size?: number; color?: string }>;
-}
-
+export type ProcessingStep = PipelineCapabilityStage;
 export type StepState = 'pending' | 'active' | 'completed' | 'skipped' | 'failed';
 
-export const PIPELINE_STEPS: ProcessingStep[] = [
-  {
-    id: 'upload',
-    label: 'Upload CV',
-    description: 'Transferring document to processing server',
-    icon: UploadCloud,
-  },
-  {
-    id: 'validation',
-    label: 'Validation',
-    description: 'Verifying file integrity & format compatibility',
-    icon: FileCheck,
-  },
-  {
-    id: 'parsing',
-    label: 'Docling Parsing',
-    description: 'Extracting structured layout & OCR text elements',
-    icon: FileCode,
-  },
-  {
-    id: 'extraction',
-    label: 'Resume Extraction',
-    description: 'Structuring candidate profile, skills & work history',
-    icon: UserCheck,
-  },
-  {
-    id: 'ai_analysis',
-    label: 'AI Analysis',
-    description: 'Local Ollama LLM semantic reasoning & skill inference',
-    icon: Sparkles,
-  },
-  {
-    id: 'matching',
-    label: 'Job Matching',
-    description: 'Cross-evaluating candidate against active vacancies',
-    icon: Target,
-  },
-  {
-    id: 'ranking',
-    label: 'Score Ranking',
-    description: 'Calculating component weights & penalty thresholds',
-    icon: Award,
-  },
-  {
-    id: 'complete',
-    label: 'Analysis Ready',
-    description: 'Match scores & candidate evaluation generated',
-    icon: CheckCircle2,
-  },
-];
+export const PIPELINE_STEPS: ProcessingStep[] = PIPELINE_CAPABILITIES.stages;
 
 export interface StepProgressCardProps {
   currentStepIndex: number;
@@ -88,6 +35,7 @@ export interface StepProgressCardProps {
   onRetry?: () => void;
   isProcessing?: boolean;
   isComplete?: boolean;
+  className?: string;
 }
 
 export function formatElapsedTime(seconds: number): string {
@@ -109,16 +57,23 @@ export function StepProgressCard({
   onRetry,
   isProcessing = false,
   isComplete = false,
+  className = '',
 }: StepProgressCardProps) {
   const totalSteps = PIPELINE_STEPS.length;
   const completedCount = stepStates.filter((s) => s === 'completed' || s === 'skipped').length;
   
-  let progressPercent = Math.min(100, Math.round((completedCount / (totalSteps - 1)) * 100));
-  if (isComplete) progressPercent = 100;
-  if (isProcessing && progressPercent === 0) progressPercent = 10;
+  // Safe progress percentage: capped strictly below 100% until explicit confirmed completion
+  let progressPercent = 0;
+  if (isComplete) {
+    progressPercent = 100;
+  } else if (error) {
+    progressPercent = Math.min(90, Math.round((completedCount / totalSteps) * 100));
+  } else if (isProcessing) {
+    progressPercent = Math.max(10, Math.min(95, Math.round((completedCount / totalSteps) * 100)));
+  }
 
   return (
-    <View className="bg-surface border border-border rounded-lg p-4 shadow-sm mb-4">
+    <View className={`bg-surface border border-border rounded-lg p-4 shadow-sm ${className}`}>
       {/* Header Row: Title, Status Badge, Elapsed Time */}
       <View className="flex-row items-center justify-between mb-3 border-b border-border/60 pb-3">
         <View className="flex-row items-center gap-2">
@@ -167,7 +122,7 @@ export function StepProgressCard({
         </View>
         <View className="h-2 w-full bg-border/50 rounded-full overflow-hidden">
           <View
-            className={`h-full rounded-full transition-all duration-300 ${
+            className={`h-full rounded-full ${
               error ? 'bg-danger' : isComplete ? 'bg-success' : 'bg-primary'
             }`}
             style={{ width: `${progressPercent}%` }}
@@ -177,7 +132,7 @@ export function StepProgressCard({
 
       {/* Status Banner Message */}
       {!!statusMessage && !error && (
-        <View className="bg-primary/10 border border-primary/20 rounded-md p-2.5 mb-4 flex-row items-center gap-2">
+        <View className="bg-primary/10 border border-primary/20 rounded-md p-2.5 mb-3 flex-row items-center gap-2">
           {isProcessing && <ActivityIndicator size="small" color={COLORS.primary} />}
           <Text className="text-xs font-sans-medium text-primary flex-1">
             {statusMessage}
@@ -187,7 +142,7 @@ export function StepProgressCard({
 
       {/* Error Message with Retry Option */}
       {!!error && (
-        <View className="bg-danger/10 border border-danger/30 rounded-md p-3 mb-4 gap-2">
+        <View className="bg-danger/10 border border-danger/30 rounded-md p-3 mb-3 gap-2">
           <View className="flex-row items-center gap-2">
             <AlertTriangle size={16} color={COLORS.danger} />
             <Text className="text-xs font-sans-bold text-danger flex-1">
@@ -202,13 +157,15 @@ export function StepProgressCard({
             </View>
           )}
           {onRetry && (
-            <Pressable
-              onPress={onRetry}
-              className="bg-danger/20 border border-danger/40 self-start px-3 py-1.5 rounded-sm flex-row items-center gap-1.5 mt-1"
-            >
-              <RefreshCw size={12} color={COLORS.danger} />
-              <Text className="text-xs font-sans-medium text-danger">Retry Upload</Text>
-            </Pressable>
+            <View className="self-start mt-1">
+              <Button
+                label="Retry Upload"
+                variant="destructive"
+                size="sm"
+                icon={<RefreshCw size={12} color={COLORS.textInverse} />}
+                onPress={onRetry}
+              />
+            </View>
           )}
         </View>
       )}
@@ -250,13 +207,13 @@ export function StepProgressCard({
                 }`}
               >
                 {isCurrent ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={COLORS.textInverse} />
                 ) : state === 'completed' ? (
-                  <CheckCircle2 size={15} color="#FFFFFF" />
+                  <CheckCircle2 size={15} color={COLORS.textInverse} />
                 ) : state === 'skipped' ? (
                   <MinusCircle size={14} color={COLORS.textFaint} />
                 ) : state === 'failed' ? (
-                  <AlertTriangle size={14} color="#FFFFFF" />
+                  <AlertTriangle size={14} color={COLORS.textInverse} />
                 ) : (
                   <Icon size={14} color={COLORS.textMuted} />
                 )}
@@ -298,7 +255,7 @@ export function StepProgressCard({
                   numberOfLines={1}
                 >
                   {step.id === 'ai_analysis' && !useLlmEnrichment
-                    ? 'LLM semantic enrichment toggled off (Fast-track scoring)'
+                    ? 'Fast-track heuristic evaluation (LLM enrichment bypassed)'
                     : step.description}
                 </Text>
               </View>

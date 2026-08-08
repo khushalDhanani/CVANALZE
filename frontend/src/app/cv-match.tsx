@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Edit3, FileText, FolderIcon } from 'lucide-react-native';
+import { Edit3, FileText, FolderIcon, Info } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
@@ -26,10 +26,11 @@ import {
   SegmentedControl,
   MatchAnalysisCard,
   StepProgressCard,
-  StepState,
   Breadcrumbs,
+  ErrorBanner,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
+import { SUPPORTED_RESUME_FORMATS } from '@/constants/upload';
 
 export default function CvMatchScreen() {
   usePageTitle('CV Match Analysis | AIRIS');
@@ -43,10 +44,12 @@ export default function CvMatchScreen() {
       router.setParams({ tab: activeTab });
     }
   }, [activeTab]);
+
   const [cvText, setCvText] = useState<string>('');
   const [useLlmEnrichment, setUseLlmEnrichment] = useState<boolean>(true);
   const [analyzingText, setAnalyzingText] = useState<boolean>(false);
   const [textError, setTextError] = useState<string | null>(null);
+  const [pickerError, setPickerError] = useState<string | null>(null);
   const [textAnalysis, setTextAnalysis] = useState<CandidateMatchAnalysis | null>(null);
 
   const {
@@ -67,12 +70,13 @@ export default function CvMatchScreen() {
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<FilePickerAsset | null>(null);
 
+  const isBusy = uploading || analyzingText;
+
   const triggerUpload = (file: FilePickerAsset & { size?: number }) => {
-    // Check file size (max 10MB)
-    const MAX_SIZE = 10 * 1024 * 1024;
+    setPickerError(null);
     const size = file.size || (file.rawFile && file.rawFile.size) || 0;
-    if (size > MAX_SIZE) {
-      alert("File is too large. Maximum allowed size is 10MB.");
+    if (size > SUPPORTED_RESUME_FORMATS.maxSizeBytes) {
+      setPickerError(`File exceeds maximum size of 10MB (${(size / (1024 * 1024)).toFixed(1)}MB).`);
       return;
     }
     setSelectedFile(file);
@@ -89,7 +93,7 @@ export default function CvMatchScreen() {
 
   const handleAnalyzeText = async () => {
     if (!cvText.trim()) {
-      setTextError('Please enter or paste CV text first.');
+      setTextError('Please enter or paste candidate CV text first.');
       return;
     }
 
@@ -106,19 +110,20 @@ export default function CvMatchScreen() {
   };
 
   const handlePickAndUploadFile = async () => {
+    setPickerError(null);
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.pdf,.doc,.docx,.txt';
+      input.accept = SUPPORTED_RESUME_FORMATS.accept;
       input.onchange = (e: any) => {
-        const selectedFile = e.target?.files?.[0];
-        if (selectedFile) {
+        const selected = e.target?.files?.[0];
+        if (selected) {
           triggerUpload({
-            uri: URL.createObjectURL(selectedFile),
-            name: selectedFile.name,
-            type: selectedFile.type || 'application/pdf',
-            rawFile: selectedFile,
-            size: selectedFile.size,
+            uri: URL.createObjectURL(selected),
+            name: selected.name,
+            type: selected.type || 'application/pdf',
+            rawFile: selected,
+            size: selected.size,
           });
         }
       };
@@ -126,12 +131,7 @@ export default function CvMatchScreen() {
     } else {
       try {
         const result = await DocumentPicker.getDocumentAsync({
-          type: [
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/plain',
-          ],
+          type: SUPPORTED_RESUME_FORMATS.mimeTypes,
           copyToCacheDirectory: true,
         });
 
@@ -146,7 +146,7 @@ export default function CvMatchScreen() {
           });
         }
       } catch (err: any) {
-        console.warn('Native document picker failed:', err);
+        setPickerError(err.message || 'Failed to select document from device storage.');
       }
     }
   };
@@ -156,87 +156,110 @@ export default function CvMatchScreen() {
       ? enrichedResult || (basicResult?.match_analysis as any)
       : textAnalysis;
 
-  const scanId =
-    currentAnalysis?.scan_id || basicResult?.scan_id || 'manual_text_scan';
+  const rawScanId = currentAnalysis?.scan_id || basicResult?.scan_id;
+  const hasPersistedScan =
+    activeTab === 'file' && !!rawScanId && rawScanId !== 'manual_text_scan' && rawScanId !== 'undefined';
+  const scanId = rawScanId || 'manual_text_scan';
 
   const showProgressCard = activeTab === 'file' && (uploading || isComplete || !!uploadError || currentStepIndex > 0);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'CV Match Analysis' }]} />
+
+      {/* Sticky PageHeader */}
+      <View className="px-3 py-2.5 bg-surface border-b border-border">
+        <Text className="text-base font-sans-bold text-text-primary">
+          CV Parsing & Job Match Analysis
+        </Text>
+        <Text className="text-[11px] font-sans text-text-muted">
+          Multi-stage document extraction, rule-based scoring, and semantic LLM enrichment
+        </Text>
+      </View>
+
       <ScrollView className="flex-1 px-3 py-4">
-        <View className="gap-4 mb-4">
-          {/* Header */}
-          <View>
-            <Text className="text-xl font-sans-bold text-text-primary mb-1">
-              CV Parsing & Job Match Analysis
-            </Text>
-            <Text className="text-xs font-sans text-text-muted">
-              Analyze candidate resumes against active job vacancies with Docling extraction, rule-based scoring, and LLM semantic enrichment.
-            </Text>
+        <View className="gap-4 mb-8">
+          {/* Mode Selector Tabs with Processing Lock */}
+          <View className="gap-1.5">
+            <SegmentedControl
+              options={[
+                {
+                  value: 'file',
+                  label: 'Upload CV File',
+                  icon: (props) => <FolderIcon {...props} />,
+                  accessibilityLabel: 'Upload Resume File',
+                },
+                {
+                  value: 'text',
+                  label: 'Paste Raw CV Text',
+                  icon: (props) => <Edit3 {...props} />,
+                  accessibilityLabel: 'Paste Raw CV Text',
+                },
+              ]}
+              value={activeTab}
+              onChange={(val) => !isBusy && setActiveTab(val as 'file' | 'text')}
+            />
+            {isBusy && (
+              <Text className="text-[11px] font-sans text-text-muted pl-1">
+                Tab switching is locked while analysis is in progress.
+              </Text>
+            )}
           </View>
 
-          {/* Mode Selector Tabs - Upload CV File as First & Default active tab */}
-          <SegmentedControl
-            options={[
-              {
-                value: 'file',
-                label: 'Upload CV File',
-                icon: (props) => <FolderIcon {...props} />,
-                accessibilityLabel: 'Upload Resume File',
-              },
-              {
-                value: 'text',
-                label: 'Paste Raw CV Text',
-                icon: (props) => <Edit3 {...props} />,
-                accessibilityLabel: 'Paste Raw CV Text',
-              },
-            ]}
-            value={activeTab}
-            onChange={(val) => setActiveTab(val as 'file' | 'text')}
-          />
+          {/* LLM Semantic Enrichment Switch */}
+          {activeTab === 'file' && (
+            <Card className="flex-row items-center justify-between">
+              <View className="flex-1 pr-2">
+                <Text className="text-xs font-sans-bold text-text-primary">
+                  Enable LLM Semantic Enrichment
+                </Text>
+                <Text className="text-[11px] font-sans text-text-muted">
+                  Uses semantic reasoning to infer implicit qualifications and boost score accuracy.
+                </Text>
+              </View>
+              <Switch
+                value={useLlmEnrichment}
+                onValueChange={setUseLlmEnrichment}
+                disabled={isBusy}
+                trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+                thumbColor={useLlmEnrichment ? COLORS.primary : COLORS.textFaint}
+              />
+            </Card>
+          )}
 
-          {/* LLM Enrichment Switch */}
-          <Card className="flex-row items-center justify-between">
-            <View className="flex-1 pr-2">
-              <Text className="text-xs font-sans-bold text-text-primary">
-                Enable LLM Semantic Enrichment
-              </Text>
-              <Text className="text-[11px] font-sans text-text-muted">
-                Uses local Ollama model to infer implicit skills and boost match scores.
-              </Text>
-            </View>
-            <Switch
-              value={useLlmEnrichment}
-              onValueChange={setUseLlmEnrichment}
-              trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
-              thumbColor={useLlmEnrichment ? COLORS.primary : COLORS.textFaint}
-            />
-          </Card>
-
-          {/* TAB 1: Upload File (Default & Primary Tab) */}
+          {/* TAB 1: Upload File */}
           {activeTab === 'file' && (
             <View className="gap-3">
-              {/* File Upload Drop Area */}
-              <View className="bg-surface border-2 border-dashed border-border rounded-md p-6 items-center justify-center">
-                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-2">
+              {/* Document Selection Card */}
+              <Card className="items-center justify-center p-6 gap-2 border-border/80">
+                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-1">
                   <FileText size={24} color={COLORS.primary} />
                 </View>
-                <Text className="text-sm font-sans-bold text-text-primary mb-1">
-                  Upload Resume File
+                <Text className="text-sm font-sans-bold text-text-primary">
+                  Select CV Document to Match
                 </Text>
-                <Text className="text-xs font-sans text-text-muted text-center mb-4">
-                  Docling will extract text from PDF, DOCX, or Image resumes automatically.
+                <Text className="text-xs font-sans text-text-muted text-center max-w-md">
+                  Supported formats: {SUPPORTED_RESUME_FORMATS.label}. Automatic text and section extraction.
                 </Text>
 
-                <Button
-                  label={uploading ? 'Processing Resume...' : 'Select File & Match'}
-                  onPress={handlePickAndUploadFile}
-                  loading={uploading}
-                  disabled={uploading}
-                  size="md"
+                <View className="mt-2">
+                  <Button
+                    label={uploading ? 'Processing Resume...' : 'Choose File & Match'}
+                    onPress={handlePickAndUploadFile}
+                    loading={uploading}
+                    disabled={uploading}
+                    size="md"
+                  />
+                </View>
+              </Card>
+
+              {/* Picker Error Banner */}
+              {pickerError && (
+                <ErrorBanner
+                  title="Document Selection Error"
+                  message={pickerError}
                 />
-              </View>
+              )}
 
               {/* Step-by-Step Modern Progress UI */}
               {showProgressCard && (
@@ -265,12 +288,13 @@ export default function CvMatchScreen() {
                 multiline
                 numberOfLines={8}
                 placeholder="Paste candidate resume/CV text here..."
-                style={{ textAlignVertical: 'top', height: 144 }}
+                style={{ textAlignVertical: 'top', minHeight: 140, maxHeight: 280 }}
                 error={textError || undefined}
+                helperText="Paste raw plain-text resume content to perform instant semantic vacancy matching."
               />
 
               <Button
-                label={analyzingText ? 'Analyzing CV...' : 'Run Job Match Analysis'}
+                label={analyzingText ? 'Analyzing CV Content...' : 'Run Job Match Analysis'}
                 onPress={handleAnalyzeText}
                 loading={analyzingText}
                 disabled={analyzingText}
@@ -286,7 +310,7 @@ export default function CvMatchScreen() {
                 <Text className="text-base font-sans-bold text-text-primary">
                   Match Results Summary
                 </Text>
-                {activeTab === 'file' && scanId && (
+                {hasPersistedScan && (
                   <Button
                     label="Force Re-analyze"
                     variant="secondary"
@@ -304,14 +328,28 @@ export default function CvMatchScreen() {
               <MatchAnalysisCard
                 bestMatch={currentAnalysis.best_match}
                 candidateName={currentAnalysis.full_name || currentAnalysis.candidate_name}
-                onReviewPress={() => {
-                  setSelectedJobForReview(currentAnalysis.best_match!);
-                  setReviewModalVisible(true);
-                }}
+                onReviewPress={
+                  hasPersistedScan
+                    ? () => {
+                        setSelectedJobForReview(currentAnalysis.best_match!);
+                        setReviewModalVisible(true);
+                      }
+                    : undefined
+                }
               />
 
+              {/* Non-persisted scan guidance */}
+              {!hasPersistedScan && (
+                <View className="bg-surface border border-border rounded-md p-2.5 flex-row items-center gap-2">
+                  <Info size={14} color={COLORS.textMuted} />
+                  <Text className="text-xs font-sans text-text-muted flex-1">
+                    HR Review & score corrections are available when analyzing uploaded documents with a persisted scan record.
+                  </Text>
+                </View>
+              )}
+
               {/* Other Suitable Openings */}
-              {currentAnalysis.suitable_openings?.length > 1 && (
+              {currentAnalysis.suitable_openings && currentAnalysis.suitable_openings.length > 1 && (
                 <View className="gap-2 mt-2">
                   <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">
                     Other Suitable Vacancies ({currentAnalysis.suitable_openings.length - 1})
@@ -352,10 +390,14 @@ export default function CvMatchScreen() {
                             />
                           </View>
                         }
-                        onPress={() => {
-                          setSelectedJobForReview(job);
-                          setReviewModalVisible(true);
-                        }}
+                        onPress={
+                          hasPersistedScan
+                            ? () => {
+                                setSelectedJobForReview(job);
+                                setReviewModalVisible(true);
+                              }
+                            : undefined
+                        }
                       />
                     ))}
                 </View>
@@ -364,12 +406,14 @@ export default function CvMatchScreen() {
           )}
 
           {/* HR Review Modal */}
-          <HrReviewModal
-            visible={reviewModalVisible}
-            scanId={scanId}
-            job={selectedJobForReview}
-            onClose={() => setReviewModalVisible(false)}
-          />
+          {hasPersistedScan && (
+            <HrReviewModal
+              visible={reviewModalVisible}
+              scanId={scanId}
+              job={selectedJobForReview}
+              onClose={() => setReviewModalVisible(false)}
+            />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
