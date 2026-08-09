@@ -1,40 +1,49 @@
 # Work Status
 
 ## Last Completed Task
-**Fix Docker stack not starting locally**
+**Fix worker processing failures (prompt templates, DepartmentDomainMaster, RQ retries)**
 
 ### Root Cause
-Local Postgres volume was completely empty (no schema, no migrations), and the API
-requires an active rule-config profile in PostgreSQL on startup. Several latent bugs
-also blocked a fresh setup.
+The worker log showed three distinct failures during CV processing:
+1. `relation "cvai.prompt_templates" does not exist` -> `PromptService.get_prompt` raises
+   `PROMPT_UNAVAILABLE` when no template row exists. The table was created by `create_all`
+   (after the `INITIALIZE_DATABASE_ON_STARTUP` fix) but contained **0 rows**.
+2. `column DepartmentDomainMaster.DepartmentNameSnapshot does not exist` -> migration 005
+   created the table without that column; `create_all` skips existing tables, so the drift
+   persisted. Also `DepartmentDomainMaster` and `department_alias_mappings` were empty.
+3. RQ retries were never executed: the worker ran without `--with-scheduler`, so jobs placed
+   in the `rq:scheduled:*` zset by `retry_intervals` sat forever.
 
-### Fixes Applied
-1. **`backend/scripts/migrations/postgres/018_add_generation_sequence_column.sql`** —
-   table references were unqualified (`cv_results`); migration 011 creates `cvai.cv_results`,
-   so 018 failed on fresh DBs. Qualified with `cvai.`. Also fixed the down script
-   (`DROP COLUMN IF NOT EXISTS` syntax error + unqualified index/table refs).
-2. **New migration `019_widen_system_rules_target_value.sql`** — `cvai.system_rules.target_value`
-   was `VARCHAR(255)` but the model uses `Text`; rule metadata (recommendations,
-   section_patterns, canonical_equivalents) exceeds 255 chars and seeding failed.
-3. **`docker-compose.yml`** — `migrate-postgres` service passed stale `--dialect postgres`
-   flag to `run_migrations.py`, which no longer accepts it.
-4. **`backend/app/services/configuration_service.py`** — `_broadcast_invalidation` called
-   non-existent `RedisCache._get_client()`; replaced with the established `_REDIS_CLIENT` pattern.
-
-### Setup Performed (fresh local DB)
-- Ran all migrations via `docker compose -f docker-compose.yml -f docker-compose.local.yml run --rm --build migrate-postgres`.
-- Seeded + activated rule-config profile v1.1.0 from `tests/mock_rule_config.py`
-  (repo `rule_config.json` was deleted in commit `bcd0c91`; `MOCK_RULE_CONFIG` is the canonical source)
-  via `ConfigurationService.create_profile` + `activate_profile`, mounting the mock file into a one-off `api` container.
+### Fix
+- Seeded prompt templates via `backend/scripts/seed_prompts.py` (one-off api container):
+  `dynamic_mapping`, `match_analysis`, `optimized_match`, `profile_extraction`,
+  `work_experience_extraction_v1` (all `language=en`, `environment=production`, active).
+- New migration `020_add_department_name_snapshot.sql` (+ down) adds
+  `"DepartmentNameSnapshot" VARCHAR(200)` to `public."DepartmentDomainMaster"`; applied.
+- Seeded `DepartmentDomainMaster` (52 rows) from `app/data/department_domains_seed.json`
+  via `backend/scripts/seed_department_domains.py`.
+- Manually requeued the stuck job `cvjob_0c22fc0786d40c9399263854c08a49b5ac29d9fb1fab2122834c5c754794c403-2`.
+- Added `--with-scheduler` to the `worker` command in both `docker-compose.yml` and
+  `docker-compose.local.yml`; recreated the worker container.
 
 ### Verification
-- All containers healthy: `cv_analyzer_api`, `cv_analyzer_worker`, `cv_analyzer_redis`, `cv_analyzer_pgvector`.
-- `GET /` -> 200; `GET /api/config/active` returns version 1.1.0 (4 fields, 14 vacancy rules).
-- Worker listening on `cv-processing` queue.
-- Note: MSSQL write-permission warning is non-fatal in development mode
-  (`APP_ENVIRONMENT=development` from `docker-compose.local.yml`).
+- Failed job re-processed: `Successfully completed process_cv_job(...)`, `Job OK`, status `finished`.
+- `public.cv_results` row persisted: `cv_ut1765894215` / `Utkarsh Patil` / `COMPLETED` / `generation_sequence=2`.
+- `optimized_match` Ollama call succeeded (after an initial timeout fell back to retry and completed).
+- Worker now healthy with scheduler: `rq worker --with-scheduler ...`.
+- API healthy: `GET /` -> 200, `GET /api/config/active` -> version 1.1.0.
 
 ## Previous Tasks
+**Fix `relation "cv_results" does not exist` (missing public-schema model tables)**
+- `docker-compose.local.yml`: `INITIALIZE_DATABASE_ON_STARTUP` `"false"` -> `"true"`; missing model tables created by `create_all`.
+
+## Previous Tasks
+**Fix Docker stack not starting locally**
+- Migration 018 schema-qualification fix, new migration 019 (`system_rules.target_value` -> TEXT),
+  stale `--dialect postgres` flag removal, `RedisCache._get_client()` bug fix,
+  seeded/activated rule-config profile v1.1.0 from `tests/mock_rule_config.py`.
+
+## Older Tasks
 **Home Page Card Overlap & Layout Fix**
 
 ### Key Fixes & Architecture Updates

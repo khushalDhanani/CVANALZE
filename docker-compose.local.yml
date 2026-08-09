@@ -4,7 +4,7 @@
 x-local-backend-environment: &local-backend-environment
   APP_ENVIRONMENT: development
   AUTH_ENABLED: "false"
-  INITIALIZE_DATABASE_ON_STARTUP: "false"
+  INITIALIZE_DATABASE_ON_STARTUP: "true"
   STARTUP_CACHE_WARMUP_ENABLED: "false"
   MSSQL_READ_ONLY_URL: '${MSSQL_READ_ONLY_URL}'
   POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
@@ -68,7 +68,7 @@ services:
       context: ./backend
       args:
         INSTALL_MSSQL_ODBC: "true"
-    command: ["rq", "worker", "--max-jobs", "${RQ_WORKER_MAX_JOBS:-10}", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
+    command: ["rq", "worker", "--with-scheduler", "--max-jobs", "${RQ_WORKER_MAX_JOBS:-10}", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
     environment:
       <<: *local-backend-environment
     volumes:
