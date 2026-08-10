@@ -514,6 +514,30 @@ class ResultRepository:
         return False
 
     @classmethod
+    def _result_precedence(cls, data: dict[str, Any]) -> tuple[int, int, str]:
+        try:
+            generation_sequence = int(data.get("generation_sequence") or 0)
+        except (TypeError, ValueError):
+            generation_sequence = 0
+
+        status = str(data.get("status") or "").upper()
+        has_completed_analysis = (
+            status in {"COMPLETED", "COMPLETED_DEGRADED", "NEW_CV", "REPROCESSED", "CACHE_HIT"}
+            or data.get("progress") == 100
+            or data.get("is_complete") is True
+        ) and status != "PROCESSING"
+        timestamp = str(data.get("updated_at") or data.get("parsed_at") or data.get("created_at") or "")
+        return generation_sequence, int(has_completed_analysis), timestamp
+
+    @classmethod
+    def _merge_preferred_result(cls, results_by_id: dict[str, dict[str, Any]], item_id: str, candidate: dict[str, Any]) -> bool:
+        existing = results_by_id.get(item_id)
+        if existing is not None and cls._result_precedence(candidate) <= cls._result_precedence(existing):
+            return False
+        results_by_id[item_id] = candidate
+        return True
+
+    @classmethod
     def list_all_results(cls) -> list[dict[str, Any]]:
         results_by_id: dict[str, dict[str, Any]] = {}
 
@@ -530,7 +554,7 @@ class ResultRepository:
                                 data = json.loads(val)
                                 if isinstance(data, dict):
                                     item_id = str(data.get("id") or data.get("scan_id") or key).lower()
-                                    results_by_id[item_id] = data
+                                    cls._merge_preferred_result(results_by_id, item_id, data)
                         except Exception:
                             continue
                     if cursor == 0:
@@ -545,11 +569,7 @@ class ResultRepository:
                     data = row.raw_data
                     if isinstance(data, dict):
                         item_id = str(data.get("id") or data.get("scan_id") or row.cv_key).lower()
-                        db_ts = str(data.get("updated_at") or data.get("parsed_at") or data.get("created_at") or "")
-                        redis_item = results_by_id.get(item_id)
-                        redis_ts = str((redis_item or {}).get("updated_at") or (redis_item or {}).get("parsed_at") or (redis_item or {}).get("created_at") or "") if redis_item else ""
-                        if item_id not in results_by_id or db_ts >= redis_ts:
-                            results_by_id[item_id] = data
+                        if cls._merge_preferred_result(results_by_id, item_id, data):
                             # Sync cache parity
                             fn = f"{row.cv_key}.json" if not row.cv_key.endswith(".json") else row.cv_key
                             cv_result_cache_manager.set(fn, data, ttl=cls.CACHE_TTL_SECONDS)

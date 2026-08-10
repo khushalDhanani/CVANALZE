@@ -1,6 +1,41 @@
 # Work Status
 
 ## Last Completed Task
+**Restore completed candidates hidden by stale processing placeholders**
+
+### Architecture Impact Analysis
+- Corrected result deduplication at the shared `ResultRepository` boundary so every downstream consumer receives the authoritative generation for each candidate identity.
+- Preserved candidate search, dashboard, recommendation, vector, API, persistence, and matching contracts.
+
+### Files Changed
+- Canonical result merge policy: `backend/app/repositories/result.py`.
+- Regression coverage: `backend/tests/test_generation_consistency.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Compare the live candidate-search response with persisted PostgreSQL result rows.
+- Identify completed and processing rows sharing the same raw candidate ID.
+- Rank duplicate results by generation sequence, completed-analysis state, and timestamp.
+- Apply the same merge rule to Redis and PostgreSQL result collection.
+
+### Code Changes
+- `ResultRepository.list_all_results()` now uses one centralized precedence rule rather than allowing scan order or equal timestamps to overwrite completed analysis.
+- A higher generation wins; within the same generation a completed analysis wins over a processing placeholder; timestamps break remaining ties.
+- Added focused regression cases for the observed equal-generation collision and a newer-timestamp placeholder with a lower generation.
+
+### Verification Checklist
+- [x] Live candidate search returned 4 records while PostgreSQL contained 6 completed analysis rows and 3 processing placeholders.
+- [x] Confirmed `cv_san1761727581` completed and processing rows share the same raw identity, timestamp, and generation sequence.
+- [x] Confirmed the completed `cv_gptsuifgr321345678o9p` row has generation sequence 56 while its newer-timestamp processing placeholder has sequence 19.
+- [x] Both Redis and PostgreSQL merge paths use the centralized precedence rule.
+- [x] `git diff --check` passed.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Running containers were not rebuilt or restarted, so live verification requires the updated backend image/process.
+
+### Refactoring Performed
+- Extracted duplicate-result precedence and merge decisions into repository helpers; no storage or API contract was changed.
+
+## Previous Task
 **Show analyzed candidate names in dashboard recent activity**
 
 ### Architecture Impact Analysis

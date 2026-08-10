@@ -105,6 +105,36 @@ def test_ensure_canonical_metadata_does_not_assign_generation_sequence_by_defaul
     assert "generation_sequence" not in enriched or enriched["generation_sequence"] is None
 
 
+def test_result_precedence_prefers_completed_record_for_equal_generation():
+    processing = {
+        "status": "processing",
+        "generation_sequence": 17,
+        "updated_at": "2026-08-10T10:59:13.660525+00:00",
+    }
+    completed = {
+        "status": "COMPLETED",
+        "generation_sequence": 17,
+        "updated_at": "2026-08-10T10:59:13.660525+00:00",
+    }
+
+    assert ResultRepository._result_precedence(completed) > ResultRepository._result_precedence(processing)
+
+
+def test_result_precedence_uses_generation_before_placeholder_timestamp():
+    stale_processing = {
+        "status": "processing",
+        "generation_sequence": 19,
+        "updated_at": "2026-08-10T12:18:03.515035+00:00",
+    }
+    completed = {
+        "status": "COMPLETED",
+        "generation_sequence": 56,
+        "updated_at": "2026-08-08T11:25:08.178531+00:00",
+    }
+
+    assert ResultRepository._result_precedence(completed) > ResultRepository._result_precedence(stale_processing)
+
+
 def test_atomic_save_result_uses_db_sequence_for_new_rows():
     cv_key = "cv_test_db_seq_1"
     fn = f"{cv_key}.json"
