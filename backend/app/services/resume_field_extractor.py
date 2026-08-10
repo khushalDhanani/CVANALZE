@@ -31,6 +31,11 @@ _LABEL_PREFIX_DENYLIST: frozenset[str] = frozenset({
     "location", "address", "place", "city",
     "qualification", "education", "degree", "board", "institute",
 })
+_NON_NAME_FIELD_LABELS: frozenset[str] = frozenset({
+    "subject", "contact", "phone", "mobile", "email", "language", "address",
+    "gender", "state", "nationality", "marital status", "date of birth", "dob",
+    "pin", "pin code", "pincode", "personal data", "personal details", "resume", "cv",
+})
 
 
 class classproperty:
@@ -72,6 +77,15 @@ class ResumeFieldExtractor:
         + r"\s*(?:[\-–—~/]|->|\bto\b|\btill\b|\buntil\b|\bthrough\b)\s*"
         + _END_PART
         + r"(?:\b|_|\))",
+        re.IGNORECASE,
+    )
+    _INLINE_NAME_LABEL = re.compile(r"\bname\s*[.:-]+\s*", re.IGNORECASE)
+    _INLINE_NAME_OWNER = re.compile(
+        r"\b(?:father'?s?|mother'?s?|spouse'?s?|company|organization|employer|institution|school|college)\s+$",
+        re.IGNORECASE,
+    )
+    _INLINE_FIELD_BOUNDARY = re.compile(
+        r"\s+(?:(?:permanent|current|postal|residential)\s+)?(?:address|date\s+of\s+birth|dob|contact(?:\s+no)?|phone|mobile|email|nationality|marital\s+status|gender|languages?\s+known)\s*[.:-]+",
         re.IGNORECASE,
     )
 
@@ -131,18 +145,21 @@ class ResumeFieldExtractor:
                 + indices
             )
 
-        # Strip common trailing job titles from line before name validation
-        _title_suffix = re.compile(
-            r"\s+\b(sr\.?|jr\.?|senior|junior|lead|principal|chief|head|executive|manager|director|engineer|developer|analyst|consultant|specialist|officer|architect|designer)(?:\b|\s).*$",
-            re.IGNORECASE,
-        )
-
-        candidates: list[tuple[str, bool]] = []
+        candidates: list[tuple[str, bool, int]] = []
         seen_indices: set[int] = set()
         for index in indices:
             if index in seen_indices or index >= len(text_lines):
                 continue
             seen_indices.add(index)
+            labeled_candidate = cls._name_from_labeled_field(text_lines[index])
+            if labeled_candidate and cls._is_valid_name(labeled_candidate, email, phone, location):
+                words = [word.lower() for word in labeled_candidate.split()]
+                matches_email = any(
+                    word in email_tokens or any(word in token or token in word for token in email_tokens if len(token) >= 3 and len(word) >= 3)
+                    for word in words
+                )
+                candidates.append((labeled_candidate, matches_email, cls._name_structure_score(labeled_candidate, index, text_lines) + 8))
+
             candidate = cls._clean_name_line(text_lines[index])
             if not candidate or "@" in candidate or "CONTACT" in candidate.upper():
                 continue
@@ -152,17 +169,27 @@ class ResumeFieldExtractor:
                     word in email_tokens or any(word in token or token in word for token in email_tokens if len(token) >= 3 and len(word) >= 3)
                     for word in words
                 )
-                candidates.append((candidate, matches_email))
+                candidates.append((candidate, matches_email, cls._name_structure_score(candidate, index, text_lines)))
             else:
-                # Try stripping job title suffix
-                stripped = _title_suffix.sub("", candidate).strip()
+                # PDF/OCR output commonly places the name and role on one visual line.
+                title_boundary = cls._find_job_title_boundary(candidate)
+                stripped = candidate[:title_boundary].strip(" -|:") if title_boundary is not None else candidate
                 if stripped and stripped != candidate and cls._is_valid_name(stripped, email, phone, location):
                     words = [word.lower() for word in stripped.split()]
                     matches_email = any(
                         word in email_tokens or any(word in token or token in word for token in email_tokens if len(token) >= 3 and len(word) >= 3)
                         for word in words
                     )
-                    candidates.append((stripped, matches_email))
+                    candidates.append((stripped, matches_email, cls._name_structure_score(stripped, index, text_lines)))
+
+            combined_header_name = cls._name_from_combined_header(candidate)
+            if combined_header_name and cls._is_valid_name(combined_header_name, email, phone, location):
+                words = [word.lower() for word in combined_header_name.split()]
+                matches_email = any(
+                    word in email_tokens or any(word in token or token in word for token in email_tokens if len(token) >= 3 and len(word) >= 3)
+                    for word in words
+                )
+                candidates.append((combined_header_name, matches_email, cls._name_structure_score(combined_header_name, index, text_lines)))
 
         # If no valid candidates found in header, search full document for lines matching email tokens
         if not candidates and email_tokens:
@@ -170,27 +197,30 @@ class ResumeFieldExtractor:
                 candidate = cls._clean_name_line(raw_l)
                 if not candidate or "@" in candidate:
                     continue
-                cand_clean = _title_suffix.sub("", candidate).strip()
+                title_boundary = cls._find_job_title_boundary(candidate)
+                cand_clean = candidate[:title_boundary].strip(" -|:") if title_boundary is not None else candidate
                 words = [word.lower() for word in cand_clean.split()]
                 matches_email = any(
                     word in email_tokens or any(word in token or token in word for token in email_tokens if len(token) >= 3 and len(word) >= 3)
                     for word in words
                 )
                 if matches_email and cls._is_valid_name(cand_clean, email, phone, location):
-                    candidates.append((cand_clean, True))
+                    candidates.append((cand_clean, True, cls._name_structure_score(cand_clean, index, text_lines)))
                     break
 
-        for candidate, matches_email in candidates:
-            if matches_email:
-                return (
-                    candidate,
-                    scores.get("header_email_validated", 0.95),
-                    "HIGH",
-                    "header_email_validated",
-                )
-        if candidates:
+        email_validated = [candidate for candidate in candidates if candidate[1]]
+        if email_validated:
+            candidate = max(email_validated, key=lambda item: item[2])[0]
             return (
-                candidates[0][0],
+                candidate,
+                scores.get("header_email_validated", 0.95),
+                "HIGH",
+                "header_email_validated",
+            )
+        if candidates:
+            candidate = max(candidates, key=lambda item: item[2])[0]
+            return (
+                candidate,
                 scores.get("header_contact_section", 0.85),
                 "HIGH",
                 "header_contact_section",
@@ -219,6 +249,65 @@ class ResumeFieldExtractor:
             "FALLBACK",
             "default",
         )
+
+    @classmethod
+    def revalidate_candidate_name(cls, result: dict[str, Any]) -> None:
+        """Refresh a stale, missing, or structurally invalid name from the stored CV text."""
+        resume_json = result.get("resume_json")
+        contact = resume_json.get("contact_info") if isinstance(resume_json, dict) else None
+        contact_info = contact if isinstance(contact, dict) else {}
+        source = str(contact_info.get("extraction_source") or result.get("name_extraction_source") or "").lower()
+        cv_text = result.get("markdown") or result.get("text") or ""
+
+        try:
+            current_confidence = float(contact_info.get("name_confidence") or result.get("name_confidence") or 0.0)
+            current_name = str(
+                contact_info.get("name")
+                or contact_info.get("full_name")
+                or result.get("full_name")
+                or result.get("candidate_name")
+                or ""
+            ).strip()
+            email = contact_info.get("email") or result.get("email")
+            phone = contact_info.get("phone") or result.get("phone")
+            location = contact_info.get("location") or result.get("location")
+            fallback_source = source in {"email_username_fallback", "filename_fallback", "default"}
+            current_name_is_valid = cls._is_valid_name(current_name, email, phone, location)
+            if not cv_text or (not fallback_source and current_name_is_valid):
+                return
+            name, confidence, confidence_level, extraction_source = cls.extract_candidate_name(
+                str(cv_text).splitlines(),
+                email,
+                phone,
+                location,
+                result.get("filename"),
+            )
+        except Exception as exc:
+            logger.warning("[CANDIDATE_NAME] Name refresh skipped for %s: %s", result.get("id") or result.get("scan_id"), exc)
+            return
+
+        if (current_name_is_valid and confidence <= current_confidence) or not name or name == "Unknown Candidate":
+            return
+
+        for key in ("name", "full_name", "candidate_name"):
+            contact_info[key] = name
+        contact_info["name_confidence"] = confidence
+        contact_info["name_confidence_level"] = confidence_level
+        contact_info["extraction_source"] = extraction_source
+        if isinstance(contact_info.get("field_confidence"), dict):
+            contact_info["field_confidence"]["name"] = confidence
+        if isinstance(contact_info.get("field_confidence_tiers"), dict):
+            contact_info["field_confidence_tiers"]["name"] = confidence_level
+
+        result["full_name"] = name
+        result["candidate_name"] = name
+        result["name_confidence"] = confidence
+        result["name_confidence_tier"] = confidence_level
+        result["name_extraction_source"] = extraction_source
+        if isinstance(result.get("field_confidence"), dict):
+            result["field_confidence"]["name"] = confidence
+        if isinstance(result.get("field_confidence_tiers"), dict):
+            result["field_confidence_tiers"]["name"] = confidence_level
 
     @classmethod
     def extract_location(
@@ -714,6 +803,8 @@ class ResumeFieldExtractor:
             return False
         if any(value in candidate.lower() for value in ("@", "http", "www.", ".com", "github", "linkedin")):
             return False
+        if re.search(r"[:|]", candidate):
+            return False
         # Reject single-word names ending with period (e.g. "job.")
         stripped = candidate.strip()
         if stripped.endswith(".") and " " not in stripped:
@@ -721,19 +812,27 @@ class ResumeFieldExtractor:
         tokens = [token for token in candidate.split() if token]
         if not 1 <= len(tokens) <= 4:
             return False
+        normalized_candidate = re.sub(r"\s+", " ", candidate.lower().strip(" .:-"))
+        if normalized_candidate in _NON_NAME_FIELD_LABELS:
+            return False
         upper_tokens = [token.upper() for token in tokens]
         denied = cls.JOB_TITLE_KEYWORDS | cls.RESUME_HEADER_KEYWORDS
+        first_token = re.sub(r"[^A-Z]", "", upper_tokens[0])
+        field_labels = {label.upper() for label in _LABEL_PREFIX_DENYLIST} | {
+            "STATE", "NATIONALITY", "GENDER", "DOB", "BIRTH", "MARITAL", "PIN", "PINCODE",
+        }
+        if first_token in field_labels:
+            return False
         if len(tokens) == 1 and upper_tokens[0] in denied:
             return False
         if sum(token in denied for token in upper_tokens) >= len(tokens) * 0.5:
             return False
-        # Reject names that look like job titles (contain role keywords)
-        _title_reject = re.compile(
-            r"\b(engineer|developer|manager|executive|analyst|consultant|director|lead|specialist|officer|sr\.|jr\.|senior|junior|flutter|android|ios|production|planning|control|quality|assurance|instrumentation|coordinator|supervisor|technician|administrator|incharge|in\s*charge)\b",
-            re.IGNORECASE,
-        )
-        if _title_reject.search(candidate):
-            return False
+        # Reject configured role phrases without baking industries or technologies into extraction code.
+        role_terms = RuleConfigManager.get_keywords("name", "job_title_denylist")
+        for term in role_terms:
+            role_pattern = r"\s+".join(re.escape(part) for part in term.split())
+            if role_pattern and re.search(rf"\b{role_pattern}\b", candidate, re.IGNORECASE):
+                return False
         # Reject names that look like company names
         if _COMPANY_SUFFIXES.search(candidate):
             return False
@@ -742,7 +841,95 @@ class ResumeFieldExtractor:
     @staticmethod
     def _clean_name_line(line: str) -> str:
         clean_line = line.strip().lstrip("#*->•: ").rstrip(" *#:")
-        return re.sub(r"^name\s*[:-]?\s*", "", clean_line, flags=re.IGNORECASE).strip()
+        return re.sub(r"^name\s*[.:-]*\s*", "", clean_line, flags=re.IGNORECASE).strip()
+
+    @classmethod
+    def _name_from_labeled_field(cls, line: str) -> str | None:
+        """Extract a name from a merged personal-details line without consuming adjacent fields."""
+        for match in cls._INLINE_NAME_LABEL.finditer(line):
+            if cls._INLINE_NAME_OWNER.search(line[:match.start()]):
+                continue
+            value = line[match.end():]
+            boundary = cls._INLINE_FIELD_BOUNDARY.search(value)
+            if boundary:
+                value = value[:boundary.start()]
+            value = re.sub(r"^(?:mr|mrs|ms|miss|dr)\.?\s+", "", value.strip(), flags=re.IGNORECASE)
+            value = value.strip(" -*|:;,.")
+            if 1 <= len(value.split()) <= 4:
+                return value
+        return None
+
+    @staticmethod
+    def _name_structure_score(candidate: str, index: int, text_lines: list[str]) -> int:
+        """Rank structurally plausible names without relying on a person's vocabulary."""
+        token_count = len(candidate.split())
+        score = 4 if 2 <= token_count <= 4 else 0
+        raw_line = text_lines[index].strip() if 0 <= index < len(text_lines) else ""
+        previous_line = text_lines[index - 1].strip() if index > 0 else ""
+        if re.match(r"^(?:#+\s*)?name\s*[.:-]", raw_line, re.IGNORECASE):
+            score += 6
+        if re.fullmatch(r"(?:#+\s*)?name\s*[.:-]*", previous_line, re.IGNORECASE):
+            score += 6
+        if index < 6:
+            score += 2
+        return score
+
+    @classmethod
+    def _name_from_combined_header(cls, line: str) -> str | None:
+        """Recover a name from OCR/PDF lines that merge decorative text, name, and role."""
+        if not line:
+            return None
+
+        tokens = line.split()
+        collapsed: list[tuple[str, bool]] = []
+        index = 0
+        while index < len(tokens):
+            if len(tokens[index]) == 1 and tokens[index].isalpha():
+                letters: list[str] = []
+                while index < len(tokens) and len(tokens[index]) == 1 and tokens[index].isalpha():
+                    letters.append(tokens[index])
+                    index += 1
+                collapsed.append(("".join(letters) if len(letters) >= 2 else letters[0], len(letters) >= 2))
+                continue
+            collapsed.append((tokens[index], False))
+            index += 1
+
+        normalized = " ".join(token for token, _ in collapsed)
+        title_boundary = cls._find_job_title_boundary(normalized)
+        if title_boundary is None:
+            return None
+
+        prefix = normalized[:title_boundary].strip(" -|:")
+        prefix_tokens = prefix.split()
+        spaced_token_index = next((idx for idx, (_, from_spaced_run) in enumerate(collapsed[:len(prefix_tokens)]) if from_spaced_run), None)
+        if spaced_token_index is not None and spaced_token_index > 0:
+            prefix_tokens = prefix_tokens[spaced_token_index:]
+
+        header_terms = RuleConfigManager.get_keywords("name", "header_denylist")
+        while prefix_tokens and prefix_tokens[0].lower().strip(".:-") in header_terms:
+            prefix_tokens.pop(0)
+        if not 1 <= len(prefix_tokens) <= 4:
+            return None
+        return " ".join(prefix_tokens).title()
+
+    @classmethod
+    def _find_job_title_boundary(cls, value: str) -> int | None:
+        """Locate the first configured role phrase, including when OCR glues it to a name token."""
+        if not value:
+            return None
+        boundaries: list[tuple[int, int]] = []
+        for raw_term in RuleConfigManager.get_keywords("name", "job_title_denylist"):
+            term = raw_term.strip()
+            compact_length = len(re.sub(r"\W", "", term))
+            if compact_length < 2:
+                continue
+            pattern = r"\s+".join(re.escape(part) for part in term.split())
+            for match in re.finditer(pattern, value, re.IGNORECASE):
+                before_is_boundary = match.start() == 0 or not value[match.start() - 1].isalnum()
+                after_is_boundary = match.end() == len(value) or not value[match.end()].isalnum()
+                if after_is_boundary and (before_is_boundary or compact_length >= 4):
+                    boundaries.append((match.start(), -compact_length))
+        return min(boundaries)[0] if boundaries else None
 
     @staticmethod
     def _email_name_tokens(email: str | None) -> list[str]:

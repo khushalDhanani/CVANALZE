@@ -11,6 +11,7 @@ from app.schemas.candidate_search import (
     CandidateSearchResultItem,
 )
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
+from app.services.resume_field_extractor import ResumeFieldExtractor
 
 
 class CandidateSearchService:
@@ -106,6 +107,8 @@ class CandidateSearchService:
         for r in results:
             if not r or not isinstance(r, dict):
                 continue
+
+            ResumeFieldExtractor.revalidate_candidate_name(r)
 
             cv_key = str(r.get("id") or r.get("filename") or "")
             cv_key = cv_key.removesuffix(".json")

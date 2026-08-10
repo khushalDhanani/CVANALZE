@@ -53,6 +53,69 @@ def test_candidate_search_excludes_processing_records_by_default(tmp_path, monke
     assert "cv_document_processing_test" not in candidate_ids
 
 
+@pytest.mark.parametrize("stored_name", ["applications", None])
+def test_candidate_search_revalidates_stale_or_missing_candidate_names(monkeypatch, stored_name):
+    result = {
+        "id": "cv_generic_name_refresh",
+        "filename": "generic.pdf",
+        "status": "COMPLETED",
+        "progress": 100,
+        "markdown": "## CONTACT\nJordan Lee\napplications@sample.org\n+1 202 555 0187\nAustin, Texas",
+        "full_name": stored_name,
+        "candidate_name": stored_name,
+        "name_confidence": 0.3 if stored_name else 0.0,
+        "name_extraction_source": "email_username_fallback" if stored_name else "default",
+        "resume_json": {
+            "contact_info": {
+                "name": stored_name,
+                "email": "applications@sample.org",
+                "phone": "+1 202 555 0187",
+                "location": "Austin, Texas",
+                "name_confidence": 0.3 if stored_name else 0.0,
+                "extraction_source": "email_username_fallback" if stored_name else "default",
+            }
+        },
+    }
+    monkeypatch.setattr(ResultRepository, "list_all_results", lambda: [result])
+
+    response = CandidateSearchService.search_candidates(CandidateSearchRequest())
+
+    assert len(response.candidates) == 1
+    assert response.candidates[0].full_name == "Jordan Lee"
+
+
+def test_candidate_search_revalidates_name_embedded_in_personal_details(monkeypatch):
+    result = {
+        "id": "cv_generic_inline_name",
+        "filename": "generic.pdf",
+        "status": "COMPLETED",
+        "progress": 100,
+        "markdown": (
+            "PERSONAL DETAILS NAME : Mr. VIRAL D. HIRANI PERMANENT ADDRESS : 505 Example Road "
+            "CONTACT NO : 9913042301 EMAIL : viralhirani1985@gmail.com\n\nEDUCATION QUALIFICATION: -"
+        ),
+        "full_name": "EDUCATION QUALIFICATION: -",
+        "candidate_name": "EDUCATION QUALIFICATION: -",
+        "name_confidence": 0.85,
+        "name_extraction_source": "header_contact_section",
+        "resume_json": {
+            "contact_info": {
+                "name": "EDUCATION QUALIFICATION: -",
+                "email": "viralhirani1985@gmail.com",
+                "phone": "9913042301",
+                "name_confidence": 0.85,
+                "extraction_source": "header_contact_section",
+            }
+        },
+    }
+    monkeypatch.setattr(ResultRepository, "list_all_results", lambda: [result])
+
+    response = CandidateSearchService.search_candidates(CandidateSearchRequest())
+
+    assert len(response.candidates) == 1
+    assert response.candidates[0].full_name == "VIRAL D. HIRANI"
+
+
 def test_get_status_returns_processing_while_incomplete(tmp_path, monkeypatch):
     """Verify GET /api/match/status returns processing response while progress < 100."""
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")

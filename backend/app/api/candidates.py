@@ -11,6 +11,7 @@ from app.schemas.candidate_search import (
     CandidateSearchResponse,
 )
 from app.services.candidate_search_service import CandidateSearchService
+from app.services.resume_field_extractor import ResumeFieldExtractor
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
@@ -88,6 +89,8 @@ def get_candidate_detail(candidate_id: str):
 
     if not result:
         raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
+
+    ResumeFieldExtractor.revalidate_candidate_name(result)
 
     from app.services.experience_calculator import ExperienceCalculator
 

@@ -207,18 +207,12 @@ export default function CandidateListScreen() {
   });
 
   const renderCandidateRow = ({ item }: { item: CandidateSummary }) => {
-    const nameTier = item.name_confidence_tier || item.field_confidence_tiers?.name;
-    const locTier = item.location_confidence_tier || item.field_confidence_tiers?.location;
-    const jobTitleTier = item.job_title_confidence_tier || item.field_confidence_tiers?.job_title;
-    const compTier = item.company_name_confidence_tier || item.field_confidence_tiers?.company_name;
-
     const jobTitleVal = item.job_title || item.best_match?.job_title;
 
     const titleNode = (
       <FieldConfidenceView
         fieldName="name"
         value={item.full_name}
-        tier={nameTier}
         fallbackLabel="Name not detected"
       />
     );
@@ -244,7 +238,6 @@ export default function CandidateListScreen() {
           <FieldConfidenceView
             fieldName="job_title"
             value={jobTitleVal}
-            tier={jobTitleTier}
             icon={<Briefcase size={12} color={COLORS.textFaint} />}
             fallbackLabel="Job title not detected"
             textClassName="text-xs"
@@ -253,7 +246,6 @@ export default function CandidateListScreen() {
             <FieldConfidenceView
               fieldName="company_name"
               value={item.company_name}
-              tier={compTier}
               icon={<Building size={12} color={COLORS.textFaint} />}
               fallbackLabel="Company not detected"
               textClassName="text-xs"
@@ -261,7 +253,6 @@ export default function CandidateListScreen() {
             <FieldConfidenceView
               fieldName="location"
               value={item.location}
-              tier={locTier}
               icon={<MapPin size={12} color={COLORS.textFaint} />}
               fallbackLabel="Location not detected"
               textClassName="text-xs"

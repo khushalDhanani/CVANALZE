@@ -107,13 +107,13 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
     rawState ||
     (canonicalYears !== null && canonicalYears > 0 ? 'CALCULATED' : (canonicalYears === 0 ? 'ZERO_CONFIRMED' : 'UNKNOWN'));
 
-  const formatDisplayExperience = (years: number | null): string => {
+  const formatDisplayExperience = (years: number | null): string | undefined => {
     const rawGross =
       candidateData?.gross_display ||
       candidateData?.experience_summary?.gross_display ||
       summary?.gross_display;
 
-    if (rawGross && rawGross.trim().length > 0) {
+    if (typeof rawGross === 'string' && rawGross.trim().length > 0) {
       return rawGross;
     }
 
@@ -121,9 +121,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
       return 'Experience Present (Dates Unparseable)';
     }
 
-    if (years === null || years === undefined) {
-      return 'N/A';
-    }
+    if (years === null || years === undefined) return undefined;
 
     if (years === 0 || experienceState === 'ZERO_CONFIRMED') {
       return '0 years 0 months';
@@ -138,8 +136,8 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   const experienceDisplayText = formatDisplayExperience(canonicalYears);
 
 
-  const formatEmpType = (type?: string | null): string => {
-    if (!type || type.trim().length === 0) return 'Not specified';
+  const formatEmpType = (type?: string | null): string | undefined => {
+    if (!type || type.trim().length === 0) return undefined;
     switch (type.toLowerCase()) {
       case 'full_time':
         return 'Full-Time';
@@ -158,6 +156,11 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
       default:
         return type.replace('_', ' ').toUpperCase();
     }
+  };
+
+  const formatDateRange = (start?: string | null, end?: string | null, isCurrent = false): string | undefined => {
+    const values = [start?.trim(), isCurrent ? 'Present' : end?.trim()].filter((value): value is string => Boolean(value));
+    return values.length > 0 ? values.join(' → ') : undefined;
   };
 
   const formatAssignmentType = (type: string) => {
@@ -230,15 +233,15 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
             {asg.title_or_subrole}
           </Text>
         </View>
-        <Badge label={formatAssignmentType(asg.assignment_type)} tone="info" />
+        {asg.assignment_type ? <Badge label={formatAssignmentType(asg.assignment_type)} tone="info" /> : null}
       </View>
-      <Text className="text-[10px] font-sans text-text-muted">
-        {asg.start_date || 'N/A'} → {asg.is_current ? 'Present' : asg.end_date || 'N/A'}
-      </Text>
+      {formatDateRange(asg.start_date, asg.end_date, asg.is_current) ? <Text className="text-[10px] font-sans text-text-muted">
+        {formatDateRange(asg.start_date, asg.end_date, asg.is_current)}
+      </Text> : null}
       {asg.details && asg.details.length > 0 && (
         <View className="mt-1 gap-0.5">
-          {asg.details.slice(0, 2).map((d, idx) => (
-            <Text key={idx} className="text-[10px] font-sans text-text-muted leading-3" numberOfLines={2}>
+          {asg.details.map((d, idx) => (
+            <Text key={idx} className="text-[10px] font-sans text-text-muted leading-3">
               • {d}
             </Text>
           ))}
@@ -262,22 +265,19 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
         <View className="flex-row justify-between items-center mb-1">
           <View className="flex-row items-center gap-1.5 flex-1 pr-2">
             <Briefcase size={12} color={COLORS.info} />
-            <Text className="text-xs font-sans-bold text-text-primary leading-4">
-              {node.job_title}
-            </Text>
+            {node.job_title ? <Text className="text-xs font-sans-bold text-text-primary leading-4">{node.job_title}</Text> : null}
           </View>
-          <Badge label={formatEmpType(node.employment_type)} tone="neutral" />
+          {formatEmpType(node.employment_type) ? <Badge label={formatEmpType(node.employment_type)!} tone="neutral" /> : null}
         </View>
 
-        <Text className="text-xs font-sans text-text-muted">
-          {node.company} • {node.start_date || 'N/A'} → {node.is_current ? 'Present' : node.end_date || 'N/A'}
-          {node.duration_months > 0 ? ` (${node.duration_months} mo)` : ''}
-        </Text>
+        {node.company || formatDateRange(node.start_date, node.end_date, node.is_current) || node.duration_months > 0 ? <Text className="text-xs font-sans text-text-muted">
+          {[node.company, formatDateRange(node.start_date, node.end_date, node.is_current), node.duration_months > 0 ? `${node.duration_months} mo` : undefined].filter(Boolean).join(' • ')}
+        </Text> : null}
 
         {node.responsibilities && node.responsibilities.length > 0 && (
           <View className="mt-1 pt-1 border-t border-border/40 gap-0.5">
-            {node.responsibilities.slice(0, 2).map((resp, idx) => (
-              <Text key={idx} className="text-[11px] font-sans text-text-muted leading-3.5" numberOfLines={2}>
+            {node.responsibilities.map((resp, idx) => (
+              <Text key={idx} className="text-[11px] font-sans text-text-muted leading-3.5">
                 • {resp}
               </Text>
             ))}
@@ -302,22 +302,19 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
       <View className="flex-row justify-between items-center mb-1">
         <View className="flex-row items-center gap-1.5 flex-1 pr-2">
           <Briefcase size={12} color={COLORS.info} />
-          <Text className="text-xs font-sans-bold text-text-primary leading-4">
-            {cj.primary_title}
-          </Text>
+          {cj.primary_title ? <Text className="text-xs font-sans-bold text-text-primary leading-4">{cj.primary_title}</Text> : null}
         </View>
-        <Badge label={formatEmpType(cj.employment_type)} tone="neutral" />
+        {formatEmpType(cj.employment_type) ? <Badge label={formatEmpType(cj.employment_type)!} tone="neutral" /> : null}
       </View>
 
-      <Text className="text-xs font-sans text-text-muted">
-        {cj.parent_company} • {cj.start_date || 'N/A'} → {cj.is_current ? 'Present' : cj.end_date || 'N/A'}
-        {cj.duration_months > 0 ? ` (${cj.duration_months} mo)` : ''}
-      </Text>
+      {cj.parent_company || formatDateRange(cj.start_date, cj.end_date, cj.is_current) || cj.duration_months > 0 ? <Text className="text-xs font-sans text-text-muted">
+        {[cj.parent_company, formatDateRange(cj.start_date, cj.end_date, cj.is_current), cj.duration_months > 0 ? `${cj.duration_months} mo` : undefined].filter(Boolean).join(' • ')}
+      </Text> : null}
 
       {cj.responsibilities && cj.responsibilities.length > 0 && (
         <View className="mt-1 pt-1 border-t border-border/40 gap-0.5">
-          {cj.responsibilities.slice(0, 2).map((resp, idx) => (
-            <Text key={idx} className="text-[11px] font-sans text-text-muted leading-3.5" numberOfLines={2}>
+          {cj.responsibilities.map((resp, idx) => (
+            <Text key={idx} className="text-[11px] font-sans text-text-muted leading-3.5">
               • {resp}
             </Text>
           ))}
@@ -345,7 +342,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
             Experience Timeline & Gaps
           </Text>
         </View>
-        <Badge
+        {summary && (typeof summary.has_current_employment === 'boolean' || typeof summary.unexplained_gaps_count === 'number') ? <Badge
           label={
             summary?.has_current_employment
               ? 'Currently Employed'
@@ -360,7 +357,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
               ? 'warning'
               : 'neutral'
           }
-        />
+        /> : null}
       </View>
 
       {/* Assessment Banner */}
@@ -376,6 +373,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
       {/* Single Source KPI Summary from Backend summary object */}
       {summary ? (
         <View className="flex-row flex-wrap gap-2">
+          {experienceDisplayText ? (
           <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">
             <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">
               Total Experience
@@ -386,7 +384,9 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
 
 
           </View>
+          ) : null}
 
+          {typeof summary.total_employment_gaps_count === 'number' && typeof summary.unexplained_gaps_count === 'number' ? (
           <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">
             <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">
               Employment Gaps
@@ -395,7 +395,9 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
               {summary.total_employment_gaps_count} ({summary.unexplained_gaps_count} Unexplained)
             </Text>
           </View>
+          ) : null}
 
+          {typeof summary.concurrent_roles_count === 'number' ? (
           <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">
             <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">
               Concurrent Roles
@@ -404,6 +406,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
               {summary.concurrent_roles_count} Overlap(s)
             </Text>
           </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -448,10 +451,10 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
                           Concurrent / Overlapping Roles ({cluster.roles_count})
                         </Text>
                       </View>
-                      <Badge
-                        label={`${cluster.start_date || 'N/A'} → ${cluster.end_date || 'Present'}`}
+                      {formatDateRange(cluster.start_date, cluster.end_date, !cluster.end_date) ? <Badge
+                        label={formatDateRange(cluster.start_date, cluster.end_date, !cluster.end_date)!}
                         tone="info"
-                      />
+                      /> : null}
                     </View>
 
                     <Text className="text-[11px] font-sans text-text-muted">

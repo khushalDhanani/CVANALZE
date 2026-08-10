@@ -28,33 +28,33 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
   const location = contact.location;
 
   return (
-    <Card className="border-border/60 shadow-sm mb-4">
+    <Card className="mb-4 shadow-sm border-border/60">
       {/* Header Info */}
-      <View className="flex-row items-center gap-3 pb-3 border-b border-border/50 mb-3">
-        <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
+      <View className="flex-row items-center gap-3 pb-3 mb-3 border-b border-border/50">
+        <View className="items-center justify-center w-10 h-10 rounded-full bg-primary/10">
           <User size={20} color={COLORS.primary} />
         </View>
         <View className="flex-1">
           <Text className="text-base font-sans-bold text-text-primary">
             {resolvedName}
           </Text>
-          <View className="flex-row flex-wrap gap-x-3 gap-y-1 mt-1">
+          <View className="flex-row flex-wrap mt-1 gap-x-3 gap-y-1">
             {!!email && (
               <View className="flex-row items-center gap-1">
                 <Mail size={12} color={COLORS.textMuted} />
-                <Text className="text-xs font-sans text-text-muted">{email}</Text>
+                <Text className="font-sans text-xs text-text-muted">{email}</Text>
               </View>
             )}
             {!!phone && (
               <View className="flex-row items-center gap-1">
                 <Phone size={12} color={COLORS.textMuted} />
-                <Text className="text-xs font-sans text-text-muted">{phone}</Text>
+                <Text className="font-sans text-xs text-text-muted">{phone}</Text>
               </View>
             )}
             {!!location && (
               <View className="flex-row items-center gap-1">
                 <MapPin size={12} color={COLORS.textMuted} />
-                <Text className="text-xs font-sans text-text-muted">{location}</Text>
+                <Text className="font-sans text-xs text-text-muted">{location}</Text>
               </View>
             )}
           </View>
@@ -89,9 +89,9 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
             {strengths.map((s, idx) => (
               <View
                 key={idx}
-                className="bg-surface-elevated px-2 py-1 rounded-md border border-border/60"
+                className="px-2 py-1 border rounded-md bg-surface-elevated border-border/60"
               >
-                <Text className="text-xs font-sans text-text-primary">{s}</Text>
+                <Text className="font-sans text-xs text-text-primary">{s}</Text>
               </View>
             ))}
           </View>
@@ -100,14 +100,14 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
 
       {/* AI Career Summary */}
       {!!ai_career_summary && (
-        <View className="bg-primary/5 border border-primary/20 rounded-md p-3">
+        <View className="p-3 border rounded-md bg-primary/5 border-primary/20">
           <View className="flex-row items-center gap-1.5 mb-1.5">
             <Sparkles size={14} color={COLORS.primary} />
             <Text className="text-xs font-sans-bold text-primary">
               AI Career Summary
             </Text>
           </View>
-          <Text className="text-xs font-sans text-text-secondary leading-relaxed">
+          <Text className="font-sans text-xs leading-relaxed text-text-secondary">
             {ai_career_summary}
           </Text>
         </View>

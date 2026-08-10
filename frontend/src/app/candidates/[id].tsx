@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,7 +6,7 @@ import {
   ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3,
   RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target,
   CheckCircle2, Sparkles, AlertTriangle, Users, MapPin, Building,
-  Activity, Search, BookOpen, Layers
+  Activity, Search, BookOpen, Layers, Link, Code2
 } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
@@ -36,18 +36,26 @@ import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { COLORS } from '@/constants/colors';
 import { formatDateTime } from '@/utils/date';
+import {
+  buildCandidateDetailViewModel,
+  cleanCandidateText,
+  normalizeCandidateRouteId,
+  responseMatchesCandidateId,
+} from '@/utils/candidateDetail';
 
 type TabType = 'overview' | 'processing';
 
 export default function CandidateDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string; query?: string; classification?: string; department?: string }>();
+  const params = useLocalSearchParams<{ id: string | string[]; query?: string; classification?: string; department?: string }>();
   const { id, query, classification, department } = params;
+  const candidateCvId = normalizeCandidateRouteId(id);
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   const [data, setData] = useState<CVUploadResponse | null>(null);
-  const candName = data?.full_name || data?.candidate_name || data?.resume_json?.contact_info?.name;
+  const candidateView = useMemo(() => data ? buildCandidateDetailViewModel(data) : null, [data]);
+  const candName = candidateView?.name;
   usePageTitle(candName ? `Candidate: ${candName} | AIRIS` : 'Candidate Profile | AIRIS');
 
   const getReturnHref = () => {
@@ -69,7 +77,6 @@ export default function CandidateDetailScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showFullText, setShowFullText] = useState<boolean>(false);
-  const [showAllExperience, setShowAllExperience] = useState<boolean>(false);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
   const [selectedJobForReview, setSelectedJobForReview] = useState<any>(null);
 
@@ -85,54 +92,87 @@ export default function CandidateDetailScreen() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const detailRequestRef = useRef<number>(0);
+  const activeCandidateIdRef = useRef<string | undefined>(candidateCvId);
+  activeCandidateIdRef.current = candidateCvId;
 
-  const fetchDetail = () => {
-    if (!id) return;
+  const stopTimers = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    timerRef.current = null;
+    pollTimerRef.current = null;
+  }, []);
+
+  const fetchDetail = useCallback(() => {
+    const requestId = ++detailRequestRef.current;
+    stopTimers();
+    setData(null);
+    setRecommendations(null);
+    setShowFullText(false);
+    setReviewModalVisible(false);
+    setSelectedJobForReview(null);
+    setIsReanalyzing(false);
+    setIsReprocessing(false);
+    setReprocessError(null);
+    setRecommendationsError(null);
+
+    if (!candidateCvId) {
+      setLoading(false);
+      setRecommendationsLoading(false);
+      setError('The candidate CV ID is missing or invalid.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     candidateService
-      .getCandidateById(id)
+      .getCandidateById(candidateCvId)
       .then((res) => {
+        if (requestId !== detailRequestRef.current) return;
+        if (!res || typeof res !== 'object' || !responseMatchesCandidateId(res, candidateCvId)) {
+          throw new Error('The API returned an empty or mismatched candidate record.');
+        }
         setData(res);
         if (res.status === 'COMPLETED' || res.is_complete || res.progress === 100 || res.match_analysis) {
           setIsReprocessing(false);
           stopTimers();
         }
       })
-      .catch((err) => setError(err.message || 'Failed to load candidate details.'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (requestId === detailRequestRef.current) setError(err.message || 'Failed to load candidate details.');
+      })
+      .finally(() => {
+        if (requestId === detailRequestRef.current) setLoading(false);
+      });
 
     setRecommendationsLoading(true);
-    setRecommendationsError(null);
     candidateService
-      .getCandidateRecommendations(id)
+      .getCandidateRecommendations(candidateCvId)
       .then((rec) => {
+        if (requestId !== detailRequestRef.current) return;
         setRecommendations(rec);
         setRecommendationsError(null);
       })
       .catch((err) => {
+        if (requestId !== detailRequestRef.current) return;
         setRecommendationsError(err.message || 'Failed to load candidate recommendations.');
         setRecommendations(null);
       })
-      .finally(() => setRecommendationsLoading(false));
-  };
+      .finally(() => {
+        if (requestId === detailRequestRef.current) setRecommendationsLoading(false);
+      });
+  }, [candidateCvId, stopTimers]);
 
   useEffect(() => {
     fetchDetail();
     return () => {
+      detailRequestRef.current += 1;
       stopTimers();
     };
-  }, [id]);
-
-  const stopTimers = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    timerRef.current = null;
-    pollTimerRef.current = null;
-  };
+  }, [fetchDetail, stopTimers]);
 
   const handleConfirmReprocess = async () => {
-    if (!id) return;
+    if (!candidateCvId) return;
     stopTimers();
     setReprocessModalVisible(false);
     setIsReprocessing(true);
@@ -152,7 +192,7 @@ export default function CandidateDetailScreen() {
     }, 1000);
 
     try {
-      await candidateService.reprocessCandidate(id);
+      await candidateService.reprocessCandidate(candidateCvId);
 
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       let pollCount = 0;
@@ -168,7 +208,7 @@ export default function CandidateDetailScreen() {
         }
 
         try {
-          const statusRes: any = await cvService.getCvStatus(id);
+          const statusRes: any = await cvService.getCvStatus(candidateCvId);
           const statusStr = statusRes.status;
           const msg = statusRes.message || statusRes.error || '';
           const pct = statusRes.progress || 0;
@@ -233,10 +273,12 @@ export default function CandidateDetailScreen() {
 
   const handleReanalyze = async () => {
     if (!scanId) return;
+    const requestedCandidateId = candidateCvId;
     setIsReanalyzing(true);
     try {
       await matchService.reanalyzeScan(scanId);
       setTimeout(() => {
+        if (activeCandidateIdRef.current !== requestedCandidateId) return;
         fetchDetail();
         setIsReanalyzing(false);
       }, 1500);
@@ -249,7 +291,7 @@ export default function CandidateDetailScreen() {
   const rawAnalysis = data?.enriched_match_analysis || data?.match_analysis;
   const analysis: any = rawAnalysis;
   const bestMatch = rawAnalysis?.best_match;
-  const scanId = data?.scan_id || data?.id || id || '';
+  const scanId = data?.scan_id || data?.id || candidateCvId || '';
 
   const rawTimestamp = data?.parsed_at || data?.scanned_at || data?.created_at;
   const formattedParsedAt = formatDateTime(rawTimestamp);
@@ -273,6 +315,7 @@ export default function CandidateDetailScreen() {
       <View className="w-full lg:w-5/12 gap-4">
 
         {/* Active Vacancy Summary Card */}
+        {analysis && (analysis.active_vacancy_summary || analysis.match_status || bestMatch) ? (
         <Card className="gap-2 p-3 shadow-none border-border">
           <View className="flex-row items-center justify-between pb-2 mb-1 border-b border-border">
             <View className="flex-row items-center gap-1.5">
@@ -280,13 +323,13 @@ export default function CandidateDetailScreen() {
               <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Active Vacancy Summary</Text>
             </View>
             <VacancyMatchStatusBadge
-              status={analysis?.match_status || (analysis?.has_genuine_match ? 'MATCHED' : (analysis?.active_vacancy_summary?.includes('NO_ACTIVE_VACANCIES') ? 'NO_ACTIVE_VACANCIES' : 'NO_STRONG_MATCH'))}
+              status={analysis.match_status || (analysis.has_genuine_match ? 'MATCHED' : 'ANALYSIS_NOT_AVAILABLE')}
               score={resolveVacancyFitScore(bestMatch)}
             />
           </View>
-          <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-surface border border-border'}`}>
-            <Text className="text-xs leading-5 text-text-primary">{analysis?.active_vacancy_summary || 'No suitable active vacancy found.'}</Text>
-          </View>
+          {analysis.active_vacancy_summary ? <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-surface border border-border'}`}>
+            {analysis.active_vacancy_summary ? <Text className="text-xs leading-5 text-text-primary">{analysis.active_vacancy_summary}</Text> : null}
+          </View> : null}
 
           {/* Render canonical score breakdown if available on best match */}
           {bestMatch?.score_breakdown ? (
@@ -297,126 +340,123 @@ export default function CandidateDetailScreen() {
             />
           ) : null}
         </Card>
+        ) : null}
 
         {/* Contact Info Card with FieldConfidenceView */}
+        {candidateView && (candidateView.email || candidateView.phone || candidateView.location || candidateView.linkedin || candidateView.github) ? (
         <Card className="gap-2 p-3 shadow-none border-border">
           <Text className="mb-1 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Contact Information</Text>
+          {candidateView.email ? (
           <FieldConfidenceView
             fieldName="email"
-            value={data?.email}
-            tier={data?.field_confidence_tiers?.name}
+            value={candidateView.email}
             icon={<Mail size={14} color={COLORS.textFaint} />}
-            fallbackLabel="Email not specified"
           />
+          ) : null}
+          {candidateView.phone ? (
           <FieldConfidenceView
             fieldName="phone"
-            value={data?.phone}
+            value={candidateView.phone}
             icon={<Phone size={14} color={COLORS.textFaint} />}
-            fallbackLabel="Phone not specified"
           />
+          ) : null}
+          {candidateView.location ? (
           <FieldConfidenceView
             fieldName="location"
-            value={data?.location || data?.resume_json?.contact_info?.location}
+            value={candidateView.location}
             tier={data?.location_confidence_tier || data?.field_confidence_tiers?.location}
             icon={<MapPin size={14} color={COLORS.textFaint} />}
-            fallbackLabel="Location not specified"
           />
+          ) : null}
+          {candidateView.linkedin ? <FieldConfidenceView fieldName="linkedin" value={candidateView.linkedin} icon={<Link size={14} color={COLORS.textFaint} />} /> : null}
+          {candidateView.github ? <FieldConfidenceView fieldName="github" value={candidateView.github} icon={<Code2 size={14} color={COLORS.textFaint} />} /> : null}
         </Card>
+        ) : null}
+
+        {candidateView?.summary ? (
+          <Card className="gap-2 p-3 shadow-none border-border">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Professional Summary</Text>
+            <Text className="text-xs leading-5 text-text-primary">{candidateView.summary}</Text>
+          </Card>
+        ) : null}
 
         {/* Experience Timeline */}
-        {(() => {
-          const allExp =
-            data?.work_experience ||
-            data?.resume_json?.work_experience ||
-            data?.resume_json?.experience ||
-            data?.normalized_resume?.employment ||
-            [];
-
-          if (allExp.length === 0) return null;
-
-          const displayedExp = showAllExperience ? allExp : allExp.slice(0, 5);
-
-          return (
+        {candidateView && candidateView.experience.length > 0 ? (
             <Card className="gap-3 p-3 shadow-none border-border">
               <View className="flex-row items-center justify-between">
                 <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Experience History</Text>
-                <Text className="text-[11px] font-sans text-text-muted">{allExp.length} roles</Text>
+                <Text className="text-[11px] font-sans text-text-muted">{candidateView.experience.length} roles</Text>
               </View>
 
-              {displayedExp.map((exp: any, idx: number) => {
-                const title = typeof exp.job_title === 'object'
-                  ? (exp.job_title?.normalized_value || exp.job_title?.raw_value || 'Not specified')
-                  : (exp.job_title || exp.role || 'Not specified');
-                const company = typeof exp.company === 'object'
-                  ? (exp.company?.normalized_value || exp.company?.raw_value || 'Not specified')
-                  : (exp.company || exp.company_name || 'Not specified');
-                const dates = exp.interval?.raw_value || exp.dates || exp.duration || 'Not specified';
-                return (
+              {candidateView.experience.map((exp, idx) => (
                   <View key={idx} className="pb-3 pl-3 border-l-2 border-border">
-                    <Text className="text-xs font-sans-bold text-text-primary">{title}</Text>
-                    <Text className="font-sans text-xs text-text-muted">{company} • {dates}</Text>
+                    {exp.title ? <Text className="text-xs font-sans-bold text-text-primary">{exp.title}</Text> : null}
+                    {exp.company || exp.dates ? <Text className="font-sans text-xs text-text-muted">{[exp.company, exp.dates].filter(Boolean).join(' • ')}</Text> : null}
+                    {exp.responsibilities.map((responsibility, responsibilityIndex) => (
+                      <Text key={responsibilityIndex} className="mt-1 text-[11px] leading-4 text-text-primary">• {responsibility}</Text>
+                    ))}
                   </View>
-                );
-              })}
-
-              {allExp.length > 5 && (
-                <Pressable
-                  onPress={() => setShowAllExperience(!showAllExperience)}
-                  className="py-1 min-h-[36px] justify-center"
-                  accessibilityRole="button"
-                >
-                  <Text className="text-xs text-primary font-sans-medium">
-                    {showAllExperience ? 'Show fewer roles' : `+ ${allExp.length - 5} more roles`}
-                  </Text>
-                </Pressable>
-              )}
+              ))}
             </Card>
-          );
-        })()}
+        ) : null}
 
         {/* Education & Certs */}
+        {candidateView && (candidateView.education.length > 0 || candidateView.certifications.length > 0) ? (
         <Card className="gap-3 p-3 shadow-none border-border">
-          <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Education</Text>
-          {(data?.resume_json?.education || []).length > 0 ? (
-            data!.resume_json!.education!.slice(0, 3).map((edu: any, idx: number) => (
+          {candidateView.education.length > 0 ? (
+            <View className="gap-2">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Education</Text>
+            {candidateView.education.map((edu, idx) => (
               <View key={idx}>
-                <Text className="text-xs font-sans-bold text-text-primary">{edu.degree || 'Degree not specified'}</Text>
-                <Text className="text-[11px] font-sans text-text-muted">{edu.institution || 'Institution not specified'} • {edu.passing_year || 'Year not specified'}</Text>
+                {edu.degree ? <Text className="text-xs font-sans-bold text-text-primary">{edu.degree}</Text> : null}
+                {edu.institution || edu.dates ? <Text className="text-[11px] font-sans text-text-muted">{[edu.institution, edu.dates].filter(Boolean).join(' • ')}</Text> : null}
+                {edu.grade ? <Text className="text-[11px] font-sans text-text-primary">{edu.grade}</Text> : null}
+                {edu.details ? <Text className="text-[11px] font-sans text-text-primary">{edu.details}</Text> : null}
               </View>
-            ))
-          ) : (
-            <Text className="text-xs text-text-muted">No education history found.</Text>
-          )}
+            ))}
+            </View>
+          ) : null}
 
-          {(data?.resume_json?.certifications || []).length > 0 && (
+          {candidateView.certifications.length > 0 && (
             <View className="mt-2 border-t border-border pt-2 gap-1.5">
               <Text className="text-[11px] font-sans-bold text-text-muted uppercase tracking-wider">Certifications</Text>
               <View className="flex-row flex-wrap gap-1">
-                {data!.resume_json!.certifications!.slice(0, 5).map((cert: string, idx: number) => (
+                {candidateView.certifications.map((cert, idx) => (
                   <Badge key={idx} label={cert} tone="neutral" />
                 ))}
               </View>
             </View>
           )}
         </Card>
+        ) : null}
 
         {/* Candidate Skills */}
-        {(() => {
-          const rawSkills = data?.resume_json?.skills;
-          const skillsList: string[] = Array.isArray(rawSkills)
-            ? rawSkills.filter((s: any) => typeof s === 'string' && s.trim())
-            : (rawSkills?.all_skills || []).filter((s: any) => typeof s === 'string' && s.trim());
-          return skillsList.length > 0 ? (
+        {candidateView && candidateView.skills.length > 0 ? (
             <Card className="gap-2 p-3 shadow-none border-border">
               <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Skills</Text>
               <View className="flex-row flex-wrap gap-1">
-                {skillsList.map((skill: string, idx: number) => (
+                {candidateView.skills.map((skill, idx) => (
                   <Badge key={idx} label={skill} tone="neutral" />
                 ))}
               </View>
             </Card>
-          ) : null;
-        })()}
+        ) : null}
+
+        {candidateView && candidateView.projects.length > 0 ? (
+          <Card className="gap-3 p-3 shadow-none border-border">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Projects</Text>
+            {candidateView.projects.map((project, idx) => (
+              <View key={idx} className="pb-3 border-b border-border last:border-b-0">
+                {project.name ? <Text className="text-xs font-sans-bold text-text-primary">{project.name}</Text> : null}
+                {project.description ? <Text className="mt-1 text-[11px] leading-4 text-text-primary">{project.description}</Text> : null}
+                {project.technologies.length > 0 ? (
+                  <View className="flex-row flex-wrap gap-1 mt-1">{project.technologies.map((technology, techIndex) => <Badge key={techIndex} label={technology} tone="neutral" />)}</View>
+                ) : null}
+                {project.bulletPoints.map((point, pointIndex) => <Text key={pointIndex} className="mt-1 text-[11px] leading-4 text-text-primary">• {point}</Text>)}
+              </View>
+            ))}
+          </Card>
+        ) : null}
 
         {/* Suitable Openings */}
         {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
@@ -552,14 +592,18 @@ export default function CandidateDetailScreen() {
             <Text className="text-[11px] text-text-muted mb-1">
               These vacancies scored below the suitability threshold. HR review is recommended before any decision.
             </Text>
-            {analysis.unsuitable_openings.map((match: any, idx: number) => (
+            {analysis.unsuitable_openings.map((match: any, idx: number) => {
+              const fitScore = resolveVacancyFitScore(match);
+              const jobTitle = cleanCandidateText(match.job_title);
+              const departmentName = cleanCandidateText(match.department_name || match.department);
+              return (
               <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
                 <View className="flex-1 pr-2">
-                  <Text className="text-xs font-sans-bold text-text-primary">{match.job_title}</Text>
-                  <Text className="text-[11px] text-text-muted">{match.department_name || match.department}</Text>
+                  {jobTitle ? <Text className="text-xs font-sans-bold text-text-primary">{jobTitle}</Text> : null}
+                  {departmentName ? <Text className="text-[11px] text-text-muted">{departmentName}</Text> : null}
                 </View>
                 <View className="flex-row items-center gap-2">
-                  <ScoreBadge score={resolveVacancyFitScore(match) ?? 0} classification={match.classification} />
+                  {fitScore != null ? <ScoreBadge score={fitScore} classification={match.classification} /> : null}
                   <Button
                     label="Review"
                     variant="ghost"
@@ -571,7 +615,8 @@ export default function CandidateDetailScreen() {
                   />
                 </View>
               </View>
-            ))}
+              );
+            })}
           </Card>
         )}
 
@@ -587,14 +632,17 @@ export default function CandidateDetailScreen() {
             </View>
             <View className="gap-2">
               {data.similar_candidates.map((sim: any, idx: number) => {
+                const similarCandidateId = cleanCandidateText(sim.candidate_id || sim.id);
+                const similarCandidateName = cleanCandidateText(sim.full_name || sim.filename || similarCandidateId);
+                if (!similarCandidateId || !similarCandidateName) return null;
                 const simScore = Math.round((sim.similarity_score || sim.score || 0) * 100);
                 return (
                   <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
                     <View>
-                      <Text className="text-xs cursor-pointer font-sans-bold text-text-primary" onPress={() => router.push(`/candidates/${encodeURIComponent(sim.candidate_id || sim.id)}` as any)}>
-                        {sim.full_name || sim.filename || sim.candidate_id}
+                      <Text className="text-xs cursor-pointer font-sans-bold text-text-primary" onPress={() => router.push(`/candidates/${encodeURIComponent(similarCandidateId)}` as any)}>
+                        {similarCandidateName}
                       </Text>
-                      <Text className="text-[11px] text-text-muted">{sim.primary_department ? `Dept: ${sim.primary_department}` : 'Vector Match'}</Text>
+                      {cleanCandidateText(sim.primary_department) ? <Text className="text-[11px] text-text-muted">Dept: {sim.primary_department}</Text> : null}
                     </View>
                     <Badge label={`${simScore}%`} tone={simScore >= 80 ? 'success' : simScore >= 60 ? 'info' : 'neutral'} />
                   </View>
@@ -605,6 +653,7 @@ export default function CandidateDetailScreen() {
         )}
 
         {/* Resume Extracted Text without Nested ScrollView */}
+        {candidateView?.extractedText ? (
         <Card className="p-0 overflow-hidden shadow-none border-border">
           <View className="flex-row items-center justify-between p-3 border-b border-border bg-background">
             <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Extracted CV Text</Text>
@@ -620,10 +669,11 @@ export default function CandidateDetailScreen() {
               numberOfLines={showFullText ? undefined : 8}
               className="text-[11px] font-mono text-text-primary leading-5"
             >
-              {data?.markdown || data?.text || 'No text extracted.'}
+              {candidateView.extractedText}
             </Text>
           </View>
         </Card>
+        ) : null}
 
       </View>
 
@@ -658,16 +708,20 @@ export default function CandidateDetailScreen() {
             </View>
 
             {/* 2-Column Insight Grid inside Card */}
-            <View className="flex-row flex-wrap gap-2">
+            {recommendations.experience_assessment || recommendations.role_department_fit ? <View className="flex-row flex-wrap gap-2">
+              {recommendations.experience_assessment ? (
               <View className="flex-1 min-w-[140px] bg-background p-2 rounded border border-border">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-0.5">Experience & Seniority</Text>
-                <Text className="text-xs leading-4 text-text-primary">{recommendations.experience_assessment || 'Not specified'}</Text>
+                <Text className="text-xs leading-4 text-text-primary">{recommendations.experience_assessment}</Text>
               </View>
+              ) : null}
+              {recommendations.role_department_fit ? (
               <View className="flex-1 min-w-[140px] bg-background p-2 rounded border border-border">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-0.5">Role & Dept Fit</Text>
-                <Text className="text-xs leading-4 text-text-primary">{recommendations.role_department_fit || 'Not specified'}</Text>
+                <Text className="text-xs leading-4 text-text-primary">{recommendations.role_department_fit}</Text>
               </View>
-            </View>
+              ) : null}
+            </View> : null}
 
             {recommendations.risk_flags && recommendations.risk_flags.length > 0 && (
               <View className="p-2 border rounded bg-danger/5 border-danger/20">
@@ -702,11 +756,11 @@ export default function CandidateDetailScreen() {
         ) : null}
 
         {/* Experience Timeline & Gaps Section */}
-        <ExperienceTimelineCard
+        {data && (data.experience_gap_analysis || data.experience_summary || recommendations?.experience_assessment) ? <ExperienceTimelineCard
           analysis={(data as any)?.experience_gap_analysis || (data as any)?.experience_summary?.gap_analysis || (analysis as any)?.experience_gap_analysis || (recommendations as any)?.experience_gap_analysis}
           experienceAssessment={(data as any)?.experience_summary?.experience_assessment || recommendations?.experience_assessment}
           candidateData={data}
-        />
+        /> : null}
 
         {/* AI Career Summary & Domain Insights */}
         {(analysis?.ai_career_summary || analysis?.recommended_department || analysis?.professional_domain) && (
@@ -720,15 +774,15 @@ export default function CandidateDetailScreen() {
               <Text className="mb-2 font-sans text-xs leading-5 text-text-primary">{analysis.ai_career_summary}</Text>
             ) : null}
 
-            <View className="flex-row items-center justify-between">
+            {analysis?.recommended_department || analysis?.primary_department ? <View className="flex-row items-center justify-between">
               <Text className="text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
-              <Badge label={analysis?.recommended_department || analysis?.primary_department || 'General'} tone="info" />
-            </View>
-            <View className="flex-row items-center justify-between mt-1">
+              <Badge label={analysis.recommended_department || analysis.primary_department} tone="info" />
+            </View> : null}
+            {analysis?.professional_domain ? <View className="flex-row items-center justify-between mt-1">
               <Text className="text-xs font-sans-medium text-text-muted">Professional Domain:</Text>
-              <Text className="text-xs font-sans-bold text-text-primary">{analysis?.professional_domain || 'Not specified'}</Text>
-            </View>
-            {analysis?.suitable_job_roles && (
+              <Text className="text-xs font-sans-bold text-text-primary">{analysis.professional_domain}</Text>
+            </View> : null}
+            {analysis?.suitable_job_roles?.length > 0 && (
               <View className="pt-2 mt-2 border-t border-border">
                 <Text className="mb-1 text-xs font-sans-medium text-text-muted">Suitable Job Roles:</Text>
                 <View className="flex-row flex-wrap gap-1">
@@ -738,7 +792,7 @@ export default function CandidateDetailScreen() {
                 </View>
               </View>
             )}
-            {recommendations?.talent_pools && (
+            {recommendations?.talent_pools && recommendations.talent_pools.length > 0 && (
               <View className="pt-2 mt-2 border-t border-border">
                 <Text className="mb-1 text-xs font-sans-medium text-text-muted">Assigned Talent Pools:</Text>
                 <View className="flex-row flex-wrap gap-1">
@@ -748,7 +802,7 @@ export default function CandidateDetailScreen() {
                 </View>
               </View>
             )}
-            {recommendations?.related_skills && (
+            {recommendations?.related_skills && recommendations.related_skills.length > 0 && (
               <View className="pt-2 mt-2 border-t border-border">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase tracking-wider mb-1">Semantically Related Skills:</Text>
                 <View className="flex-row flex-wrap gap-1">
@@ -785,31 +839,41 @@ export default function CandidateDetailScreen() {
         <ErrorBanner title="Reprocessing Error" message={reprocessError} />
       )}
 
-      <Card className="p-3 shadow-none border-border">
+      {data && (cleanCandidateText(data.filename || data.id) || rawTimestamp || typeof data.ocr_applied === 'boolean' || data.page_count != null || cleanCandidateText(data.status)) ? <Card className="p-3 shadow-none border-border">
         <Text className="mb-2 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Processing Metadata</Text>
         <View className="gap-2">
+          {cleanCandidateText(data.filename || data.id) ? (
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Filename:</Text>
             <Text className="font-mono text-xs text-text-primary">{data?.filename || data?.id}</Text>
           </View>
+          ) : null}
+          {rawTimestamp ? (
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Analyzed At:</Text>
             <Text className="font-mono text-xs text-text-primary">{formattedParsedAt}</Text>
           </View>
+          ) : null}
+          {typeof data.ocr_applied === 'boolean' ? (
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Extraction Method:</Text>
             <Badge label={data?.ocr_applied ? 'RapidOCR' : 'Native PDF'} tone="info" />
           </View>
+          ) : null}
+          {data.page_count != null ? (
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Pages:</Text>
-            <Text className="font-mono text-xs text-text-primary">{data?.page_count != null ? `${data.page_count} pg` : 'Unknown'}</Text>
+            <Text className="font-mono text-xs text-text-primary">{data.page_count} pg</Text>
           </View>
+          ) : null}
+          {cleanCandidateText(data.status) ? (
           <View className="flex-row items-center justify-between">
             <Text className="text-xs text-text-muted">Status:</Text>
-            <Badge label={data?.status || 'UNKNOWN'} tone={getStatusTone(data?.status)} />
+            <Badge label={data.status!} tone={getStatusTone(data.status || undefined)} />
           </View>
+          ) : null}
         </View>
-      </Card>
+      </Card> : null}
     </View>
   );
 
@@ -822,7 +886,7 @@ export default function CandidateDetailScreen() {
       <Breadcrumbs
         items={[
           { label: 'Candidate Directory', href: getReturnHref() },
-          { label: candName || id || 'Candidate Profile' },
+          { label: candName || candidateCvId || 'Candidate Profile' },
         ]}
       />
       {/* 1. Header Area (Responsive & Tokenized) */}
@@ -846,11 +910,13 @@ export default function CandidateDetailScreen() {
               </View>
               <View className="flex-1">
                 <Text numberOfLines={1} ellipsizeMode="tail" className="text-sm font-sans-bold text-text-primary">
-                  {data?.full_name || data?.candidate_name || data?.resume_json?.contact_info?.name || 'Unknown Candidate'}
+                  {candidateView?.name || 'Candidate Profile'}
                 </Text>
+                {candidateView?.jobTitle || candidateView?.company ? (
                 <Text numberOfLines={1} ellipsizeMode="tail" className="text-[11px] font-sans-medium text-text-muted">
-                  {data?.job_title || data?.resume_json?.contact_info?.job_title || data?.match_analysis?.best_match?.job_title || 'No Title'} • {data?.company_name || 'No Company'}
+                  {[candidateView.jobTitle, candidateView.company].filter(Boolean).join(' • ')}
                 </Text>
+                ) : null}
               </View>
             </View>
           </View>
@@ -869,7 +935,7 @@ export default function CandidateDetailScreen() {
             {data?.experience_years != null ? (
               <View className="items-center px-2.5 py-1 border rounded bg-background border-border">
                 <Text className="text-[11px] text-text-muted uppercase font-sans-bold">Experience</Text>
-                <Text className="text-xs font-sans-bold text-text-primary">{data.experience_years} Yrs • {data.seniority || 'Assessed'}</Text>
+                <Text className="text-xs font-sans-bold text-text-primary">{data.experience_years} Yrs{cleanCandidateText(data.seniority) ? ` • ${data.seniority}` : ''}</Text>
               </View>
             ) : null}
             {bestMatch?.overall_score != null ? (

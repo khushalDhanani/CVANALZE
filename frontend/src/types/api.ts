@@ -308,6 +308,30 @@ export interface FieldConfidenceTiers {
   company_name?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
 }
 
+export interface CandidateResumeContact {
+  name?: string | null;
+  full_name?: string | null;
+  candidate_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
+  field_confidence?: Record<string, number | null> | null;
+  extraction_source?: string | null;
+}
+
+export interface CandidateResumeJson {
+  contact_info?: CandidateResumeContact | null;
+  summary?: string | null;
+  work_experience?: Record<string, unknown>[] | null;
+  experience?: Record<string, unknown>[] | null;
+  education?: Record<string, unknown>[] | null;
+  skills?: string[] | { all_skills?: string[]; categorized?: Record<string, string[]> } | null;
+  projects?: Record<string, unknown>[] | null;
+  certifications?: Array<string | Record<string, unknown>> | null;
+}
+
 export interface CVUploadResponse {
   scan_id: string;
   filename: string;
@@ -320,6 +344,10 @@ export interface CVUploadResponse {
   location?: string | null;
   job_title?: string | null;
   company_name?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
+  summary?: string | null;
+  contact_info?: CandidateResumeContact | null;
   name_confidence?: number | null;
   name_confidence_tier?: string | null;
   location_confidence_tier?: string | null;
@@ -328,6 +356,29 @@ export interface CVUploadResponse {
   field_confidence?: Record<string, number | null> | null;
   field_confidence_tiers?: FieldConfidenceTiers | null;
   name_extraction_source?: string | null;
+  id?: string | null;
+  candidate_id?: string | null;
+  cv_id?: string | null;
+  legacy_cv_keys?: string[] | null;
+  text?: string | null;
+  status?: string | null;
+  progress?: number | null;
+  is_complete?: boolean | null;
+  page_count?: number | null;
+  is_scanned?: boolean | null;
+  ocr_applied?: boolean | null;
+  scanned_at?: string | null;
+  created_at?: string | null;
+  experience_years?: number | null;
+  seniority?: string | null;
+  work_experience?: Record<string, unknown>[] | null;
+  education?: Array<string | Record<string, unknown>> | null;
+  skills?: string[] | { all_skills?: string[]; skills?: string[]; categorized?: Record<string, string[]> } | null;
+  projects?: Array<string | Record<string, unknown>> | null;
+  certifications?: Array<string | Record<string, unknown>> | Record<string, unknown> | null;
+  resume_json?: CandidateResumeJson | null;
+  normalized_resume?: Record<string, unknown> | null;
+  similar_candidates?: Array<Record<string, any>> | null;
   match_analysis?: CandidateMatchAnalysis | null;
   enriched_match_analysis?: EnrichedCandidateAnalysis | null;
   [key: string]: any;
@@ -799,5 +850,3 @@ export interface ExperienceGapAnalysisData {
   timeline_events?: TimelineEventItem[];
   hr_review_indicators?: string[];
 }
-
-

@@ -1,6 +1,177 @@
 # Work Status
 
 ## Last Completed Task
+**Make candidate names consistent across directory cards and detail pages**
+
+### Architecture Impact Analysis
+- Centralized read-time candidate-name revalidation in the existing deterministic `ResumeFieldExtractor`.
+- Both `/candidates/search` and `/candidates/{id}` now normalize names through the same path before mapping their existing response contracts.
+- No candidate-specific rule, UI redesign, API field, Ollama integration, or persistence side effect was introduced.
+
+### Files Changed
+- `backend/app/services/resume_field_extractor.py`.
+- `backend/app/services/candidate_search_service.py`.
+- `backend/app/api/candidates.py`.
+- `backend/tests/test_candidate_search_flow.py`.
+- `backend/tests/test_cv_extraction.py`.
+- `workstatus.md`.
+
+### Root Cause and Implementation
+- The detail endpoint revalidated stale fallback/invalid names before responding, but the candidate search service returned the persisted `full_name`/`candidate_name` unchanged.
+- Stored-result audit identified `cv_gptsuifgr321345678o9p` as `Gtworks` from `email_username_fallback`; this explains why its card could disagree with the corrected detail page.
+- The reported `cv_13736_HIRANI` record stores `EDUCATION QUALIFICATION: -` as a high-confidence name while the real name is embedded in a parser-merged `PERSONAL DETAILS NAME: ... PERMANENT ADDRESS: ...` line.
+- Moved the generic revalidation from the detail API into `ResumeFieldExtractor.revalidate_candidate_name` and invoked it for every valid list record before field mapping.
+- Added generic inline `NAME:` field extraction that stops at adjacent personal-detail labels and rejects owner-qualified labels such as company, institution, father, mother, or spouse names.
+- The shared method supports stale fallback, missing, structurally invalid, and parser-merged names using CV text, contact structure, configured extraction rules, and existing confidence gates.
+
+### Verification
+- Stored-result audit found two affected completed records: one invalid education-heading name and one email-username fallback; no top-level/contact alias mismatch was found among the remaining stored records.
+- Added candidate-search regressions for stale fallback, missing names, and the merged personal-details format that previously produced `EDUCATION QUALIFICATION: -`.
+- Added focused extractor coverage confirming the merged structure resolves to the name inside the labeled field rather than the following education heading.
+- Focused source tracing confirms both list and detail paths call the same revalidation method.
+- `git diff --check` passed.
+- Rebuilt and recreated the local API container with the merged local Compose configuration; the API is healthy.
+- Live `/api/v1/candidates/search` verification returns `VIRAL D. HIRANI`, `ZALA SAMJUBHA RANUBHA`, and `Tarun Gupta` for the three screenshot records.
+- Each corresponding `/api/v1/candidates/{id}` response returns the exact same `full_name` and `candidate_name` as the list response.
+
+### Refactoring Performed
+- Removed the detail-endpoint-only name helper and replaced it with one reusable extractor method.
+
+## Previous Task
+**Remove confidence badges from candidate directory**
+
+### Architecture Impact Analysis
+- Kept the candidate directory route, search API, response types, and detail-page confidence rendering unchanged.
+- Removed confidence-tier presentation only from `/candidates`; candidate field values and missing-value fallbacks still use the existing shared component.
+
+### Files Changed
+- `frontend/src/app/candidates/index.tsx`.
+- `workstatus.md`.
+
+### Root Cause and Implementation
+- The list row preferred the legacy top-level `name_confidence_tier` alias over the normalized `field_confidence_tiers.name` value. Those aliases can disagree on older records.
+- Removed `nameTier` and the other list-only tier mappings, then stopped passing confidence tiers to every candidate-directory field so no confidence badge is rendered.
+- No API contract or candidate detail behavior changed.
+
+### Verification
+- Focused source check confirms `/candidates` no longer declares tier variables or passes a `tier` prop to `FieldConfidenceView`.
+- `git diff --check` passed.
+- Build and test commands were not run, per the repository instruction requiring an explicit request.
+
+### Refactoring Performed
+- Removed the four now-unused tier variables from the list-row renderer.
+
+## Previous Task
+**Generic CV extraction and candidate-detail audit**
+
+### Architecture Impact Analysis
+- Preserved the required `route ID -> API -> extraction/normalization -> typed view model -> dynamic UI` flow.
+- Candidate identity remains deterministically extracted; the detail API revalidates legacy invalid/fallback names without candidate-specific rules.
+- Frontend normalization remains a single typed boundary and does not infer vacancy data as candidate identity.
+
+### Files Changed
+- Backend extraction/API/tests: `backend/app/services/resume_field_extractor.py`, `backend/app/api/candidates.py`, `backend/tests/test_cv_extraction.py`.
+- Frontend normalization/UI/tests: `frontend/src/utils/candidateDetail.ts`, `frontend/src/types/api.ts`, `frontend/src/app/candidates/[id].tsx`, `frontend/src/components/ui/ExperienceTimelineCard.tsx`, `frontend/src/__tests__/candidateDetailGeneric.test.mjs`.
+- `workstatus.md`.
+
+### Audit Findings and Fixes
+- Removed the fixed technology/role regex introduced for one merged header; OCR name/role boundaries now use versioned `job_title_denylist` and `header_denylist` configuration.
+- Replaced contact-proximity first-match selection with structural candidate ranking, preventing labels such as education, state, or subject fields from becoming names.
+- Revalidates both low-confidence fallback identities and structurally invalid legacy high-confidence identities.
+- Removed schema assumptions caused by nullish-coalescing empty strings, first-array-only education/projects, and company-only experience merging.
+- Supports top-level, raw resume, and normalized resume fields; record and flat-string arrays; nested certification containers; normalized value objects; multiple roles at one employer; and partial/null payloads.
+- Removed timeline array truncation and `N/A`/`Not specified` rendering. Missing timeline data and metadata are hidden rather than synthesized.
+- Production code contains no candidate-specific names, IDs, emails, locations, or CV-layout strings.
+
+### Verification
+- Backend focused extraction/API tests: 8 passed across ordinary headers, generic-email fallback, filename fallback, two distinct OCR-merged layouts, invalid field labels, and legacy response revalidation.
+- Frontend generic mapper test: passed for canonical, normalized, flat, nested, partial, mismatched-ID, and multi-role payloads.
+- Existing frontend suites: 20 passed; strict TypeScript compilation passed.
+- Python compilation and `git diff --check`: passed.
+- Corpus mapper audit: 22 stored candidate payloads across 6 distinct section/contact shapes completed without exceptions or null sentinel leakage.
+- Rebuilt API/worker and verified four different stored CV structures end to end:
+  - `cv_gptsuifgr321345678o9p` -> `Tarun Gupta`, populated contact, experience, education, skills, and projects.
+  - `cv_1761281901_CandidateCVFileName_13595` -> `Shubham Sureshbhai Gavhane`, missing phone/location/projects handled as absent.
+  - `cv_13736_HIRANI` -> `Viral D. HIRANI`, previously invalid education-heading identity corrected.
+  - `cv_1760681936` -> `ZALA SAMJUBHA RANUBHA`, letter-style resume and previously invalid state/subject identities corrected.
+
+### Refactoring Performed
+- Consolidated configured role-boundary detection, structural name scoring, and invalid-label rejection in the existing extractor.
+- Consolidated multi-source field precedence, cleaning, merging, and deduplication in the typed frontend view-model mapper.
+- No new extractor/client/API route was introduced; no Ollama, scoring, or visual-design behavior changed.
+
+## Previous Task
+
+**Recover local API from startup failure**
+
+### Architecture Impact Analysis
+- No application code or security control changed.
+- The failure came from launching only the production Compose definition on a local machine, which omitted the documented local override.
+
+### Files Changed
+- `workstatus.md` only.
+
+### Implementation and Verification
+- Confirmed `verify_mssql_readonly()` was terminating production-mode startup because the configured MSSQL account has write permissions.
+- Confirmed the API-key message was a separate warning, not the terminating exception.
+- Recreated the stack with `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker`.
+- API, worker, PostgreSQL, and Redis are healthy.
+- `GET /` returns the CV Analyzer welcome response.
+- `GET /api/v1/candidates/cv_gptsuifgr321345678o9p` returns HTTP 200 with the exact `id`/`scan_id`, `Tarun Gupta`, and `COMPLETED` status.
+
+### Refactoring Performed
+- None.
+
+## Previous Task
+
+**Dynamic candidate CV detail page audit and repair**
+
+### Architecture Impact Analysis
+- Preserved the generic `/candidates/[id]` route and existing `/api/v1/candidates/{candidate_id}` contract.
+- Added one frontend normalization boundary between the verified API schema and rendering; no candidate-specific UI logic or mock data was introduced.
+- Kept deterministic resume extraction authoritative and added a generic read-time upgrade for legacy results whose names were stored from low-confidence email/filename fallbacks.
+
+### Root Cause
+- Route resolution and API lookup selected the correct result for `cv_gptsuifgr321345678o9p`; `id` and `scan_id` both matched the requested route.
+- The stored result was wrong: Docling merged the PDF header into `OW T A R U N GUPTAFULL STACK D E V E L O P E R...`, so name extraction fell back to the email username and persisted `Gtworks` even though the CV contains `TARUN GUPTA`.
+- The page independently caused incomplete/misleading output by using a vacancy title as a candidate-title fallback, mapping only selected raw fields, truncating education/certifications/experience, omitting projects and responsibilities, rendering placeholder rows, and accepting stale out-of-order requests after route changes.
+
+### Files Changed
+- `backend/app/services/resume_field_extractor.py`: recovers names from parser-merged, letter-spaced header/name/job-title lines.
+- `backend/app/api/candidates.py`: upgrades stale low-confidence fallback names with the current deterministic extractor before returning candidate details.
+- `backend/tests/test_cv_extraction.py`: covers merged-header extraction and detail-response stale-name upgrades.
+- `frontend/src/utils/candidateDetail.ts`: verified response normalization, route/response identity validation, null cleanup, entity decoding, source merging, and complete section view models.
+- `frontend/src/types/api.ts`: additive candidate-detail response types matching the observed API payload.
+- `frontend/src/app/candidates/[id].tsx`: route-safe loading and fully dynamic rendering for all existing CV sections.
+
+### Dynamic Behavior Implemented
+- Normalizes and validates `string | string[]` route IDs, rejects path-like/empty IDs, verifies response identity, and reports invalid, empty, mismatched, and failed responses.
+- Clears candidate and recommendation state on every route change and sequence-guards all asynchronous responses to prevent another candidate's data from flashing or overwriting the current route.
+- Dynamically renders all experience entries and responsibilities, education entries, certifications, skills, projects, contact links, summary, extracted text, and existing analysis arrays.
+- Hides missing sections/rows and removes `null`, `undefined`, `Unknown`, `Not specified`, and fabricated candidate-title/company/vacancy fallbacks.
+- Uses candidate work history for candidate title/company fallback and never uses `match_analysis.best_match.job_title` as candidate identity.
+
+### Verification
+- `npx tsc --noEmit`: passed with zero TypeScript errors.
+- Focused extraction/API tests: 5 passed (`deterministic_name_extraction` and stale-name detail upgrade).
+- Python syntax compilation for both changed backend modules: passed.
+- Rebuilt Docker `api` and `worker` images and started Redis/PostgreSQL dependencies.
+- Route-handler verification in the rebuilt API image:
+  - `cv_gptsuifgr321345678o9p` resolved to the exact requested `id`/`scan_id`, returned `Tarun Gupta` from `header_contact_section`, 2 experience records, 2 education records, 21 API skills, and 10 projects.
+  - `cv_1761281901_CandidateCVFileName_13595` resolved to the exact requested `id`/`scan_id`, returned `Shubham Sureshbhai Gavhane`, 2 experience records, 11 education records, 25 skills, and no projects; null phone/location remain hidden by the UI mapper.
+- Frontend mapper verification rendered 2 roles and 12 responsibilities, 2 education entries, 24 merged skills, and all 10 projects for the requested candidate; the second candidate omitted its absent contact/project fields without leaking null sentinels.
+- `git diff --check`: passed.
+
+### Pending Environment Issue
+- The HTTP API container currently fails its existing startup safety gate because the configured MSSQL credential has write permissions. The read-only credential must be corrected before browser-level HTTP verification; this security control was not weakened.
+- A broader generation-consistency suite had 6 environment failures because host tests resolve PostgreSQL as Docker hostname `pgvector`; 4 tests passed. These failures are unrelated to the candidate-page changes.
+
+### Refactoring Performed
+- Consolidated candidate response cleanup and field precedence in one reusable frontend mapper instead of duplicating optional/fallback logic across JSX.
+- No Ollama integration, scoring rule, API contract, or visual styling was changed.
+
+## Previous Task
+
 **Local LLM reliability, safety, quality, and observability foundation**
 
 ### Architecture Impact Analysis
