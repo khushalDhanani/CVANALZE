@@ -383,7 +383,7 @@ export default function CandidateDetailScreen() {
         ) : null}
 
         {/* Experience Timeline */}
-        {candidateView && candidateView.experience.length > 0 ? (
+        {/* {candidateView && candidateView.experience.length > 0 ? (
             <Card className="gap-3 p-3 shadow-none border-border">
               <View className="flex-row items-center justify-between">
                 <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Experience History</Text>
@@ -400,7 +400,7 @@ export default function CandidateDetailScreen() {
                   </View>
               ))}
             </Card>
-        ) : null}
+        ) : null} */}
 
         {/* Education & Certs */}
         {candidateView && (candidateView.education.length > 0 || candidateView.certifications.length > 0) ? (
@@ -433,7 +433,7 @@ export default function CandidateDetailScreen() {
         ) : null}
 
         {/* Candidate Skills */}
-        {candidateView && candidateView.skills.length > 0 ? (
+        {/* {candidateView && candidateView.skills.length > 0 ? (
             <Card className="gap-2 p-3 shadow-none border-border">
               <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Skills</Text>
               <View className="flex-row flex-wrap gap-1">
@@ -442,9 +442,9 @@ export default function CandidateDetailScreen() {
                 ))}
               </View>
             </Card>
-        ) : null}
+        ) : null} */}
 
-        {candidateView && candidateView.projects.length > 0 ? (
+        {/* {candidateView && candidateView.projects.length > 0 ? (
           <Card className="gap-3 p-3 shadow-none border-border">
             <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Projects</Text>
             {candidateView.projects.map((project, idx) => (
@@ -458,11 +458,11 @@ export default function CandidateDetailScreen() {
               </View>
             ))}
           </Card>
-        ) : null}
+        ) : null} */}
 
         {/* Suitable Openings */}
         {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
-          analysis.suitable_openings.map((match: any, idx: number) => {
+          analysis.suitable_openings.slice(0, 5).map((match: any, idx: number) => {
             const rawStatus = match.vacancy_match_status || match.match_status || match.classification;
             const fitScore = resolveVacancyFitScore(match);
             const isTop = idx === 0 && (rawStatus === 'MATCHED' || rawStatus === 'HIGH');
@@ -697,8 +697,8 @@ export default function CandidateDetailScreen() {
             <Text className="text-xs text-danger">{recommendationsError}</Text>
           </Card>
         ) : recommendations ? (
-          <Card className="w-full items-stretch gap-3 p-3 shadow-none border-info/40">
-            <View className="w-full flex-row flex-wrap items-center justify-between gap-2 pb-2 border-b border-border">
+          <Card className="items-stretch w-full gap-3 p-3 shadow-none border-info/40">
+            <View className="flex-row flex-wrap items-center justify-between w-full gap-2 pb-2 border-b border-border">
               <View className="flex-row items-center min-w-0 gap-1.5">
                 <Sparkles size={14} color={COLORS.info} />
                 <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Hiring Intelligence</Text>
@@ -892,11 +892,11 @@ export default function CandidateDetailScreen() {
         ]}
       />
       {/* 1. Header Area (Responsive & Tokenized) */}
-      <View className="z-10 px-4 py-3 bg-surface border-b shadow-sm border-border">
-        <View className="flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <View className="z-10 px-4 py-3 border-b shadow-sm bg-surface border-border">
+        <View className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
 
           {/* Left Side: Back Button & High-Level Identity */}
-          <View className="flex-row flex-1 gap-2 items-center">
+          <View className="flex-row items-center flex-1 gap-2">
             <Pressable
               onPress={handleBack}
               accessibilityRole="button"
@@ -924,7 +924,7 @@ export default function CandidateDetailScreen() {
           </View>
 
           {/* Right Side: Primary Metric & Actions */}
-          <View className="flex-row items-center gap-2 flex-wrap self-end sm:self-auto">
+          <View className="flex-row flex-wrap items-center self-end gap-2 sm:self-auto">
             {/* Hiring Recommendation Badge */}
             {recommendations && !recommendationsLoading && recommendations.hiring_recommendation ? (
               <View className="hidden md:flex">
@@ -946,7 +946,7 @@ export default function CandidateDetailScreen() {
                 <Text className="text-xs font-sans-bold text-primary">{Math.round(bestMatch.overall_score)}%</Text>
               </View>
             ) : null}
-            <View className="flex-row gap-2 items-center">
+            <View className="flex-row items-center gap-2">
               <Button
                 variant="secondary"
                 size="sm"
@@ -970,7 +970,7 @@ export default function CandidateDetailScreen() {
       </View>
 
       {/* 2. Tab Navigation */}
-      <View className="flex-row gap-4 px-4 overflow-x-auto bg-surface border-b border-border">
+      <View className="flex-row gap-4 px-4 overflow-x-auto border-b bg-surface border-border">
         {[
           { id: 'overview', label: 'Overview', icon: <Activity size={14} color={activeTab === 'overview' ? COLORS.primary : COLORS.textMuted} /> },
           { id: 'processing', label: 'Processing Pipeline', icon: <Layers size={14} color={activeTab === 'processing' ? COLORS.primary : COLORS.textMuted} /> },

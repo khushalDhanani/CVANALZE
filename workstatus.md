@@ -486,3 +486,25 @@ The worker log showed three distinct failures during CV processing:
 ## Important decisions
 - Internal promotions, transfers, and deputations are not treated as genuine concurrent employment; the existing canonical job renderer continues to show them as nested assignments.
 - Existing unrelated model/environment edits and the deleted `ollama-optimization.md` were preserved untouched.
+# Limit Suitable Openings on Candidate Detail (2026-08-10)
+
+## Work completed
+- Limited the candidate detail page to display the first five ranked `suitable_openings` instead of rendering the complete result collection.
+- Capped the normalized candidate-detail `suitable_openings` collection at five so frontend counts and every page-level consumer also receive only five entries.
+- Kept the full backend response and vacancy matching behavior unchanged.
+
+## Files changed
+- `frontend/src/app/candidates/[id].tsx`
+- `frontend/src/utils/candidateDetail.ts`
+- `workstatus.md`
+
+## Verification
+- Frontend diagnostics checked for the changed candidate page.
+- `git diff --check` passed.
+- Tests/build were not run because project instructions require explicit user authorization.
+
+## Pending work
+- None.
+
+## Important decisions
+- The cap is frontend-only and preserves the existing ranking order, so the five highest-ranked suitable openings are shown while the backend retains the full results.

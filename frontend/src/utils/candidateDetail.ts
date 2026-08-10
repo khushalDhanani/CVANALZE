@@ -84,7 +84,7 @@ export const normalizeCandidateMatchAnalysis = (value: unknown): UnknownRecord |
   const unsuitable = rejected.filter((match, index) => rejected.findIndex((candidate) => matchIdentity(candidate) === matchIdentity(match)) === index);
   const rawBestMatch = isRecord(value.best_match) ? value.best_match : undefined;
   const bestMatch = selected[0] ?? (isProperlyMatchedOpening(rawBestMatch) ? rawBestMatch : null);
-  const suitableOpenings = bestMatch && selected.length === 0 ? [bestMatch] : selected;
+  const suitableOpenings = (bestMatch && selected.length === 0 ? [bestMatch] : selected).slice(0, 5);
   const hasGenuineMatch = suitableOpenings.length > 0;
 
   return {
