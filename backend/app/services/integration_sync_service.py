@@ -394,7 +394,7 @@ class VacancySyncService(BaseSyncService):
     MSSQL_MODEL = RecruitVacancyRequest
     MSSQL_ID_COL = RecruitVacancyRequest.VacancyRequestID
     MSSQL_UPDATED_COL = RecruitVacancyRequest.VacencyRequestUpdDt
-    MSSQL_CREATED_COL = RecruitVacancyRequest.VacencyRequestEntDt
+    MSSQL_CREATED_COL = RecruitVacancyRequest.VacancyRequestEntDt
     MSSQL_IS_ACTIVE_COL = RecruitVacancyRequest.VacancyRequestIsActive
 
 class SourceFreshnessService:

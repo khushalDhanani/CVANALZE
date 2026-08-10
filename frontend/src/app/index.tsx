@@ -296,7 +296,7 @@ export default function HomeScreen() {
                 {candidates.slice(0, 4).map((cand, i) => (
                   <DenseRow
                     key={`${cand.id}-${i}`}
-                    title={cand.filename || 'Unknown CV'}
+                    title={cand.full_name || cand.filename || 'Unknown CV'}
                     subtitle={cand.best_match?.job_title || 'Parsed recently'}
                     onPress={() => router.push(`/candidates/${encodeURIComponent(cand.id)}` as any)}
                   />

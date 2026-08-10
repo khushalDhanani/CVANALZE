@@ -1,6 +1,65 @@
 # Work Status
 
 ## Last Completed Task
+**Show analyzed candidate names in dashboard recent activity**
+
+### Architecture Impact Analysis
+- Reused the existing `CandidateSummary.full_name` field already returned by candidate search and displayed by the All CV page.
+- Changed only the dashboard presentation fallback order; candidate identity, navigation, extraction, persistence, matching, and API contracts remain unchanged.
+
+### Files Changed
+- Dashboard recent-activity UI: `frontend/src/app/index.tsx`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Trace the analyzed name from backend extraction through the candidate-search summary.
+- Compare the All CV row title with the dashboard recent-activity title.
+- Prefer the analyzed full name on the dashboard and retain the filename as a fallback when no name was detected.
+
+### Code Changes
+- Dashboard recent activity now displays `full_name` after analysis instead of always using the uploaded filename such as `san1761727581.pdf`.
+- The uploaded filename remains the fallback for incomplete or unnamed results.
+
+### Verification Checklist
+- [x] Confirmed candidate search exposes `full_name` in `CandidateSummary`.
+- [x] Confirmed the All CV listing already uses the analyzed name.
+- [x] Confirmed recent-activity navigation still uses the stable candidate ID.
+- [x] `git diff --check` passed.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- None; this was a one-line presentation correction.
+
+## Previous Task
+**Fix vacancy integration sync worker import failure**
+
+### Architecture Impact Analysis
+- Corrected the canonical vacancy synchronization service's reference to the existing MSSQL ORM field.
+- Preserved the current sync architecture, database schema, queue configuration, and API contracts.
+
+### Files Changed
+- Vacancy sync configuration: `backend/app/services/integration_sync_service.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Compare the failing service attribute with the `RecruitVacancyRequest` ORM declaration.
+- Correct only the mismatched created-timestamp attribute while retaining the schema's intentionally misspelled update-timestamp field.
+- Review the focused diff and perform whitespace validation without running the project.
+
+### Code Changes
+- `VacancySyncService.MSSQL_CREATED_COL` now references `RecruitVacancyRequest.VacancyRequestEntDt`, matching the declared ORM column and preventing the module-import `AttributeError`.
+
+### Verification Checklist
+- [x] Confirmed `RecruitVacancyRequest` declares `VacancyRequestEntDt`.
+- [x] Confirmed the service's `VacencyRequestUpdDt` reference still matches the separately declared ORM update column.
+- [x] Confirmed no other `VacencyRequestEntDt` references remain under `backend`.
+- [x] `git diff --check` passed.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- None; this was a one-line field-reference correction.
+
+## Previous Task
 **Remove Canonical Fit Breakdown from candidate listing cards**
 
 ### Architecture Impact Analysis
