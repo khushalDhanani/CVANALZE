@@ -1,11 +1,16 @@
 from __future__ import annotations
 # backend/app/services/dynamic_taxonomy_service.py
+import hashlib
 import logging
+import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
+from app.core.config import settings
 from app.core.database import PostgresAppSession
 from app.models.pg import DomainEmbedding
+from app.models.taxonomy import DesignationMaster, DesignationSynonym, JobFamilyMaster
+from app.services.domain_embedding_service import DomainEmbeddingService
 from app.services.embedding_service import EmbeddingService
 from app.schemas.classification_types import (
     ClassificationEvidence,
@@ -29,6 +34,131 @@ class DynamicTaxonomyService:
     3. Dynamic Domain & Job Family Hierarchy Resolution
     4. Graceful Fallback to RuleConfig Defaults
     """
+
+    @classmethod
+    def add_designation(
+        cls,
+        designation_name: str,
+        family_name: str,
+        synonyms: list[str] | None = None,
+        seniority_level: str = "Standard",
+    ) -> bool:
+        """Add or update a PostgreSQL taxonomy designation and its pgvector terms."""
+        clean_name = str(designation_name or "").strip()
+        clean_family = str(family_name or "").strip()
+        clean_seniority = str(seniority_level or "Standard").strip() or "Standard"
+        if not clean_name or not clean_family or len(clean_name) > 255 or len(clean_family) > 255 or len(clean_seniority) > 50:
+            return False
+
+        clean_synonyms = list(
+            dict.fromkeys(
+                str(synonym).strip().lower()
+                for synonym in (synonyms or [])
+                if synonym and str(synonym).strip()
+            )
+        )
+        if any(len(synonym) > 255 for synonym in clean_synonyms):
+            return False
+
+        if PostgresAppSession is None:
+            logger.warning("[DYNAMIC_TAXONOMY] PostgreSQL is unavailable; designation was not written.")
+            return False
+
+        terms = list(dict.fromkeys([clean_name.lower(), *clean_synonyms]))
+        try:
+            embeddings = DomainEmbeddingService.get_or_generate_domain_embeddings(
+                terms,
+                "job_titles",
+                allow_live_generation=True,
+                persist_generated=False,
+            )
+        except Exception as exc:
+            logger.error(f"[DYNAMIC_TAXONOMY] Could not generate designation embeddings for '{clean_name}': {exc}")
+            return False
+        if any(not embeddings.get(term) for term in terms):
+            logger.warning(f"[DYNAMIC_TAXONOMY] Designation embeddings unavailable for '{clean_name}'.")
+            return False
+
+        try:
+            with PostgresAppSession() as session:
+                family = session.query(JobFamilyMaster).filter(func.lower(JobFamilyMaster.family_name) == clean_family.lower()).first()
+                if family is None:
+                    return False
+
+                designation = session.query(DesignationMaster).filter(func.lower(DesignationMaster.designation_name) == clean_name.lower()).first()
+                if designation is not None and designation.family_id != family.family_id:
+                    logger.warning(f"[DYNAMIC_TAXONOMY] Designation '{clean_name}' already belongs to another job family.")
+                    return False
+
+                if designation is None:
+                    base_code = re.sub(r"[^A-Z0-9]+", "_", clean_name.upper()).strip("_") or "DESIGNATION"
+                    designation_code = base_code[:100]
+                    code_owner = session.query(DesignationMaster).filter(DesignationMaster.designation_code == designation_code).first()
+                    if code_owner is not None:
+                        suffix = hashlib.sha256(f"{clean_family}:{clean_name}".encode("utf-8")).hexdigest()[:8].upper()
+                        designation_code = f"{base_code[:91]}_{suffix}"
+                    designation = DesignationMaster(
+                        family_id=family.family_id,
+                        designation_code=designation_code,
+                        designation_name=clean_name,
+                        seniority_level=clean_seniority,
+                        is_active=True,
+                    )
+                    session.add(designation)
+                    session.flush()
+                else:
+                    designation.designation_name = clean_name
+                    designation.seniority_level = clean_seniority
+                    designation.is_active = True
+
+                content_hash_source = "|".join([clean_family.lower(), clean_name.lower(), clean_seniority.lower(), *sorted(clean_synonyms)])
+                designation.content_hash = hashlib.sha256(content_hash_source.encode("utf-8")).hexdigest()
+
+                existing_synonyms = session.query(DesignationSynonym).filter(func.lower(DesignationSynonym.synonym_text).in_(terms)).all()
+                if any(synonym.designation_id != designation.designation_id for synonym in existing_synonyms):
+                    logger.warning(f"[DYNAMIC_TAXONOMY] A synonym for '{clean_name}' is already assigned to another designation.")
+                    session.rollback()
+                    return False
+
+                existing_terms = {synonym.synonym_text.strip().lower() for synonym in existing_synonyms}
+                for term in terms:
+                    if term not in existing_terms:
+                        session.add(
+                            DesignationSynonym(
+                                designation_id=designation.designation_id,
+                                synonym_text=term,
+                                is_canonical=term == clean_name.lower(),
+                            )
+                        )
+
+                vector_rows = session.query(DomainEmbedding).filter(
+                    DomainEmbedding.category == "job_titles",
+                    DomainEmbedding.term.in_(terms),
+                ).all()
+                vectors_by_term = {row.term: row for row in vector_rows}
+                for term in terms:
+                    content_hash = hashlib.sha256(term.encode("utf-8")).hexdigest()
+                    vector_row = vectors_by_term.get(term)
+                    if vector_row is None:
+                        session.add(
+                            DomainEmbedding(
+                                category="job_titles",
+                                term=term,
+                                embedding=embeddings[term],
+                                embedding_model_version=settings.EMBEDDING_MODEL,
+                                content_hash=content_hash,
+                            )
+                        )
+                    else:
+                        vector_row.embedding = embeddings[term]
+                        vector_row.embedding_model_version = settings.EMBEDDING_MODEL
+                        vector_row.content_hash = content_hash
+
+                session.commit()
+                return True
+        except Exception as exc:
+            logger.error(f"[DYNAMIC_TAXONOMY] Failed to add PostgreSQL designation '{clean_name}': {exc}", exc_info=True)
+            return False
 
     @classmethod
     def resolve_candidate_role_and_domain(

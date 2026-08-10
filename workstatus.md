@@ -1,6 +1,50 @@
 # Work Status
 
 ## Last Completed Task
+**Connect Add Designation to PostgreSQL taxonomy and pgvector**
+
+### Architecture Impact Analysis
+- Connected the existing administrator `POST /api/domain-knowledge/designations` route to a real `DynamicTaxonomyService.add_designation` implementation.
+- Designation masters and synonyms are written only to the CV Analyzer-owned PostgreSQL `cvai` taxonomy tables; designation and synonym embeddings are written to PostgreSQL `domain_embeddings` using pgvector.
+- The write path does not open, import, update, or flush an MSSQL session. Existing MSSQL taxonomy reads used by classification remain unchanged.
+- Reused `DomainEmbeddingService` and the centralized `EmbeddingService` batch generation path; no second Ollama client, retry strategy, cache, or embedding implementation was introduced.
+- The route and response contract remain unchanged.
+
+### Files Changed
+- Route documentation/error detail: `backend/app/api/domain_knowledge.py`.
+- PostgreSQL taxonomy write service: `backend/app/services/dynamic_taxonomy_service.py`.
+- Transaction-compatible embedding generation option: `backend/app/services/domain_embedding_service.py`.
+- Regression coverage: `backend/tests/test_domain_knowledge_embeddings.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Validate and normalize the designation, parent family, seniority, and synonyms.
+- Generate all job-title embeddings through the existing centralized embedding service without independently committing them.
+- Resolve the parent job family and add or update the designation and synonyms in PostgreSQL.
+- Insert or update the designation/synonym vectors in `domain_embeddings` in the same PostgreSQL transaction.
+- Reject missing families, unavailable embeddings, cross-family designation conflicts, and aliases already assigned to another designation.
+
+### Code Changes
+- Added `DynamicTaxonomyService.add_designation` with idempotent case-insensitive designation lookup, deterministic designation codes, canonical synonym creation, content hashing, and conflict protection.
+- Added `persist_generated` to `DomainEmbeddingService` so callers can reuse centralized generation while owning a larger PostgreSQL transaction; existing callers retain automatic persistence by default.
+- Successful Add Designation requests now commit taxonomy and pgvector rows together.
+- Corrected the route docstring so it no longer claims to write to MSSQL.
+- Added route-delegation and PostgreSQL taxonomy/pgvector persistence regressions.
+
+### Verification Checklist
+- [x] `DynamicTaxonomyService.add_designation` now exists and is connected to the route.
+- [x] Designations write to `cvai.designations`.
+- [x] Canonical names and supplied aliases write to `cvai.designation_synonyms`.
+- [x] Corresponding `job_titles` vectors write to PostgreSQL `domain_embeddings`.
+- [x] The Add Designation implementation contains no MSSQL session or MSSQL model write path.
+- [x] Existing centralized embedding generation remains the only embedding implementation.
+- [x] `git diff --check` passed.
+- [ ] Tests were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Added an opt-out for immediate embedding persistence so taxonomy and vector records can be committed atomically by the PostgreSQL designation service.
+
+## Previous Task
 **Make Docker RQ workers consume every project queue through the intended worker entry point**
 
 ### Architecture Impact Analysis

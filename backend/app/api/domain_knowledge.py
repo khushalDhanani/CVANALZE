@@ -85,7 +85,7 @@ def get_semantic_equivalents(
 @router.post("/designations", response_model=dict[str, Any])
 def add_new_designation(request: AddDesignationRequest) -> dict[str, Any]:
     """
-    Dynamically add a new designation with synonyms to MSSQL & pgvector without code/JSON changes.
+    Dynamically add a new designation with synonyms to PostgreSQL taxonomy and pgvector.
     """
     success = DynamicTaxonomyService.add_designation(
         designation_name=request.designation_name,
@@ -96,7 +96,7 @@ def add_new_designation(request: AddDesignationRequest) -> dict[str, Any]:
     if not success:
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to add designation '{request.designation_name}'. Ensure parent family exists.",
+            detail=f"Failed to add designation '{request.designation_name}'. Ensure the parent family exists and embeddings are available.",
         )
     return {
         "status": "success",

@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,7 +10,10 @@ from app.core.cache import (
     vacancy_cache_manager,
 )
 from app.main import app
+from app.models.pg import DomainEmbedding
+from app.models.taxonomy import DesignationMaster, DesignationSynonym, JobFamilyMaster
 from app.services.domain_embedding_service import DomainEmbeddingService
+from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.scoring_engine import ScoringEngine
 
 client = TestClient(app)
@@ -114,3 +120,75 @@ def test_domain_knowledge_equivalents_api():
     assert data["term"] == "postgres"
     assert data["category"] == "skills"
     assert isinstance(data["equivalents"], list)
+
+
+def test_add_designation_api_uses_dynamic_taxonomy_service():
+    with patch.object(DynamicTaxonomyService, "add_designation", return_value=True) as add_designation:
+        resp = client.post(
+            "/api/domain-knowledge/designations",
+            json={
+                "designation_name": "Prompt Engineer",
+                "family_name": "Software Engineering & Development",
+                "synonyms": ["LLM Engineer"],
+                "seniority_level": "Senior",
+            },
+        )
+
+    assert resp.status_code == 200
+    add_designation.assert_called_once_with(
+        designation_name="Prompt Engineer",
+        family_name="Software Engineering & Development",
+        synonyms=["LLM Engineer"],
+        seniority_level="Senior",
+    )
+
+
+def test_add_designation_persists_postgres_taxonomy_and_pgvector(monkeypatch):
+    session = MagicMock()
+    family = SimpleNamespace(family_id=17)
+    designation_results = iter([None, None])
+
+    def query(model):
+        result = MagicMock()
+        if model is JobFamilyMaster:
+            result.filter.return_value.first.return_value = family
+        elif model is DesignationMaster:
+            result.filter.return_value.first.side_effect = lambda: next(designation_results)
+        elif model in (DesignationSynonym, DomainEmbedding):
+            result.filter.return_value.all.return_value = []
+        return result
+
+    def assign_designation_id(record):
+        if isinstance(record, DesignationMaster):
+            record.designation_id = 501
+
+    session.query.side_effect = query
+    session.add.side_effect = assign_designation_id
+    session_context = MagicMock()
+    session_context.__enter__.return_value = session
+    monkeypatch.setattr("app.services.dynamic_taxonomy_service.PostgresAppSession", lambda: session_context)
+    monkeypatch.setattr(
+        DomainEmbeddingService,
+        "get_or_generate_domain_embeddings",
+        MagicMock(
+            return_value={
+                "prompt engineer": [0.1] * 768,
+                "llm engineer": [0.2] * 768,
+            }
+        ),
+    )
+
+    success = DynamicTaxonomyService.add_designation(
+        designation_name="Prompt Engineer",
+        family_name="Software Engineering & Development",
+        synonyms=["LLM Engineer"],
+        seniority_level="Senior",
+    )
+
+    assert success is True
+    added_records = [call.args[0] for call in session.add.call_args_list]
+    assert any(isinstance(record, DesignationMaster) for record in added_records)
+    assert {record.synonym_text for record in added_records if isinstance(record, DesignationSynonym)} == {"prompt engineer", "llm engineer"}
+    assert {record.term for record in added_records if isinstance(record, DomainEmbedding)} == {"prompt engineer", "llm engineer"}
+    assert all(record.category == "job_titles" for record in added_records if isinstance(record, DomainEmbedding))
+    session.commit.assert_called_once_with()

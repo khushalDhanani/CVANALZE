@@ -37,7 +37,13 @@ class DomainEmbeddingService:
         return dict(RuleConfigManager.get_domain_embedding_rules().canonical_equivalents)
 
     @classmethod
-    def get_or_generate_domain_embedding(cls, term: str, category: str, allow_live_generation: bool = True) -> list[float] | None:
+    def get_or_generate_domain_embedding(
+        cls,
+        term: str,
+        category: str,
+        allow_live_generation: bool = True,
+        persist_generated: bool = True,
+    ) -> list[float] | None:
         if not term or not term.strip():
             return None
 
@@ -46,6 +52,7 @@ class DomainEmbeddingService:
             [clean_term],
             category,
             allow_live_generation=allow_live_generation,
+            persist_generated=persist_generated,
         ).get(clean_term)
 
     @classmethod
@@ -54,6 +61,7 @@ class DomainEmbeddingService:
         terms: list[str],
         category: str,
         allow_live_generation: bool = True,
+        persist_generated: bool = True,
     ) -> dict[str, list[float]]:
         """Resolve related domain terms through one cached, serialized Ollama batch."""
         cat = category.strip().lower()
@@ -85,7 +93,8 @@ class DomainEmbeddingService:
                 embedding = generated.get(str(index))
                 if embedding:
                     resolved[clean_term] = embedding
-                    cls._save_domain_embedding(clean_term, cat, embedding, model_version)
+                    if persist_generated:
+                        cls._save_domain_embedding(clean_term, cat, embedding, model_version)
         return resolved
 
     @staticmethod
