@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.analysis import router as match_router
+from app.api.auth import router as auth_router
 from app.api.analytics import router as analytics_router
 from app.api.batch import router as batch_router
 from app.api.candidates import router as candidates_router
@@ -79,6 +80,7 @@ app.add_middleware(
 app.add_middleware(RequestContextMiddleware)
 
 for router in (
+    auth_router,
     cv_router,
     match_router,
     jobs_router,

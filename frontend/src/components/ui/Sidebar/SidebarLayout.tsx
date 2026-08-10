@@ -1,10 +1,11 @@
 import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { Slot, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, Search, Briefcase, Layers, Settings, Users, X, BarChart3, Database, GitBranch, BookOpen } from 'lucide-react-native';
+import { Layers, LogOut, X } from 'lucide-react-native';
 import { useState, useEffect } from 'react';
 import { COLORS } from '@/constants/colors';
 import { BRAND } from '@/constants/brand';
+import { useAuth } from '@/components/auth/AuthenticationGate';
 
 import { NAV_ITEMS } from '@/constants/navigation';
 
@@ -13,6 +14,7 @@ export function SidebarLayout() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const router = useRouter();
+  const { authRequired, role, signOut } = useAuth();
 
   const isMobile = width < 768;
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
@@ -110,6 +112,23 @@ export function SidebarLayout() {
               );
             })}
           </ScrollView>
+
+          {authRequired && (
+            <View className="border-t border-border px-3 py-3 gap-1">
+              {!!role && (
+                <Text className="px-3 text-[11px] font-sans text-text-muted capitalize">{role} session</Text>
+              )}
+              <Pressable
+                onPress={signOut}
+                className="flex-row items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md active:bg-background"
+                accessibilityRole="button"
+                accessibilityLabel="Sign out"
+              >
+                <LogOut size={20} color={COLORS.textMuted} />
+                <Text className="text-sm font-sans text-text-muted">Sign out</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
 

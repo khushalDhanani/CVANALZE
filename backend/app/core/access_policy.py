@@ -14,6 +14,9 @@ class EndpointPolicy:
 ENDPOINT_POLICIES: tuple[EndpointPolicy, ...] = (
     EndpointPolicy("GET", "/", AccessTier.PUBLIC),
     EndpointPolicy("GET", "/health", AccessTier.PUBLIC),
+    EndpointPolicy("GET", "/api/auth/session", AccessTier.PUBLIC),
+    EndpointPolicy("POST", "/api/auth/session", AccessTier.PUBLIC),
+    EndpointPolicy("DELETE", "/api/auth/session", AccessTier.PUBLIC),
     EndpointPolicy("GET", "/api/match/health", AccessTier.ADMINISTRATOR),
     EndpointPolicy("POST", "/api/match/analyze", AccessTier.RECRUITER),
     EndpointPolicy("POST", "/api/match/upload", AccessTier.RECRUITER),

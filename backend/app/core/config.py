@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     AUTH_ENABLED: bool = False
     RECRUITER_API_KEYS: list[str] = []
     ADMINISTRATOR_API_KEYS: list[str] = []
+    AUTH_SESSION_SIGNING_KEY: str = ""
+    AUTH_SESSION_TTL_SECONDS: int = 8 * 60 * 60
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_REQUESTS: int = 300
     RATE_LIMIT_WINDOW_SECONDS: int = 60
@@ -189,7 +191,7 @@ class Settings(BaseSettings):
 
     @property
     def AUTH_REQUIRED(self) -> bool:
-        return self.AUTH_ENABLED or self.IS_PRODUCTION
+        return self.AUTH_ENABLED
 
     @property
     def TRUSTED_ORIGINS(self) -> list[str]:

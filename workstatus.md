@@ -1,6 +1,129 @@
 # Work Status
 
 ## Last Completed Task
+**Prevent authentication UI and credentialed-CORS failures when authentication is disabled**
+
+### Architecture Impact Analysis
+- Kept `AUTH_ENABLED` as the central backend switch and retained all existing middleware, roles, API keys, and signed-session behavior.
+- Made the shared frontend client discover whether authentication is enabled before deciding whether to send browser credentials.
+- Authentication-disabled deployments no longer require credentialed CORS merely to bootstrap the frontend.
+- No API route, response contract, backend authorization rule, or Ollama behavior changed.
+
+### Files Changed
+- `frontend/src/services/apiClient.ts`.
+- `frontend/src/components/auth/AuthenticationGate.tsx`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Query the public session-status endpoint without browser credentials.
+- Enable cookie credentials only when the backend reports `auth_required=true`.
+- Separate backend-connectivity failures from actual unauthenticated state in the root UI.
+
+### Code Changes
+- Replaced unconditional `credentials: 'include'` with a shared credential mode driven by `/api/auth/session`.
+- Authentication-disabled mode now uses `credentials: 'omit'` for API calls, so `CORS_ALLOW_CREDENTIALS=false` remains valid locally.
+- Authentication-enabled mode performs a credential-free status discovery followed by a credentialed cookie check and retains the existing sign-in/session flow.
+- A failed API connection now shows only an API connectivity message and retry action; it no longer displays an access-key prompt before auth status is known.
+
+### Verification Checklist
+- [x] Compose resolves `APP_ENVIRONMENT=development` and `AUTH_ENABLED=false` for the local API.
+- [x] API and frontend development servers respond on ports 8000 and 8081.
+- [x] `GET /api/auth/session` returns HTTP 200 with `authenticated=true` and `auth_required=false`.
+- [x] The response permits origin `http://localhost:8081` without requiring credentialed CORS.
+- [x] Unauthenticated `GET /api/jobs` returns HTTP 200.
+- [x] `git diff --check` passed.
+- [ ] In-app browser visual verification was unavailable because the browser-control runtime is not exposed in this session.
+
+### Refactoring Performed
+- Centralized frontend credential-mode selection in `apiClient`; screens and feature services remain unaware of authentication details.
+
+## Previous Task
+**Make `AUTH_ENABLED` the single authentication enable/disable switch**
+
+### Architecture Impact Analysis
+- Kept `AccessControlMiddleware`, endpoint access policies, recruiter/administrator roles, API-key authentication, and signed browser sessions unchanged.
+- Changed only the centralized `Settings.AUTH_REQUIRED` decision so deployment environment no longer overrides the explicit authentication switch.
+- The frontend already consumes `/api/auth/session`; with authentication disabled it receives `authenticated=true` and renders normally without sign-in.
+- No route-specific bypass, localhost condition, API contract change, or Ollama behavior was introduced.
+
+### Files Changed
+- Central switch: `backend/app/core/config.py`.
+- Compose configuration: `docker-compose.yml`, `docker-compose.local.yml`.
+- Regression coverage: `backend/tests/test_phase6_api_reliability.py`.
+- Documentation: `README.md`, `workstatus.md`.
+
+### Implementation Plan
+- Return `AUTH_ENABLED` directly from `AUTH_REQUIRED`.
+- Preserve secure-on defaults in the production Compose file while allowing `.env` overrides.
+- Preserve auth-off defaults in the local Compose override while allowing the same `.env` variable to override it.
+- Verify protected access with authentication disabled, missing credentials with authentication enabled, and valid credentials with authentication enabled.
+
+### Code Changes
+- Replaced `return self.AUTH_ENABLED or self.IS_PRODUCTION` with `return self.AUTH_ENABLED`.
+- Changed root Compose to `AUTH_ENABLED: '${AUTH_ENABLED:-true}'`.
+- Changed the local Compose override to `AUTH_ENABLED: '${AUTH_ENABLED:-false}'` so it also honors the same environment variable.
+- Replaced the obsolete production-forced-auth regression with explicit enabled/disabled behavior tests against `GET /api/jobs`.
+- Updated documentation that previously stated production always forces authentication.
+
+### Verification Checklist
+- [x] `AUTH_ENABLED=false`: unauthenticated `GET /api/jobs` returns HTTP 200 through the existing central middleware bypass.
+- [x] `AUTH_ENABLED=true`: unauthenticated `GET /api/jobs` returns the existing HTTP 401 `UNAUTHORIZED` response.
+- [x] `AUTH_ENABLED=true`: `Authorization: Bearer recruiter-secret` successfully accesses `GET /api/jobs`.
+- [x] Existing administrator role enforcement and `X-API-Key` authentication coverage also passed.
+- [x] Focused result: 3 tests passed, 12 deselected.
+- [x] Full operational reliability result: 15 tests passed.
+- [x] `git diff --check` passed.
+- [x] No authentication middleware, roles, API-key/token support, or individual API routes were removed or bypassed.
+
+### Refactoring Performed
+- None; this was the smallest centralized configuration change.
+
+## Previous Task
+**Connect the frontend to protected production APIs without embedding an administrator key**
+
+### Architecture Impact Analysis
+- Preserved the existing API-key roles and `AccessControlMiddleware` as the authorization authority.
+- Added a stateless browser-session adapter: a supplied API key is validated once, then replaced by a short-lived signed HttpOnly cookie for subsequent requests.
+- Kept the Expo frontend static; no server credential or `EXPO_PUBLIC_*` secret was introduced.
+- The cookie is accepted by the same middleware for HTTP, uploads, and browser WebSocket handshakes; direct API-key authentication remains backward compatible for non-browser clients.
+- No Ollama configuration, client, cache, retry, timeout, generation, or embedding path changed.
+
+### Files Changed
+- Backend authentication and routing: `backend/app/api/auth.py`, `backend/app/core/security.py`, `backend/app/core/access_policy.py`, `backend/app/core/config.py`, `backend/app/core/lifecycle.py`, `backend/app/main.py`.
+- Frontend session flow: `frontend/src/services/apiClient.ts`, `frontend/src/components/auth/AuthenticationGate.tsx`, `frontend/src/app/_layout.tsx`, `frontend/src/components/ui/Sidebar/SidebarLayout.tsx`.
+- Configuration, documentation, and regression coverage: `docker-compose.yml`, `backend/.env.example`, `README.md`, `backend/tests/test_phase6_api_reliability.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Characterize the session endpoints explicitly as public while keeping all application routes protected by their existing recruiter/administrator policy.
+- Exchange a transient user-entered API key for a role-bearing session signed with an independent server-only secret.
+- Store the session only in an `HttpOnly`, `SameSite=Strict`, production-`Secure` cookie and send it with every shared frontend API request.
+- Gate application routes on session status, return to sign-in on HTTP 401, and expose an explicit logout action.
+
+### Code Changes
+- Added `GET`, `POST`, and `DELETE /api/auth/session` for session inspection, creation, and logout.
+- Added HMAC-signed, versioned, expiring session tokens with signature, expiry, format, and role validation.
+- Required an independent `AUTH_SESSION_SIGNING_KEY` of at least 32 characters; missing or weak configuration fails browser session creation closed.
+- Added `AUTH_SESSION_TTL_SECONDS` with an eight-hour default and credentialed-CORS deployment configuration.
+- Updated `apiClient` to use `credentials: 'include'`, centralize session operations, and notify the auth gate when a protected call returns HTTP 401.
+- Added a sign-in gate that holds the access key only for the exchange request, clears it immediately afterward, and never persists it in frontend configuration or storage.
+- Added role/session display and logout to the existing sidebar.
+
+### Verification Checklist
+- [x] Static source inspection confirms no API key or session-signing secret is embedded in frontend code or public environment variables.
+- [x] Session cookies are configured `HttpOnly`, `SameSite=Strict`, path-scoped to `/`, and `Secure` in production.
+- [x] Session signatures use an independent server-side secret, preserve recruiter/administrator authorization, expire, and reject tampering.
+- [x] Direct `Authorization: Bearer` and `X-API-Key` clients remain supported.
+- [x] `git diff --check` passed before the work-status update.
+- [x] Added focused tests for cookie attributes, key non-disclosure, protected access, administrator denial, logout, expiry, and tampering.
+- [ ] Builds and tests were not run because repository instructions require explicit permission.
+- [ ] Production deployment must set a unique `AUTH_SESSION_SIGNING_KEY`, the exact HTTPS frontend `ALLOWED_ORIGINS`, and `CORS_ALLOW_CREDENTIALS=true`.
+
+### Refactoring Performed
+- Centralized API-key and session-cookie authentication in the existing access-control middleware.
+- Centralized frontend session handling in the shared API client and one root authentication gate; individual services and screens did not gain duplicate auth logic.
+
+## Previous Task
 **Make CV-to-department and active-vacancy matching fully evidence-driven**
 
 ### Architecture Impact Analysis

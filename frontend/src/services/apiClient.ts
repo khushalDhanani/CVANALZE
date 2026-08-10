@@ -1,6 +1,16 @@
 import { Platform } from 'react-native';
 import { API_CONFIG } from '@/constants/config';
 
+export interface AuthSession {
+  authenticated: boolean;
+  auth_required: boolean;
+  role: 'recruiter' | 'administrator' | null;
+  expires_in_seconds: number | null;
+}
+
+let unauthorizedHandler: (() => void) | null = null;
+let sessionCredentialsEnabled = false;
+
 export class ApiError extends Error {
   status: number;
   data: any;
@@ -33,6 +43,7 @@ async function request<T>(
   try {
     const response = await fetch(url, {
       ...options,
+      credentials: options.credentials ?? (sessionCredentialsEnabled ? 'include' : 'omit'),
       headers: {
         ...defaultHeaders,
         ...options.headers,
@@ -51,6 +62,9 @@ async function request<T>(
     }
 
     if (!response.ok) {
+      if (response.status === 401 && endpoint !== '/api/auth/session') {
+        unauthorizedHandler?.();
+      }
       const errorMessage =
         (typeof data === 'object' && data?.detail) ||
         (typeof data === 'string' && data) ||
@@ -72,6 +86,39 @@ async function request<T>(
 }
 
 export const apiClient = {
+  setUnauthorizedHandler: (handler: (() => void) | null) => {
+    unauthorizedHandler = handler;
+  },
+
+  getSession: async () => {
+    const publicStatus = await request<AuthSession>('/api/auth/session', {
+      method: 'GET',
+      credentials: 'omit',
+    });
+    sessionCredentialsEnabled = publicStatus.auth_required;
+    if (!publicStatus.auth_required) {
+      return publicStatus;
+    }
+    return request<AuthSession>('/api/auth/session', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  createSession: (apiKey: string) => {
+    sessionCredentialsEnabled = true;
+    return request<AuthSession>('/api/auth/session', {
+      method: 'POST',
+      headers: { 'X-API-Key': apiKey },
+      credentials: 'include',
+    });
+  },
+
+  deleteSession: () => request<AuthSession>('/api/auth/session', {
+    method: 'DELETE',
+    credentials: 'include',
+  }),
+
   get: <T>(endpoint: string, headers?: Record<string, string>) =>
     request<T>(endpoint, { method: 'GET', headers }),
 

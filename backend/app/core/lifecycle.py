@@ -54,6 +54,8 @@ def initialize_database_schema() -> None:
 def verify_runtime_security() -> None:
     if settings.AUTH_REQUIRED and not settings.RECRUITER_API_KEYS and not settings.ADMINISTRATOR_API_KEYS:
         logger.error("[STARTUP] Authentication is required but no API keys are configured; protected endpoints will fail closed.")
+    if settings.AUTH_REQUIRED and len(settings.AUTH_SESSION_SIGNING_KEY.encode("utf-8")) < 32:
+        logger.error("[STARTUP] Browser sessions require AUTH_SESSION_SIGNING_KEY with at least 32 characters; session creation will fail closed.")
     if any(origin.strip() == "*" for origin in settings.ALLOWED_ORIGINS):
         logger.warning("[STARTUP] Wildcard CORS origins are ignored; configure explicit trusted origins.")
 

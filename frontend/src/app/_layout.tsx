@@ -6,6 +6,7 @@ import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_7
 import { useEffect } from 'react';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { AuthenticationGate } from '@/components/auth/AuthenticationGate';
 import { SidebarLayout } from '@/components/ui/Sidebar/SidebarLayout';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,7 +34,9 @@ export default function TabLayout() {
   return (
     <ThemeProvider value={DefaultTheme}>
       <AnimatedSplashOverlay />
-      <SidebarLayout />
+      <AuthenticationGate>
+        <SidebarLayout />
+      </AuthenticationGate>
     </ThemeProvider>
   );
 }

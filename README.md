@@ -53,15 +53,21 @@ Key boundaries are intentionally centralized:
 access. Configuration, reprocessing, cache administration, warmup, synchronization, training data, model health, taxonomy mutation, and performance metrics require
 administrator access. Uncharacterized `/api/*` routes fail closed as administrator-only.
 
-Authenticate with either header:
+Non-browser clients can authenticate with either header:
 
 ```http
 Authorization: Bearer <api-key>
 X-API-Key: <api-key>
 ```
 
-Administrator keys inherit recruiter permissions. `AUTH_ENABLED=false` is available for local development, but production and staging always require authentication.
-Protected endpoints return HTTP 503 when authentication is required and no keys are configured.
+Administrator keys inherit recruiter permissions. `AUTH_ENABLED` is the single authentication switch in every environment. When it is `false`, protected routes bypass
+authentication centrally; when it is `true`, the existing recruiter/administrator policy is enforced. Protected endpoints return HTTP 503 when authentication is
+enabled and no keys are configured.
+
+The frontend does not embed either API key. A recruiter or administrator enters an issued key at sign-in; `POST /api/auth/session` validates it and returns an eight-hour,
+signed `HttpOnly`, `Secure` (in production), `SameSite=Strict` session cookie. The browser discards the entered key after that exchange and sends only the cookie on
+subsequent requests. `GET /api/auth/session` checks the current session, and `DELETE /api/auth/session` signs out. Deploy the frontend and API on HTTPS origins within
+the same site, list the exact frontend origin in `ALLOWED_ORIGINS`, and keep credentialed CORS enabled.
 
 The characterized endpoint inventory and successful response shapes are in [Phase 0 API contracts](backend/docs/phase0-api-contracts.md). The enforced policy is
 documented in [Phase 6](backend/docs/phase6-api-operational-reliability.md).
@@ -151,11 +157,13 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `APP_ENVIRONMENT` | `development` | Enables production/staging containment when set to `production`, `prod`, or `staging`. |
-| `AUTH_ENABLED` | `false` | Enables API-key enforcement locally; production/staging always enforce it. |
+| `AUTH_ENABLED` | `false` (`true` in Compose) | Enables the existing API-key/session authentication and recruiter/administrator authorization policy. |
 | `RECRUITER_API_KEYS` | `[]` | JSON array of recruiter secrets. |
 | `ADMINISTRATOR_API_KEYS` | `[]` | JSON array of administrator secrets. |
+| `AUTH_SESSION_SIGNING_KEY` | empty | Independent random secret of at least 32 characters used only to sign browser sessions. |
+| `AUTH_SESSION_TTL_SECONDS` | `28800` | Lifetime of the signed browser session cookie. |
 | `ALLOWED_ORIGINS` | `["http://localhost:8081"]` | Explicit trusted CORS origins; wildcard entries are ignored. |
-| `CORS_ALLOW_CREDENTIALS` | `false` | Enables credentialed cross-origin requests only for trusted origins. |
+| `CORS_ALLOW_CREDENTIALS` | `false` (`true` in Compose) | Enables browser session cookies only for explicitly trusted origins. |
 | `RATE_LIMIT_ENABLED` | `true` | Enables the per-process application containment limit. |
 | `RATE_LIMIT_REQUESTS` | `300` local, `120` Compose | Requests allowed per socket-peer bucket and window. |
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Sliding-window duration. |
@@ -285,7 +293,9 @@ provide deployment values through the shell or an ignored root `.env`, including
 POSTGRES_PASSWORD=replace-with-a-unique-secret
 RECRUITER_API_KEYS=["replace-with-a-generated-recruiter-secret"]
 ADMINISTRATOR_API_KEYS=["replace-with-a-generated-administrator-secret"]
+AUTH_SESSION_SIGNING_KEY=replace-with-an-independent-random-secret-at-least-32-characters
 ALLOWED_ORIGINS=["https://recruiting.example.com"]
+CORS_ALLOW_CREDENTIALS=true
 ```
 
 Start infrastructure, apply migrations, and then start the application processes:
@@ -355,7 +365,7 @@ error envelopes, configured rate limits, and Ollama-disabled fallback.
 - Legacy filename result lookup is preserved when the alias identifies exactly one canonical CV. Ambiguous aliases no longer select an unrelated candidate.
 - Legacy job statuses adapt to canonical states. `error_details` remains present but never exposes a traceback.
 - Top-level error `detail` remains alongside the canonical error envelope.
-- PDF/DOCX-only uploads, production authentication, collision rejection, safe input limits, and default unknown-job HTTP 404 are intentional containment changes.
+- PDF/DOCX-only uploads, configurable authentication, collision rejection, safe input limits, and default unknown-job HTTP 404 are intentional containment changes.
 - Versioned extraction, matching, prompt, model, vacancy, and content identities deliberately prevent stale cache reuse.
 
 ## Remaining limitations

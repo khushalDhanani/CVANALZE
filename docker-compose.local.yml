@@ -3,7 +3,7 @@
 
 x-local-backend-environment: &local-backend-environment
   APP_ENVIRONMENT: development
-  AUTH_ENABLED: "false"
+  AUTH_ENABLED: '${AUTH_ENABLED:-false}'
   INITIALIZE_DATABASE_ON_STARTUP: "true"
   STARTUP_CACHE_WARMUP_ENABLED: "false"
   MSSQL_READ_ONLY_URL: '${MSSQL_READ_ONLY_URL}'

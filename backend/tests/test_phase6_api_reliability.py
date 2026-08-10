@@ -11,6 +11,8 @@ from app.core.error_handlers import register_exception_handlers
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.request_context import RequestContextMiddleware
 from app.core.security import AccessControlMiddleware
+from app.core.security import AuthenticatedPrincipal, authenticate_session_token, create_session_token
+from app.api.auth import router as auth_router
 from app.main import app as main_app
 from app.schemas.analysis import HRReviewRequest
 from app.schemas.contracts import AccessTier
@@ -23,6 +25,24 @@ def _app_with_operational_middleware(path: str = "/test") -> FastAPI:
 
     @test_app.get(path)
     async def endpoint():
+        return {"status": "ok"}
+
+    test_app.add_middleware(AccessControlMiddleware)
+    test_app.add_middleware(RequestContextMiddleware)
+    return test_app
+
+
+def _app_with_session_auth() -> FastAPI:
+    test_app = FastAPI()
+    register_exception_handlers(test_app)
+    test_app.include_router(auth_router, prefix="/api")
+
+    @test_app.get("/api/candidates")
+    async def candidates():
+        return {"status": "ok"}
+
+    @test_app.get("/api/config/active")
+    async def active_config():
         return {"status": "ok"}
 
     test_app.add_middleware(AccessControlMiddleware)
@@ -48,6 +68,7 @@ def test_authentication_and_role_authorization(monkeypatch):
     monkeypatch.setattr(settings, "AUTH_ENABLED", True)
     monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
     monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", ["administrator-secret"])
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
     client = TestClient(_app_with_operational_middleware("/api/config/match"))
 
     unauthorized = client.get("/api/config/match", headers={"X-Request-ID": "request-auth"})
@@ -63,17 +84,75 @@ def test_authentication_and_role_authorization(monkeypatch):
     assert allowed.status_code == 200
 
 
-def test_production_authentication_fails_closed(monkeypatch):
+def test_authentication_disabled_bypasses_protected_endpoint(monkeypatch):
     monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
     monkeypatch.setattr(settings, "AUTH_ENABLED", False)
     monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
     monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", [])
-    client = TestClient(_app_with_operational_middleware("/api/candidates"))
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
+    client = TestClient(_app_with_operational_middleware("/api/jobs"))
 
-    response = client.get("/api/candidates")
+    response = client.get("/api/jobs")
 
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "UNAUTHORIZED"
+    assert settings.AUTH_REQUIRED is False
+    assert response.status_code == 200
+
+
+def test_authentication_enabled_protects_endpoint_and_accepts_valid_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "development")
+    monkeypatch.setattr(settings, "AUTH_ENABLED", True)
+    monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
+    monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", [])
+    client = TestClient(_app_with_operational_middleware("/api/jobs"))
+
+    unauthorized = client.get("/api/jobs")
+    authenticated = client.get("/api/jobs", headers={"Authorization": "Bearer recruiter-secret"})
+
+    assert settings.AUTH_REQUIRED is True
+    assert unauthorized.status_code == 401
+    assert unauthorized.json()["error"]["code"] == "UNAUTHORIZED"
+    assert authenticated.status_code == 200
+
+
+def test_frontend_exchanges_api_key_for_secure_session_cookie(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "AUTH_ENABLED", True)
+    monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
+    monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", ["administrator-secret"])
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
+    client = TestClient(_app_with_session_auth(), base_url="https://api.example.test")
+
+    login = client.post("/api/auth/session", headers={"X-API-Key": "recruiter-secret"})
+
+    assert login.status_code == 200
+    assert login.json()["role"] == "recruiter"
+    cookie = login.headers["set-cookie"]
+    assert "cv_analyzer_session=" in cookie
+    assert "HttpOnly" in cookie
+    assert "Secure" in cookie
+    assert "SameSite=strict" in cookie
+    assert "recruiter-secret" not in cookie
+    assert client.get("/api/candidates").status_code == 200
+    assert client.get("/api/config/active").status_code == 403
+
+    logout = client.delete("/api/auth/session")
+
+    assert logout.status_code == 200
+    assert client.get("/api/candidates").status_code == 401
+
+
+def test_signed_session_rejects_expiry_and_tampering(monkeypatch):
+    monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
+    monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", [])
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
+    monkeypatch.setattr(settings, "AUTH_SESSION_TTL_SECONDS", 60)
+    principal = AuthenticatedPrincipal(AccessTier.RECRUITER, "fingerprint")
+    token = create_session_token(principal, issued_at=100)
+
+    assert authenticate_session_token(token, now=159) == principal
+    assert authenticate_session_token(token, now=160) is None
+    tampered_token = ("A" if token[0] != "A" else "B") + token[1:]
+    assert authenticate_session_token(tampered_token, now=159) is None
 
 
 def test_unhandled_exception_returns_stable_envelope_without_trace(monkeypatch):
