@@ -1,12 +1,22 @@
 import { apiClient } from './apiClient';
 import { JobOpening, VacancyRecommendationsResponse } from '@/types/api';
 
+export type VacancyLoadStatus = 'success' | 'empty' | 'stale';
+
+export interface VacancyLoadResult {
+  jobs: JobOpening[];
+  status: VacancyLoadStatus;
+}
+
 export const jobsService = {
   /**
    * Retrieve all active job openings.
    */
-  getJobs: (): Promise<JobOpening[]> => {
-    return apiClient.get<JobOpening[]>('/api/jobs');
+  getJobs: async (): Promise<VacancyLoadResult> => {
+    const response = await apiClient.getWithMetadata<JobOpening[]>('/api/jobs');
+    const headerStatus = response.headers.get('X-Vacancy-Status');
+    const status = headerStatus === 'stale' ? 'stale' : response.data.length === 0 ? 'empty' : 'success';
+    return { jobs: response.data, status };
   },
 
   /**
@@ -34,4 +44,3 @@ export const jobsService = {
     return apiClient.post<{ message: string }>('/api/jobs/cache/invalidate');
   },
 };
-

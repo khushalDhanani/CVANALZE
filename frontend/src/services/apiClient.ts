@@ -15,6 +15,11 @@ export interface ApiGetOptions {
   headers?: Record<string, string>;
 }
 
+export interface ApiResponse<T> {
+  data: T;
+  headers: Headers;
+}
+
 let unauthorizedHandler: (() => void) | null = null;
 let sessionCredentialsEnabled = false;
 
@@ -54,7 +59,8 @@ function appendQueryParams(
 
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  onResponse?: (response: Response) => void,
 ): Promise<T> {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
   
@@ -101,6 +107,7 @@ async function request<T>(
       throw new ApiError(errorMessage, response.status, data);
     }
 
+    onResponse?.(response);
     return data as T;
   } catch (error: any) {
     clearTimeout(timeoutId);
@@ -153,6 +160,17 @@ export const apiClient = {
       method: 'GET',
       headers: options.headers,
     }),
+
+  getWithMetadata: async <T>(endpoint: string, options: ApiGetOptions = {}): Promise<ApiResponse<T>> => {
+    let responseHeaders = new Headers();
+    const data = await request<T>(appendQueryParams(endpoint, options.params), {
+      method: 'GET',
+      headers: options.headers,
+    }, (response) => {
+      responseHeaders = response.headers;
+    });
+    return { data, headers: responseHeaders };
+  },
 
   post: <T>(endpoint: string, body?: any, headers?: Record<string, string>) =>
     request<T>(endpoint, {

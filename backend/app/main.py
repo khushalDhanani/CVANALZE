@@ -74,6 +74,7 @@ app.add_middleware(
         "X-RateLimit-Limit",
         "X-RateLimit-Remaining",
         "X-RateLimit-Reset",
+        "X-Vacancy-Status",
         "Retry-After",
     ],
 )

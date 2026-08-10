@@ -25,6 +25,7 @@ import {
   Breadcrumbs,
   OrganizationHierarchySelector,
   ErrorBanner,
+  StatusBanner,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { formatSalary, formatExperience } from '@/utils/salary';
@@ -33,7 +34,7 @@ export default function VacanciesScreen() {
   usePageTitle('Job Vacancies | AIRIS');
   const router = useRouter();
   const params = useLocalSearchParams<{ query?: string; department?: string; domain?: string }>();
-  const { jobs, loading, error, refreshJobs } = useJobs();
+  const { jobs, status, loading, error, refreshJobs } = useJobs();
 
   const [searchQuery, setSearchQuery] = useState<string>(params.query || '');
   const [filterDept, setFilterDept] = useState<string>(params.department || '');
@@ -272,6 +273,16 @@ export default function VacanciesScreen() {
           </View>
         )}
 
+        {status === 'stale' && !loading && !error && (
+          <StatusBanner
+            className="mb-3"
+            tone="warning"
+            title="Showing cached vacancies"
+            message="MSSQL is currently unavailable. These vacancies may be out of date."
+            onRetry={refreshJobs}
+          />
+        )}
+
         {/* Search & Filters Panel */}
         <Card className="mb-4 gap-3 bg-surface border-border">
           <TextField
@@ -335,12 +346,12 @@ export default function VacanciesScreen() {
             contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: numColumns > 1 ? 4 : 0 }}
             onRefresh={refreshJobs}
             refreshing={loading}
-            ListEmptyComponent={
+            ListEmptyComponent={status === 'stale' ? null : (
               <EmptyState
                 title="No job openings found"
                 subtitle="Try adjusting your search criteria or reset active filters."
               />
-            }
+            )}
           />
         )}
       </View>

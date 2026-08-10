@@ -4,7 +4,9 @@ import hashlib
 import json
 import threading
 import time
+from dataclasses import dataclass
 from datetime import timezone
+from enum import Enum
 from typing import Any, ClassVar
 
 from sqlalchemy.orm import Session
@@ -18,6 +20,22 @@ from app.services.job_preprocessor import JobPreprocessor
 from app.services.vacancy_service import VacancyService
 
 VACANCY_CACHE_KEY = "all_jobs"
+
+
+class VacancyLoadStatus(str, Enum):
+    SUCCESS = "success"
+    EMPTY = "empty"
+    STALE = "stale"
+
+
+@dataclass(frozen=True)
+class VacancyLoadResult:
+    jobs: list[dict[str, Any]]
+    status: VacancyLoadStatus
+
+
+class VacancySourceUnavailableError(RuntimeError):
+    """Raised when MSSQL cannot be read and no cached vacancy snapshot exists."""
 
 
 class RepositoryMetrics:
@@ -82,7 +100,7 @@ class RepositoryMetrics:
 class JobRepository:
     """
     Enterprise Data Access Repository for Job Openings.
-    Queries live MSSQL DB vacancies when available, with graceful fallback to DEFAULT_JOB_OPENINGS.
+    Queries live MSSQL DB vacancies and falls back only to the last successful cached snapshot.
     Uses CacheManager (Memory L1 + Redis L2) with version-aware caching.
     Business logic (taxonomy, embedding sync) is decoupled into dedicated services.
     """
@@ -121,20 +139,34 @@ class JobRepository:
 
     @classmethod
     def get_all_jobs(cls, db: Session | None = None) -> list[dict[str, Any]]:
+        result = cls.load_all_jobs(db=db)
+        if result.status == VacancyLoadStatus.STALE and not result.jobs:
+            raise VacancySourceUnavailableError("MSSQL vacancy source is unavailable and the cached vacancy snapshot is empty.")
+        return result.jobs
+
+    @classmethod
+    def load_all_jobs(cls, db: Session | None = None) -> VacancyLoadResult:
         cached_entry = vacancy_cache_manager.get(cls._VACANCY_CACHE_KEY)
+        cached_jobs: list[dict[str, Any]] | None = None
         if cached_entry is not None:
-            if isinstance(cached_entry, dict) and "jobs" in cached_entry and "version" in cached_entry:
+            if isinstance(cached_entry, dict) and isinstance(cached_entry.get("jobs"), list) and "version" in cached_entry:
                 stored_jobs = cached_entry["jobs"]
-                stored_version = cached_entry["version"]
-                if not cls._is_stale(stored_version, stored_jobs, db):
+                stored_version = str(cached_entry["version"])
+                cached_jobs = stored_jobs
+                staleness = cls._is_stale(stored_version, stored_jobs, db)
+                if staleness is False:
                     RepositoryMetrics.record_cache_hit()
                     logger.info("JobRepository.get_all_jobs: CACHE HIT. Returning cached vacancies.")
-                    return stored_jobs
-                logger.info("JobRepository.get_all_jobs: Stale version detected. Re-fetching.")
+                    status = VacancyLoadStatus.SUCCESS if stored_jobs else VacancyLoadStatus.EMPTY
+                    return VacancyLoadResult(jobs=stored_jobs, status=status)
+                if staleness is None:
+                    RepositoryMetrics.record_cache_hit()
+                    logger.warning("JobRepository.get_all_jobs: MSSQL unavailable. Returning stale cached vacancies.")
+                    return VacancyLoadResult(jobs=stored_jobs, status=VacancyLoadStatus.STALE)
+                logger.info("JobRepository.get_all_jobs: Vacancy changes detected. Re-fetching.")
             else:
-                RepositoryMetrics.record_cache_hit()
-                logger.info("JobRepository.get_all_jobs: CACHE HIT (legacy format). Returning cached vacancies.")
-                return cached_entry
+                cached_jobs = cached_entry if isinstance(cached_entry, list) else None
+                logger.info("JobRepository.get_all_jobs: Legacy cache entry detected. Revalidating against MSSQL.")
 
         RepositoryMetrics.record_cache_miss()
         logger.info("JobRepository.get_all_jobs: CACHE MISS. Fetching from DB.")
@@ -149,31 +181,35 @@ class JobRepository:
                 logger.warning(f"Could not create DB session: {exc}")
                 db = None
 
-        job_dicts_to_return: list[dict[str, Any]] | None = None
+        if db is None:
+            if cached_jobs is not None:
+                RepositoryMetrics.record_cache_hit()
+                logger.warning("JobRepository.get_all_jobs: MSSQL session unavailable. Returning stale cached vacancies.")
+                return VacancyLoadResult(jobs=cached_jobs, status=VacancyLoadStatus.STALE)
+            raise VacancySourceUnavailableError("MSSQL vacancy source is unavailable.")
 
-        if db is not None:
-            try:
-                service = VacancyService(db)
-                vacancies = service.get_active_vacancies()
-                if vacancies:
-                    raw_dicts = [v.model_dump() for v in vacancies]
-                    # Delegate job preprocessing to JobPreprocessor
-                    job_dicts = JobPreprocessor.preprocess_job_dicts(raw_dicts)
-
-                    unique_dept_ids = sorted({j.get("department_id") for j in job_dicts if j.get("department_id") is not None})
-                    logger.info(f"JobRepository.get_all_jobs: Active Vacancies: {len(job_dicts)} | Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}")
-                    job_dicts_to_return = job_dicts
-                else:
-                    logger.warning("JobRepository.get_all_jobs: 0 active vacancies returned from MSSQL DB.")
-            except Exception as exc:
-                logger.error(f"JobRepository.get_all_jobs error querying DB: {exc}")
-                pass  # Gracefully degrade to an empty list or cache
-            finally:
-                if close_session:
-                    db.close()
-
-        if job_dicts_to_return is None:
-            job_dicts_to_return = []
+        try:
+            service = VacancyService(db)
+            vacancies = service.get_active_vacancies()
+            raw_dicts = [vacancy.model_dump() for vacancy in vacancies]
+            job_dicts_to_return = JobPreprocessor.preprocess_job_dicts(raw_dicts)
+            unique_dept_ids = sorted(
+                {department_id for job in job_dicts_to_return if (department_id := job.get("department_id")) is not None}
+            )
+            logger.info(
+                f"JobRepository.get_all_jobs: Active Vacancies: {len(job_dicts_to_return)} | "
+                f"Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}"
+            )
+        except Exception as exc:
+            logger.error(f"JobRepository.get_all_jobs error querying DB: {exc}")
+            if cached_jobs is not None:
+                RepositoryMetrics.record_cache_hit()
+                logger.warning("JobRepository.get_all_jobs: Returning stale cached vacancies after MSSQL query failure.")
+                return VacancyLoadResult(jobs=cached_jobs, status=VacancyLoadStatus.STALE)
+            raise VacancySourceUnavailableError("MSSQL vacancy source is unavailable.") from exc
+        finally:
+            if close_session:
+                db.close()
 
         version = cls._compute_vacancy_hash(job_dicts_to_return)
         vacancy_cache_manager.set(
@@ -195,7 +231,8 @@ class JobRepository:
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         RepositoryMetrics.record_db_fetch(elapsed_ms, len(job_dicts_to_return), version)
 
-        return job_dicts_to_return
+        status = VacancyLoadStatus.SUCCESS if job_dicts_to_return else VacancyLoadStatus.EMPTY
+        return VacancyLoadResult(jobs=job_dicts_to_return, status=status)
 
     @classmethod
     def get_vacancy_version(cls) -> str:
@@ -211,10 +248,10 @@ class JobRepository:
         stored_version: str,
         stored_jobs: list[dict[str, Any]],
         db: Session | None = None,
-    ) -> bool:
+    ) -> bool | None:
         """
         Lightweight staleness check: checks if live DB vacancies (IDs, titles, count) differ from stored_version.
-        Returns True if database vacancies changed, False if up to date.
+        Returns True if database vacancies changed, False if up to date, and None when MSSQL cannot be checked.
         """
         t0 = time.perf_counter()
         now = time.monotonic()
@@ -233,7 +270,7 @@ class JobRepository:
                 db = None
 
         if db is None:
-            return False
+            return None
 
         try:
             from sqlalchemy import or_, select
@@ -256,18 +293,15 @@ class JobRepository:
             ).order_by(RecruitVacancyRequest.VacancyRequestID)
             
             rows = db.execute(stmt).scalars().all()
-            if rows:
-                db_pairs = sorted(str(r) for r in rows)
-                db_version = hashlib.sha256(json.dumps(db_pairs).encode()).hexdigest()
-                stored_ids = sorted(str(j.get("vacancy_id") or j.get("id")) for j in stored_jobs)
-                stored_ids_version = hashlib.sha256(json.dumps(stored_ids).encode()).hexdigest()
-                is_stale_result = db_version != stored_ids_version
-                if is_stale_result:
-                    logger.info(f"[STALENESS_DEBUG] db_count={len(db_pairs)} stored_count={len(stored_ids)} db_diff={set(db_pairs)-set(stored_ids)} stored_diff={set(stored_ids)-set(db_pairs)}")
-                else:
-                    logger.info(f"[STALENESS_DEBUG] Staleness check matched! count={len(db_pairs)}")
+            db_pairs = sorted(str(row) for row in rows)
+            db_version = hashlib.sha256(json.dumps(db_pairs).encode()).hexdigest()
+            stored_ids = sorted(str(job.get("vacancy_id") or job.get("id")) for job in stored_jobs)
+            stored_ids_version = hashlib.sha256(json.dumps(stored_ids).encode()).hexdigest()
+            is_stale_result = db_version != stored_ids_version
+            if is_stale_result:
+                logger.info(f"[STALENESS_DEBUG] db_count={len(db_pairs)} stored_count={len(stored_ids)} db_diff={set(db_pairs)-set(stored_ids)} stored_diff={set(stored_ids)-set(db_pairs)}")
             else:
-                is_stale_result = False
+                logger.info(f"[STALENESS_DEBUG] Staleness check matched! count={len(db_pairs)}")
 
             cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
 
@@ -301,7 +335,7 @@ class JobRepository:
                     .scalar()
                     or 0
                 )
-                is_stale_result = (count != len(stored_jobs)) if count > 0 else False
+                is_stale_result = count != len(stored_jobs)
                 cls._STALENESS_CACHE[stored_version] = (now, is_stale_result)
 
                 elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -309,8 +343,7 @@ class JobRepository:
                 return is_stale_result
             except Exception as inner_exc:
                 logger.warning(f"Staleness check failed: {exc} | fallback: {inner_exc}")
-                cls._STALENESS_CACHE[stored_version] = (now, False)
-                return False
+                return None
         finally:
             if close_session:
                 db.close()

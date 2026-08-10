@@ -27,7 +27,7 @@ import { BRAND } from '@/constants/brand';
 export default function HomeScreen() {
   usePageTitle('Dashboard | AIRIS');
   const router = useRouter();
-  const { jobs, loading: jobsLoading, error: jobsError } = useJobs();
+  const { jobs, status: jobsStatus, loading: jobsLoading, error: jobsError } = useJobs();
   const { candidates, loading: candidatesLoading, error: candidatesError } = useCandidates();
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
   const [llmHealth, setLlmHealth] = useState<LlmHealthResponse | null>(null);
@@ -105,9 +105,9 @@ export default function HomeScreen() {
             <StatCard
               label="Active Vacancies"
               value={jobsLoading ? undefined : jobsError ? 'Unavailable' : jobs.length}
-              sublabel={jobsError ? 'Failed to fetch directory' : 'Current active vacancies'}
+              sublabel={jobsError ? 'Failed to fetch directory' : jobsStatus === 'stale' ? 'Showing stale cached data' : 'Current active vacancies'}
               loading={jobsLoading}
-              tone={jobsError ? 'danger' : 'neutral'}
+              tone={jobsError ? 'danger' : jobsStatus === 'stale' ? 'warning' : 'neutral'}
             />
             <StatCard
               label="LLM Engine"
@@ -320,6 +320,29 @@ export default function HomeScreen() {
                 title="Vacancy Directory Unavailable"
                 message={jobsError}
               />
+            ) : jobsStatus === 'stale' ? (
+              <View className="gap-2">
+                <StatusBanner
+                  tone="warning"
+                  title="Showing cached vacancies"
+                  message="MSSQL is currently unavailable. Vacancy data may be out of date."
+                />
+                {uniqueJobs.length > 0 && (
+                  <ResponsiveFieldGrid minItemWidth={280} gap={10}>
+                    {uniqueJobs.slice(0, 4).map((job, i) => (
+                      <DenseRow
+                        key={(job as any).VacancyID || (job as any).id || i}
+                        title={(job as any).VacancyTitle || (job as any).title || 'Unknown'}
+                        subtitle={(job as any).DepartmentName || (job as any).department || 'General'}
+                        onPress={() => {
+                          const vId = (job as any).id || (job as any).VacancyID;
+                          router.push(vId ? (`/vacancies/${vId}` as any) : `/vacancies`);
+                        }}
+                      />
+                    ))}
+                  </ResponsiveFieldGrid>
+                )}
+              </View>
             ) : uniqueJobs.length === 0 ? (
               <EmptyState variant="compact" title="No active vacancies" subtitle="Created job openings will appear here" />
             ) : (

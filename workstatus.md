@@ -1,6 +1,54 @@
 # Work Status
 
 ## Last Completed Task
+**Fix vacancy DB failure handling**
+
+### Architecture Impact Analysis
+- Added an explicit vacancy load result at the repository boundary so successful rows, a legitimate successful zero-row query, and stale cached data are distinct states.
+- MSSQL session/query failures now raise a source-unavailable error when no successful cached snapshot exists; they are never converted into or cached as an empty vacancy list.
+- Existing `GET /api/jobs` list bodies remain backward compatible. The route returns HTTP 503 without a usable cache and exposes `X-Vacancy-Status` for successful, empty, or stale results.
+- Existing internal list callers remain compatible; an unavailable source with only an empty stale snapshot raises instead of producing a false no-active-vacancies result.
+- No Ollama integration, matching algorithm, vacancy query, or persistence model changed.
+
+### Files Changed
+- Vacancy repository state/error handling: `backend/app/repositories/job.py`.
+- Vacancy API status propagation: `backend/app/api/jobs.py`.
+- Browser-readable response metadata: `backend/app/main.py`.
+- Frontend metadata handling: `frontend/src/services/apiClient.ts`, `frontend/src/services/jobsService.ts`, `frontend/src/hooks/useJobs.ts`.
+- Frontend vacancy states: `frontend/src/app/index.tsx`, `frontend/src/app/vacancies/index.tsx`.
+- Regression coverage: `backend/tests/test_job_repository.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Represent vacancy loads with explicit success, empty, and stale statuses.
+- Cache only results returned by a completed MSSQL vacancy query, including legitimate zero-row results.
+- Fall back to the last successful cache after MSSQL failure and return HTTP 503 when no usable cache exists.
+- Preserve the jobs list response contract and transport freshness through a response header.
+- Render MSSQL-unavailable and stale-cache states separately from a legitimate empty vacancy directory.
+
+### Code Changes
+- Added `VacancyLoadResult`, `VacancyLoadStatus`, and `VacancySourceUnavailableError` to the existing job repository.
+- Changed staleness checks to return an unavailable state on failed DB validation instead of declaring the cache fresh.
+- Corrected zero-row staleness comparisons so a real transition from vacancies to zero vacancies refreshes and caches the legitimate empty result.
+- Added `X-Vacancy-Status` to `GET /api/jobs` and CORS-exposed headers; source failure without cache now returns HTTP 503.
+- Added response-metadata support to the shared frontend client and stale-cache warnings to the dashboard and vacancy directory.
+- Added regressions for uncached MSSQL failure, legitimate empty results, and stale-cache fallback without cache overwrite.
+
+### Verification Checklist
+- [x] MSSQL session/query failure is not written to the vacancy cache as `[]`.
+- [x] A successful MSSQL query returning zero active vacancies is cached and reported as `empty`.
+- [x] A failed MSSQL refresh returns the last successful snapshot as `stale` without overwriting it.
+- [x] A failed MSSQL load without a usable snapshot returns HTTP 503 instead of `No active vacancies`.
+- [x] The existing `GET /api/jobs` JSON list contract is preserved.
+- [x] Frontend views distinguish unavailable, stale, legitimate-empty, and successful vacancy states.
+- [x] Language-server diagnostics found no new source errors; unresolved backend dependency imports are environment-level diagnostics.
+- [x] `git diff --check` passed.
+- [ ] Tests and builds were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Centralized vacancy freshness/source-state decisions in `JobRepository.load_all_jobs`; existing list-based callers continue through `get_all_jobs`.
+
+## Previous Task
 **Connect Add Designation to PostgreSQL taxonomy and pgvector**
 
 ### Architecture Impact Analysis

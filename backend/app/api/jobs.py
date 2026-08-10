@@ -1,9 +1,9 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from app.core.database import get_mssql_read_db
-from app.repositories.job import JobRepository
+from app.repositories.job import JobRepository, VacancySourceUnavailableError
 from app.schemas.job import JobOpening
 from app.services.vacancy_service import VacancyService
 from app.core.config import settings
@@ -21,7 +21,7 @@ async def list_active_vacancies(db: Session = Depends(get_mssql_read_db)):
     except Exception as exc:
         from app.core.logging import logger
         logger.exception(f"Failed to list active vacancies: {exc}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve active vacancies.") from exc
+        raise HTTPException(status_code=503, detail="MSSQL vacancy source is unavailable.") from exc
 
 # Existing routes continue below
 
@@ -29,10 +29,14 @@ async def list_active_vacancies(db: Session = Depends(get_mssql_read_db)):
 
 
 @router.get("", response_model=list[JobOpening])
-async def list_jobs():
+async def list_jobs(response: Response):
     """Retrieve all available job openings."""
     try:
-        return await run_in_threadpool(JobRepository.get_all_jobs)
+        result = await run_in_threadpool(JobRepository.load_all_jobs)
+        response.headers["X-Vacancy-Status"] = result.status.value
+        return result.jobs
+    except VacancySourceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         from app.core.logging import logger
 
@@ -62,7 +66,10 @@ async def invalidate_jobs_cache():
 @router.get("/{job_id}", response_model=JobOpening)
 async def get_job(job_id: str):
     """Retrieve a specific job opening by ID."""
-    job = await run_in_threadpool(JobRepository.get_job_by_id, job_id)
+    try:
+        job = await run_in_threadpool(JobRepository.get_job_by_id, job_id)
+    except VacancySourceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
