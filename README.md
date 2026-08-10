@@ -33,7 +33,7 @@ External/runtime services
   -> Redis: RQ, distributed locks, processing records, and cache tier
   -> PostgreSQL/pgvector: embeddings and vector-backed services
   -> MSSQL: configured recruiting, taxonomy, and system data (Strictly READ-ONLY; enforced on startup)
-  -> SyncService: pulls taxonomy, candidates, and vacancies from MSSQL into PostgreSQL
+  -> RQ cron -> integration snapshot sync: pulls taxonomy, candidates, and vacancies from MSSQL into PostgreSQL
   -> Ollama: pooled generation and embedding transport
   -> shared uploads volume: retained raw files, results, file cache, and training data
 ```

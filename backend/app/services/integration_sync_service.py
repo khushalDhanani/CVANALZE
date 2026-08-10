@@ -168,6 +168,7 @@ class BaseSyncService:
             return {"status": "skipped", "reason": "No DB connection"}
 
         metrics = {
+            "status": "running",
             "records_read": 0,
             "records_inserted": 0,
             "records_updated": 0,
@@ -213,7 +214,7 @@ class BaseSyncService:
                                 record_updated = cls._get_updated_timestamp(record)
 
                                 is_active = True
-                                if cls.MSSQL_IS_ACTIVE_COL:
+                                if cls.MSSQL_IS_ACTIVE_COL is not None:
                                     is_active = getattr(record, cls.MSSQL_IS_ACTIVE_COL.name)
 
                                 # Check if exists in snapshot
@@ -295,6 +296,7 @@ class BaseSyncService:
                         metrics["watermark_after"] = max_updated
 
                 run.status = "PARTIAL_FAILED" if metrics["records_failed"] > 0 else "COMPLETED"
+                metrics["status"] = run.status.lower()
                 run.completed_at = datetime.now(timezone.utc)
                 run.records_read = metrics["records_read"]
                 run.records_inserted = metrics["records_inserted"]
@@ -308,6 +310,7 @@ class BaseSyncService:
             except Exception as e:
                 pg_db.rollback()
                 logger.error(f"Sync failed for {cls.ENTITY_TYPE}: {e}", exc_info=True)
+                metrics["status"] = "failed"
                 run.status = "FAILED"
                 run.completed_at = datetime.now(timezone.utc)
                 run.records_failed = metrics["records_failed"]

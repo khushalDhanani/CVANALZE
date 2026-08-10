@@ -1,6 +1,52 @@
 # Work Status
 
 ## Last Completed Task
+**Connect canonical MSSQL → PostgreSQL sync and validation snapshot jobs**
+
+### Architecture Impact Analysis
+- Selected `integration_sync_service.py` as the sole MSSQL → PostgreSQL synchronization architecture because it owns source snapshots, content hashes, watermarks, run/error records, retries, and backfills.
+- Removed the unused legacy `SyncService`, which directly mutated taxonomy tables, swallowed failures, and duplicated only part of the integration pipeline.
+- Added a dedicated RQ cron scheduler process; the existing RQ worker continues to execute jobs from the configured processing queue and `shadow_validation` queue.
+- Scheduled reference, candidate, and vacancy snapshot synchronization every 15 minutes and validation metric snapshots daily, with environment-configurable enable flags and intervals.
+- Added a Redis execution lock so overlapping sync ticks cannot run the canonical synchronization pipeline concurrently.
+
+### Files Changed
+- Canonical sync result state: `backend/app/services/integration_sync_service.py`.
+- Removed duplicate sync implementation: `backend/app/services/sync_service.py`.
+- RQ jobs and scheduler entrypoint: `backend/app/core/background_tasks.py`, `backend/start_scheduler.py`.
+- Scheduler configuration and deployment: `backend/app/core/config.py`, `backend/.env.example`, `docker-compose.yml`, `docker-compose.local.yml`.
+- Architecture documentation and regression coverage: `README.md`, `backend/tests/test_background_sync_jobs.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Compare both synchronization paths and retain the snapshot/watermark implementation.
+- Expose completed, partial, skipped, and failed entity outcomes to the RQ job wrapper.
+- Register canonical integration sync and validation snapshot functions with an RQ cron scheduler.
+- Deploy the scheduler beside the existing RQ worker and make intervals configurable.
+- Prevent overlapping canonical sync executions and add focused scheduler/task regressions.
+
+### Code Changes
+- `BaseSyncService.run_sync()` now returns an explicit status and safely checks SQLAlchemy active-column expressions with `is not None`.
+- `run_integration_sync()` runs reference, candidate, and vacancy snapshot services, reports partial runs as `completed_degraded`, and raises for failed/unavailable entities so RQ records an observable failure.
+- `snapshot_validation_metrics()` calls the existing `MetricsEngine.snapshot_metrics()` implementation as a background job.
+- `start_scheduler.py` registers enabled jobs with RQ `CronScheduler` and starts the dedicated scheduler process.
+- Compose now runs `cv_analyzer_scheduler`; sync defaults to 900 seconds and metrics snapshots to 86400 seconds.
+- Deleted the unreferenced direct-taxonomy `SyncService` implementation.
+
+### Verification Checklist
+- [x] Only the integration snapshot/watermark architecture remains for MSSQL → PostgreSQL synchronization.
+- [x] The recurring sync covers departments, designations, job profiles, candidates, and vacancies.
+- [x] The scheduler is a real Compose service and the existing worker listens to both registered queues.
+- [x] Overlapping integration sync executions are rejected by a Redis lock.
+- [x] Failed or unavailable entity syncs surface as failed RQ jobs; partial entity failures surface as degraded results and remain recorded in `SyncRun`/`SyncError`.
+- [x] Existing validation metric snapshots are registered as a recurring job.
+- [x] Language-server diagnostics found no new source errors beyond unresolved installed-dependency imports; `git diff --check` passed.
+- [ ] Tests, builds, Compose validation, and Docker execution were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Removed the duplicate direct-taxonomy synchronization service and centralized recurring orchestration around the existing integration snapshot services.
+
+## Previous Task
 **Fix batch CV processing and move matching to Redis/RQ**
 
 ### Architecture Impact Analysis
