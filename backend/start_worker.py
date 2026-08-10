@@ -19,14 +19,17 @@ def main():
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
 
-    listen = [settings.RQ_QUEUE_NAME, "shadow_validation", "default"]
+    listen = list(dict.fromkeys([settings.RQ_QUEUE_NAME, "shadow_validation", "default"]))
     queues = [Queue(name, connection=conn) for name in listen]
     # RQ's default Worker ends each forked workhorse with os._exit(), which skips
     # Python finalizers used by docling/PyTorch and leaks their semaphores. The
     # process is already dedicated to this queue, so execute jobs in-process and
     # allow normal cleanup instead of merely suppressing resource_tracker output.
     worker = SimpleWorker(queues, connection=conn)
-    worker.work()
+    work_options = {"with_scheduler": True}
+    if settings.RQ_WORKER_MAX_JOBS > 0:
+        work_options["max_jobs"] = settings.RQ_WORKER_MAX_JOBS
+    worker.work(**work_options)
 
 
 if __name__ == "__main__":

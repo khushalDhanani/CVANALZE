@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     STARTUP_CACHE_WARMUP_ENABLED: bool = True
     REDIS_URL: Optional[str] = None
     RQ_QUEUE_NAME: str = "cv-processing"
+    RQ_WORKER_MAX_JOBS: int = 0
     RQ_JOB_TIMEOUT_SECONDS: int = 900
     RQ_RESULT_TTL_SECONDS: int = 604800
     RQ_MAX_RETRIES: int = 2

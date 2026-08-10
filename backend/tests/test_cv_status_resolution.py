@@ -16,8 +16,8 @@ client = TestClient(app)
 def test_start_worker_queue_configuration():
     """Verify start_worker listens to RQ_QUEUE_NAME, shadow_validation, and default queues."""
     from start_worker import main
-    with patch("start_worker.Worker") as mock_worker:
-        with patch("start_worker.Redis"):
+    with patch("start_worker.SimpleWorker") as mock_worker:
+        with patch("start_worker.Redis"), patch("start_worker.settings.RQ_WORKER_MAX_JOBS", 0):
             mock_worker.return_value.work.return_value = None
             main()
             assert mock_worker.called
@@ -26,6 +26,7 @@ def test_start_worker_queue_configuration():
             assert settings.RQ_QUEUE_NAME in queue_names
             assert "shadow_validation" in queue_names
             assert "default" in queue_names
+            mock_worker.return_value.work.assert_called_once_with(with_scheduler=True)
 
 
 def test_status_resolution_by_cv_id_alias(tmp_path, monkeypatch):

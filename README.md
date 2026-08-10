@@ -185,7 +185,8 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `POSTGRES_APP_URL` | local PostgreSQL URL | PostgreSQL/pgvector connection string. |
 | `MSSQL_READ_ONLY_URL` | empty | MSSQL connection string. Required for enterprise data. |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for RQ, locks, processing records, and cache. |
-| `RQ_QUEUE_NAME` | `cv-processing` | Queue consumed by the API and worker. |
+| `RQ_QUEUE_NAME` | `cv-processing` | Primary CV-processing queue consumed by the worker. |
+| `RQ_WORKER_MAX_JOBS` | `0` | Optional number of jobs processed before the worker exits and Docker restarts it; zero is unlimited. |
 | `RQ_JOB_TIMEOUT_SECONDS` | `900` | Worker execution timeout. |
 | `RQ_RESULT_TTL_SECONDS` | `604800` | RQ result retention in seconds. |
 | `RQ_MAX_RETRIES` | `2` | Retries after the first attempt. |
@@ -275,11 +276,11 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ```bash
-uv run rq worker --url redis://localhost:6379/0 cv-processing
+uv run python start_worker.py
 ```
 
-If `RQ_QUEUE_NAME` or `REDIS_URL` changes, pass the same values to the worker. The in-process fallback is a development containment path, not a substitute for a
-worker in deployed environments.
+The worker reads `REDIS_URL` and `RQ_QUEUE_NAME` from the shared settings and consumes the primary CV queue, `shadow_validation`, and `default`. The in-process
+fallback is a development containment path, not a substitute for a worker in deployed environments.
 
 The API exposes service discovery at `http://localhost:8000/`, dependency health at `http://localhost:8000/health`, and OpenAPI UI at
 `http://localhost:8000/docs`.

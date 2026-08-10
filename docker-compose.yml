@@ -21,6 +21,7 @@ x-backend-environment: &backend-environment
   POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
   REDIS_URL: 'redis://redis:6379/0'
   RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
+  RQ_WORKER_MAX_JOBS: '${RQ_WORKER_MAX_JOBS:-0}'
   RQ_JOB_TIMEOUT_SECONDS: '${RQ_JOB_TIMEOUT_SECONDS:-900}'
   RQ_RESULT_TTL_SECONDS: '${RQ_RESULT_TTL_SECONDS:-604800}'
   RQ_MAX_RETRIES: '${RQ_MAX_RETRIES:-2}'
@@ -89,7 +90,7 @@ services:
   worker:
     build: ./backend
     container_name: cv_analyzer_worker
-    command: ["rq", "worker", "--with-scheduler", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
+    command: ["python", "start_worker.py"]
     environment: *backend-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"

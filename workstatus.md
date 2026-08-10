@@ -1,6 +1,51 @@
 # Work Status
 
 ## Last Completed Task
+**Make Docker RQ workers consume every project queue through the intended worker entry point**
+
+### Architecture Impact Analysis
+- Audited every RQ producer and queue reference in the backend: CV processing, vacancy embedding sync, and upload-directory processing use the configurable `RQ_QUEUE_NAME` (`cv-processing` by default); shadow validation uses `shadow_validation`; the embedding backfill utility references `default`.
+- Reused `backend/start_worker.py` as the single worker startup implementation because it already subscribes to the configurable CV queue, `shadow_validation`, and `default` with the existing in-process `SimpleWorker` cleanup behavior.
+- Docker production and local workers now use that implementation instead of a separate RQ CLI command that consumed only the CV queue.
+- Delayed retry scheduling and the local worker recycle limit remain enabled.
+- No RQ producer, job payload, retry policy, queue name, API contract, or Ollama integration changed.
+
+### Files Changed
+- Worker implementation and configuration: `backend/start_worker.py`, `backend/app/core/config.py`, `backend/.env.example`.
+- Container startup: `docker-compose.yml`, `docker-compose.local.yml`.
+- Documentation: `README.md`.
+- Regression coverage: `backend/tests/test_cv_status_resolution.py`, `backend/tests/test_worker_cleanup.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Inventory all direct RQ `Queue` construction and enqueue sites.
+- Compare producer queue names with the queues consumed by Docker and `start_worker.py`.
+- Route both Compose worker services through `start_worker.py`.
+- Preserve RQ scheduling and the local maximum-jobs restart behavior in shared settings.
+- Update worker tests and startup documentation.
+
+### Code Changes
+- Changed both Compose worker commands to `python start_worker.py`.
+- Retained the three intended subscriptions and de-duplicated them if `RQ_QUEUE_NAME` is configured as `shadow_validation` or `default`.
+- Enabled the RQ scheduler from `start_worker.py`, preserving delayed retry handling previously supplied by the CLI `--with-scheduler` option.
+- Added `RQ_WORKER_MAX_JOBS`; zero means unlimited in production, while the lightweight local override retains its default of ten jobs.
+- Corrected the queue-configuration regression to mock the worker implementation actually used (`SimpleWorker`) and added recycle-limit coverage.
+- Updated manual startup instructions to use the same worker entry point as Docker.
+
+### Verification Checklist
+- [x] Configurable primary queue (`cv-processing` by default) is consumed.
+- [x] `shadow_validation` is consumed.
+- [x] `default` is consumed.
+- [x] Production and local Compose use `start_worker.py`; no Compose worker command remains limited to one RQ queue.
+- [x] Scheduler support remains enabled for delayed retries.
+- [x] Local `RQ_WORKER_MAX_JOBS=10` behavior remains available; production defaults to unlimited.
+- [x] `git diff --check` passed.
+- [ ] Tests and Docker Compose execution were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Consolidated container and manual worker startup on the existing `start_worker.py` implementation and removed the duplicate Compose CLI startup path.
+
+## Previous Task
 **Separate CV identity from AIRIS/MSSQL candidate identity in shadow validation**
 
 ### Architecture Impact Analysis
