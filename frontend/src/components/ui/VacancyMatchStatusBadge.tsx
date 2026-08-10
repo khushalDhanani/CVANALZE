@@ -16,6 +16,7 @@ import { Badge, Tone } from './Badge';
 import { Card } from './Card';
 import { COLORS } from '@/constants/colors';
 import { CanonicalVacancyMatchStatus, VacancyFitScoreBreakdown } from '@/types/api';
+export { resolveVacancyFitScore } from '@/utils/candidateDetail';
 
 export interface CanonicalStatusMeta {
   status: CanonicalVacancyMatchStatus;
@@ -153,15 +154,6 @@ export function getCanonicalMatchStatusMeta(
         isError: true,
       };
   }
-}
-
-export function resolveVacancyFitScore(match?: any): number | undefined {
-  if (!match) return undefined;
-
-  const canonicalScore = match.vacancy_fit_score ?? match.overall_score ?? match.score;
-  if (canonicalScore != null) return Number(canonicalScore);
-
-  return undefined;
 }
 
 interface VacancyMatchStatusBadgeProps {

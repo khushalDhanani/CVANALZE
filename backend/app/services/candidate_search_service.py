@@ -134,11 +134,7 @@ class CandidateSearchService:
                     ),
                     {},
                 )
-            best_match_score = best_match.get("vacancy_fit_score")
-            if best_match_score is None:
-                best_match_score = best_match.get("overall_score")
-            if best_match_score is None:
-                best_match_score = best_match.get("score")
+            best_match_score = VacancyFitEvaluator.resolve_opening_score(best_match) if best_match else None
 
             resume_json = r.get("resume_json") or {}
             contact_info = resume_json.get("contact_info") or {}

@@ -48,6 +48,28 @@ const VERIFIED_MATCH_CLASSIFICATIONS = new Set(['HIGH', 'STRONG', 'DB_MATCH', 'H
 const VERIFIED_MATCH_STATUSES = new Set(['MATCHED', 'HIGH', 'STRONG', 'DB_MATCH', 'HIGHLY_RECOMMENDED']);
 const REJECTED_MATCH_STATUSES = new Set(['NO_STRONG_MATCH', 'NO_STRONG_VACANCY_MATCH']);
 
+interface MatchScoreSource {
+  vacancy_fit_score?: unknown;
+  overall_score?: unknown;
+  score?: unknown;
+  score_breakdown?: unknown;
+}
+
+export const resolveVacancyFitScore = (match?: MatchScoreSource): number | undefined => {
+  if (!match) return undefined;
+
+  const fitScore = Number(match.vacancy_fit_score);
+  const hasFitScore = match.vacancy_fit_score != null && Number.isFinite(fitScore);
+  if (hasFitScore && (fitScore !== 0 || isRecord(match.score_breakdown))) return fitScore;
+
+  for (const fallback of [match.overall_score, match.score]) {
+    if (fallback == null) continue;
+    const score = Number(fallback);
+    if (Number.isFinite(score)) return score;
+  }
+  return hasFitScore ? fitScore : undefined;
+};
+
 export const isProperlyMatchedOpening = (value: unknown): value is UnknownRecord => {
   if (!isRecord(value)) return false;
 
@@ -59,8 +81,13 @@ export const isProperlyMatchedOpening = (value: unknown): value is UnknownRecord
       ? value.mandatory_fails
       : [];
   const scoreBreakdown = isRecord(value.score_breakdown) ? value.score_breakdown : {};
-  const hasVerifiedDecision = status ? VERIFIED_MATCH_STATUSES.has(status) : Boolean(classification && VERIFIED_MATCH_CLASSIFICATIONS.has(classification));
-  const canonicalScore = Number(value.vacancy_fit_score ?? value.overall_score ?? value.score ?? 0);
+  const fitScore = Number(value.vacancy_fit_score);
+  const hasCanonicalFit = isRecord(value.score_breakdown)
+    || (value.vacancy_fit_score != null && Number.isFinite(fitScore) && fitScore !== 0);
+  const hasVerifiedDecision = hasCanonicalFit && status
+    ? VERIFIED_MATCH_STATUSES.has(status)
+    : Boolean(classification && VERIFIED_MATCH_CLASSIFICATIONS.has(classification));
+  const canonicalScore = resolveVacancyFitScore(value) ?? 0;
 
   return Boolean(
     hasVerifiedDecision

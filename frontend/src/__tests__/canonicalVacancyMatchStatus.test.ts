@@ -174,8 +174,13 @@ test('15. Frontend does NOT recalculate status from score thresholds', () => {
   assertEquals(metaMatched.label, 'MATCHED');
 });
 
-test('16. resolveVacancyFitScore preserves an explicit canonical zero', () => {
+test('16. resolveVacancyFitScore recovers a legacy placeholder zero', () => {
   const match = { vacancy_fit_score: 0.0, overall_score: 76.4, score: 76.4 };
+  assertEquals(resolveVacancyFitScore(match), 76.4);
+});
+
+test('17. resolveVacancyFitScore preserves a computed canonical zero', () => {
+  const match = { vacancy_fit_score: 0.0, overall_score: 76.4, score: 76.4, score_breakdown: { overall_fit_score: 0.0 } };
   assertEquals(resolveVacancyFitScore(match), 0.0);
 });
 

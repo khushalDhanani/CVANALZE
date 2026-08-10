@@ -60,15 +60,7 @@ class RecommendationService:
         min_threshold = scoring_config.match_high_threshold
 
         def canonical_score(opening: dict[str, Any]) -> float:
-            value = opening.get("vacancy_fit_score")
-            if value is None:
-                value = opening.get("overall_score")
-            if value is None:
-                value = opening.get("score")
-            try:
-                return float(value or 0.0)
-            except (TypeError, ValueError):
-                return 0.0
+            return VacancyFitEvaluator.resolve_opening_score(opening)
 
         canonical_status = VacancyFitEvaluator.determine_candidate_match_status(
             candidate_id=cv_key,

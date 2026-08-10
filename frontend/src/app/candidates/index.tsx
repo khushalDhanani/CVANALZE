@@ -20,7 +20,6 @@ import {
 } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import {
-  VacancyFitScoreBreakdownCard,
   VacancyMatchStatusBadge,
   normalizeCanonicalMatchStatus,
   resolveVacancyFitScore,
@@ -213,7 +212,6 @@ export default function CandidateListScreen() {
 
   const renderCandidateRow = ({ item }: { item: CandidateSummary }) => {
     const jobTitleVal = item.job_title || item.best_match?.job_title;
-    const fitBreakdown = item.best_match?.score_breakdown;
 
     const titleNode = (
       <FieldConfidenceView
@@ -269,16 +267,6 @@ export default function CandidateListScreen() {
         <Text numberOfLines={1} className="text-[11px] font-sans text-text-faint mt-0.5">
           File: {item.filename}
         </Text>
-
-        {fitBreakdown ? (
-          <View className="mt-2" pointerEvents="none">
-            <VacancyFitScoreBreakdownCard
-              breakdown={fitBreakdown}
-              penalty={fitBreakdown.hierarchy_mismatch_penalty}
-              rejectionReason={item.best_match?.domain_mismatch_reason || item.best_match?.reason}
-            />
-          </View>
-        ) : null}
       </View>
     );
 

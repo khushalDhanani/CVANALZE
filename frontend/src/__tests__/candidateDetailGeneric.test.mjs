@@ -75,11 +75,11 @@ assert(!responseMatchesCandidateId(canonicalPayload, 'cv_beta'), 'Mismatched res
 const normalizedMatches = normalizeCandidateMatchAnalysis({
   has_genuine_match: true,
   match_status: 'DB_MATCH',
-  best_match: { vacancy_id: 1, classification: 'HIGH', match_status: 'MATCHED', score: 88, mandatory_failures: [] },
+  best_match: { vacancy_id: 1, classification: 'HIGH', match_status: 'MATCHED', score: 88, score_breakdown: {}, mandatory_failures: [] },
   suitable_openings: [
-    { vacancy_id: 1, classification: 'HIGH', match_status: 'MATCHED', score: 88, mandatory_failures: [] },
-    { vacancy_id: 2, classification: 'MEDIUM', match_status: 'MATCHED', score: 72.3, mandatory_failures: [] },
-    { vacancy_id: 3, classification: 'HIGH', match_status: 'MATCHED', score: 91, mandatory_failures: [{ requirement_id: 'minimum_experience' }] },
+    { vacancy_id: 1, classification: 'HIGH', match_status: 'MATCHED', score: 88, score_breakdown: {}, mandatory_failures: [] },
+    { vacancy_id: 2, classification: 'MEDIUM', match_status: 'MATCHED', score: 72.3, score_breakdown: {}, mandatory_failures: [] },
+    { vacancy_id: 3, classification: 'HIGH', match_status: 'MATCHED', score: 91, score_breakdown: {}, mandatory_failures: [{ requirement_id: 'minimum_experience' }] },
   ],
   unsuitable_openings: [{ vacancy_id: 4, classification: 'LOW', match_status: 'NO_STRONG_VACANCY_MATCH', score: 35 }],
 });
@@ -103,5 +103,18 @@ const normalizedLegacySplitScore = normalizeCandidateMatchAnalysis({
 });
 assert(normalizedLegacySplitScore.match_status === 'MATCHED', 'A persisted canonical MATCHED opening must repair a stale candidate-level status.');
 assert(normalizedLegacySplitScore.best_match.vacancy_fit_score === 89.2, 'The canonical fit score must remain the displayed score.');
+
+const normalizedLegacyPlaceholderScore = normalizeCandidateMatchAnalysis({
+  match_status: 'DB_MATCH',
+  best_match: { vacancy_id: 1038, vacancy_fit_score: 0, overall_score: 86.4, score: 86.4, score_breakdown: null, classification: 'HIGH', vacancy_match_status: 'MATCHED' },
+  suitable_openings: [
+    { vacancy_id: 1038, vacancy_fit_score: 0, overall_score: 86.4, score: 86.4, score_breakdown: null, classification: 'HIGH', vacancy_match_status: 'MATCHED' },
+    { vacancy_id: 811, vacancy_fit_score: 0, overall_score: 72.3, score: 72.3, score_breakdown: null, classification: 'MEDIUM', vacancy_match_status: 'MATCHED' },
+  ],
+  unsuitable_openings: [],
+});
+assert(normalizedLegacyPlaceholderScore.match_status === 'MATCHED', 'A legacy high-confidence match must remain the selected candidate match.');
+assert(normalizedLegacyPlaceholderScore.suitable_openings.length === 1, 'A legacy medium classification must remain a potential manual-review opening.');
+assert(normalizedLegacyPlaceholderScore.unsuitable_openings.length === 1, 'Legacy potential matches must remain visible for manual review.');
 
 console.log('Candidate detail generic tests: passed');

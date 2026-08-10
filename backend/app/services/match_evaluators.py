@@ -1182,6 +1182,28 @@ class VacancyFitEvaluator:
         return None
 
     @classmethod
+    def resolve_opening_score(cls, opening: dict[str, Any] | Any) -> float:
+        """Resolve the canonical score while remaining compatible with legacy persisted matches."""
+        if isinstance(opening, dict):
+            fit_score = cls._parse_score_value(opening.get("vacancy_fit_score"))
+            score_breakdown = opening.get("score_breakdown")
+            overall_score = opening.get("overall_score")
+            legacy_score = opening.get("score")
+        else:
+            fit_score = cls._parse_score_value(getattr(opening, "vacancy_fit_score", None))
+            score_breakdown = getattr(opening, "score_breakdown", None)
+            overall_score = getattr(opening, "overall_score", None)
+            legacy_score = getattr(opening, "score", None)
+
+        if fit_score is not None and (fit_score != 0.0 or score_breakdown is not None):
+            return float(fit_score)
+
+        fallback_score = cls._parse_score_value(overall_score)
+        if fallback_score is None:
+            fallback_score = cls._parse_score_value(legacy_score)
+        return float(fallback_score if fallback_score is not None else fit_score or 0.0)
+
+    @classmethod
     def classify_opening_fit(
         cls,
         opening: dict[str, Any] | Any,
@@ -1200,20 +1222,8 @@ class VacancyFitEvaluator:
             high_threshold = high_threshold if high_threshold is not None else scoring_config.match_high_threshold
             potential_threshold = potential_threshold if potential_threshold is not None else scoring_config.match_medium_threshold
 
-        def _resolve_score(src: Any, fallback1: Any = None, fallback2: Any = None) -> float:
-            score = cls._parse_score_value(src)
-            if score is None:
-                score = cls._parse_score_value(fallback1)
-            if score is None:
-                score = cls._parse_score_value(fallback2)
-            return float(score or 0.0)
-
         if isinstance(opening, dict):
-            score = _resolve_score(
-                opening.get("vacancy_fit_score"),
-                opening.get("score"),
-                opening.get("overall_score"),
-            )
+            score = cls.resolve_opening_score(opening)
             status = str(opening.get("vacancy_match_status") or opening.get("match_status") or "").upper()
             failures = opening.get("mandatory_failures") or opening.get("mandatory_fails") or []
             has_domain_mismatch_req = any(
@@ -1228,11 +1238,7 @@ class VacancyFitEvaluator:
             elif hasattr(score_breakdown, "is_hierarchy_valid"):
                 is_hierarchy_valid = getattr(score_breakdown, "is_hierarchy_valid", True)
         else:
-            score = _resolve_score(
-                getattr(opening, "vacancy_fit_score", None),
-                getattr(opening, "score", None),
-                getattr(opening, "overall_score", None),
-            )
+            score = cls.resolve_opening_score(opening)
             status = str(getattr(opening, "vacancy_match_status", getattr(opening, "match_status", ""))).upper()
             failures = getattr(opening, "mandatory_failures", [])
             has_domain_mismatch_req = any(

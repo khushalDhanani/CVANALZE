@@ -1,6 +1,71 @@
 # Work Status
 
 ## Last Completed Task
+**Remove Canonical Fit Breakdown from candidate listing cards**
+
+### Architecture Impact Analysis
+- Kept canonical score/status data and API contracts unchanged.
+- Removed only the listing-page presentation of the detailed score breakdown; candidate detail continues to render the shared breakdown component.
+
+### Files Changed
+- Candidate listing UI: `frontend/src/app/candidates/index.tsx`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Remove the breakdown component import, listing-row data binding, and listing-only render block.
+- Confirm all detail-page breakdown usages remain intact.
+
+### Code Changes
+- Candidate cards on `/candidates` no longer render Canonical Fit Breakdown.
+- Match score/status badges remain visible on listing cards.
+- Candidate detail still renders breakdowns for the best match and vacancy results.
+
+### Verification Checklist
+- [x] No Canonical Fit Breakdown reference remains in the candidate listing page.
+- [x] Candidate detail retains all existing `VacancyFitScoreBreakdownCard` usages.
+- [x] `git diff --check` passed.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Removed the now-unused listing import and local variable; no shared component or API refactoring was needed.
+
+## Previous Task
+**Legacy placeholder-score compatibility for `cv_1761281901_CandidateCVFileName_13595`**
+
+### Architecture Impact Analysis
+- Preserved `vacancy_fit_score` as the canonical score for newly evaluated openings while distinguishing legacy default zero values by the absence of `score_breakdown`.
+- Centralized legacy score resolution in `VacancyFitEvaluator` for classification, recommendation, and candidate-search paths.
+- Centralized frontend score resolution in the candidate-detail utility and retained the existing badge export contract.
+
+### Files Changed
+- Backend score consumers: `backend/app/services/match_evaluators.py`, `backend/app/services/recommendation_service.py`, `backend/app/services/candidate_search_service.py`.
+- Frontend normalization/display: `frontend/src/utils/candidateDetail.ts`, `frontend/src/components/ui/VacancyMatchStatusBadge.tsx`.
+- Regression coverage: `backend/tests/test_vacancy_match_status.py`, `frontend/src/__tests__/canonicalVacancyMatchStatus.test.ts`, `frontend/src/__tests__/candidateDetailGeneric.test.mjs`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Inspect the persisted candidate payload and distinguish calculated scores from schema defaults.
+- Use the breakdown's presence as the generic version/evaluation marker for an authoritative zero.
+- Apply the same resolver to classification, API summaries/recommendations, and frontend display/normalization.
+- Preserve high legacy classifications as selected matches and medium legacy classifications as manual-review potential matches.
+
+### Code Changes
+- Added `VacancyFitEvaluator.resolve_opening_score`: nonzero fit scores and fit scores with a breakdown are authoritative; a zero without a breakdown falls back to legacy `overall_score` and `score`.
+- Candidate search and recommendations now reuse that resolver rather than independently selecting score fields.
+- Frontend badge consumers now reuse `resolveVacancyFitScore` from candidate-detail normalization.
+- Legacy status normalization uses stored classification when the canonical fit evaluation marker is absent, preventing legacy medium rows from being promoted solely by a stale `MATCHED` field.
+
+### Verification Checklist
+- [x] Confirmed the stored Executive opening has `score=86.4`, `overall_score=86.4`, `vacancy_fit_score=0`, `score_breakdown=null`, `classification=HIGH`, and no mandatory failures.
+- [x] Confirmed the stored Plant Assistant opening has `score=72.3`, `overall_score=72.3`, `vacancy_fit_score=0`, `score_breakdown=null`, and `classification=MEDIUM`.
+- [x] Added generic coverage for legacy placeholder zero and genuine computed zero records.
+- [x] `git diff --check` passed.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Replaced three independent score-field fallback implementations with one backend resolver and one frontend resolver; no candidate, role, or vacancy exception was added.
+
+## Previous Task
 **Canonical match-score consistency and false-positive guardrails**
 
 ### Architecture Impact Analysis

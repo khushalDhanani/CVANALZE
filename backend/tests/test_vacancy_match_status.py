@@ -53,7 +53,7 @@ def test_vacancy_fit_evaluator_classify_opening_fit():
     assert VacancyFitEvaluator.classify_opening_fit(rejected_op, high_threshold=70.0) == "NO_STRONG_MATCH"
 
 
-def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_score_for_objects():
+def test_vacancy_fit_evaluator_classify_opening_fit_recovers_legacy_object_score():
     class DummyOpening:
         vacancy_fit_score = 0.0
         score = 76.4
@@ -62,10 +62,10 @@ def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_sco
         classification = "MEDIUM"
 
     opening = DummyOpening()
-    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "NO_STRONG_MATCH"
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "MATCHED"
 
 
-def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_score_for_dicts():
+def test_vacancy_fit_evaluator_classify_opening_fit_recovers_legacy_dict_score():
     opening = {
         "vacancy_fit_score": 0.0,
         "score": 76.4,
@@ -73,16 +73,27 @@ def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_sco
         "vacancy_match_status": "MATCHED",
         "classification": "MEDIUM",
     }
-    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "NO_STRONG_MATCH"
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "MATCHED"
 
 
-def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_score_for_string_values():
+def test_vacancy_fit_evaluator_classify_opening_fit_recovers_legacy_string_score():
     opening = {
         "vacancy_fit_score": "0.0",
         "score": "76.4",
         "overall_score": "76.4",
         "vacancy_match_status": "MATCHED",
         "classification": "MEDIUM",
+    }
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "MATCHED"
+
+
+def test_vacancy_fit_evaluator_classify_opening_fit_preserves_computed_zero():
+    opening = {
+        "vacancy_fit_score": 0.0,
+        "score": 76.4,
+        "overall_score": 76.4,
+        "score_breakdown": {"overall_fit_score": 0.0},
+        "vacancy_match_status": "MATCHED",
     }
     assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "NO_STRONG_MATCH"
 
