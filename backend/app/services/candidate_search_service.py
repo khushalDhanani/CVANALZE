@@ -293,8 +293,13 @@ class CandidateSearchService:
                         "job_title": best_match.get("job_title"),
                         "department": best_match.get("department") or best_match.get("department_name"),
                         "score": best_match.get("score") or best_match.get("overall_score"),
+                        "vacancy_fit_score": best_match.get("vacancy_fit_score"),
+                        "vacancy_match_status": best_match.get("vacancy_match_status"),
+                        "match_status": best_match.get("match_status"),
+                        "score_breakdown": best_match.get("score_breakdown"),
                         "classification": best_match.get("classification"),
                         "recommendation": best_match.get("recommendation"),
+                        "reason": best_match.get("reason"),
                         "domain_mismatch_capped": best_match.get("domain_mismatch_capped")
                         or any(
                             (f.get("requirement_id") == "req_domain_mismatch" if isinstance(f, dict) else False)

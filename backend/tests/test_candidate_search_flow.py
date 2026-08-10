@@ -116,6 +116,45 @@ def test_candidate_search_revalidates_name_embedded_in_personal_details(monkeypa
     assert response.candidates[0].full_name == "VIRAL D. HIRANI"
 
 
+def test_candidate_search_preserves_canonical_fit_breakdown(monkeypatch):
+    score_breakdown = {
+        "hierarchy_score": 80.0,
+        "designation_role_score": 90.0,
+        "skills_score": 85.0,
+        "experience_score": 75.0,
+        "semantic_similarity_score": 70.0,
+        "overall_fit_score": 81.25,
+        "hierarchy_mismatch_penalty": 0.0,
+        "is_hierarchy_valid": True,
+        "match_status": "MATCHED",
+    }
+    result = {
+        "id": "cv_fit_breakdown",
+        "filename": "fit_breakdown.pdf",
+        "status": "COMPLETED",
+        "progress": 100,
+        "full_name": "Canonical Candidate",
+        "match_analysis": {
+            "best_match": {
+                "job_title": "Engineer",
+                "vacancy_fit_score": 81.25,
+                "vacancy_match_status": "MATCHED",
+                "score_breakdown": score_breakdown,
+                "reason": "Canonical fit evaluated from configured dimensions.",
+            }
+        },
+    }
+    monkeypatch.setattr(ResultRepository, "list_all_results", lambda: [result])
+
+    response = CandidateSearchService.search_candidates(CandidateSearchRequest())
+
+    assert len(response.candidates) == 1
+    best_match = response.candidates[0].best_match
+    assert best_match is not None
+    assert best_match["score_breakdown"] == score_breakdown
+    assert best_match["vacancy_match_status"] == "MATCHED"
+
+
 def test_get_status_returns_processing_while_incomplete(tmp_path, monkeypatch):
     """Verify GET /api/match/status returns processing response while progress < 100."""
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")

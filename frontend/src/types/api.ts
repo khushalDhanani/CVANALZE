@@ -571,8 +571,10 @@ export interface CandidateSummary {
     vacancy_fit_score?: number | null;
     vacancy_match_status?: CanonicalVacancyMatchStatus | string | null;
     match_status?: CanonicalVacancyMatchStatus | string | null;
+    score_breakdown?: VacancyFitScoreBreakdown | null;
     classification?: string;
     recommendation?: string;
+    reason?: string | null;
     domain_mismatch_capped?: boolean;
     domain_mismatch_reason?: string | null;
   };

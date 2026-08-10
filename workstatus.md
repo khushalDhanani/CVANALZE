@@ -1,6 +1,43 @@
 # Work Status
 
 ## Last Completed Task
+**Show Canonical Fit Breakdown on the All CV page**
+
+### Architecture Impact Analysis
+- Reused the existing `VacancyFitScoreBreakdownCard` from candidate detail rather than creating a second presentation or recalculating scores in the frontend.
+- Extended the existing candidate-search summary projection with canonical fields already persisted under `match_analysis.best_match`.
+- Kept all fit dimensions, weights, penalties, statuses, and reasons sourced from the dynamic backend matching result.
+
+### Files Changed
+- Candidate directory UI: `frontend/src/app/candidates/index.tsx`.
+- Candidate summary contract: `frontend/src/types/api.ts`.
+- Candidate-search result projection: `backend/app/services/candidate_search_service.py`.
+- Regression coverage: `backend/tests/test_candidate_search_flow.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Trace the detail-page breakdown component and the All CV search response.
+- Preserve canonical fit fields in the summary API.
+- Render the shared breakdown only when a candidate has canonical score data.
+- Add focused response-contract coverage and run static diagnostics.
+
+### Code Changes
+- Candidate search summaries now include `vacancy_fit_score`, canonical match statuses, `score_breakdown`, and the persisted reason.
+- `CandidateSummary.best_match` now types those additive fields.
+- Each applicable All CV candidate row renders the same canonical breakdown card used by the detail page, including hierarchy penalties and rejection reasons.
+
+### Verification Checklist
+- [x] The All CV page receives canonical persisted scores rather than calculating fit client-side.
+- [x] Candidate rows without a score breakdown remain unchanged.
+- [x] The shared component and dynamic matching result are reused.
+- [x] Frontend language-server diagnostics are clean; backend diagnostics show only existing environment/dependency issues.
+- [x] `git diff --check` passed.
+- [ ] Tests and lint were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- None; the existing shared fit-breakdown component was reused directly.
+
+## Previous Task
 **Full CV analyzer integration trace and reliability closure**
 
 ### Architecture Impact Analysis
@@ -51,7 +88,7 @@
 ### Refactoring Performed
 - Extracted shadow enqueue policy into one MatchService helper and centralized organization MSSQL session failure conversion; no matching, taxonomy, parser, or Ollama logic was duplicated.
 
-## Previous Task
+## Earlier Task
 **Connect canonical MSSQL → PostgreSQL sync and validation snapshot jobs**
 
 ### Architecture Impact Analysis
