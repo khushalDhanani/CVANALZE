@@ -16,13 +16,13 @@ export const organizationService = {
   },
 
   getCompanies: (businessGroupId?: number | null): Promise<CompanyItem[]> => {
-    const params = businessGroupId ? { business_group_id: String(businessGroupId) } : undefined;
-    return apiClient.get<CompanyItem[]>('/api/organization/companies', params);
+    const params = businessGroupId != null ? { business_group_id: businessGroupId } : undefined;
+    return apiClient.get<CompanyItem[]>('/api/organization/companies', { params });
   },
 
   getLocations: (companyId?: number | null): Promise<LocationItem[]> => {
-    const params = companyId ? { company_id: String(companyId) } : undefined;
-    return apiClient.get<LocationItem[]>('/api/organization/locations', params);
+    const params = companyId != null ? { company_id: companyId } : undefined;
+    return apiClient.get<LocationItem[]>('/api/organization/locations', { params });
   },
 
   getMainDepartments: (): Promise<MainDepartmentItem[]> => {
@@ -33,10 +33,10 @@ export const organizationService = {
     companyId?: number | null,
     mainDepartmentId?: number | null
   ): Promise<DepartmentItem[]> => {
-    const params: Record<string, string> = {};
-    if (companyId != null) params.company_id = String(companyId);
-    if (mainDepartmentId != null) params.main_department_id = String(mainDepartmentId);
-    return apiClient.get<DepartmentItem[]>('/api/organization/departments', params);
+    const params: Record<string, number> = {};
+    if (companyId != null) params.company_id = companyId;
+    if (mainDepartmentId != null) params.main_department_id = mainDepartmentId;
+    return apiClient.get<DepartmentItem[]>('/api/organization/departments', { params });
   },
 
   getDesignations: (
@@ -44,11 +44,11 @@ export const organizationService = {
     departmentId?: number | null,
     mainDepartmentId?: number | null
   ): Promise<DesignationItem[]> => {
-    const params: Record<string, string> = {};
-    if (companyId != null) params.company_id = String(companyId);
-    if (departmentId != null) params.department_id = String(departmentId);
-    if (mainDepartmentId != null) params.main_department_id = String(mainDepartmentId);
-    return apiClient.get<DesignationItem[]>('/api/organization/designations', params);
+    const params: Record<string, number> = {};
+    if (companyId != null) params.company_id = companyId;
+    if (departmentId != null) params.department_id = departmentId;
+    if (mainDepartmentId != null) params.main_department_id = mainDepartmentId;
+    return apiClient.get<DesignationItem[]>('/api/organization/designations', { params });
   },
 
   getHierarchy: (): Promise<any> => {

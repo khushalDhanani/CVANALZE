@@ -1,6 +1,44 @@
 # Work Status
 
 ## Last Completed Task
+**Fix organization filters by separating GET query parameters from headers**
+
+### Architecture Impact Analysis
+- Changed only the shared frontend HTTP client contract and organization service callers.
+- Backend organization routes, query names, response contracts, caching, repositories, and hierarchy validation remain unchanged.
+- Authentication headers remain supported independently through the new GET options object.
+- No Ollama behavior or integration changed.
+
+### Files Changed
+- `frontend/src/services/apiClient.ts`.
+- `frontend/src/services/organizationService.ts`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Add a typed GET options object with separate `params` and `headers` properties.
+- Serialize query parameters onto the request URL with URL encoding and null/undefined omission.
+- Migrate every organization filter call from a raw second argument to `{ params }`.
+- Audit all other `apiClient.get` calls for old positional second-argument usage.
+
+### Code Changes
+- Added `ApiQueryValue` and `ApiGetOptions` to the shared client.
+- Added centralized query serialization supporting strings, numbers, booleans, repeated array values, existing query strings, and omitted nullish values.
+- `apiClient.get(endpoint, options)` now sends `options.params` in the URL and only `options.headers` as HTTP headers.
+- Updated company, location, department, and designation organization calls to use `{ params }`.
+- Numeric IDs are retained as numbers until centralized serialization, including valid zero values.
+
+### Verification Checklist
+- [x] Confirmed backend query names: `business_group_id`, `company_id`, `main_department_id`, and `department_id`.
+- [x] Confirmed every organization filter call uses the new `{ params }` contract.
+- [x] Audited all frontend `apiClient.get` usages; no other raw positional params/headers caller remains.
+- [x] Confirmed the shared GET options type supports params and headers simultaneously.
+- [x] `git diff --check` passed.
+- [ ] Builds and tests were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Centralized query-string construction in `apiClient` rather than duplicating URL assembly in organization services.
+
+## Previous Task
 **Connect the frontend configuration screen to the canonical versioned config API**
 
 ### Architecture Impact Analysis

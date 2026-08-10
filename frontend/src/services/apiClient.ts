@@ -8,6 +8,13 @@ export interface AuthSession {
   expires_in_seconds: number | null;
 }
 
+export type ApiQueryValue = string | number | boolean | null | undefined;
+
+export interface ApiGetOptions {
+  params?: Record<string, ApiQueryValue | ApiQueryValue[]>;
+  headers?: Record<string, string>;
+}
+
 let unauthorizedHandler: (() => void) | null = null;
 let sessionCredentialsEnabled = false;
 
@@ -21,6 +28,28 @@ export class ApiError extends Error {
     this.status = status;
     this.data = data;
   }
+}
+
+function appendQueryParams(
+  endpoint: string,
+  params?: ApiGetOptions['params'],
+): string {
+  if (!params) {
+    return endpoint;
+  }
+  const pairs: string[] = [];
+  Object.entries(params).forEach(([key, rawValue]) => {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    values.forEach((value) => {
+      if (value !== undefined && value !== null) {
+        pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+      }
+    });
+  });
+  if (pairs.length === 0) {
+    return endpoint;
+  }
+  return `${endpoint}${endpoint.includes('?') ? '&' : '?'}${pairs.join('&')}`;
 }
 
 async function request<T>(
@@ -119,8 +148,11 @@ export const apiClient = {
     credentials: 'include',
   }),
 
-  get: <T>(endpoint: string, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: 'GET', headers }),
+  get: <T>(endpoint: string, options: ApiGetOptions = {}) =>
+    request<T>(appendQueryParams(endpoint, options.params), {
+      method: 'GET',
+      headers: options.headers,
+    }),
 
   post: <T>(endpoint: string, body?: any, headers?: Record<string, string>) =>
     request<T>(endpoint, {
