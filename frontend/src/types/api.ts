@@ -427,8 +427,6 @@ export interface MatchEngineConfigResponse {
   MAX_SCORE_ON_MANDATORY_FAILURE: number;
   LLM_SEMANTIC_WEIGHT: number;
   MAX_LLM_BOOST: number;
-  LLM_SKIP_MARGIN_THRESHOLD: number;
-  LLM_SKIP_COVERAGE_THRESHOLD: number;
   MATCH_COMPONENT_WEIGHTS: MatchComponentWeights;
 }
 
@@ -439,9 +437,55 @@ export interface MatchEngineConfigUpdate {
   MAX_SCORE_ON_MANDATORY_FAILURE?: number;
   LLM_SEMANTIC_WEIGHT?: number;
   MAX_LLM_BOOST?: number;
-  LLM_SKIP_MARGIN_THRESHOLD?: number;
-  LLM_SKIP_COVERAGE_THRESHOLD?: number;
   MATCH_COMPONENT_WEIGHTS?: Partial<MatchComponentWeights>;
+}
+
+export interface UnifiedMatchScoringParameters {
+  career_transition_role_score: number;
+  role_divergence_score: number;
+  default_role_score: number;
+  below_min_exp_multiplier: number;
+  overqualification_penalty: number;
+  domain_default_match_score: number;
+  low_coverage_threshold: number;
+  false_positive_score_cap: number;
+  match_high_threshold: number;
+  match_medium_threshold: number;
+  mandatory_failure_penalty: number;
+  max_score_on_failure: number;
+  llm_semantic_weight: number;
+  max_llm_boost: number;
+  component_weights: MatchComponentWeights;
+}
+
+export interface UnifiedRuleConfig {
+  version: string;
+  description: string;
+  last_updated: string;
+  global_confidence_tiers: Record<string, unknown>;
+  fields: Record<string, unknown>;
+  scoring: {
+    match: Record<string, unknown> & {
+      scoring_parameters: UnifiedMatchScoringParameters;
+    };
+    prefilter: Record<string, unknown>;
+    taxonomy: Record<string, unknown>;
+    resume_quality: Record<string, unknown>;
+    domain_embedding: Record<string, unknown>;
+  };
+  workflow: Record<string, unknown>;
+}
+
+export interface ConfigVersionCreatedResponse {
+  status: string;
+  profile_id: number;
+  version_tag: string;
+}
+
+export interface ConfigVersionActivatedResponse {
+  status: string;
+  activated_version: string;
+  tenant_id: string | null;
 }
 
 export interface BatchCandidateResult {

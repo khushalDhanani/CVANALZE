@@ -23,8 +23,6 @@ export default function ConfigScreen() {
   const [mediumThreshold, setMediumThreshold] = useState<string>('40');
   const [llmWeight, setLlmWeight] = useState<string>('0.15');
   const [maxLlmBoost, setMaxLlmBoost] = useState<string>('15.0');
-  const [skipMargin, setSkipMargin] = useState<string>('15.0');
-  const [skipCoverage, setSkipCoverage] = useState<string>('0.50');
   const [mandatoryPenalty, setMandatoryPenalty] = useState<string>('20.0');
   const [weights, setWeights] = useState<MatchComponentWeights>({
     role: 0.15,
@@ -45,8 +43,6 @@ export default function ConfigScreen() {
       setMediumThreshold(String(config.MATCH_MEDIUM_THRESHOLD));
       setLlmWeight(String(config.LLM_SEMANTIC_WEIGHT));
       setMaxLlmBoost(String(config.MAX_LLM_BOOST));
-      setSkipMargin(String(config.LLM_SKIP_MARGIN_THRESHOLD ?? '15.0'));
-      setSkipCoverage(String(config.LLM_SKIP_COVERAGE_THRESHOLD ?? '0.50'));
       setMandatoryPenalty(String(config.MANDATORY_FAILURE_PENALTY_PER_ITEM));
       if (config.MATCH_COMPONENT_WEIGHTS) {
         setWeights(config.MATCH_COMPONENT_WEIGHTS);
@@ -66,8 +62,6 @@ export default function ConfigScreen() {
       mediumThreshold !== String(config.MATCH_MEDIUM_THRESHOLD) ||
       llmWeight !== String(config.LLM_SEMANTIC_WEIGHT) ||
       maxLlmBoost !== String(config.MAX_LLM_BOOST) ||
-      skipMargin !== String(config.LLM_SKIP_MARGIN_THRESHOLD ?? '15.0') ||
-      skipCoverage !== String(config.LLM_SKIP_COVERAGE_THRESHOLD ?? '0.50') ||
       mandatoryPenalty !== String(config.MANDATORY_FAILURE_PENALTY_PER_ITEM) ||
       JSON.stringify(weights) !== JSON.stringify(config.MATCH_COMPONENT_WEIGHTS || {})
     )
@@ -78,8 +72,6 @@ export default function ConfigScreen() {
   const medNum = parseFloat(mediumThreshold);
   const llmWeightNum = parseFloat(llmWeight);
   const maxBoostNum = parseFloat(maxLlmBoost);
-  const skipMarginNum = parseFloat(skipMargin);
-  const skipCoverageNum = parseFloat(skipCoverage);
   const penaltyNum = parseFloat(mandatoryPenalty);
 
   const highError =
@@ -106,16 +98,6 @@ export default function ConfigScreen() {
       ? 'Must be between 0.0 and 50.0 points'
       : undefined;
 
-  const skipMarginError =
-    isNaN(skipMarginNum) || skipMarginNum < 0
-      ? 'Must be a non-negative number'
-      : undefined;
-
-  const skipCoverageError =
-    isNaN(skipCoverageNum) || skipCoverageNum < 0 || skipCoverageNum > 1
-      ? 'Must be a ratio between 0.00 and 1.00'
-      : undefined;
-
   const penaltyError =
     isNaN(penaltyNum) || penaltyNum < 0
       ? 'Must be a non-negative number'
@@ -131,8 +113,6 @@ export default function ConfigScreen() {
     !medError &&
     !llmWeightError &&
     !maxBoostError &&
-    !skipMarginError &&
-    !skipCoverageError &&
     !penaltyError;
 
   const handleSave = async () => {
@@ -146,8 +126,6 @@ export default function ConfigScreen() {
         MATCH_MEDIUM_THRESHOLD: medNum,
         LLM_SEMANTIC_WEIGHT: llmWeightNum,
         MAX_LLM_BOOST: maxBoostNum,
-        LLM_SKIP_MARGIN_THRESHOLD: skipMarginNum,
-        LLM_SKIP_COVERAGE_THRESHOLD: skipCoverageNum,
         MANDATORY_FAILURE_PENALTY_PER_ITEM: penaltyNum,
         MATCH_COMPONENT_WEIGHTS: weights,
       });
@@ -286,42 +264,11 @@ export default function ConfigScreen() {
               />
             </Card>
 
-            {/* SECTION 3: LLM Bypass Settings */}
-            <Card className="p-3.5 gap-3.5 shadow-none border-border">
-              <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
-                3. LLM Fast-Track Bypass Settings
-              </Text>
-
-              <View className="flex-col sm:flex-row gap-3">
-                <View className="flex-1">
-                  <TextField
-                    label="Margin Threshold (pts):"
-                    value={skipMargin}
-                    onChangeText={setSkipMargin}
-                    keyboardType="numeric"
-                    error={skipMarginError}
-                    helperText="Score delta between top 2 matches to bypass LLM"
-                  />
-                </View>
-
-                <View className="flex-1">
-                  <TextField
-                    label="Coverage Threshold Ratio:"
-                    value={skipCoverage}
-                    onChangeText={setSkipCoverage}
-                    keyboardType="numeric"
-                    error={skipCoverageError}
-                    helperText="Minimum skill coverage ratio to bypass LLM"
-                  />
-                </View>
-              </View>
-            </Card>
-
-            {/* SECTION 4: Component Weights */}
+            {/* SECTION 3: Component Weights */}
             <Card className="p-3.5 gap-3.5 shadow-none border-border">
               <View className="flex-row justify-between items-center mb-1">
                 <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
-                  4. Component Score Weights
+                  3. Component Score Weights
                 </Text>
                 <Text
                   className={`text-xs font-sans-bold ${

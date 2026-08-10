@@ -1,26 +1,93 @@
 import { apiClient } from './apiClient';
 import {
+  ConfigVersionActivatedResponse,
+  ConfigVersionCreatedResponse,
   MatchEngineConfigResponse,
   MatchEngineConfigUpdate,
+  UnifiedRuleConfig,
 } from '@/types/api';
+
+const getActiveConfig = (): Promise<UnifiedRuleConfig> => {
+  return apiClient.get<UnifiedRuleConfig>('/api/config/active');
+};
+
+const toMatchEngineConfig = (config: UnifiedRuleConfig): MatchEngineConfigResponse => {
+  const parameters = config.scoring.match.scoring_parameters;
+  return {
+    MATCH_HIGH_THRESHOLD: parameters.match_high_threshold,
+    MATCH_MEDIUM_THRESHOLD: parameters.match_medium_threshold,
+    MANDATORY_FAILURE_PENALTY_PER_ITEM: parameters.mandatory_failure_penalty,
+    MAX_SCORE_ON_MANDATORY_FAILURE: parameters.max_score_on_failure,
+    LLM_SEMANTIC_WEIGHT: parameters.llm_semantic_weight,
+    MAX_LLM_BOOST: parameters.max_llm_boost,
+    MATCH_COMPONENT_WEIGHTS: parameters.component_weights,
+  };
+};
+
+const applyMatchUpdate = (
+  activeConfig: UnifiedRuleConfig,
+  payload: MatchEngineConfigUpdate,
+  versionTag: string,
+): UnifiedRuleConfig => {
+  const current = activeConfig.scoring.match.scoring_parameters;
+  return {
+    ...activeConfig,
+    version: versionTag,
+    last_updated: new Date().toISOString(),
+    scoring: {
+      ...activeConfig.scoring,
+      match: {
+        ...activeConfig.scoring.match,
+        scoring_parameters: {
+          ...current,
+          match_high_threshold: payload.MATCH_HIGH_THRESHOLD ?? current.match_high_threshold,
+          match_medium_threshold: payload.MATCH_MEDIUM_THRESHOLD ?? current.match_medium_threshold,
+          mandatory_failure_penalty: payload.MANDATORY_FAILURE_PENALTY_PER_ITEM ?? current.mandatory_failure_penalty,
+          max_score_on_failure: payload.MAX_SCORE_ON_MANDATORY_FAILURE ?? current.max_score_on_failure,
+          llm_semantic_weight: payload.LLM_SEMANTIC_WEIGHT ?? current.llm_semantic_weight,
+          max_llm_boost: payload.MAX_LLM_BOOST ?? current.max_llm_boost,
+          component_weights: {
+            ...current.component_weights,
+            ...payload.MATCH_COMPONENT_WEIGHTS,
+          },
+        },
+      },
+    },
+  };
+};
 
 export const configService = {
   /**
-   * Retrieve current engine weights & thresholds.
+   * Retrieve the active versioned rule configuration and map its editable match fields.
    */
   getMatchConfig: (): Promise<MatchEngineConfigResponse> => {
-    return apiClient.get<MatchEngineConfigResponse>('/api/config/match');
+    return getActiveConfig().then(toMatchEngineConfig);
   },
 
   /**
-   * Update engine weights & thresholds.
+   * Create and activate a complete new rule configuration version with the edited match fields.
    */
-  updateMatchConfig: (
+  updateMatchConfig: async (
     payload: MatchEngineConfigUpdate
   ): Promise<MatchEngineConfigResponse> => {
-    return apiClient.put<MatchEngineConfigResponse>(
-      '/api/config/match',
-      payload
+    const activeConfig = await getActiveConfig();
+    const versionTag = `ui-${Date.now()}`;
+    const nextConfig = applyMatchUpdate(activeConfig, payload, versionTag);
+    const createQuery = [
+      `version_tag=${encodeURIComponent(versionTag)}`,
+      `description=${encodeURIComponent(activeConfig.description)}`,
+      'created_by=frontend',
+      `audit_reason=${encodeURIComponent('Matching configuration updated from frontend')}`,
+    ].join('&');
+
+    await apiClient.post<ConfigVersionCreatedResponse>(
+      `/api/config/versions?${createQuery}`,
+      nextConfig,
     );
+    await apiClient.post<ConfigVersionActivatedResponse>(
+      `/api/config/versions/${encodeURIComponent(versionTag)}/activate`,
+      { tenant_id: null },
+    );
+    return toMatchEngineConfig(nextConfig);
   },
 };

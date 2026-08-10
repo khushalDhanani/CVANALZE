@@ -69,11 +69,11 @@ def test_authentication_and_role_authorization(monkeypatch):
     monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
     monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", ["administrator-secret"])
     monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
-    client = TestClient(_app_with_operational_middleware("/api/config/match"))
+    client = TestClient(_app_with_operational_middleware("/api/config/active"))
 
-    unauthorized = client.get("/api/config/match", headers={"X-Request-ID": "request-auth"})
-    forbidden = client.get("/api/config/match", headers={"Authorization": "Bearer recruiter-secret"})
-    allowed = client.get("/api/config/match", headers={"X-API-Key": "administrator-secret"})
+    unauthorized = client.get("/api/config/active", headers={"X-Request-ID": "request-auth"})
+    forbidden = client.get("/api/config/active", headers={"Authorization": "Bearer recruiter-secret"})
+    allowed = client.get("/api/config/active", headers={"X-API-Key": "administrator-secret"})
 
     assert unauthorized.status_code == 401
     assert unauthorized.json()["error"]["code"] == "UNAUTHORIZED"

@@ -1,6 +1,48 @@
 # Work Status
 
 ## Last Completed Task
+**Connect the frontend configuration screen to the canonical versioned config API**
+
+### Architecture Impact Analysis
+- Replaced the frontend's references to the nonexistent legacy `/api/config/match` route with the existing canonical `UnifiedRuleConfig` API.
+- Configuration reads now come from `/api/config/active`; writes preserve the complete active document, create a new version, and activate that version through the existing backend workflow.
+- Kept the existing frontend form as a view adapter over `scoring.match.scoring_parameters`; no second backend route, repository, schema, or configuration store was introduced.
+- Existing administrator authorization for all configuration routes remains unchanged.
+- No Ollama client, request, cache, retry, timeout, generation, or embedding behavior changed.
+
+### Files Changed
+- Canonical API types and adapter: `frontend/src/types/api.ts`, `frontend/src/services/configService.ts`.
+- Configuration UI: `frontend/src/app/config.tsx`.
+- Access-policy regression route correction: `backend/tests/test_phase6_api_reliability.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Model the canonical `UnifiedRuleConfig` response and the create/activate responses used by the frontend.
+- Map the canonical nested match-scoring parameters into the existing editable form fields.
+- On save, fetch the latest active document, merge only submitted match fields, assign a unique version tag, create the full version, and activate it.
+- Remove controls for values that are not part of the versioned backend contract.
+
+### Code Changes
+- `getMatchConfig` now calls `GET /api/config/active` and reads `scoring.match.scoring_parameters`.
+- `updateMatchConfig` now calls `POST /api/config/versions` followed by `POST /api/config/versions/{version_tag}/activate`.
+- New versions use `ui-{timestamp}` tags and include frontend creator/audit metadata.
+- Unedited configuration sections and unexposed scoring parameters are preserved from the latest active document.
+- Removed LLM skip margin/coverage controls because those are runtime environment settings, not fields in `UnifiedRuleConfig`.
+- Updated the authorization regression to use the real administrator endpoint `/api/config/active`.
+
+### Verification Checklist
+- [x] Live `GET /api/config/active` confirmed the canonical nested match-scoring field names and active version metadata.
+- [x] Frontend production code contains no `/api/config/match` reference.
+- [x] Frontend configuration calls exactly the three existing backend routes characterized by `access_policy.py`.
+- [x] Save construction preserves the complete active configuration and changes only supported match-scoring parameters.
+- [x] `git diff --check` passed.
+- [ ] Builds and tests were not run because repository instructions require explicit permission.
+- [ ] No live save was performed because it would create and activate a persistent configuration version.
+
+### Refactoring Performed
+- Consolidated canonical-to-form and form-to-canonical mapping in `configService`; the hook and screen do not duplicate backend document-shape logic.
+
+## Previous Task
 **Prevent authentication UI and credentialed-CORS failures when authentication is disabled**
 
 ### Architecture Impact Analysis
