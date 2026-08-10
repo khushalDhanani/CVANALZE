@@ -1,6 +1,57 @@
 # Work Status
 
 ## Last Completed Task
+**Fix candidate-detail hiring-intelligence column layout**
+
+### Architecture Impact Analysis
+- Changed presentation only in the existing candidate detail page.
+- Candidate loading, match normalization, recommendation data, API contracts, and Ollama behavior remain unchanged.
+
+### Files Changed
+- `frontend/src/app/candidates/[id].tsx`.
+- `workstatus.md`.
+
+### Implementation
+- Replaced desktop widths totaling 100% plus a gap with proportional `5:7` flex columns, preventing overflow and unintended wrapping.
+- Added `min-w-0` and zero flex-basis constraints so both columns can shrink within the available viewport.
+- Made the Hiring Intelligence header and AI domain metadata rows wrap safely when badges or values are long.
+- Constrained long professional-domain text while retaining right alignment on wider layouts.
+
+### Verification Checklist
+- [x] Serena reports no errors or warnings for `frontend/src/app/candidates/[id].tsx`.
+- [x] `git diff --check` passed.
+- [ ] Browser visual verification was unavailable because the browser-control runtime is not exposed in this session.
+- [ ] Builds and tests were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Reused the existing cards, badges, spacing tokens, and responsive breakpoint; no new component or CSS rule was introduced.
+
+## Previous Task
+**Activate `gemma3:4b` for the Docker backend**
+
+### Architecture Impact Analysis
+- Preserved `app.core.config.settings` as the single Ollama configuration source.
+- No Ollama transport, generation, embedding, API contract, cache, or scoring logic changed.
+
+### Files Changed
+- `.env`: changed the active Compose runtime model from `qwen3:4b` to `gemma3:4b`.
+- `backend/.env.example`: already contained `OLLAMA_MODEL=gemma3:4b` from the user's existing changes; no additional edit was required.
+- `workstatus.md`.
+
+### Implementation
+- Rebuilt and force-recreated the `api` and `worker` services using the merged base and local Compose configuration.
+- Confirmed both recreated containers receive `OLLAMA_MODEL=gemma3:4b`.
+
+### Verification Checklist
+- [x] API and worker containers are healthy.
+- [x] API startup verified the `gemma3:4b` generation model and `nomic-embed-text` embedding model.
+- [x] Live `/api/match/health` returns `status=online`, `model_configured=gemma3:4b`, and `model_available=true`.
+- [x] `git diff --check` passed.
+
+### Refactoring Performed
+- None; this was a configuration-only runtime switch.
+
+## Previous Task
 **Restrict candidate vacancy selection to verified matches**
 
 ### Architecture Impact Analysis
@@ -406,3 +457,32 @@ The worker log showed three distinct failures during CV processing:
 
 ### Verification
 - **TypeScript Compilation (`npx tsc --noEmit`)**: **PASSED (0 errors)**.
+# Candidate Hiring Intelligence and Timeline UI Correction (2026-08-10)
+
+## Work completed
+- Restored the intended responsive candidate overview split with reliable standard width utilities; the Hiring Intelligence column now fills the remaining desktop width without overflowing.
+- Made Hiring Intelligence content consistently stretch and left-align within its card.
+- Added recommendation display-text cleanup for OCR bullets, encoded ampersands, repeated whitespace, dangling punctuation, and an empty department phrase.
+- Corrected timeline construction so internal assignments remain under one employment period instead of being reported as concurrent/overlapping jobs.
+- Added a regression test asserting that an internal deputation produces zero concurrent roles and no concurrent-cluster timeline event.
+
+## Files changed
+- `frontend/src/app/candidates/[id].tsx`
+- `frontend/src/utils/candidateDetail.ts`
+- `backend/app/services/experience_gap_service.py`
+- `backend/tests/test_experience_gap_analysis.py`
+- `workstatus.md`
+
+## Verification
+- `git diff --check` passed.
+- Frontend TypeScript diagnostics are clean for both changed frontend files.
+- Backend diagnostics only report pre-existing typing/dependency-environment issues outside the changed timeline logic.
+- Tests/build were not run because project instructions require explicit user authorization.
+
+## Pending work
+- Restart/recreate the backend service to load the Python timeline change, then refresh the candidate page.
+- Optional visual browser verification once the browser runtime is available.
+
+## Important decisions
+- Internal promotions, transfers, and deputations are not treated as genuine concurrent employment; the existing canonical job renderer continues to show them as nested assignments.
+- Existing unrelated model/environment edits and the deleted `ollama-optimization.md` were preserved untouched.

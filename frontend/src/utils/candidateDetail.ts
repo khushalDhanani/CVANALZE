@@ -117,6 +117,20 @@ export const cleanCandidateText = (value: unknown): string | undefined => {
   return cleaned;
 };
 
+export const cleanRecommendationText = (value: unknown): string | undefined => {
+  const cleaned = cleanCandidateText(value);
+  if (!cleaned) return undefined;
+  const displayText = cleaned
+    .replace(/[\u2022\u2023\u2043\u2219\u25aa-\u25ab\u25a0-\u25a4\uf0b7]/g, ' ')
+    .replace(/\bamp;?\b/gi, '&')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/\s+for\s+\.$/i, '.')
+    .replace(/[\s,;]+$/g, '')
+    .trim();
+  return displayText || undefined;
+};
+
 const firstCandidateText = (...values: unknown[]): string | undefined => {
   for (const value of values) {
     const cleaned = cleanCandidateText(value);

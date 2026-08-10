@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = ""
-    OLLAMA_MODEL: str = "qwen3:4b"  # or qwen2.5:3b etc based on what's available
+    OLLAMA_MODEL: str = "gemma3:4b"  # or qwen2.5:3b etc based on what's available
     OLLAMA_REQUEST_TIMEOUT: float = 300.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0

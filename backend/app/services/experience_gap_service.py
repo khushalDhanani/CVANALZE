@@ -8,7 +8,6 @@ from app.core.logging import logger
 from app.schemas.experience_gap import (
     CanonicalJob,
     ChildAssignment,
-    ConcurrentRoleCluster,
     EmploymentEntityResolution,
     ExperienceGap,
     ExperienceGapAnalysis,
@@ -937,56 +936,17 @@ class ExperienceGapService:
                 responsibilities=cj.responsibilities,
             )
 
-            if len(cj.child_assignments) > 0:
-                child_nodes: list[ExperienceTimelineNode] = []
-                for asg in cj.child_assignments:
-                    child_nodes.append(
-                        ExperienceTimelineNode(
-                            record_id=asg.assignment_id,
-                            company=cj.parent_company,
-                            job_title=asg.title_or_subrole,
-                            employment_type=cj.employment_type,
-                            start_date=asg.start_date,
-                            end_date=asg.end_date,
-                            is_current=asg.is_current,
-                            duration_months=cj.duration_months,
-                            precision="month",
-                            date_confidence=cj.date_confidence,
-                            responsibilities=asg.details,
-                        )
-                    )
-                cluster = ConcurrentRoleCluster(
-                    cluster_id=f"cluster_{cj.job_id}",
+            events.append(
+                TimelineEvent(
+                    event_id=f"event_{event_counter}",
+                    event_type="EMPLOYMENT_PERIOD",
                     start_date=cj.start_date,
                     end_date=cj.end_date,
                     is_current=cj.is_current,
                     duration_months=cj.duration_months,
-                    roles_count=len(child_nodes),
-                    child_nodes=child_nodes,
+                    node=node,
                 )
-                events.append(
-                    TimelineEvent(
-                        event_id=f"event_{event_counter}",
-                        event_type="CONCURRENT_CLUSTER",
-                        start_date=cj.start_date,
-                        end_date=cj.end_date,
-                        is_current=cj.is_current,
-                        duration_months=cj.duration_months,
-                        cluster=cluster,
-                    )
-                )
-            else:
-                events.append(
-                    TimelineEvent(
-                        event_id=f"event_{event_counter}",
-                        event_type="EMPLOYMENT_PERIOD",
-                        start_date=cj.start_date,
-                        end_date=cj.end_date,
-                        is_current=cj.is_current,
-                        duration_months=cj.duration_months,
-                        node=node,
-                    )
-                )
+            )
             event_counter += 1
 
         return events

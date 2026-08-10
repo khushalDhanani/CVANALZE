@@ -290,6 +290,25 @@ def test_deputation_and_internal_assignments():
     assert analysis.summary.total_employment_gaps_count == 0
 
 
+def test_internal_assignments_are_not_rendered_as_concurrent_employment():
+    resume_json = {
+        "work_experience": [
+            {"job_title": "Engineer", "company": "Parent Global", "dates": "01/2021 - Present"},
+            {
+                "job_title": "Site Assignment",
+                "company": "Overseas Sub Pte Ltd",
+                "dates": "03/2022 - 09/2022",
+                "responsibilities": ["International deputation assignment by Parent Global"],
+            },
+        ]
+    }
+
+    analysis = ExperienceGapService.analyze_timeline(resume_json, reference_date=datetime.date(2024, 1, 1))
+
+    assert analysis.summary.concurrent_roles_count == 0
+    assert all(event.event_type != "CONCURRENT_CLUSTER" for event in analysis.timeline_events)
+
+
 def test_promotions_and_transfers():
     # Promotion & transfer within same company -> 0 gaps
     resume_json = {
@@ -336,7 +355,5 @@ def test_explicit_7type_entity_resolution():
     asg_resolutions = [asg.entity_resolution for asg in c_job.child_assignments]
     assert "DEPUTATION" in asg_resolutions
     assert "PROMOTION_TRANSFER" in asg_resolutions
-
-
 
 

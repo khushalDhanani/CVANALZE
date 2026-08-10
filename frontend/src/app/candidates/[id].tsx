@@ -39,6 +39,7 @@ import { formatDateTime } from '@/utils/date';
 import {
   buildCandidateDetailViewModel,
   cleanCandidateText,
+  cleanRecommendationText,
   normalizeCandidateMatchAnalysis,
   normalizeCandidateRouteId,
   responseMatchesCandidateId,
@@ -311,9 +312,9 @@ export default function CandidateDetailScreen() {
   // -------------------------------------------------------------
 
   const renderOverviewTab = () => (
-    <View className="flex-col lg:flex-row gap-4">
+    <View className="flex-col gap-4 lg:flex-row lg:items-start">
       {/* Left Column (Candidate Data) */}
-      <View className="w-full lg:w-5/12 gap-4">
+      <View className="w-full min-w-0 gap-4 lg:w-5/12 lg:flex-none">
 
         {/* Active Vacancy Summary Card */}
         {analysis && (analysis.active_vacancy_summary || analysis.match_status || bestMatch) ? (
@@ -679,7 +680,7 @@ export default function CandidateDetailScreen() {
       </View>
 
       {/* Right Column (Hiring Intelligence & Matches) */}
-      <View className="w-full lg:w-7/12 gap-4">
+      <View className="w-full min-w-0 gap-4 lg:flex-1">
 
         {/* Recommendation Engine */}
         {recommendationsLoading ? (
@@ -696,9 +697,9 @@ export default function CandidateDetailScreen() {
             <Text className="text-xs text-danger">{recommendationsError}</Text>
           </Card>
         ) : recommendations ? (
-          <Card className="gap-3 p-3 shadow-none border-info/40">
-            <View className="flex-row items-center justify-between pb-2 border-b border-border">
-              <View className="flex-row items-center gap-1.5">
+          <Card className="w-full items-stretch gap-3 p-3 shadow-none border-info/40">
+            <View className="w-full flex-row flex-wrap items-center justify-between gap-2 pb-2 border-b border-border">
+              <View className="flex-row items-center min-w-0 gap-1.5">
                 <Sparkles size={14} color={COLORS.info} />
                 <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Hiring Intelligence</Text>
               </View>
@@ -713,43 +714,43 @@ export default function CandidateDetailScreen() {
               {recommendations.experience_assessment ? (
               <View className="flex-1 min-w-[140px] bg-background p-2 rounded border border-border">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-0.5">Experience & Seniority</Text>
-                <Text className="text-xs leading-4 text-text-primary">{recommendations.experience_assessment}</Text>
+                <Text className="text-xs leading-4 text-text-primary">{cleanRecommendationText(recommendations.experience_assessment)}</Text>
               </View>
               ) : null}
               {recommendations.role_department_fit ? (
               <View className="flex-1 min-w-[140px] bg-background p-2 rounded border border-border">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-0.5">Role & Dept Fit</Text>
-                <Text className="text-xs leading-4 text-text-primary">{recommendations.role_department_fit}</Text>
+                <Text className="text-xs leading-4 text-text-primary">{cleanRecommendationText(recommendations.role_department_fit)}</Text>
               </View>
               ) : null}
             </View> : null}
 
             {recommendations.risk_flags && recommendations.risk_flags.length > 0 && (
-              <View className="p-2 border rounded bg-danger/5 border-danger/20">
+              <View className="w-full p-2 border rounded bg-danger/5 border-danger/20">
                 <View className="flex-row items-center gap-1 mb-1">
                   <AlertTriangle size={12} color={COLORS.danger} />
                   <Text className="text-[11px] font-sans-bold text-danger uppercase">Risk Flags</Text>
                 </View>
                 {recommendations.risk_flags.map((flag, idx) => (
-                  <Text key={idx} className="text-xs leading-4 text-danger">• {flag}</Text>
+                  <Text key={idx} className="text-xs leading-4 text-danger">• {cleanRecommendationText(flag)}</Text>
                 ))}
               </View>
             )}
 
             {recommendations.strengths && recommendations.strengths.length > 0 && (
-              <View>
+              <View className="w-full">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-1">Key Strengths</Text>
                 {recommendations.strengths.map((str, idx) => (
-                  <Text key={idx} className="text-xs text-text-primary leading-4 mb-0.5"><Text className="text-success">✓</Text> {str}</Text>
+                  <Text key={idx} className="text-xs text-text-primary leading-4 mb-0.5"><Text className="text-success">✓</Text> {cleanRecommendationText(str)}</Text>
                 ))}
               </View>
             )}
 
             {recommendations.interview_focus_areas && recommendations.interview_focus_areas.length > 0 && (
-              <View className="pt-2 border-t border-border">
+              <View className="w-full pt-2 border-t border-border">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-1">Interview Focus Areas</Text>
                 {recommendations.interview_focus_areas.map((focus, idx) => (
-                  <Text key={idx} className="text-xs text-text-primary leading-4 mb-0.5">• {focus}</Text>
+                  <Text key={idx} className="text-xs text-text-primary leading-4 mb-0.5">• {cleanRecommendationText(focus)}</Text>
                 ))}
               </View>
             )}
@@ -775,13 +776,13 @@ export default function CandidateDetailScreen() {
               <Text className="mb-2 font-sans text-xs leading-5 text-text-primary">{analysis.ai_career_summary}</Text>
             ) : null}
 
-            {analysis?.recommended_department || analysis?.primary_department ? <View className="flex-row items-center justify-between">
-              <Text className="text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
+            {analysis?.recommended_department || analysis?.primary_department ? <View className="flex-row flex-wrap items-center justify-between gap-2">
+              <Text className="flex-1 min-w-[140px] text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
               <Badge label={analysis.recommended_department || analysis.primary_department} tone="info" />
             </View> : null}
-            {analysis?.professional_domain ? <View className="flex-row items-center justify-between mt-1">
-              <Text className="text-xs font-sans-medium text-text-muted">Professional Domain:</Text>
-              <Text className="text-xs font-sans-bold text-text-primary">{analysis.professional_domain}</Text>
+            {analysis?.professional_domain ? <View className="flex-row flex-wrap items-start justify-between gap-2 mt-1">
+              <Text className="flex-1 min-w-[140px] text-xs font-sans-medium text-text-muted">Professional Domain:</Text>
+              <Text className="text-xs font-sans-bold text-right text-text-primary max-w-[70%]">{analysis.professional_domain}</Text>
             </View> : null}
             {analysis?.suitable_job_roles?.length > 0 && (
               <View className="pt-2 mt-2 border-t border-border">
