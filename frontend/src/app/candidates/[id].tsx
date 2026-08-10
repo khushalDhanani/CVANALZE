@@ -375,12 +375,52 @@ export default function CandidateDetailScreen() {
         </Card>
         ) : null}
 
-        {candidateView?.summary ? (
+        {/* {candidateView?.summary ? (
           <Card className="gap-2 p-3 shadow-none border-border">
             <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Professional Summary</Text>
             <Text className="text-xs leading-5 text-text-primary">{candidateView.summary}</Text>
           </Card>
-        ) : null}
+        ) : null} */}
+
+        {/* Unsuitable Openings — Manual Review Required */}
+        {analysis?.unsuitable_openings && analysis.unsuitable_openings.length > 0 && (
+          <Card className="gap-2 p-3 shadow-none border-warning/30 bg-warning/5">
+            <View className="flex-row items-center gap-1.5 mb-1 border-b border-warning/20 pb-2">
+              <AlertTriangle size={14} color={COLORS.warning} />
+              <Text className="text-xs tracking-wider uppercase font-sans-bold text-warning">
+                Manual Review Required ({analysis.unsuitable_openings.length})
+              </Text>
+            </View>
+            <Text className="text-[11px] text-text-muted mb-1">
+              These vacancies did not meet every verified-match criterion. HR review is recommended before any decision.
+            </Text>
+            {analysis.unsuitable_openings.map((match: any, idx: number) => {
+              const fitScore = resolveVacancyFitScore(match);
+              const jobTitle = cleanCandidateText(match.job_title);
+              const departmentName = cleanCandidateText(match.department_name || match.department);
+              return (
+              <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
+                <View className="flex-1 pr-2">
+                  {jobTitle ? <Text className="text-xs font-sans-bold text-text-primary">{jobTitle}</Text> : null}
+                  {departmentName ? <Text className="text-[11px] text-text-muted">{departmentName}</Text> : null}
+                </View>
+                <View className="flex-row items-center gap-2">
+                  {fitScore != null ? <ScoreBadge score={fitScore} classification={match.classification} /> : null}
+                  <Button
+                    label="Review"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => {
+                      setSelectedJobForReview(match);
+                      setReviewModalVisible(true);
+                    }}
+                  />
+                </View>
+              </View>
+              );
+            })}
+          </Card>
+        )}
 
         {/* Experience Timeline */}
         {/* {candidateView && candidateView.experience.length > 0 ? (
@@ -581,46 +621,6 @@ export default function CandidateDetailScreen() {
             </View>
           </Card>
         ) : null}
-
-        {/* Unsuitable Openings — Manual Review Required */}
-        {analysis?.unsuitable_openings && analysis.unsuitable_openings.length > 0 && (
-          <Card className="gap-2 p-3 shadow-none border-warning/30 bg-warning/5">
-            <View className="flex-row items-center gap-1.5 mb-1 border-b border-warning/20 pb-2">
-              <AlertTriangle size={14} color={COLORS.warning} />
-              <Text className="text-xs tracking-wider uppercase font-sans-bold text-warning">
-                Manual Review Required ({analysis.unsuitable_openings.length})
-              </Text>
-            </View>
-            <Text className="text-[11px] text-text-muted mb-1">
-              These vacancies did not meet every verified-match criterion. HR review is recommended before any decision.
-            </Text>
-            {analysis.unsuitable_openings.map((match: any, idx: number) => {
-              const fitScore = resolveVacancyFitScore(match);
-              const jobTitle = cleanCandidateText(match.job_title);
-              const departmentName = cleanCandidateText(match.department_name || match.department);
-              return (
-              <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
-                <View className="flex-1 pr-2">
-                  {jobTitle ? <Text className="text-xs font-sans-bold text-text-primary">{jobTitle}</Text> : null}
-                  {departmentName ? <Text className="text-[11px] text-text-muted">{departmentName}</Text> : null}
-                </View>
-                <View className="flex-row items-center gap-2">
-                  {fitScore != null ? <ScoreBadge score={fitScore} classification={match.classification} /> : null}
-                  <Button
-                    label="Review"
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => {
-                      setSelectedJobForReview(match);
-                      setReviewModalVisible(true);
-                    }}
-                  />
-                </View>
-              </View>
-              );
-            })}
-          </Card>
-        )}
 
         {/* Similar Candidates (pgvector) */}
         {data?.similar_candidates && data.similar_candidates.length > 0 && (
