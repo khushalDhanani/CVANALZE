@@ -44,6 +44,62 @@ export interface CandidateDetailViewModel {
 
 const isRecord = (value: unknown): value is UnknownRecord => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+const VERIFIED_MATCH_CLASSIFICATIONS = new Set(['HIGH', 'STRONG', 'DB_MATCH', 'HIGHLY_RECOMMENDED']);
+const VERIFIED_MATCH_STATUSES = new Set(['MATCHED', 'HIGH', 'STRONG', 'DB_MATCH', 'HIGHLY_RECOMMENDED']);
+const REJECTED_MATCH_STATUSES = new Set(['NO_STRONG_MATCH', 'NO_STRONG_VACANCY_MATCH']);
+
+export const isProperlyMatchedOpening = (value: unknown): value is UnknownRecord => {
+  if (!isRecord(value)) return false;
+
+  const classification = cleanCandidateText(value.classification)?.toUpperCase().replaceAll(' ', '_');
+  const status = (cleanCandidateText(value.vacancy_match_status) ?? cleanCandidateText(value.match_status))?.toUpperCase().replaceAll(' ', '_');
+  const failures = Array.isArray(value.mandatory_failures)
+    ? value.mandatory_failures
+    : Array.isArray(value.mandatory_fails)
+      ? value.mandatory_fails
+      : [];
+  const scoreBreakdown = isRecord(value.score_breakdown) ? value.score_breakdown : {};
+
+  return Boolean(
+    classification
+    && VERIFIED_MATCH_CLASSIFICATIONS.has(classification)
+    && (!status || VERIFIED_MATCH_STATUSES.has(status))
+    && !REJECTED_MATCH_STATUSES.has(status || '')
+    && failures.length === 0
+    && value.domain_mismatch_capped !== true
+    && value.is_cross_domain !== true
+    && scoreBreakdown.is_hierarchy_valid !== false
+  );
+};
+
+const matchIdentity = (match: UnknownRecord): string => String(match.vacancy_id ?? match.job_id ?? `${match.job_title ?? ''}:${match.department_name ?? match.department ?? ''}`);
+
+export const normalizeCandidateMatchAnalysis = (value: unknown): UnknownRecord | undefined => {
+  if (!isRecord(value)) return undefined;
+
+  const claimedSuitable = Array.isArray(value.suitable_openings) ? value.suitable_openings.filter(isRecord) : [];
+  const existingUnsuitable = Array.isArray(value.unsuitable_openings) ? value.unsuitable_openings.filter(isRecord) : [];
+  const selected = claimedSuitable.filter(isProperlyMatchedOpening);
+  const rejected = [...claimedSuitable.filter((match) => !isProperlyMatchedOpening(match)), ...existingUnsuitable];
+  const unsuitable = rejected.filter((match, index) => rejected.findIndex((candidate) => matchIdentity(candidate) === matchIdentity(match)) === index);
+  const rawBestMatch = isRecord(value.best_match) ? value.best_match : undefined;
+  const bestMatch = selected[0] ?? (isProperlyMatchedOpening(rawBestMatch) ? rawBestMatch : null);
+  const suitableOpenings = bestMatch && selected.length === 0 ? [bestMatch] : selected;
+  const hasGenuineMatch = suitableOpenings.length > 0;
+
+  return {
+    ...value,
+    best_match: bestMatch,
+    suitable_openings: suitableOpenings,
+    unsuitable_openings: unsuitable,
+    has_genuine_match: hasGenuineMatch,
+    match_status: hasGenuineMatch ? 'MATCHED' : 'NO_STRONG_MATCH',
+    active_vacancy_summary: hasGenuineMatch
+      ? value.active_vacancy_summary
+      : 'No verified active vacancy match met all required selection criteria. Potential matches remain available for manual HR review.',
+  };
+};
+
 const decodeEntities = (value: string): string => value
   .replace(/&amp;/gi, '&')
   .replace(/&lt;/gi, '<')

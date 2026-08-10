@@ -16,7 +16,7 @@ candidateModule.filename = sourcePath;
 candidateModule.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 candidateModule._compile(output, sourcePath);
 
-const { buildCandidateDetailViewModel, normalizeCandidateRouteId, responseMatchesCandidateId } = candidateModule.exports;
+const { buildCandidateDetailViewModel, normalizeCandidateMatchAnalysis, normalizeCandidateRouteId, responseMatchesCandidateId } = candidateModule.exports;
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -71,5 +71,19 @@ assert(normalizeCandidateRouteId(['cv_alpha']) === 'cv_alpha', 'Array route para
 assert(normalizeCandidateRouteId('../cv_alpha') === undefined, 'Path-like route IDs must be rejected.');
 assert(responseMatchesCandidateId(canonicalPayload, 'cv_alpha'), 'Matching response identities must pass.');
 assert(!responseMatchesCandidateId(canonicalPayload, 'cv_beta'), 'Mismatched response identities must be rejected.');
+
+const normalizedMatches = normalizeCandidateMatchAnalysis({
+  has_genuine_match: true,
+  match_status: 'DB_MATCH',
+  best_match: { vacancy_id: 1, classification: 'HIGH', match_status: 'MATCHED', score: 88, mandatory_failures: [] },
+  suitable_openings: [
+    { vacancy_id: 1, classification: 'HIGH', match_status: 'MATCHED', score: 88, mandatory_failures: [] },
+    { vacancy_id: 2, classification: 'MEDIUM', match_status: 'MATCHED', score: 72.3, mandatory_failures: [] },
+    { vacancy_id: 3, classification: 'HIGH', match_status: 'MATCHED', score: 91, mandatory_failures: [{ requirement_id: 'minimum_experience' }] },
+  ],
+  unsuitable_openings: [{ vacancy_id: 4, classification: 'LOW', match_status: 'NO_STRONG_VACANCY_MATCH', score: 35 }],
+});
+assert(normalizedMatches.suitable_openings.length === 1 && normalizedMatches.best_match.vacancy_id === 1, 'Only verified HIGH matches without hard disqualifiers may remain selected.');
+assert(normalizedMatches.unsuitable_openings.length === 3, 'Potential and disqualified matches must remain available for manual review.');
 
 console.log('Candidate detail generic tests: passed');

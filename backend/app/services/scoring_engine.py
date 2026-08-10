@@ -25,6 +25,7 @@ from app.services.match_evaluators import (
     CrossDomainGuardEvaluator,
     RecommendationEvaluator,
     RequirementEvaluator,
+    VacancyFitEvaluator,
     is_ignorable_requirement,
 )
 
@@ -447,22 +448,10 @@ class ScoringEngine:
         evaluated_matches.sort(key=lambda m: m.score, reverse=True)
 
         high_threshold = scoring_config.match_high_threshold
-        medium_threshold = scoring_config.match_medium_threshold
         suitable_matches = [
             m
             for m in evaluated_matches
-            if (
-                # Original: strong, non-domain-capped HIGH matches
-                (m.score >= high_threshold and m.classification == "HIGH" and not m.domain_mismatch_capped)
-                or
-                # Extended: MEDIUM matches that are domain-aligned and pass all mandatory gates
-                (
-                    m.score >= medium_threshold
-                    and m.classification == "MEDIUM"
-                    and not m.domain_mismatch_capped
-                    and not m.mandatory_failures
-                )
-            )
+            if VacancyFitEvaluator.is_eligible_match(m, high_threshold=high_threshold)
         ]
         unsuitable_matches = [m for m in evaluated_matches if m not in suitable_matches]
         best_match = suitable_matches[0] if suitable_matches else None

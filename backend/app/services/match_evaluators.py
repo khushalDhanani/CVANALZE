@@ -1157,13 +1157,18 @@ class VacancyFitEvaluator:
             is_domain_rejected = bool(getattr(opening, "domain_mismatch_capped", False) or getattr(opening, "is_cross_domain", False) or has_domain_mismatch_req)
             is_hierarchy_valid = getattr(getattr(opening, "score_breakdown", None), "is_hierarchy_valid", True)
 
-        # Check hard rejection / hierarchy mismatch
-        if is_domain_rejected or is_hierarchy_valid is False:
+        # Mandatory failures, domain rejection, and invalid hierarchy are hard
+        # disqualifiers. They must never be promoted by an otherwise high score.
+        if failures or is_domain_rejected or is_hierarchy_valid is False:
             return VacancyMatchStatus.NO_STRONG_MATCH.value
 
-        is_high_class = classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"} if classification else True
+        if status in {"NO_STRONG_MATCH", "NO_STRONG_VACANCY_MATCH"}:
+            return VacancyMatchStatus.NO_STRONG_MATCH.value
 
-        if score >= high_threshold and is_high_class and status != "NO_STRONG_VACANCY_MATCH":
+        is_high_class = classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
+        is_matched_status = status in {"", "MATCHED", "HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
+
+        if score >= high_threshold and is_high_class and is_matched_status:
             return VacancyMatchStatus.MATCHED.value
         elif score >= potential_threshold:
             return VacancyMatchStatus.POTENTIAL_MATCH.value
@@ -1177,28 +1182,13 @@ class VacancyFitEvaluator:
         high_threshold: float = 70.0,
         potential_threshold: float = 50.0,
     ) -> bool:
-        """Returns True if the opening is a canonical MATCHED or qualifying POTENTIAL_MATCH result.
+        """Returns True only for a verified canonical MATCHED result.
 
-        A POTENTIAL_MATCH is included as eligible when:
-        - Score >= potential_threshold (default 50)
-        - Not domain-mismatch-capped
-        - No mandatory requirement failures
-        This allows near-match candidates (e.g. 72.3% MEDIUM) to surface in suitable_openings
-        rather than being buried in unsuitable_openings.
+        POTENTIAL_MATCH results remain available for manual HR review, but are
+        never promoted into suitable_openings.
         """
         fit = cls.classify_opening_fit(opening, high_threshold=high_threshold, potential_threshold=potential_threshold)
-        if fit == VacancyMatchStatus.MATCHED.value:
-            return True
-        if fit == VacancyMatchStatus.POTENTIAL_MATCH.value:
-            # Promote POTENTIAL_MATCH to eligible only if it has no hard disqualifiers
-            if isinstance(opening, dict):
-                is_capped = bool(opening.get("domain_mismatch_capped") or opening.get("is_cross_domain"))
-                failures = opening.get("mandatory_failures") or opening.get("mandatory_fails") or []
-            else:
-                is_capped = bool(getattr(opening, "domain_mismatch_capped", False) or getattr(opening, "is_cross_domain", False))
-                failures = getattr(opening, "mandatory_failures", []) or getattr(opening, "mandatory_fails", [])
-            return not is_capped and not failures
-        return False
+        return fit == VacancyMatchStatus.MATCHED.value
 
     @classmethod
     def determine_candidate_match_status(
@@ -1248,4 +1238,3 @@ class VacancyFitEvaluator:
             return VacancyMatchStatus.POTENTIAL_MATCH.value
         else:
             return VacancyMatchStatus.NO_STRONG_MATCH.value
-

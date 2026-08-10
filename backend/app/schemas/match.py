@@ -158,10 +158,10 @@ class CandidateMatchAnalysis(BaseModel):
     candidate_name: str | None = Field(default=None, description="Extracted candidate name")
     primary_department: str = Field(..., description="Top recommended department for candidate")
     best_match: JobMatchResult | None = Field(default=None, description="Top matching job opening")
-    suitable_openings: list[JobMatchResult] = Field(..., description="Job openings classified as HIGH or MEDIUM, ranked by match score")
+    suitable_openings: list[JobMatchResult] = Field(..., description="Verified HIGH job matches with no hard disqualifiers, ranked by match score")
     unsuitable_openings: list[JobMatchResult] = Field(
         default_factory=list,
-        description="Job openings classified as LOW, retained for HR manual review but not suitable matches",
+        description="Potential or unsuitable openings retained for HR manual review but not selected as suitable matches",
     )
     rejection_policy_note: str = Field(
         default="Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",

@@ -1,6 +1,50 @@
 # Work Status
 
 ## Last Completed Task
+**Restrict candidate vacancy selection to verified matches**
+
+### Architecture Impact Analysis
+- Kept deterministic backend scoring authoritative and tightened the existing canonical `VacancyFitEvaluator` instead of adding a second matching engine.
+- Both enriched matching and the legacy/basic scoring path now use the same strict eligibility rule.
+- Only verified HIGH/MATCHED results without mandatory failures, domain rejection, or invalid hierarchy enter `suitable_openings`.
+- Added defensive frontend normalization so previously stored candidate analyses are corrected immediately on `/candidates/[id]`; potential and disqualified vacancies remain visible for HR review.
+- No API field, route, Ollama integration, persistence format, or candidate record was removed.
+
+### Files Changed
+- `backend/app/services/match_evaluators.py`.
+- `backend/app/services/scoring_engine.py`.
+- `backend/app/schemas/match.py`.
+- `backend/app/schemas/analysis.py`.
+- `backend/tests/test_vacancy_match_status.py`.
+- `frontend/src/utils/candidateDetail.ts`.
+- `frontend/src/app/candidates/[id].tsx`.
+- `frontend/src/__tests__/candidateDetailGeneric.test.mjs`.
+- `workstatus.md`.
+
+### Implementation
+- Stopped promoting `POTENTIAL_MATCH`/MEDIUM vacancies into `suitable_openings`.
+- Made mandatory failures and explicit no-strong-match statuses hard disqualifiers even when the numeric score is high.
+- Required an explicit verified classification and compatible match status for canonical selection.
+- Replaced the legacy scorer's duplicated HIGH-or-MEDIUM list comprehension with `VacancyFitEvaluator.is_eligible_match`.
+- Normalized stored detail payloads before rendering.
+- Invalid selected vacancies move to `unsuitable_openings`, the best match is recomputed from verified selections, and stale genuine-match flags/statuses are corrected.
+- Updated the manual-review explanation and schema descriptions to reflect the stricter contract.
+
+### Verification Checklist
+- [x] Audited all 30 stored result files, including local test fixtures.
+- [x] Found four currently selected vacancy entries; three satisfy the strict verified-match criteria and one 72.3% MEDIUM entry is demoted to manual review.
+- [x] Added backend regression coverage for verified HIGH, MEDIUM/potential, and mandatory-failure cases.
+- [x] Added frontend regression coverage confirming only verified HIGH matches remain selected while rejected entries remain reviewable.
+- [x] Serena diagnostics found no errors or warnings in the changed frontend files or `scoring_engine.py`.
+- [x] The only reported backend diagnostic is the pre-existing `_stop_phrases` return-type warning at `match_evaluators.py:34`, outside the changed selection logic.
+- [x] `git diff --check` passed.
+- [ ] Builds and tests were not run because repository instructions require an explicit request.
+
+### Refactoring Performed
+- Consolidated both backend selection paths on the existing canonical evaluator.
+- Added one reusable candidate-detail match normalizer rather than embedding filtering rules in JSX.
+
+## Previous Task
 **Make candidate names consistent across directory cards and detail pages**
 
 ### Architecture Impact Analysis

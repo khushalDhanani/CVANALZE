@@ -97,6 +97,32 @@ def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_fit_
     assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
 
 
+def test_only_verified_high_matches_are_eligible_for_selection():
+    verified = {
+        "score": 88.0,
+        "classification": "HIGH",
+        "vacancy_match_status": "MATCHED",
+        "mandatory_failures": [],
+    }
+    potential = {
+        "score": 72.3,
+        "classification": "MEDIUM",
+        "vacancy_match_status": "MATCHED",
+        "mandatory_failures": [],
+    }
+    mandatory_failure = {
+        "score": 91.0,
+        "classification": "HIGH",
+        "vacancy_match_status": "MATCHED",
+        "mandatory_failures": [{"requirement_id": "minimum_experience"}],
+    }
+
+    assert VacancyFitEvaluator.is_eligible_match(verified, high_threshold=80.0) is True
+    assert VacancyFitEvaluator.is_eligible_match(potential, high_threshold=80.0) is False
+    assert VacancyFitEvaluator.is_eligible_match(mandatory_failure, high_threshold=80.0) is False
+    assert VacancyFitEvaluator.classify_opening_fit(mandatory_failure, high_threshold=80.0) == "NO_STRONG_MATCH"
+
+
 def test_determine_candidate_match_status_all_7_states():
     dummy_vacancies = [{"id": 1, "title": "Software Developer"}]
 

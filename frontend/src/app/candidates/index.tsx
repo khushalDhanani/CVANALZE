@@ -222,14 +222,14 @@ export default function CandidateListScreen() {
 
     const subtitleNode = (
       <View className="gap-1 mt-0.5">
-        <View className="flex-row items-center gap-3 flex-wrap">
+        <View className="flex-row flex-wrap items-center gap-3">
           <View className="flex-row items-center gap-1">
             <Mail size={12} color={COLORS.textFaint} />
-            <Text numberOfLines={1} className="text-xs font-sans text-text-muted">{emailText}</Text>
+            <Text numberOfLines={1} className="font-sans text-xs text-text-muted">{emailText}</Text>
           </View>
           <View className="flex-row items-center gap-1">
             <Phone size={12} color={COLORS.textFaint} />
-            <Text numberOfLines={1} className="text-xs font-sans text-text-muted">{phoneText}</Text>
+            <Text numberOfLines={1} className="font-sans text-xs text-text-muted">{phoneText}</Text>
           </View>
         </View>
 
@@ -242,7 +242,7 @@ export default function CandidateListScreen() {
             fallbackLabel="Job title not detected"
             textClassName="text-xs"
           />
-          <View className="flex-row items-center gap-3 flex-wrap">
+          <View className="flex-row flex-wrap items-center gap-3">
             <FieldConfidenceView
               fieldName="company_name"
               value={item.company_name}
@@ -371,7 +371,7 @@ export default function CandidateListScreen() {
         </View>
 
         {/* Responsive Filter Grid */}
-        <View className="mb-4 gap-2.5">
+        {/* <View className="mb-4 gap-2.5">
           <View className="flex-col sm:flex-row gap-2.5">
             <View className="flex-1 min-w-[140px]">
               <TextField
@@ -442,13 +442,13 @@ export default function CandidateListScreen() {
               />
             </View>
           </View>
-        </View>
+        </View> */}
 
         {/* Loading / Error / Data state */}
         {loading ? (
-          <View className="flex-1 justify-center items-center py-12">
+          <View className="items-center justify-center flex-1 py-12">
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text className="text-xs font-sans text-text-muted mt-2">
+            <Text className="mt-2 font-sans text-xs text-text-muted">
               Loading candidate directory...
             </Text>
           </View>
@@ -480,7 +480,7 @@ export default function CandidateListScreen() {
                   subtitle="Upload or analyze CVs to populate the candidate directory."
                 />
               ) : (
-                <View className="items-center py-6 gap-3">
+                <View className="items-center gap-3 py-6">
                   <EmptyState
                     title="No Matching Candidate Records"
                     subtitle="No candidates match the active search criteria and filter rules."

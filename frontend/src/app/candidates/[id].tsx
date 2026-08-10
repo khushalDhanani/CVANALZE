@@ -39,6 +39,7 @@ import { formatDateTime } from '@/utils/date';
 import {
   buildCandidateDetailViewModel,
   cleanCandidateText,
+  normalizeCandidateMatchAnalysis,
   normalizeCandidateRouteId,
   responseMatchesCandidateId,
 } from '@/utils/candidateDetail';
@@ -289,8 +290,8 @@ export default function CandidateDetailScreen() {
   };
 
   const rawAnalysis = data?.enriched_match_analysis || data?.match_analysis;
-  const analysis: any = rawAnalysis;
-  const bestMatch = rawAnalysis?.best_match;
+  const analysis: any = useMemo(() => normalizeCandidateMatchAnalysis(rawAnalysis), [rawAnalysis]);
+  const bestMatch = analysis?.best_match;
   const scanId = data?.scan_id || data?.id || candidateCvId || '';
 
   const rawTimestamp = data?.parsed_at || data?.scanned_at || data?.created_at;
@@ -590,7 +591,7 @@ export default function CandidateDetailScreen() {
               </Text>
             </View>
             <Text className="text-[11px] text-text-muted mb-1">
-              These vacancies scored below the suitability threshold. HR review is recommended before any decision.
+              These vacancies did not meet every verified-match criterion. HR review is recommended before any decision.
             </Text>
             {analysis.unsuitable_openings.map((match: any, idx: number) => {
               const fitScore = resolveVacancyFitScore(match);
