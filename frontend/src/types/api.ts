@@ -158,6 +158,7 @@ export interface VacancyFitScoreBreakdown {
   designation_role_score: number;
   skills_score: number;
   experience_score: number;
+  education_score?: number;
   semantic_similarity_score: number;
   overall_fit_score: number;
   hierarchy_mismatch_penalty: number;

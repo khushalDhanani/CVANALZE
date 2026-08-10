@@ -174,9 +174,9 @@ test('15. Frontend does NOT recalculate status from score thresholds', () => {
   assertEquals(metaMatched.label, 'MATCHED');
 });
 
-test('16. resolveVacancyFitScore falls back to overall_score when vacancy_fit_score is explicitly zero', () => {
+test('16. resolveVacancyFitScore preserves an explicit canonical zero', () => {
   const match = { vacancy_fit_score: 0.0, overall_score: 76.4, score: 76.4 };
-  assertEquals(resolveVacancyFitScore(match), 76.4);
+  assertEquals(resolveVacancyFitScore(match), 0.0);
 });
 
 // -------------------------------------------------------------
@@ -207,4 +207,3 @@ export function runTests(): { passed: number; failed: number; total: number } {
 
 // Default export runner
 export default runTests;
-

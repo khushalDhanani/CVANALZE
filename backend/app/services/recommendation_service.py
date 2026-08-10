@@ -48,14 +48,32 @@ class RecommendationService:
         raw_match = r.get("match_analysis") if isinstance(r, dict) else None
         match_analysis = raw_match if isinstance(raw_match, dict) else {}
         suitable_openings = match_analysis.get("suitable_openings") or []
+        unsuitable_openings = match_analysis.get("unsuitable_openings") or []
+        stored_best_match = match_analysis.get("best_match") or {}
+        evaluated_openings = [*suitable_openings, *unsuitable_openings]
+        if isinstance(stored_best_match, dict) and stored_best_match:
+            best_id = stored_best_match.get("vacancy_id") or stored_best_match.get("job_id")
+            if not any((opening.get("vacancy_id") or opening.get("job_id")) == best_id for opening in evaluated_openings if isinstance(opening, dict)):
+                evaluated_openings.insert(0, stored_best_match)
 
         scoring_config = ScoringConfig.load()
         min_threshold = scoring_config.match_high_threshold
 
+        def canonical_score(opening: dict[str, Any]) -> float:
+            value = opening.get("vacancy_fit_score")
+            if value is None:
+                value = opening.get("overall_score")
+            if value is None:
+                value = opening.get("score")
+            try:
+                return float(value or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
         canonical_status = VacancyFitEvaluator.determine_candidate_match_status(
             candidate_id=cv_key,
             result_data=r,
-            vacancies_evaluated=suitable_openings,
+            vacancies_evaluated=evaluated_openings,
             has_active_vacancies=has_active_vacancies,
             high_threshold=min_threshold,
         )
@@ -108,11 +126,17 @@ class RecommendationService:
 
         eligible_openings = [
             opening
-            for opening in suitable_openings
-            if isinstance(opening, dict) and VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=min_threshold) in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}
+            for opening in evaluated_openings
+            if isinstance(opening, dict)
+            and VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=min_threshold)
+            in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}
         ]
-        stored_best_match = match_analysis.get("best_match") or {}
-        if not eligible_openings and isinstance(stored_best_match, dict) and VacancyFitEvaluator.classify_opening_fit(stored_best_match, high_threshold=min_threshold) in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}:
+        stored_best_status = (
+            VacancyFitEvaluator.classify_opening_fit(stored_best_match, high_threshold=min_threshold)
+            if isinstance(stored_best_match, dict)
+            else VacancyMatchStatus.NO_STRONG_MATCH.value
+        )
+        if not eligible_openings and stored_best_status in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}:
             eligible_openings = [stored_best_match]
         best_match = eligible_openings[0] if eligible_openings else {}
 
@@ -194,7 +218,7 @@ class RecommendationService:
                         "vacancy_id": vac.get("vacancy_id") or vac.get("id") or vac.get("job_id"),
                         "job_title": vac.get("job_title"),
                         "department": vac.get("department") or vac.get("department_name"),
-                        "score": float(vac.get("score") or vac.get("overall_score") or 0.0),
+                        "score": canonical_score(vac),
                         "classification": vac.get("classification"),
                         "recommendation": vac.get("recommendation"),
                         "reason": vac.get("ranking_reason") or vac.get("reason"),
@@ -223,7 +247,7 @@ class RecommendationService:
             if not isinstance(vac, dict):
                 continue
             job_title = vac.get("job_title") or "Target Vacancy"
-            vac_score = vac.get("score") or vac.get("overall_score") or 0.0
+            vac_score = canonical_score(vac)
 
             missing_skills = vac.get("missing_skills") or []
             missing_criteria = vac.get("missing_criteria") or []

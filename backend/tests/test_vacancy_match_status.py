@@ -53,7 +53,7 @@ def test_vacancy_fit_evaluator_classify_opening_fit():
     assert VacancyFitEvaluator.classify_opening_fit(rejected_op, high_threshold=70.0) == "NO_STRONG_MATCH"
 
 
-def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero_fit_score_for_objects():
+def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_score_for_objects():
     class DummyOpening:
         vacancy_fit_score = 0.0
         score = 76.4
@@ -62,10 +62,10 @@ def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero
         classification = "MEDIUM"
 
     opening = DummyOpening()
-    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "NO_STRONG_MATCH"
 
 
-def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero_fit_score_for_dicts():
+def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_score_for_dicts():
     opening = {
         "vacancy_fit_score": 0.0,
         "score": 76.4,
@@ -73,10 +73,10 @@ def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero
         "vacancy_match_status": "MATCHED",
         "classification": "MEDIUM",
     }
-    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "NO_STRONG_MATCH"
 
 
-def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero_fit_score_for_string_values():
+def test_vacancy_fit_evaluator_classify_opening_fit_preserves_zero_canonical_score_for_string_values():
     opening = {
         "vacancy_fit_score": "0.0",
         "score": "76.4",
@@ -84,7 +84,20 @@ def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_zero
         "vacancy_match_status": "MATCHED",
         "classification": "MEDIUM",
     }
-    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "NO_STRONG_MATCH"
+
+
+def test_canonical_fit_score_does_not_depend_on_legacy_classification():
+    opening = {
+        "vacancy_fit_score": 89.2,
+        "score": 73.5,
+        "overall_score": 73.5,
+        "classification": "MEDIUM",
+        "vacancy_match_status": "MATCHED",
+        "mandatory_failures": [],
+    }
+
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=80.0, potential_threshold=50.0) == "MATCHED"
 
 
 def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_fit_score_missing():
@@ -94,7 +107,7 @@ def test_vacancy_fit_evaluator_classify_opening_fit_uses_overall_score_when_fit_
         "vacancy_match_status": "MATCHED",
         "classification": "MEDIUM",
     }
-    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "POTENTIAL_MATCH"
+    assert VacancyFitEvaluator.classify_opening_fit(opening, high_threshold=70.0, potential_threshold=50.0) == "MATCHED"
 
 
 def test_only_verified_high_matches_are_eligible_for_selection():
@@ -292,3 +305,28 @@ def test_recommendation_service_consistency_with_evaluator():
         recs = RecommendationService.get_candidate_recommendations("comp_strong")
         assert recs["hiring_recommendation"] == "MATCHED"
         assert len(recs["best_vacancies"]) == 1
+
+    # 7. Legacy results in the review list still use canonical fit score/status.
+    legacy_split_score_result = {
+        "candidate_id": "legacy_split_score",
+        "status": "completed",
+        "match_analysis": {
+            "suitable_openings": [],
+            "unsuitable_openings": [{
+                "vacancy_id": 1215,
+                "job_title": "Configured Vacancy",
+                "department": "Production",
+                "score": 73.5,
+                "overall_score": 73.5,
+                "vacancy_fit_score": 89.2,
+                "classification": "MEDIUM",
+                "vacancy_match_status": "MATCHED",
+                "mandatory_failures": [],
+            }],
+        },
+    }
+    with patch("app.repositories.result.ResultRepository.resolve_result", return_value=legacy_split_score_result), \
+         patch("app.repositories.job.JobRepository.get_all_jobs", return_value=[{"id": 1215, "title": "Configured Vacancy"}]):
+        recs = RecommendationService.get_candidate_recommendations("legacy_split_score")
+        assert recs["hiring_recommendation"] == "MATCHED"
+        assert recs["overall_match_confidence"] == 89.2

@@ -83,7 +83,25 @@ const normalizedMatches = normalizeCandidateMatchAnalysis({
   ],
   unsuitable_openings: [{ vacancy_id: 4, classification: 'LOW', match_status: 'NO_STRONG_VACANCY_MATCH', score: 35 }],
 });
-assert(normalizedMatches.suitable_openings.length === 1 && normalizedMatches.best_match.vacancy_id === 1, 'Only verified HIGH matches without hard disqualifiers may remain selected.');
-assert(normalizedMatches.unsuitable_openings.length === 3, 'Potential and disqualified matches must remain available for manual review.');
+assert(normalizedMatches.suitable_openings.length === 2 && normalizedMatches.best_match.vacancy_id === 1, 'Backend MATCHED decisions without hard disqualifiers must remain selected.');
+assert(normalizedMatches.unsuitable_openings.length === 2, 'Hard-disqualified and rejected matches must remain available for manual review.');
+
+const normalizedLegacySplitScore = normalizeCandidateMatchAnalysis({
+  match_status: 'NO_SUITABLE_MATCH',
+  best_match: null,
+  suitable_openings: [],
+  unsuitable_openings: [{
+    vacancy_id: 1215,
+    vacancy_fit_score: 89.2,
+    score: 73.5,
+    overall_score: 73.5,
+    classification: 'MEDIUM',
+    vacancy_match_status: 'MATCHED',
+    mandatory_failures: [],
+  }],
+  active_vacancy_summary: 'NO_STRONG_MATCH: stale summary',
+});
+assert(normalizedLegacySplitScore.match_status === 'MATCHED', 'A persisted canonical MATCHED opening must repair a stale candidate-level status.');
+assert(normalizedLegacySplitScore.best_match.vacancy_fit_score === 89.2, 'The canonical fit score must remain the displayed score.');
 
 console.log('Candidate detail generic tests: passed');

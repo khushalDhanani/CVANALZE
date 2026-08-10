@@ -567,8 +567,7 @@ class MatchService:
         )
 
         if not has_genuine_match:
-            best_match = None
-            top_level_match_status = MatchStatus.NO_SUITABLE_MATCH
+            top_level_match_status = MatchStatus.PARTIAL_MATCH if best_match is not None else MatchStatus.NO_SUITABLE_MATCH
             if cand_classification:
                 cand_classification = cand_classification.model_copy(update={
                     "match_status": MatchStatus.NO_SUITABLE_MATCH,

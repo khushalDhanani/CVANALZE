@@ -255,7 +255,7 @@ class VacancyService:
             job_description=job_desc,
             responsibilities=job_desc,
             required_skills=skills,
-            required_skills_are_mandatory=False,
+            required_skills_are_mandatory=True,
             preferred_keywords=[],
             min_experience_years=min_exp,
             max_experience_years=max_exp,

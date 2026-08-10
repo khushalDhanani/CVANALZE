@@ -49,11 +49,12 @@ class VacancyFitScoreBreakdown(BaseModel):
     designation_role_score: float = Field(default=0.0, description="Designation and role alignment score (0-100)")
     skills_score: float = Field(default=0.0, description="Mandatory & preferred skills match score (0-100)")
     experience_score: float = Field(default=0.0, description="Experience & seniority match score (0-100)")
+    education_score: float = Field(default=0.0, description="Required education alignment score (0-100)")
     semantic_similarity_score: float = Field(default=0.0, description="Dense vector nomic-embed-text similarity score (0-100)")
     overall_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0-100)")
     hierarchy_mismatch_penalty: float = Field(default=0.0, description="Penalty deduction applied for hierarchy mismatch")
     is_hierarchy_valid: bool = Field(default=True, description="Whether MSSQL parent-child hierarchy validation passed")
-    match_status: str = Field(default="MATCHED", description="MATCHED or NO_STRONG_VACANCY_MATCH")
+    match_status: str = Field(default="MATCHED", description="MATCHED, POTENTIAL_MATCH, or NO_STRONG_VACANCY_MATCH")
 
 
 class JobMatchResult(BaseModel):

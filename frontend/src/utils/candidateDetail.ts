@@ -59,11 +59,13 @@ export const isProperlyMatchedOpening = (value: unknown): value is UnknownRecord
       ? value.mandatory_fails
       : [];
   const scoreBreakdown = isRecord(value.score_breakdown) ? value.score_breakdown : {};
+  const hasVerifiedDecision = status ? VERIFIED_MATCH_STATUSES.has(status) : Boolean(classification && VERIFIED_MATCH_CLASSIFICATIONS.has(classification));
+  const canonicalScore = Number(value.vacancy_fit_score ?? value.overall_score ?? value.score ?? 0);
 
   return Boolean(
-    classification
-    && VERIFIED_MATCH_CLASSIFICATIONS.has(classification)
-    && (!status || VERIFIED_MATCH_STATUSES.has(status))
+    hasVerifiedDecision
+    && Number.isFinite(canonicalScore)
+    && canonicalScore > 0
     && !REJECTED_MATCH_STATUSES.has(status || '')
     && failures.length === 0
     && value.domain_mismatch_capped !== true
@@ -79,12 +81,17 @@ export const normalizeCandidateMatchAnalysis = (value: unknown): UnknownRecord |
 
   const claimedSuitable = Array.isArray(value.suitable_openings) ? value.suitable_openings.filter(isRecord) : [];
   const existingUnsuitable = Array.isArray(value.unsuitable_openings) ? value.unsuitable_openings.filter(isRecord) : [];
-  const selected = claimedSuitable.filter(isProperlyMatchedOpening);
-  const rejected = [...claimedSuitable.filter((match) => !isProperlyMatchedOpening(match)), ...existingUnsuitable];
+  const allOpenings = [...claimedSuitable, ...existingUnsuitable].filter(
+    (match, index, matches) => matches.findIndex((candidate) => matchIdentity(candidate) === matchIdentity(match)) === index
+  );
+  const selected = allOpenings.filter(isProperlyMatchedOpening);
+  const rejected = allOpenings.filter((match) => !isProperlyMatchedOpening(match));
   const unsuitable = rejected.filter((match, index) => rejected.findIndex((candidate) => matchIdentity(candidate) === matchIdentity(match)) === index);
   const rawBestMatch = isRecord(value.best_match) ? value.best_match : undefined;
-  const bestMatch = selected[0] ?? (isProperlyMatchedOpening(rawBestMatch) ? rawBestMatch : null);
-  const suitableOpenings = (bestMatch && selected.length === 0 ? [bestMatch] : selected).slice(0, 5);
+  const rawStatus = cleanCandidateText(value.match_status)?.toUpperCase().replaceAll(' ', '_');
+  const isPotential = rawStatus === 'POTENTIAL_MATCH' || rawStatus === 'PARTIAL_MATCH';
+  const bestMatch = selected[0] ?? (isPotential && rawBestMatch ? rawBestMatch : isProperlyMatchedOpening(rawBestMatch) ? rawBestMatch : null);
+  const suitableOpenings = selected.slice(0, 5);
   const hasGenuineMatch = suitableOpenings.length > 0;
 
   return {
@@ -93,10 +100,12 @@ export const normalizeCandidateMatchAnalysis = (value: unknown): UnknownRecord |
     suitable_openings: suitableOpenings,
     unsuitable_openings: unsuitable,
     has_genuine_match: hasGenuineMatch,
-    match_status: hasGenuineMatch ? 'MATCHED' : 'NO_STRONG_MATCH',
+    match_status: hasGenuineMatch ? 'MATCHED' : bestMatch ? 'POTENTIAL_MATCH' : 'NO_STRONG_MATCH',
     active_vacancy_summary: hasGenuineMatch
-      ? value.active_vacancy_summary
-      : 'No verified active vacancy match met all required selection criteria. Potential matches remain available for manual HR review.',
+      ? (String(value.active_vacancy_summary || '').includes('NO_STRONG_MATCH') ? 'A verified active vacancy match met the required selection criteria.' : value.active_vacancy_summary)
+      : bestMatch
+        ? value.active_vacancy_summary
+        : 'No verified active vacancy match met all required selection criteria. Potential matches remain available for manual HR review.',
   };
 };
 

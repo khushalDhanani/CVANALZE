@@ -41,7 +41,7 @@ export function normalizeCanonicalMatchStatus(
   if (s === 'MATCHED' || s === 'HIGH' || s === 'STRONG' || s === 'HIGHLY RECOMMENDED' || s === 'HIRE') {
     return 'MATCHED';
   }
-  if (s === 'POTENTIAL_MATCH' || s === 'MEDIUM' || s === 'POTENTIAL FIT' || s === 'RECOMMENDED' || s === 'CONSIDER') {
+  if (s === 'POTENTIAL_MATCH' || s === 'PARTIAL_MATCH' || s === 'MEDIUM' || s === 'POTENTIAL FIT' || s === 'RECOMMENDED' || s === 'CONSIDER') {
     return 'POTENTIAL_MATCH';
   }
   if (s === 'NO_ACTIVE_VACANCIES') {
@@ -158,17 +158,8 @@ export function getCanonicalMatchStatusMeta(
 export function resolveVacancyFitScore(match?: any): number | undefined {
   if (!match) return undefined;
 
-  const scoreCandidates = [match.vacancy_fit_score, match.overall_score, match.score];
-  for (const candidate of scoreCandidates) {
-    if (candidate != null && candidate !== 0) {
-      return Number(candidate);
-    }
-  }
-
-  // If all known scores are zero but at least one is present, return the explicit 0.
-  if (match.vacancy_fit_score != null || match.overall_score != null || match.score != null) {
-    return Number(match.vacancy_fit_score ?? match.overall_score ?? match.score);
-  }
+  const canonicalScore = match.vacancy_fit_score ?? match.overall_score ?? match.score;
+  if (canonicalScore != null) return Number(canonicalScore);
 
   return undefined;
 }
@@ -252,26 +243,32 @@ export function VacancyFitScoreBreakdownCard({
         </Text>
       </View>
 
-      {/* 5-Dimension Grid */}
+      {/* Canonical fit dimensions. Weights are configuration-driven on the backend. */}
       <View className="flex-row flex-wrap gap-2">
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[11px] font-sans text-text-muted">Hierarchy (25%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Hierarchy</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.hierarchy_score}%</Text>
         </View>
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[11px] font-sans text-text-muted">Role / Title (20%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Role / Title</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.designation_role_score}%</Text>
         </View>
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[11px] font-sans text-text-muted">Skills (25%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Skills</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.skills_score}%</Text>
         </View>
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[11px] font-sans text-text-muted">Experience (15%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Experience</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.experience_score}%</Text>
         </View>
+        {breakdown.education_score != null ? (
+          <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
+            <Text className="text-[11px] font-sans text-text-muted">Education</Text>
+            <Text className="text-xs font-sans-bold text-text-primary">{breakdown.education_score}%</Text>
+          </View>
+        ) : null}
         <View className="flex-1 min-w-[90px] bg-surface p-1.5 rounded border border-border/40">
-          <Text className="text-[11px] font-sans text-text-muted">Semantic (15%)</Text>
+          <Text className="text-[11px] font-sans text-text-muted">Semantic</Text>
           <Text className="text-xs font-sans-bold text-text-primary">{breakdown.semantic_similarity_score}%</Text>
         </View>
       </View>

@@ -11,6 +11,7 @@ from app.schemas.candidate_search import (
     CandidateSearchResultItem,
 )
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
+from app.services.match_evaluators import VacancyFitEvaluator, VacancyMatchStatus
 from app.services.resume_field_extractor import ResumeFieldExtractor
 
 
@@ -103,6 +104,9 @@ class CandidateSearchService:
                         fallback_scores[cv_key] = round(EmbeddingService.cosine_similarity(query_embedding, candidate_embedding), 4)
 
         items: list[CandidateSearchResultItem] = []
+        scoring_parameters = RuleConfigManager.get_scoring_parameters()
+        high_threshold = scoring_parameters.match_high_threshold
+        potential_threshold = scoring_parameters.match_medium_threshold
 
         for r in results:
             if not r or not isinstance(r, dict):
@@ -116,6 +120,25 @@ class CandidateSearchService:
             raw_match = r.get("match_analysis")
             match_analysis = raw_match if isinstance(raw_match, dict) else {}
             best_match = match_analysis.get("best_match") or {}
+            evaluated_openings = [
+                opening
+                for opening in [*(match_analysis.get("suitable_openings") or []), *(match_analysis.get("unsuitable_openings") or [])]
+                if isinstance(opening, dict)
+            ]
+            if not best_match or VacancyFitEvaluator.classify_opening_fit(best_match, high_threshold, potential_threshold) == VacancyMatchStatus.NO_STRONG_MATCH.value:
+                best_match = next(
+                    (
+                        opening
+                        for opening in evaluated_openings
+                        if VacancyFitEvaluator.classify_opening_fit(opening, high_threshold, potential_threshold) in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}
+                    ),
+                    {},
+                )
+            best_match_score = best_match.get("vacancy_fit_score")
+            if best_match_score is None:
+                best_match_score = best_match.get("overall_score")
+            if best_match_score is None:
+                best_match_score = best_match.get("score")
 
             resume_json = r.get("resume_json") or {}
             contact_info = resume_json.get("contact_info") or {}
@@ -292,7 +315,7 @@ class CandidateSearchService:
                     best_match={
                         "job_title": best_match.get("job_title"),
                         "department": best_match.get("department") or best_match.get("department_name"),
-                        "score": best_match.get("score") or best_match.get("overall_score"),
+                        "score": best_match_score,
                         "vacancy_fit_score": best_match.get("vacancy_fit_score"),
                         "vacancy_match_status": best_match.get("vacancy_match_status"),
                         "match_status": best_match.get("match_status"),

@@ -637,8 +637,22 @@ class ComponentScoreEvaluator:
             TaxonomyClassifier.are_families_compatible(context.cand_families, job_ctx.vac_family)
             or any(_share_root_family(candidate_family, job_ctx.vac_family) for candidate_family in context.cand_families)
         )
-        if family_compatible:
-            role_score = params.default_role_score
+        role_evidence_text = " ".join(
+            [
+                context.current_role or "",
+                *context.experience_titles,
+                context.domain_candidate_text or "",
+            ]
+        ).lower()
+        role_evidence_tokens = set(re.findall(r"\w+", role_evidence_text))
+        has_role_evidence = bool(job_ctx.title_lower) and (
+            job_ctx.title_lower in role_evidence_text
+            or (bool(job_ctx.title_words) and job_ctx.title_words.issubset(role_evidence_tokens))
+        )
+        if has_role_evidence:
+            role_score = typed_config.perfect_component_score
+        elif family_compatible:
+            role_score = params.domain_default_match_score
         elif transition_detected:
             role_score = params.career_transition_role_score
         elif context.current_role and job_title:
@@ -1000,6 +1014,7 @@ class VacancyFitEvaluator:
         cv_text: str = "",
         cand_hierarchy: Any | None = None,
         comp_results: Any | None = None,
+        mandatory_failures: list[MandatoryFailureDetails] | None = None,
         scoring_config: Any | None = None,
         threshold: float | None = None,
     ) -> VacancyFitResults:
@@ -1097,11 +1112,13 @@ class VacancyFitEvaluator:
         weights = typed_config.component_weights
         skill_weight = weights.get("skills", 0.0) + weights.get("technology", 0.0)
         semantic_weight = weights.get("responsibilities", 0.0)
+        education_score = float(getattr(comp_results, "education_score", 0.0) or 0.0) if job.education_requirements else 0.0
         fit_components = [
             (hierarchy_score, weights.get("domain", 0.0), bool(j_dept or v_main_id is not None)),
             (role_score, weights.get("role", 0.0), bool(j_title)),
             (skills_score, skill_weight, bool(job.required_skills or job.preferred_keywords or job.technologies)),
             (experience_score, weights.get("experience", 0.0), job.min_experience_years is not None or job.max_experience_years is not None),
+            (education_score, weights.get("education", 0.0), bool(job.education_requirements)),
             (semantic_score, semantic_weight, bool(vac_desc)),
         ]
         active_weight = sum(weight for _, weight, active in fit_components if active and weight > 0.0)
@@ -1109,15 +1126,25 @@ class VacancyFitEvaluator:
         raw_fit_score = weighted_score / active_weight if active_weight > 0.0 else 0.0
 
         # Guardrail: High embedding similarity CANNOT override wrong department / invalid hierarchy
-        if hierarchy_mismatch:
-            mismatch_cap = min(typed_config.max_score_on_failure, typed_config.match_medium_threshold)
+        hard_failures = mandatory_failures or []
+        rejection_cap = max(0.0, typed_config.match_medium_threshold - 0.1)
+        if hard_failures:
+            final_fit_score = round(min(rejection_cap, max(0.0, raw_fit_score)), 1)
+            match_status = "NO_STRONG_VACANCY_MATCH"
+            reason = f"Vacancy fit rejected ({final_fit_score:.1f}/100): {len(hard_failures)} mandatory requirement(s) failed."
+        elif hierarchy_mismatch:
+            mismatch_cap = min(typed_config.max_score_on_failure, rejection_cap)
             final_fit_score = round(min(mismatch_cap, max(0.0, raw_fit_score - hierarchy_penalty)), 1)
             match_status = "NO_STRONG_VACANCY_MATCH"
             reason = f"Vacancy fit rejected ({final_fit_score:.1f}/100): Main Department or hierarchy mismatch."
-        elif raw_fit_score < threshold:
+        elif raw_fit_score < typed_config.match_medium_threshold:
             final_fit_score = round(raw_fit_score, 1)
             match_status = "NO_STRONG_VACANCY_MATCH"
-            reason = f"Vacancy fit score ({final_fit_score:.1f}/100) below match threshold ({threshold:.1f})."
+            reason = f"Vacancy fit score ({final_fit_score:.1f}/100) below potential-match threshold ({typed_config.match_medium_threshold:.1f})."
+        elif raw_fit_score < threshold:
+            final_fit_score = round(raw_fit_score, 1)
+            match_status = "POTENTIAL_MATCH"
+            reason = f"Potential vacancy fit ({final_fit_score:.1f}/100) below strong-match threshold ({threshold:.1f}); HR review required."
         else:
             final_fit_score = round(raw_fit_score, 1)
             match_status = "MATCHED"
@@ -1128,6 +1155,7 @@ class VacancyFitEvaluator:
             designation_role_score=round(role_score, 1),
             skills_score=round(skills_score, 1),
             experience_score=round(experience_score, 1),
+            education_score=round(education_score, 1),
             semantic_similarity_score=round(semantic_score, 1),
             overall_fit_score=final_fit_score,
             hierarchy_mismatch_penalty=round(hierarchy_penalty, 1),
@@ -1174,9 +1202,9 @@ class VacancyFitEvaluator:
 
         def _resolve_score(src: Any, fallback1: Any = None, fallback2: Any = None) -> float:
             score = cls._parse_score_value(src)
-            if score is None or score == 0.0:
+            if score is None:
                 score = cls._parse_score_value(fallback1)
-            if score is None or score == 0.0:
+            if score is None:
                 score = cls._parse_score_value(fallback2)
             return float(score or 0.0)
 
@@ -1187,7 +1215,6 @@ class VacancyFitEvaluator:
                 opening.get("overall_score"),
             )
             status = str(opening.get("vacancy_match_status") or opening.get("match_status") or "").upper()
-            classification = str(opening.get("classification") or "").upper()
             failures = opening.get("mandatory_failures") or opening.get("mandatory_fails") or []
             has_domain_mismatch_req = any(
                 isinstance(f, dict) and f.get("requirement_id") == "req_domain_mismatch"
@@ -1207,7 +1234,6 @@ class VacancyFitEvaluator:
                 getattr(opening, "overall_score", None),
             )
             status = str(getattr(opening, "vacancy_match_status", getattr(opening, "match_status", ""))).upper()
-            classification = str(getattr(opening, "classification", "")).upper()
             failures = getattr(opening, "mandatory_failures", [])
             has_domain_mismatch_req = any(
                 getattr(f, "requirement_id", None) == "req_domain_mismatch" for f in failures
@@ -1223,10 +1249,7 @@ class VacancyFitEvaluator:
         if status in {"NO_STRONG_MATCH", "NO_STRONG_VACANCY_MATCH"}:
             return VacancyMatchStatus.NO_STRONG_MATCH.value
 
-        is_high_class = classification in {"HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
-        is_matched_status = status in {"", "MATCHED", "HIGH", "STRONG", "DB_MATCH", "HIGHLY_RECOMMENDED"}
-
-        if score >= high_threshold and is_high_class and is_matched_status:
+        if score >= high_threshold:
             return VacancyMatchStatus.MATCHED.value
         elif score >= potential_threshold:
             return VacancyMatchStatus.POTENTIAL_MATCH.value

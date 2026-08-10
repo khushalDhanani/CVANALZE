@@ -155,6 +155,37 @@ def test_candidate_search_preserves_canonical_fit_breakdown(monkeypatch):
     assert best_match["vacancy_match_status"] == "MATCHED"
 
 
+def test_candidate_search_recovers_canonical_match_from_legacy_review_list(monkeypatch):
+    result = {
+        "id": "cv_legacy_split_score",
+        "filename": "legacy.pdf",
+        "status": "COMPLETED",
+        "progress": 100,
+        "full_name": "Legacy Candidate",
+        "match_analysis": {
+            "best_match": None,
+            "suitable_openings": [],
+            "unsuitable_openings": [{
+                "job_title": "Configured Vacancy",
+                "score": 73.5,
+                "overall_score": 73.5,
+                "vacancy_fit_score": 89.2,
+                "classification": "MEDIUM",
+                "vacancy_match_status": "MATCHED",
+                "mandatory_failures": [],
+            }],
+        },
+    }
+    monkeypatch.setattr(ResultRepository, "list_all_results", lambda: [result])
+
+    response = CandidateSearchService.search_candidates(CandidateSearchRequest())
+
+    best_match = response.candidates[0].best_match
+    assert best_match is not None
+    assert best_match["score"] == 89.2
+    assert best_match["vacancy_match_status"] == "MATCHED"
+
+
 def test_get_status_returns_processing_while_incomplete(tmp_path, monkeypatch):
     """Verify GET /api/match/status returns processing response while progress < 100."""
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path / "uploads")

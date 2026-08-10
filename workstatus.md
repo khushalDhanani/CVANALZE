@@ -1,6 +1,53 @@
 # Work Status
 
 ## Last Completed Task
+**Canonical match-score consistency and false-positive guardrails**
+
+### Architecture Impact Analysis
+- Made `vacancy_fit_score` the canonical ranking/display score and synchronized the legacy `score` and `overall_score` response aliases for backward compatibility.
+- Derived classification, recommendation, candidate-level status, recommendation confidence, and frontend display from the canonical fit decision rather than mixing independent score systems.
+- Kept embeddings retrieval-only and retained centralized LLM grounding; deterministic mandatory, hierarchy, role, education, and experience evidence remains authoritative.
+- Added read-time normalization for legacy persisted results so stale split-score records do not require candidate-specific data edits.
+
+### Files Changed
+- Canonical evaluation and orchestration: `backend/app/services/match_evaluators.py`, `backend/app/services/scoring_engine.py`, `backend/app/services/match_service.py`.
+- Vacancy requirements and downstream consumers: `backend/app/services/vacancy_service.py`, `backend/app/services/recommendation_service.py`, `backend/app/services/candidate_search_service.py`.
+- Contracts and frontend display: `backend/app/schemas/match.py`, `frontend/src/types/api.ts`, `frontend/src/components/ui/VacancyMatchStatusBadge.tsx`, `frontend/src/utils/candidateDetail.ts`.
+- Regression coverage: `backend/tests/test_vacancy_match_status.py`, `backend/tests/test_candidate_search_flow.py`, `frontend/src/__tests__/canonicalVacancyMatchStatus.test.ts`, `frontend/src/__tests__/candidateDetailGeneric.test.mjs`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Trace extraction, deterministic scoring, fit scoring, classification, persistence/API response, recommendation response, and UI consumption.
+- Eliminate fallback-over-zero and mixed-score classification.
+- Enforce source vacancy requirements and hard failures before final classification.
+- Preserve potential matches without converting them into either verified selections or 0% no-match recommendations.
+- Repair legacy response presentation at read time without CV-specific overrides.
+
+### Code Changes
+- Final match records now return one canonical score through `score`, `overall_score`, and `vacancy_fit_score`; recommendation classification uses that same score.
+- Mandatory failures and hierarchy mismatches cap the canonical score below the potential threshold and force no-strong-match status.
+- Potential-score results now receive an explicit `POTENTIAL_MATCH` status instead of being collapsed into no strong match.
+- Role scoring requires title/experience evidence for a perfect score; taxonomy-family compatibility alone receives only the configured neutral domain score.
+- Vacancy education is included in the canonical fit dimensions, and MSSQL required-skill lists retain mandatory semantics through scoring.
+- Candidate recommendations and candidate search inspect all evaluated openings, recover canonical legacy matches, and prefer `vacancy_fit_score` even when it is explicitly zero.
+- Candidate detail normalization preserves backend potential decisions and repairs stale candidate-level status when a persisted opening contains a verified canonical match.
+- The fit breakdown exposes education and no longer displays hardcoded weights that can disagree with active configuration.
+
+### Verification Checklist
+- [x] Stored `cv_1760668444` was traced to `73.5` legacy score/classification versus `89.2` canonical fit score/status and the later best-match reset.
+- [x] Recommendation and frontend paths now consume the canonical opening and score instead of returning a separate 0% decision.
+- [x] Explicit canonical zero values no longer fall back to a different legacy score.
+- [x] Required skills, mandatory failures, role evidence, education, experience, hierarchy, and semantic retrieval responsibilities are separated and enforced generically.
+- [x] The retained PDF and result identity for `cv_gptsuifgr321345678o9p` were verified; both contain extensive explicit Flutter/Dart professional evidence, so no candidate-specific rejection was introduced.
+- [x] Focused regression cases were added for split legacy scores, canonical zero, recommendation recovery, and candidate-list/detail recovery.
+- [x] `git diff --check` passed.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Serena language-server diagnostics could not run because the Serena transport closed during verification.
+
+### Refactoring Performed
+- Consolidated score selection around the existing `VacancyFitEvaluator` and a local canonical-score reader in the recommendation service; no new scoring engine, Ollama client, taxonomy, or cache was introduced.
+
+## Previous Task
 **Show Canonical Fit Breakdown on the All CV page**
 
 ### Architecture Impact Analysis

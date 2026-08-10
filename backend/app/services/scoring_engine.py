@@ -276,20 +276,6 @@ class ScoringEngine:
         if guard_results.additional_mandatory_failures:
             req_results.mandatory_failures.extend(guard_results.additional_mandatory_failures)
 
-        # 5. Recommendation & Confidence
-        total_req_count = len(req_results.mandatory_reqs) + len(req_results.preferred_reqs) + len(req_results.optional_reqs)
-        evidence_count = len(req_results.evidence_map)
-
-        rec_results = RecommendationEvaluator.evaluate(
-            final_score=guard_results.final_score,
-            component_coverage=comp_results.component_coverage,
-            total_req_count=total_req_count,
-            evidence_count=evidence_count,
-            scoring_config=typed_scoring_config,
-            reason_str=guard_results.reason_str,
-            missing_criteria=req_results.missing_criteria,
-        )
-
         def safe_round(val: float | None) -> float:
             return round(val, 1) if val is not None else 0.0
 
@@ -316,7 +302,22 @@ class ScoringEngine:
             cv_text=cv_text,
             cand_hierarchy=resolved_cand_hierarchy,
             comp_results=comp_results,
+            mandatory_failures=req_results.mandatory_failures,
             scoring_config=typed_scoring_config,
+        )
+
+        # 5. Recommendation & Confidence. Classification is derived from the
+        # same canonical score returned to API/UI consumers.
+        total_req_count = len(req_results.mandatory_reqs) + len(req_results.preferred_reqs) + len(req_results.optional_reqs)
+        evidence_count = len(req_results.evidence_map)
+        rec_results = RecommendationEvaluator.evaluate(
+            final_score=fit_results.vacancy_fit_score,
+            component_coverage=comp_results.component_coverage,
+            total_req_count=total_req_count,
+            evidence_count=evidence_count,
+            scoring_config=typed_scoring_config,
+            reason_str=fit_results.reason,
+            missing_criteria=req_results.missing_criteria,
         )
 
         return JobMatchResult(
@@ -329,8 +330,8 @@ class ScoringEngine:
             department_id=raw_job.get("department_id"),
             department_name=raw_job.get("department_name") or raw_job.get("department"),
             location_id=raw_job.get("location_id"),
-            score=guard_results.final_score,
-            overall_score=guard_results.final_score,
+            score=fit_results.vacancy_fit_score,
+            overall_score=fit_results.vacancy_fit_score,
             vacancy_fit_score=fit_results.vacancy_fit_score,
             score_breakdown=fit_results.score_breakdown,
             vacancy_match_status=fit_results.match_status,
