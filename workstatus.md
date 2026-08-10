@@ -1,6 +1,52 @@
 # Work Status
 
 ## Last Completed Task
+**Fix Docker healthcheck and dependency readiness reporting**
+
+### Architecture Impact Analysis
+- Replaced the API container's dependency on the absent final-image `curl` binary with a Python-standard-library probe shipped inside the backend image.
+- Changed the Docker probe target from the informational root route to `/health` and made the same probe authoritative in production and local Compose.
+- `/health` now represents configured MSSQL, PostgreSQL, Redis, and enabled Ollama readiness. It returns HTTP 200 with `status=ok` only when each configured dependency is online or intentionally disabled, and HTTP 503 with `status=unhealthy` otherwise.
+- Existing dependency field names remain intact; the response adds a `redis` field.
+- No database, queue, LLM client, startup lifecycle, or application route behavior outside health reporting changed.
+
+### Files Changed
+- Container healthchecks: `docker-compose.yml`, `docker-compose.local.yml`.
+- Image-native probe: `backend/scripts/container_healthcheck.py`.
+- Dependency readiness endpoint: `backend/app/main.py`.
+- Frontend health contract: `frontend/src/types/api.ts`.
+- Regression coverage: `backend/tests/test_phase6_api_reliability.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Use Python already present in the final backend image to call `/health` and validate both HTTP status and JSON status.
+- Include Redis in the existing dependency checks without creating another Redis client.
+- Derive the overall readiness state from all configured dependencies and return a non-success HTTP status when any is offline.
+- Preserve disabled optional dependencies as healthy configuration states.
+- Add focused regressions for healthy, database-unavailable, Redis-disabled/unavailable, and enabled-Ollama-unavailable states.
+
+### Code Changes
+- Added `scripts/container_healthcheck.py` using only `urllib`, `json`, and `sys`; connection, HTTP, timeout, and invalid-payload failures exit nonzero.
+- Both API Compose healthchecks now execute `python scripts/container_healthcheck.py`; no runtime `curl` is required.
+- `/health` retains `database`, `pg_database`, and `ollama_llm`, adds `redis`, and returns HTTP 503 when a configured dependency reports offline.
+- Redis health reuses the existing centralized cache client and reports `disabled`, `online`, or `offline`.
+- Added endpoint regressions covering HTTP status and dependency payload semantics.
+
+### Verification Checklist
+- [x] The API container healthcheck no longer invokes `curl`.
+- [x] The probe uses Python stdlib available in the final `python:3.12-slim-bookworm` image.
+- [x] Production and local Compose probe the same `/health` endpoint.
+- [x] Healthy configured dependencies produce HTTP 200 and `status=ok`.
+- [x] An unavailable configured dependency produces HTTP 503 and `status=unhealthy` while preserving per-dependency states.
+- [x] Redis and enabled Ollama readiness are included; intentionally disabled dependencies do not fail readiness.
+- [x] Language-server diagnostics found no new source errors; unresolved installed-dependency imports remain environment-level diagnostics.
+- [x] `git diff --check` passed.
+- [ ] Tests, builds, and Docker execution were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Centralized the Compose HTTP probe in one reusable image-local script and reused the existing Redis and Ollama clients for dependency checks.
+
+## Previous Task
 **Fix PostgreSQL result persistence reliability**
 
 ### Architecture Impact Analysis

@@ -518,6 +518,7 @@ export interface SystemHealthResponse {
   version: string;
   database: string;
   pg_database?: string;
+  redis?: string;
   ollama_llm: string;
 }
 

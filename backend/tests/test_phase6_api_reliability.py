@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,6 +14,7 @@ from app.core.request_context import RequestContextMiddleware
 from app.core.security import AccessControlMiddleware
 from app.core.security import AuthenticatedPrincipal, authenticate_session_token, create_session_token
 from app.api.auth import router as auth_router
+import app.main as main_module
 from app.main import app as main_app
 from app.schemas.analysis import HRReviewRequest
 from app.schemas.contracts import AccessTier
@@ -48,6 +50,73 @@ def _app_with_session_auth() -> FastAPI:
     test_app.add_middleware(AccessControlMiddleware)
     test_app.add_middleware(RequestContextMiddleware)
     return test_app
+
+
+@pytest.mark.asyncio
+async def test_health_reports_configured_dependencies_online(monkeypatch):
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    assert payload["database"] == "online"
+    assert payload["pg_database"] == "online"
+    assert payload["redis"] == "online"
+    assert payload["ollama_llm"] == "disabled"
+
+
+@pytest.mark.asyncio
+async def test_health_returns_service_unavailable_for_offline_dependency(monkeypatch):
+    def database_health(_engine, label):
+        return "offline" if label == "PostgreSQL" else "online"
+
+    monkeypatch.setattr(main_module, "_database_health", database_health)
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert payload["status"] == "unhealthy"
+    assert payload["database"] == "online"
+    assert payload["pg_database"] == "offline"
+    assert payload["redis"] == "online"
+
+
+@pytest.mark.asyncio
+async def test_health_requires_ollama_when_llm_capability_is_enabled(monkeypatch):
+    from app.services.llm_service import OllamaLLMService
+
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", True)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+    monkeypatch.setattr(OllamaLLMService, "check_health", classmethod(lambda _cls: False))
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert payload["status"] == "unhealthy"
+    assert payload["ollama_llm"] == "offline"
+
+
+def test_redis_health_distinguishes_disabled_and_unavailable(monkeypatch):
+    from app.core import cache
+
+    monkeypatch.setattr(settings, "REDIS_URL", None)
+    assert main_module._redis_health() == "disabled"
+
+    monkeypatch.setattr(settings, "REDIS_URL", "redis://redis:6379/0")
+    monkeypatch.setattr(cache, "_REDIS_CLIENT", None)
+    assert main_module._redis_health() == "offline"
 
 
 def test_concrete_paths_resolve_characterized_access_tiers():

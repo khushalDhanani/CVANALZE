@@ -68,7 +68,7 @@ services:
     cpus: 0.75
     pids_limit: 128
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=5).read()"]
+      test: ["CMD", "python", "scripts/container_healthcheck.py"]
 
   worker:
     build:

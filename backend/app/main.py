@@ -1,6 +1,7 @@
 from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.analysis import router as match_router
@@ -112,22 +113,27 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
+async def health() -> JSONResponse:
     db_status = _database_health(mssql_read_engine, "MSSQL")
     pg_status = _database_health(postgres_app_engine, "PostgreSQL")
+    redis_status = _redis_health()
     ollama_status = "disabled"
     if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         from app.services.llm_service import OllamaLLMService
 
         ollama_status = "online" if OllamaLLMService.check_health() else "offline"
 
-    return {
-        "status": "ok",
+    dependency_statuses = (db_status, pg_status, redis_status, ollama_status)
+    overall_status = "ok" if all(status in ("online", "disabled") for status in dependency_statuses) else "unhealthy"
+    payload = {
+        "status": overall_status,
         "version": settings.VERSION,
         "database": db_status,
         "pg_database": pg_status,
+        "redis": redis_status,
         "ollama_llm": ollama_status,
     }
+    return JSONResponse(status_code=200 if overall_status == "ok" else 503, content=payload)
 
 
 def _database_health(database_engine, label: str) -> str:
@@ -139,4 +145,19 @@ def _database_health(database_engine, label: str) -> str:
         return "online"
     except Exception as exc:
         logger.error(f"{label} health check failed: {type(exc).__name__}")
+        return "offline"
+
+
+def _redis_health() -> str:
+    if not settings.REDIS_URL:
+        return "disabled"
+    from app.core import cache
+
+    if cache._REDIS_CLIENT is None:
+        return "offline"
+    try:
+        cache._REDIS_CLIENT.ping()
+        return "online"
+    except Exception as exc:
+        logger.error(f"Redis health check failed: {type(exc).__name__}")
         return "offline"
