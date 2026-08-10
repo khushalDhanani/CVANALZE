@@ -11,13 +11,17 @@ from redis import Redis
 from rq import Queue, SimpleWorker
 
 from app.core.config import settings
+from app.core.config_listener import start_config_invalidation_listener
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 
 
 def main():
     logger.info("Starting RQ worker...")
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
+    RuleConfigManager.load_config(tenant_id=None)
+    start_config_invalidation_listener()
 
     listen = list(dict.fromkeys([settings.RQ_QUEUE_NAME, "shadow_validation", "default"]))
     queues = [Queue(name, connection=conn) for name in listen]
@@ -26,7 +30,7 @@ def main():
     # process is already dedicated to this queue, so execute jobs in-process and
     # allow normal cleanup instead of merely suppressing resource_tracker output.
     worker = SimpleWorker(queues, connection=conn)
-    work_options = {"with_scheduler": True}
+    work_options: dict[str, bool | int] = {"with_scheduler": True}
     if settings.RQ_WORKER_MAX_JOBS > 0:
         work_options["max_jobs"] = settings.RQ_WORKER_MAX_JOBS
     worker.work(**work_options)

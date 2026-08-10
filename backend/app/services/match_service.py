@@ -11,7 +11,7 @@ from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
 from app.core.rule_config_manager import RuleConfigManager
 from app.prompts.optimized_match import build_optimized_match_prompt
-from app.repositories.job import JobRepository
+from app.repositories.job import JobRepository, VacancyLoadStatus, VacancySourceUnavailableError
 from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
@@ -83,8 +83,19 @@ class MatchService:
         from fastapi.concurrency import run_in_threadpool
 
         # 3. Vacancy retrieval
+        vacancy_freshness = "FRESH"
         with profiler.time_stage("vacancy_retrieval"):
-            openings = job_openings if job_openings is not None else await run_in_threadpool(JobRepository.get_all_jobs)
+            if job_openings is not None:
+                openings = job_openings
+            else:
+                vacancy_result = await run_in_threadpool(JobRepository.load_all_jobs)
+                openings = vacancy_result.jobs
+                if vacancy_result.status == VacancyLoadStatus.STALE:
+                    vacancy_freshness = "STALE"
+                    if not openings:
+                        raise VacancySourceUnavailableError(
+                            "MSSQL vacancy source is unavailable and the cached vacancy snapshot is empty."
+                        )
 
         if not openings:
             logger.warning("MatchService.analyze_single_cv: No job openings available for matching.")
@@ -117,7 +128,16 @@ class MatchService:
             profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
             profiler.finish()
             profiler.log_summary()
-            return EnrichedCandidateAnalysis.model_validate(cached_result)
+            cached_analysis = EnrichedCandidateAnalysis.model_validate(cached_result).model_copy(
+                update={"freshness_status": vacancy_freshness}
+            )
+            MatchService._enqueue_shadow_if_requested(
+                cached_analysis,
+                source_candidate_id=source_candidate_id,
+                cv_text=cv_text,
+                shadow_run=_shadow_run,
+            )
+            return cached_analysis
         profiler.metrics.cache_lookup_ms = round((asyncio.get_event_loop().time() - t_cache_start) * 1000.0, 2)
 
         with profiler.time_stage("candidate_context"):
@@ -164,8 +184,8 @@ class MatchService:
 
         # CONFIDENCE GATE CHECK (Phase 3)
         llm_skipped = False
+        pre_llm_matches = []
         if filtered_job_contexts:
-            pre_llm_matches = []
             for job_context in filtered_job_contexts:
                 try:
                     pre_llm_match = ScoringEngine.evaluate_job_match(
@@ -384,7 +404,7 @@ class MatchService:
                     )
                     evaluated_matches.append(enriched_match)
                 except Exception as e:
-                    logger.error(f"Error in LLM-enriched matching for job {job.get('id') or job.get('vacancy_id')}: {e}", exc_info=True)
+                    logger.error(f"Error in LLM-enriched matching for job {job_context.job_id}: {e}", exc_info=True)
 
             evaluated_matches.sort(key=lambda m: m.vacancy_fit_score or m.score, reverse=True)
 
@@ -603,6 +623,7 @@ class MatchService:
             main_department_classification=main_dept_res,
             ai_career_suggestions=ai_career_suggestions,
             experience_gap_analysis=gap_analysis,
+            freshness_status=vacancy_freshness,
             source_watermark=vacancy_version,
             quality_metadata={
                 "matching_version": settings.MATCHING_VERSION,
@@ -616,6 +637,13 @@ class MatchService:
             },
         )
 
+        MatchService._enqueue_shadow_if_requested(
+            result,
+            source_candidate_id=source_candidate_id,
+            cv_text=cv_text,
+            shadow_run=_shadow_run,
+        )
+
         # Cache the match result for instant repeat searches if worker generation is current
         from app.repositories.result import ResultRepository
         cv_key_stem = str(cv_key or document_hash)
@@ -627,23 +655,36 @@ class MatchService:
             logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
         else:
             logger.warning(f"[STALE_GENERATION_WRITE_REJECTED] resource=match_result doc={document_hash[:12]}")
-
-
-        if getattr(settings, "SHADOW_MODE_ENABLED", False) and source_candidate_id is not None and not _shadow_run:
-            from app.services.shadow_validation_service import ShadowValidationService
-            try:
-                vacancy_id = result.best_match.vacancy_id if result.best_match else None
-                numeric_vac_id = int(vacancy_id) if vacancy_id else None
-                ShadowValidationService.enqueue_shadow_validation(
-                    source_candidate_id=source_candidate_id,
-                    vacancy_id=numeric_vac_id,
-                    prod_result_dict=result.model_dump(),
-                    cv_text=cv_text
-                )
-            except ValueError:
-                logger.warning(f"Could not enqueue shadow validation for non-numeric vacancy_id: {vacancy_id}")
-
         return result
+
+    @staticmethod
+    def _enqueue_shadow_if_requested(
+        result: EnrichedCandidateAnalysis,
+        *,
+        source_candidate_id: int | None,
+        cv_text: str,
+        shadow_run: bool,
+    ) -> None:
+        if not settings.SHADOW_MODE_ENABLED or source_candidate_id is None or shadow_run:
+            return
+
+        from app.services.shadow_validation_service import ShadowValidationService
+
+        vacancy_id = result.best_match.vacancy_id if result.best_match else None
+        try:
+            numeric_vacancy_id = int(vacancy_id) if vacancy_id else None
+        except (TypeError, ValueError):
+            logger.warning(f"Could not enqueue shadow validation for non-numeric vacancy_id: {vacancy_id}")
+            result.quality_metadata["shadow_validation_status"] = "not_queued_invalid_vacancy_id"
+            return
+
+        queued = ShadowValidationService.enqueue_shadow_validation(
+            source_candidate_id=source_candidate_id,
+            vacancy_id=numeric_vacancy_id,
+            prod_result_dict=result.model_dump(),
+            cv_text=cv_text,
+        )
+        result.quality_metadata["shadow_validation_status"] = "queued" if queued else "not_queued"
 
     @staticmethod
     def _empty_job_match() -> EnrichedJobMatchResult:
@@ -684,6 +725,9 @@ class MatchService:
         cv_text: str = "",
         normalized_resume: NormalizedResume | None = None,
     ) -> EnrichedCandidateAnalysis:
+        from app.schemas.scoring_config import ScoringConfig
+
+        scoring_config = ScoringConfig.load()
         cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
         industry_dept = cand_profile.get("recommended_department", "")
         industry_domain = cand_profile.get("professional_domain", "")
@@ -737,8 +781,8 @@ class MatchService:
             suitable_job_roles=roles,
             has_genuine_match=False,
             active_vacancy_summary="NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation.",
-            scoring_profile_code=scoring_config.profile_code if 'scoring_config' in locals() else None,
-            scoring_profile_version=scoring_config.profile_version if 'scoring_config' in locals() else None,
+            scoring_profile_code=scoring_config.profile_code,
+            scoring_profile_version=scoring_config.profile_version,
             config_version=RuleConfigManager.get_config().version,
             prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
             ai_career_summary=(

@@ -142,6 +142,12 @@ def test_batch_status_aggregates_normal_cv_job_results(monkeypatch):
         "resolve_result",
         lambda _cv_key: {"match_analysis": {"best_match": {"job_title": "Engineer"}}},
     )
+    reconcile_calls = []
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "reconcile_job",
+        lambda child: reconcile_calls.append(child) or child,
+    )
 
     completed = BatchProcessingService.get_status(record.batch_job_id)
 
@@ -149,3 +155,22 @@ def test_batch_status_aggregates_normal_cv_job_results(monkeypatch):
     assert completed.state == "COMPLETED"
     assert completed.progress == 100
     assert completed.matches[0]["analysis"]["best_match"]["job_title"] == "Engineer"
+    assert len(reconcile_calls) == 1
+
+
+def test_batch_status_marks_failed_coordinator_terminal(monkeypatch):
+    record = BatchJobRepository.save(BatchJobRecord(batch_job_id="batch_failed", limit=1))
+
+    class FailedJob:
+        @staticmethod
+        def get_status():
+            return "failed"
+
+    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
+    monkeypatch.setattr("rq.job.Job.fetch", lambda *_args, **_kwargs: FailedJob())
+
+    failed = BatchProcessingService.get_status(record.batch_job_id)
+
+    assert failed is not None
+    assert failed.state == "FAILED"
+    assert failed.progress == 100

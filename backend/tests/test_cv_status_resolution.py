@@ -17,9 +17,13 @@ def test_start_worker_queue_configuration():
     """Verify start_worker listens to RQ_QUEUE_NAME, shadow_validation, and default queues."""
     from start_worker import main
     with patch("start_worker.SimpleWorker") as mock_worker:
-        with patch("start_worker.Redis"), patch("start_worker.settings.RQ_WORKER_MAX_JOBS", 0):
+        with patch("start_worker.Redis"), patch("start_worker.settings.RQ_WORKER_MAX_JOBS", 0), \
+             patch("start_worker.RuleConfigManager.load_config") as load_config, \
+             patch("start_worker.start_config_invalidation_listener") as start_listener:
             mock_worker.return_value.work.return_value = None
             main()
+            load_config.assert_called_once_with(tenant_id=None)
+            start_listener.assert_called_once_with()
             assert mock_worker.called
             queues = mock_worker.call_args[0][0]
             queue_names = [q.name for q in queues]

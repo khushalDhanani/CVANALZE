@@ -52,8 +52,10 @@ class BatchProcessingService:
     @classmethod
     def get_status(cls, batch_job_id: str) -> BatchJobRecord | None:
         record = BatchJobRepository.get(batch_job_id)
-        if record is None or record.state in ("COMPLETED", "COMPLETED_DEGRADED", "FAILED") or record.stage != "cv_jobs_queued":
+        if record is None or record.state in ("COMPLETED", "COMPLETED_DEGRADED", "FAILED"):
             return record
+        if record.stage != "cv_jobs_queued":
+            return cls._reconcile_coordinator(record)
 
         processed = 0
         matches: list[dict[str, Any]] = []
@@ -65,6 +67,8 @@ class BatchProcessingService:
                 matches.append(cls._error_result(item, item.error))
                 continue
             child = ProcessingJobRepository.get(item.processing_job_id or "")
+            if child is not None:
+                child = ProcessingQueueService.reconcile_job(child)
             if child is None or child.state not in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED, JobState.FAILED):
                 continue
             processed += 1
@@ -109,6 +113,33 @@ class BatchProcessingService:
             message=f"Processed {processed} candidates through the standard CV pipeline.",
             completed_at=datetime.now(timezone.utc),
         )
+
+    @classmethod
+    def _reconcile_coordinator(cls, record: BatchJobRecord) -> BatchJobRecord:
+        connection = ProcessingQueueService._redis_connection()
+        if connection is None:
+            return record
+        try:
+            from rq.job import Job, NoSuchJobError
+
+            try:
+                rq_job = Job.fetch(record.batch_job_id, connection=connection)
+            except NoSuchJobError:
+                return record
+            if rq_job.get_status() != "failed":
+                return record
+            return BatchJobRepository.update(
+                record.batch_job_id,
+                state="FAILED",
+                stage="failed",
+                progress=100,
+                error="Batch coordinator failed during background execution.",
+                message="Batch processing failed before all CV jobs were queued.",
+                completed_at=datetime.now(timezone.utc),
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to reconcile batch RQ job '{record.batch_job_id}': {exc}")
+            return record
 
     @staticmethod
     def _error_result(item: BatchJobItem, message: str) -> dict[str, Any]:

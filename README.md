@@ -304,10 +304,11 @@ Start infrastructure, apply migrations, and then start the application processes
 ```bash
 docker compose up -d pgvector redis
 docker compose --profile tools run --rm migrate-postgres
-docker compose up -d api worker
+docker compose up -d api worker scheduler
 ```
 
-The API and worker share `backend/uploads`, use the same queue and service configuration, wait for healthy Redis/PostgreSQL, and restart unless stopped. The worker
+The API and worker share `backend/uploads`, use the same queue and service configuration, wait for healthy Redis/PostgreSQL, and restart unless stopped. The scheduler
+registers recurring canonical MSSQL snapshot synchronization and validation metric jobs, which the worker consumes. The worker
 must retain access to that shared volume because RQ payloads contain only job IDs. The Compose stack expects Ollama on the Docker host by default.
 
 Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `MSSQL_READ_ONLY_URL` to the API/worker through a deployment override.
@@ -317,8 +318,8 @@ Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `
 For an 8 GB M1-class Mac, layer the local override over the production-safe base file:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml build api worker
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker
+docker compose -f docker-compose.yml -f docker-compose.local.yml build api worker scheduler
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker scheduler
 ```
 
 The override limits the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.
@@ -331,7 +332,7 @@ responses are bounded and validated, and every generation or embedding batch unl
 Deterministic extraction and scoring remain available. To opt into host Ollama features, start with one feature and a small installed model:
 
 ```bash
-LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker
+LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker scheduler
 ```
 
 Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. The local profile uses `qwen3:1.7b`, keeps `nomic-embed-text` for the existing 768-dimensional
@@ -352,7 +353,7 @@ uv run python scripts/verify_schema_drift.py
 
 ```bash
 docker compose config
-docker compose build api worker migrate-postgres
+docker compose build api worker scheduler migrate-postgres
 ```
 
 After deployment, smoke-test public health, authenticated recruiter/admin routes, both upload and polling aliases, worker processing/retry behavior, request IDs,

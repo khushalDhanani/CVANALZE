@@ -238,3 +238,23 @@ async def test_shadow_validation_uses_explicit_source_candidate_id(shadow_jobs, 
         )
 
     assert enqueue_mock.call_args.kwargs["source_candidate_id"] == 42
+
+
+def test_shadow_enqueue_failure_is_observable(monkeypatch):
+    from app.schemas.analysis import EnrichedCandidateAnalysis
+
+    monkeypatch.setattr("app.services.match_service.settings.SHADOW_MODE_ENABLED", True)
+    analysis = EnrichedCandidateAnalysis(suitable_openings=[])
+
+    with patch(
+        "app.services.shadow_validation_service.ShadowValidationService.enqueue_shadow_validation",
+        return_value=False,
+    ):
+        MatchService._enqueue_shadow_if_requested(
+            analysis,
+            source_candidate_id=42,
+            cv_text="Candidate profile",
+            shadow_run=False,
+        )
+
+    assert analysis.quality_metadata["shadow_validation_status"] == "not_queued"

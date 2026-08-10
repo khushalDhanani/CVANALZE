@@ -386,6 +386,7 @@ class ConfigurationService:
         db.commit()
         db.refresh(profile_to_activate)
 
+        RuleConfigManager.load_config(tenant_id=tenant_id)
         cls._broadcast_invalidation(tenant_id)
 
         return profile_to_activate

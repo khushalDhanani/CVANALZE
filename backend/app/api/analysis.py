@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
-from app.repositories.job import JobRepository
+from app.repositories.job import JobRepository, VacancySourceUnavailableError
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.repositories.training import TrainingRepository
@@ -57,6 +57,8 @@ async def analyze_cv_text(payload: CVMatchRequest):
 
     try:
         return await MatchService.analyze_single_cv(payload.cv_text)
+    except VacancySourceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception(f"Failed to analyze CV text: {exc}")
         raise HTTPException(status_code=500, detail="An internal error occurred during CV analysis.") from exc

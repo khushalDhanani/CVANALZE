@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { CheckCircle, AlertTriangle, Building2, MapPin, Layers, Briefcase, Award } from 'lucide-react-native';
 import { organizationService } from '@/services/organizationService';
@@ -42,65 +42,116 @@ export function OrganizationHierarchySelector({
   const [loadingMd, setLoadingMd] = useState(false);
   const [loadingDept, setLoadingDept] = useState(false);
   const [loadingDesig, setLoadingDesig] = useState(false);
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
 
   const [validationResult, setValidationResult] = useState<HierarchyValidationResult | null>(null);
+
+  const recordLoadSuccess = useCallback((key: string) => {
+    setLoadErrors((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const recordLoadFailure = useCallback((key: string, error: unknown) => {
+    const message = error instanceof Error ? error.message : 'Organization data is unavailable.';
+    setLoadErrors((current) => ({ ...current, [key]: message }));
+  }, []);
 
   // 1. Fetch Business Groups & Main Depts on mount
   useEffect(() => {
     setLoadingBg(true);
     organizationService
       .getBusinessGroups()
-      .then(setBusinessGroups)
-      .catch(() => setBusinessGroups([]))
+      .then((items) => {
+        setBusinessGroups(items);
+        recordLoadSuccess('business_groups');
+      })
+      .catch((error) => {
+        setBusinessGroups([]);
+        recordLoadFailure('business_groups', error);
+      })
       .finally(() => setLoadingBg(false));
 
     setLoadingMd(true);
     organizationService
       .getMainDepartments()
-      .then(setMainDepartments)
-      .catch(() => setMainDepartments([]))
+      .then((items) => {
+        setMainDepartments(items);
+        recordLoadSuccess('main_departments');
+      })
+      .catch((error) => {
+        setMainDepartments([]);
+        recordLoadFailure('main_departments', error);
+      })
       .finally(() => setLoadingMd(false));
-  }, []);
+  }, [recordLoadFailure, recordLoadSuccess]);
 
   // 2. Fetch Companies when Business Group changes
   useEffect(() => {
     setLoadingComp(true);
     organizationService
       .getCompanies(value.business_group_id)
-      .then(setCompanies)
-      .catch(() => setCompanies([]))
+      .then((items) => {
+        setCompanies(items);
+        recordLoadSuccess('companies');
+      })
+      .catch((error) => {
+        setCompanies([]);
+        recordLoadFailure('companies', error);
+      })
       .finally(() => setLoadingComp(false));
-  }, [value.business_group_id]);
+  }, [recordLoadFailure, recordLoadSuccess, value.business_group_id]);
 
   // 3. Fetch Locations when Company changes
   useEffect(() => {
     setLoadingLoc(true);
     organizationService
       .getLocations(value.company_id)
-      .then(setLocations)
-      .catch(() => setLocations([]))
+      .then((items) => {
+        setLocations(items);
+        recordLoadSuccess('locations');
+      })
+      .catch((error) => {
+        setLocations([]);
+        recordLoadFailure('locations', error);
+      })
       .finally(() => setLoadingLoc(false));
-  }, [value.company_id]);
+  }, [recordLoadFailure, recordLoadSuccess, value.company_id]);
 
   // 4. Fetch Departments when Company or Main Department changes
   useEffect(() => {
     setLoadingDept(true);
     organizationService
       .getDepartments(value.company_id, value.main_department_id)
-      .then(setDepartments)
-      .catch(() => setDepartments([]))
+      .then((items) => {
+        setDepartments(items);
+        recordLoadSuccess('departments');
+      })
+      .catch((error) => {
+        setDepartments([]);
+        recordLoadFailure('departments', error);
+      })
       .finally(() => setLoadingDept(false));
-  }, [value.company_id, value.main_department_id]);
+  }, [recordLoadFailure, recordLoadSuccess, value.company_id, value.main_department_id]);
 
   // 5. Fetch Designations when Company, Department, or Main Department changes
   useEffect(() => {
     setLoadingDesig(true);
     organizationService
       .getDesignations(value.company_id, value.department_id, value.main_department_id)
-      .then(setDesignations)
-      .catch(() => setDesignations([]))
+      .then((items) => {
+        setDesignations(items);
+        recordLoadSuccess('designations');
+      })
+      .catch((error) => {
+        setDesignations([]);
+        recordLoadFailure('designations', error);
+      })
       .finally(() => setLoadingDesig(false));
-  }, [value.company_id, value.department_id, value.main_department_id]);
+  }, [recordLoadFailure, recordLoadSuccess, value.company_id, value.department_id, value.main_department_id]);
 
   // 6. Validate hierarchy whenever selection changes
   useEffect(() => {
@@ -119,8 +170,14 @@ export function OrganizationHierarchySelector({
 
     organizationService
       .validateHierarchy(value)
-      .then(setValidationResult)
-      .catch(() => setValidationResult(null));
+      .then((result) => {
+        setValidationResult(result);
+        recordLoadSuccess('validation');
+      })
+      .catch((error) => {
+        setValidationResult(null);
+        recordLoadFailure('validation', error);
+      });
   }, [
     value.business_group_id,
     value.company_id,
@@ -128,6 +185,8 @@ export function OrganizationHierarchySelector({
     value.main_department_id,
     value.department_id,
     value.designation_id,
+    recordLoadFailure,
+    recordLoadSuccess,
   ]);
 
   // Parent Change Handlers with Cascading Reset
@@ -257,6 +316,15 @@ export function OrganizationHierarchySelector({
       <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider mb-2">
         Organization Hierarchy
       </Text>
+
+      {Object.keys(loadErrors).length > 0 && (
+        <View className="mb-2 p-2 rounded flex-row items-center gap-1.5 border bg-danger/10 border-danger/30">
+          <AlertTriangle size={14} color={COLORS.danger} />
+          <Text className="text-xs font-sans-medium text-danger">
+            Organization data is unavailable. Check the MSSQL connection and retry.
+          </Text>
+        </View>
+      )}
 
       {/* 1. Business Group */}
       {renderSelectorRow(

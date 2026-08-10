@@ -1,13 +1,33 @@
 from __future__ import annotations
-from typing import Any, Optional
-from fastapi import APIRouter, Query
-from pydantic import BaseModel, Field
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any, Optional, cast
 
-from app.core.database import MssqlReadSession
-from app.repositories.mssql.organization_source import OrganizationSourceRepository
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
 from app.core.cache import master_data_cache_manager
+from app.core.database import MssqlReadSession
+from app.core.logging import logger
+from app.repositories.mssql.organization_source import OrganizationSourceRepository
 
 router = APIRouter(prefix="/organization", tags=["Organization Hierarchy"])
+
+
+@contextmanager
+def _organization_session() -> Iterator[Session]:
+    if MssqlReadSession is None:
+        raise HTTPException(status_code=503, detail="MSSQL organization source is unavailable.")
+    try:
+        session_factory = cast(Any, MssqlReadSession)
+        with session_factory() as db:
+            yield db
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("MSSQL organization query failed.")
+        raise HTTPException(status_code=503, detail="MSSQL organization source is unavailable.") from exc
 
 
 class HierarchyValidationRequest(BaseModel):
@@ -26,9 +46,7 @@ def get_business_groups():
     if cached:
         return cached
 
-    if MssqlReadSession is None:
-        return []
-    with MssqlReadSession() as db:
+    with _organization_session() as db:
         repo = OrganizationSourceRepository(db)
         groups = repo.get_business_groups()
         return [{"id": g.BusinessGrpID, "name": g.BusinessGrpName} for g in groups]
@@ -42,9 +60,7 @@ def get_companies(business_group_id: Optional[int] = Query(None)):
         if cached:
             return cached
 
-    if MssqlReadSession is None:
-        return []
-    with MssqlReadSession() as db:
+    with _organization_session() as db:
         repo = OrganizationSourceRepository(db)
         comps = repo.get_companies(business_group_id=business_group_id)
         return [{"id": c.CompID, "name": c.CompName, "code": c.CompCode, "business_group_id": c.BusinessGrpID} for c in comps]
@@ -58,9 +74,7 @@ def get_locations(company_id: Optional[int] = Query(None)):
         if cached:
             return cached
 
-    if MssqlReadSession is None:
-        return []
-    with MssqlReadSession() as db:
+    with _organization_session() as db:
         repo = OrganizationSourceRepository(db)
         locs = repo.get_locations(company_id=company_id)
         return [{"id": l.LocID, "name": l.LocName, "code": l.LocCode, "company_id": l.CompID} for l in locs]
@@ -73,9 +87,7 @@ def get_main_departments():
     if cached:
         return cached
 
-    if MssqlReadSession is None:
-        return []
-    with MssqlReadSession() as db:
+    with _organization_session() as db:
         repo = OrganizationSourceRepository(db)
         main_depts = repo.get_main_departments()
         return [{"id": md.MainDeptID, "name": md.DeptName} for md in main_depts]
@@ -92,9 +104,7 @@ def get_departments(
         if cached:
             return cached
 
-    if MssqlReadSession is None:
-        return []
-    with MssqlReadSession() as db:
+    with _organization_session() as db:
         repo = OrganizationSourceRepository(db)
         depts = repo.get_active_departments(company_id=company_id, main_dept_id=main_department_id)
         return [
@@ -120,9 +130,7 @@ def get_designations(
         if cached:
             return cached
 
-    if MssqlReadSession is None:
-        return []
-    with MssqlReadSession() as db:
+    with _organization_session() as db:
         repo = OrganizationSourceRepository(db)
         desigs = repo.get_all_designations(
             company_id=company_id, dept_id=department_id, main_dept_id=main_department_id
@@ -162,10 +170,7 @@ def get_hierarchy():
 @router.post("/validate")
 def validate_hierarchy(payload: HierarchyValidationRequest):
     """Validates whether a selected combination of parent-child hierarchy IDs is valid."""
-    if MssqlReadSession is None:
-        return {"is_valid": True, "errors": [], "details": {"note": "MSSQL Session unavailable; bypassed."}}
-
-    with MssqlReadSession() as db:
+    with _organization_session() as db:
         repo = OrganizationSourceRepository(db)
         return repo.validate_hierarchy(
             business_group_id=payload.business_group_id,

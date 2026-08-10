@@ -3,6 +3,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
+from app.repositories.job import VacancySourceUnavailableError
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis
@@ -94,6 +95,8 @@ async def match_cv_text(payload: CVMatchRequest):
         from app.services.match_service import MatchService
 
         return await MatchService.analyze_single_cv(payload.cv_text)
+    except VacancySourceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception(f"Failed to analyze CV text: {exc}")
         raise HTTPException(

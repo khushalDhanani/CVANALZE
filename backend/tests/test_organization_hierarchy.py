@@ -1,6 +1,7 @@
 from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock
+from fastapi import HTTPException
 from app.models.mssql.organization import (
     OrgBusinessGroupMst,
     OrgCompanyMst,
@@ -10,6 +11,7 @@ from app.models.mssql.organization import (
     OrgDesignationMst,
 )
 from app.repositories.mssql.organization_source import OrganizationSourceRepository
+from app.api import organization
 
 
 def create_mock_db():
@@ -116,6 +118,16 @@ def test_hierarchy_validation_invalid_designation_company_and_main_dept_mismatch
     )
     assert res_dept["is_valid"] is False
     assert any("belongs to Department 50, not 777" in e for e in res_dept["errors"])
+
+
+def test_organization_api_reports_unavailable_mssql(monkeypatch):
+    monkeypatch.setattr(organization, "MssqlReadSession", None)
+    monkeypatch.setattr(organization.master_data_cache_manager, "get", lambda _key: None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        organization.get_business_groups()
+
+    assert exc_info.value.status_code == 503
 
 
 def test_vacancy_mapping_populates_full_hierarchy_ids():

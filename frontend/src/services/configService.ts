@@ -88,6 +88,6 @@ export const configService = {
       `/api/config/versions/${encodeURIComponent(versionTag)}/activate`,
       { tenant_id: null },
     );
-    return toMatchEngineConfig(nextConfig);
+    return getActiveConfig().then(toMatchEngineConfig);
   },
 };

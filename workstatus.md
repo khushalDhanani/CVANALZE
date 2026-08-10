@@ -1,6 +1,57 @@
 # Work Status
 
 ## Last Completed Task
+**Full CV analyzer integration trace and reliability closure**
+
+### Architecture Impact Analysis
+- Traced CV, direct match, configuration, organization, batch, and shadow-validation flows from frontend contracts through FastAPI, services, repositories, RQ workers, PostgreSQL/MSSQL, Redis, and Ollama boundaries.
+- Preserved the existing dynamic parser, taxonomy, scoring, grounding, configuration, and matching architecture; no CV, job, department, education, or skill matching rule was hardcoded or changed.
+- Extended explicit source/degradation state across MatchService and organization APIs, made batch RQ failures terminal, and made shadow dispatch and persistence observable and retry-safe.
+- Connected active configuration reloads to both the activating API process and the RQ worker so frontend configuration changes reach background matching.
+
+### Files Changed
+- Match/vacancy failure propagation: `backend/app/api/analysis.py`, `backend/app/api/cv.py`, `backend/app/services/match_service.py`.
+- Organization dependency failure propagation: `backend/app/api/organization.py`, `frontend/src/components/ui/OrganizationHierarchySelector.tsx`.
+- Batch coordinator/child reconciliation: `backend/app/services/batch_processing_service.py`.
+- Configuration activation consistency: `backend/app/services/configuration_service.py`, `backend/start_worker.py`, `frontend/src/services/configService.ts`.
+- Shadow dispatch, retry identity, run lifecycle, and persistence: `backend/app/services/shadow_validation_service.py`.
+- Shadow deployment flag: `docker-compose.yml`, `backend/.env.example`.
+- Deployment documentation/local override: `docker-compose.local.yml`, `README.md`.
+- Regression coverage: `backend/tests/test_batch_job_processing.py`, `backend/tests/test_cv_status_resolution.py`, `backend/tests/test_organization_hierarchy.py`, `backend/tests/test_shadow_validation.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Compare every frontend URL and payload/query parameter with its mounted backend route and schema.
+- Follow each route through its service and repository to the intended database, external service, and RQ queue.
+- Correct failure paths that could appear empty, successful, or permanently in-progress.
+- Ensure configuration and shadow work cross process boundaries and retries reuse deterministic identities.
+- Add focused regressions and perform static diagnostics/diff validation without executing the project.
+
+### Code Changes
+- Direct matching now consumes `VacancyLoadResult`, reports stale vacancy snapshots in `freshness_status`, and returns HTTP 503 when MSSQL has no usable snapshot instead of reporting no active vacancies.
+- Match-cache hits still request shadow validation when `source_candidate_id` is present; shadow enqueue success/failure is recorded in `quality_metadata`.
+- Initialized the deterministic pre-LLM collection for a zero-prefilter result and corrected per-vacancy exception logging that could reference an unset variable.
+- Organization routes now return HTTP 503 for unconfigured/failed MSSQL queries, and the hierarchy selector displays an unavailable state instead of silently presenting empty filters.
+- Batch status reconciles both its coordinator RQ job and each child processing job, preventing hard worker failures from leaving batches permanently in progress.
+- Configuration activation reloads the local `RuleConfigManager`; workers load active configuration at boot and subscribe to Redis invalidations. The frontend re-reads the durable active version after activation.
+- Shadow jobs use a deterministic unique RQ identity, persist a RUNNING record before matching, retain the run ID in RQ metadata, reuse completed results on retry, and persist FAILED state when processing fails.
+- Compose now passes `SHADOW_MODE_ENABLED` to API, worker, and scheduler containers; the example environment documents its default-off behavior.
+
+### Verification Checklist
+- [x] CV upload/status URLs, multipart fields, queue function, retained parser input, MatchService call, PostgreSQL result repository, degraded persistence, and terminal response states align.
+- [x] Direct match URLs/payloads, MatchService vacancy source, deterministic scoring, centralized Ollama/grounding, cache behavior, stale success, legitimate empty, and unavailable failure paths align.
+- [x] Configuration URLs/body/query parameters, ConfigurationService methods, PostgreSQL writes, process invalidation, worker invalidation, and frontend re-read align.
+- [x] Organization filter parameter names align end to end and MSSQL failures no longer become empty successful lists or valid hierarchy bypasses.
+- [x] Batch submission is HTTP 202/RQ-based, binary PDF/DOCX inputs use the normal parser pipeline, progress aggregates child jobs, and coordinator/child failures become terminal.
+- [x] Shadow source identity flows from CV processing to MatchService, the worker consumes `shadow_validation`, and validation run/result persistence has observable success/failure and retry reuse.
+- [x] Existing Python-stdlib Docker healthcheck, dependency-aware `/health`, canonical recurring integration sync, and validation snapshot scheduler wiring remain intact.
+- [x] Language-server diagnostics found no changed-code errors beyond unresolved installed-dependency imports in the editor environment; frontend diagnostics are clean and `git diff --check` passed.
+- [ ] Tests, builds, migration execution, and Compose startup were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Extracted shadow enqueue policy into one MatchService helper and centralized organization MSSQL session failure conversion; no matching, taxonomy, parser, or Ollama logic was duplicated.
+
+## Previous Task
 **Connect canonical MSSQL → PostgreSQL sync and validation snapshot jobs**
 
 ### Architecture Impact Analysis

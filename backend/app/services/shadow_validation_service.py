@@ -1,11 +1,13 @@
-import logging
+import hashlib
 import json
-from decimal import Decimal
+import logging
 from datetime import datetime, timezone
-from pydantic.json import pydantic_encoder
-from typing import Optional
+from decimal import Decimal
+from typing import Any, Optional, cast
 
-from app.core.database import PostgresAppSession, MssqlReadSession
+from pydantic.json import pydantic_encoder
+
+from app.core.database import MssqlReadSession, PostgresAppSession
 from app.models.validation import (
     ShadowValidationRun, ShadowValidationResult, ValidationMetricsSnapshot
 )
@@ -61,8 +63,8 @@ class ShadowEvaluator:
         old_rec = old_result.best_match.recommendation if old_result and old_result.best_match else "NO_MATCH"
         new_rec = new_result.best_match.recommendation if new_result and new_result.best_match else "NO_MATCH"
         
-        old_status = (old_result.match_status.value if hasattr(old_result.match_status, 'value') else old_result.match_status) if old_result else None
-        new_status = (new_result.match_status.value if hasattr(new_result.match_status, 'value') else new_result.match_status) if new_result else None
+        old_status = str(old_result.match_status.value if hasattr(old_result.match_status, 'value') else old_result.match_status) if old_result else ""
+        new_status = str(new_result.match_status.value if hasattr(new_result.match_status, 'value') else new_result.match_status)
         class_delta = DeltaCalculator.calculate_classification_delta(old_status, new_status)
 
         # 3. Department & Designation Delta
@@ -138,63 +140,91 @@ class ShadowEvaluator:
 
 def execute_shadow_pipeline(source_candidate_id: int, vacancy_id: Optional[int], prod_result_dict: dict, cv_text: str):
     import asyncio
+    from rq import get_current_job
     from app.services.match_service import MatchService
     from app.schemas.analysis import EnrichedCandidateAnalysis
-    
-    # 1. Parse prod_result
-    prod_result = EnrichedCandidateAnalysis.model_validate(prod_result_dict)
-    
-    # 2. Run shadow pipeline independently
+
+    current_job = get_current_job()
+    run_id = int(current_job.meta.get("shadow_run_id")) if current_job and current_job.meta.get("shadow_run_id") else None
+
     try:
+        pg_session_factory = cast(Any, PostgresAppSession)
+        if pg_session_factory is None:
+            raise RuntimeError("PostgreSQL is unavailable for shadow validation persistence.")
+        with pg_session_factory() as pg_db:
+            run = pg_db.query(ShadowValidationRun).filter(ShadowValidationRun.id == run_id).first() if run_id else None
+            if run is not None:
+                existing_result = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.run_id == run.id).first()
+                if run.status == "COMPLETED" and existing_result is not None:
+                    return {"status": "completed", "run_id": run.id, "reused": True}
+                run.status = "RUNNING"
+                run.completed_at = None
+            else:
+                run = ShadowValidationRun(
+                    candidate_id=source_candidate_id,
+                    vacancy_id=vacancy_id,
+                    is_historical=False,
+                    status="RUNNING",
+                )
+                pg_db.add(run)
+            pg_db.commit()
+            pg_db.refresh(run)
+            run_id = run.id
+
+        if current_job is not None:
+            current_job.meta["shadow_run_id"] = run_id
+            current_job.save_meta()
+
+        prod_result = EnrichedCandidateAnalysis.model_validate(prod_result_dict)
         shadow_result = asyncio.run(MatchService.analyze_single_cv(
             cv_text=cv_text,
             cv_key=f"shadow_source_candidate_{source_candidate_id}",
             source_candidate_id=source_candidate_id,
             _shadow_run=True,
         ))
-    except Exception as e:
-        logger.error(f"Shadow pipeline execution failed: {e}")
-        raise
-        
-    # 3. Evaluate and persist
-    try:
-        with PostgresAppSession() as pg_db:
-            airis_status_id = None
-            if vacancy_id:
-                with MssqlReadSession() as mssql_db:
-                    mapping = mssql_db.query(RecruitVacancyCandidateList).filter(
-                        RecruitVacancyCandidateList.CandidateID == source_candidate_id,
-                        RecruitVacancyCandidateList.VacancyRequestID == vacancy_id
-                    ).first()
-                    if mapping:
-                        airis_status_id = mapping.StatusID
+        airis_status_id = None
+        if vacancy_id:
+            if MssqlReadSession is None:
+                raise RuntimeError("MSSQL is unavailable for shadow AIRIS validation.")
+            mssql_session_factory = cast(Any, MssqlReadSession)
+            with mssql_session_factory() as mssql_db:
+                mapping = mssql_db.query(RecruitVacancyCandidateList).filter(
+                    RecruitVacancyCandidateList.CandidateID == source_candidate_id,
+                    RecruitVacancyCandidateList.VacancyRequestID == vacancy_id,
+                ).first()
+                if mapping:
+                    airis_status_id = mapping.StatusID
 
-            run = ShadowValidationRun(
-                candidate_id=source_candidate_id,
-                vacancy_id=vacancy_id,
-                is_historical=False,
-                status="RUNNING"
-            )
-            pg_db.add(run)
-            pg_db.flush()
-
-            eval_result = ShadowEvaluator.evaluate(
-                source_candidate_id=source_candidate_id,
-                vacancy_id=vacancy_id,
-                old_result=prod_result,
-                new_result=shadow_result,
-                airis_status_id=airis_status_id,
-                pg_db=pg_db
-            )
-            
-            eval_result.run_id = run.id
-            pg_db.add(eval_result)
-            
+        with pg_session_factory() as pg_db:
+            run = pg_db.query(ShadowValidationRun).filter(ShadowValidationRun.id == run_id).one()
+            existing_result = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.run_id == run.id).first()
+            if existing_result is None:
+                eval_result = ShadowEvaluator.evaluate(
+                    source_candidate_id=source_candidate_id,
+                    vacancy_id=vacancy_id,
+                    old_result=prod_result,
+                    new_result=shadow_result,
+                    airis_status_id=airis_status_id,
+                    pg_db=pg_db,
+                )
+                eval_result.run_id = run.id
+                pg_db.add(eval_result)
             run.status = "COMPLETED"
             run.completed_at = datetime.now(timezone.utc)
             pg_db.commit()
+        return {"status": "completed", "run_id": run_id, "reused": existing_result is not None}
     except Exception as e:
-        logger.error(f"Shadow validation persistence failed: {e}", exc_info=True)
+        logger.error(f"Shadow validation pipeline failed: {e}", exc_info=True)
+        if run_id is not None and PostgresAppSession is not None:
+            try:
+                with cast(Any, PostgresAppSession)() as pg_db:
+                    failed_run = pg_db.query(ShadowValidationRun).filter(ShadowValidationRun.id == run_id).first()
+                    if failed_run is not None:
+                        failed_run.status = "FAILED"
+                        failed_run.completed_at = datetime.now(timezone.utc)
+                        pg_db.commit()
+            except Exception as status_exc:
+                logger.error(f"Could not persist failed shadow run {run_id}: {status_exc}")
         raise
 
 class ShadowValidationService:
@@ -205,10 +235,12 @@ class ShadowValidationService:
         vacancy_id: Optional[int], 
         prod_result_dict: dict,
         cv_text: str
-    ):
+    ) -> bool:
         """
         Enqueues the shadow validation comparison via RQ to prevent unmanaged threads.
         """
+        job_id = None
+        connection = None
         try:
             from rq import Queue, Retry
             from redis import Redis
@@ -216,10 +248,14 @@ class ShadowValidationService:
             
             if not settings.REDIS_URL:
                 logger.warning("REDIS_URL not set. Shadow validation will not be queued.")
-                return
+                return False
 
             connection = Redis.from_url(settings.REDIS_URL)
             queue = Queue("shadow_validation", connection=connection)
+            payload_hash = hashlib.sha256(
+                json.dumps(prod_result_dict, sort_keys=True, default=str).encode("utf-8")
+            ).hexdigest()[:16]
+            job_id = f"shadow-{source_candidate_id}-{vacancy_id or 0}-{payload_hash}"
             queue.enqueue(
                 execute_shadow_pipeline,
                 source_candidate_id=source_candidate_id,
@@ -227,16 +263,33 @@ class ShadowValidationService:
                 prod_result_dict=prod_result_dict,
                 cv_text=cv_text,
                 retry=Retry(max=3, interval=60),
-                job_timeout=600
+                job_timeout=600,
+                result_ttl=settings.RQ_RESULT_TTL_SECONDS,
+                job_id=job_id,
+                unique=True,
             )
+            return True
         except Exception as e:
-            logger.error(f"Failed to enqueue shadow validation: {e}")
+            try:
+                from rq.job import Job
+
+                if not job_id or connection is None:
+                    raise LookupError("Shadow job identity was not created.")
+                Job.fetch(job_id, connection=connection)
+                logger.info(f"Shadow validation job '{job_id}' is already queued or retained.")
+                return True
+            except Exception:
+                logger.error(f"Failed to enqueue shadow validation: {e}")
+            return False
 
 class MetricsEngine:
     @classmethod
     def snapshot_metrics(cls):
         """Calculates explicit global TP, TN, FP, FNR and stores a snapshot."""
-        with PostgresAppSession() as pg_db:
+        pg_session_factory = cast(Any, PostgresAppSession)
+        if pg_session_factory is None:
+            raise RuntimeError("PostgreSQL is unavailable for validation metrics persistence.")
+        with pg_session_factory() as pg_db:
             total = pg_db.query(ShadowValidationResult).filter(ShadowValidationResult.is_agreement.isnot(None)).count()
             if total == 0:
                 return
