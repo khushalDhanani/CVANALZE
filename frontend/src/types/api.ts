@@ -497,15 +497,25 @@ export interface ConfigVersionActivatedResponse {
 export interface BatchCandidateResult {
   candidate_id: number;
   candidate_name: string;
-  analysis: EnrichedCandidateAnalysis;
+  analysis?: EnrichedCandidateAnalysis;
+  status?: string;
+  error?: string;
 }
 
 export interface BatchMatchResponse {
+  batch_job_id: string;
+  status: string;
+  stage?: string;
   message: string;
   matches: BatchCandidateResult[];
+  progress: number;
+  processed: number;
+  total: number;
+  error?: string | null;
 }
 
 export interface BatchProgressMessage {
+  batch_job_id?: string;
   status: string;
   processed?: number;
   total?: number;

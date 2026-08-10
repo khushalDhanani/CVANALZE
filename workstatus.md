@@ -1,6 +1,59 @@
 # Work Status
 
 ## Last Completed Task
+**Fix batch CV processing and move matching to Redis/RQ**
+
+### Architecture Impact Analysis
+- Replaced synchronous batch matching inside the HTTP request with a persisted RQ batch coordinator and standard per-CV RQ child jobs.
+- Batch source CVs now cross the same `UploadService` binary validation and content-addressed retention boundary as individual uploads; PDF/DOCX files are never decoded with `Path.read_text()`.
+- Every child job uses the existing `ProcessingQueueService -> process_cv_job -> process_cv_file -> MatchService` chain, preserving the normal parser, identity, caching, retry, persistence, and matching behavior.
+- Added a batch-job status endpoint that aggregates durable child-job state and results without re-running matching in the API process.
+- The frontend now treats POST as an asynchronous submission and polls the batch job until `COMPLETED`, `COMPLETED_DEGRADED`, or `FAILED`.
+- No parser, matching algorithm, Ollama client, vacancy-loading rule, or database schema changed.
+
+### Files Changed
+- Batch coordinator API and authorization: `backend/app/api/batch.py`, `backend/app/core/access_policy.py`.
+- Batch state contracts and persistence: `backend/app/schemas/batch.py`, `backend/app/repositories/batch_job.py`.
+- RQ coordination and child result aggregation: `backend/app/services/batch_processing_service.py`.
+- Shared binary upload retention: `backend/app/services/upload_service.py`.
+- Frontend asynchronous contract and polling: `frontend/src/types/api.ts`, `frontend/src/services/batchService.ts`, `frontend/src/hooks/useBatchProgress.ts`, `frontend/src/app/batch.tsx`.
+- Regression coverage: `backend/tests/test_batch_job_processing.py`, `backend/tests/test_phase6_api_reliability.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Make the batch POST validate only the requested limit, persist a batch record, enqueue one coordinator, and return HTTP 202.
+- Discover candidates in the RQ coordinator rather than the HTTP request.
+- Load each CV as bounded binary content, validate PDF/DOCX structure, and persist a content-addressed retained copy.
+- Submit each candidate through the existing standard CV processing queue.
+- Aggregate child processing records and stored match results through a batch status endpoint.
+- Update the frontend to poll the persisted batch job and render completed or per-candidate failed results.
+
+### Code Changes
+- `POST /api/batch/match-candidates` now returns a queued batch job immediately and returns HTTP 503 if Redis/RQ is unavailable.
+- Added `GET /api/batch/jobs/{batch_job_id}` for progress and final results.
+- Added `BatchJobRecord`, `BatchJobItem`, and a cache-backed repository using the existing processing-job cache tiers and TTL.
+- Added an RQ coordinator that queries MSSQL candidates, validates and retains binary CV content through `UploadService`, and submits deterministic standard CV jobs.
+- Coordinator retries are idempotent: already-queued coordinators stop at `cv_jobs_queued`, while child submissions retain the existing content-addressed processing-job identity.
+- Batch completion becomes `COMPLETED_DEGRADED` when any source or child job fails or completes degraded.
+- Added `UploadService.persist_bytes` and routed individual upload persistence through it so batch and individual inputs share one validation/persistence implementation.
+- Removed direct `MatchService.analyze_single_cv` and `Path.read_text()` usage from the batch path.
+
+### Verification Checklist
+- [x] Batch PDF/DOCX files are not read with `read_text()`.
+- [x] The batch POST performs no candidate query, CV parsing, or matching.
+- [x] One RQ coordinator is enqueued and returns immediately.
+- [x] Each candidate is submitted through the normal per-CV RQ job and parser/matching pipeline.
+- [x] Binary source validation, content limits, safe names, signatures, and retained storage reuse `UploadService`.
+- [x] Batch status exposes queued, processing, completed, degraded, and failed outcomes with per-candidate results.
+- [x] Coordinator retry coverage verifies child jobs are not submitted twice after `cv_jobs_queued`.
+- [x] Language-server diagnostics found no new source errors; unresolved installed-dependency imports remain environment-level diagnostics.
+- [x] `git diff --check` passed.
+- [ ] Tests and builds were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Extracted binary persistence into `UploadService.persist_bytes` so HTTP uploads and MSSQL-discovered batch files share the same validation and retention path.
+
+## Previous Task
 **Fix Docker healthcheck and dependency readiness reporting**
 
 ### Architecture Impact Analysis

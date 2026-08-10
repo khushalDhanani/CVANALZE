@@ -37,6 +37,7 @@ ENDPOINT_POLICIES: tuple[EndpointPolicy, ...] = (
     EndpointPolicy("GET", "/api/master-data/skills", AccessTier.RECRUITER),
     EndpointPolicy("POST", "/api/master-data/warm", AccessTier.ADMINISTRATOR),
     EndpointPolicy("POST", "/api/batch/match-candidates", AccessTier.RECRUITER),
+    EndpointPolicy("GET", "/api/batch/jobs/{batch_job_id}", AccessTier.RECRUITER),
     EndpointPolicy("WEBSOCKET", "/api/batch/ws/progress", AccessTier.RECRUITER),
     EndpointPolicy("GET", "/api/config/active", AccessTier.ADMINISTRATOR),
     EndpointPolicy("POST", "/api/config/versions", AccessTier.ADMINISTRATOR),

@@ -100,16 +100,37 @@ class UploadService:
     async def accept_and_persist(cls, file: UploadFile, *, storage_key: str) -> AcceptedUpload:
         normalized = cls.normalize_filename(file.filename)
         content = await cls._read_bounded(file)
+        return await asyncio.to_thread(
+            cls.persist_bytes,
+            filename=normalized.original_filename,
+            content=content,
+            storage_key=storage_key,
+            declared_content_type=file.content_type,
+        )
+
+    @classmethod
+    def persist_bytes(
+        cls,
+        *,
+        filename: str,
+        content: bytes,
+        storage_key: str,
+        declared_content_type: str | None = None,
+    ) -> AcceptedUpload:
+        """Validate and retain an existing binary CV through the normal upload boundary."""
+        if len(content) > settings.MAX_FILE_SIZE_BYTES:
+            raise UploadTooLargeError()
+        normalized = cls.normalize_filename(filename)
         detected_content_type = cls.validate_content(
             normalized.safe_filename,
             content,
-            declared_content_type=file.content_type,
+            declared_content_type=declared_content_type,
         )
         content_hash = hashlib.sha256(content).hexdigest()
         storage_filename = cls._storage_filename(storage_key, content_hash, normalized.extension)
-        path, was_already_stored = await asyncio.to_thread(cls._persist_atomically, storage_filename, content)
+        path, was_already_stored = cls._persist_atomically(storage_filename, content)
         try:
-            await asyncio.to_thread(cls.cleanup_expired)
+            cls.cleanup_expired()
         except OSError as exc:
             logger.warning(f"Could not apply raw-upload retention policy: {exc}")
         return AcceptedUpload(
@@ -117,7 +138,7 @@ class UploadService:
             safe_filename=normalized.safe_filename,
             storage_filename=storage_filename,
             extension=normalized.extension,
-            declared_content_type=file.content_type,
+            declared_content_type=declared_content_type,
             detected_content_type=detected_content_type,
             content_hash=content_hash,
             content=content,

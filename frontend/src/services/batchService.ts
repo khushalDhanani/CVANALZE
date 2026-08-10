@@ -12,6 +12,10 @@ export const batchService = {
     );
   },
 
+  getBatchJob: (batchJobId: string): Promise<BatchMatchResponse> => {
+    return apiClient.get<BatchMatchResponse>(`/api/batch/jobs/${encodeURIComponent(batchJobId)}`);
+  },
+
   /**
    * Establish WebSocket connection to stream real-time batch progress.
    */

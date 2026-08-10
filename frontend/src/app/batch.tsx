@@ -5,7 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Radio, CheckCircle, Info, AlertTriangle } from 'lucide-react-native';
+import { Radio, CheckCircle, Info } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useBatchProgress } from '@/hooks/useBatchProgress';
@@ -18,7 +18,7 @@ import { BATCH_CANDIDATE_LIMITS } from '@/constants/limits';
 export default function BatchScreen() {
   usePageTitle('Batch Candidate Matching | AIRIS');
   const [candidateLimit, setCandidateLimit] = useState<number>(10);
-  const { running, progress, result, error, wsDisconnected, startBatch } = useBatchProgress();
+  const { running, progress, result, error, startBatch } = useBatchProgress();
 
   const handleStartBatch = () => {
     startBatch(candidateLimit);
@@ -80,7 +80,7 @@ export default function BatchScreen() {
           </View>
         ) : (
           <Text className="text-xs font-sans text-text-faint italic">
-            No suitable vacancy matches found.
+            {item.error || 'No suitable vacancy matches found.'}
           </Text>
         )}
       </Card>
@@ -153,14 +153,6 @@ export default function BatchScreen() {
             </View>
           ) : null}
 
-          {wsDisconnected && (
-            <View className="bg-warning/10 border border-warning/30 rounded p-2 mt-1 flex-row items-center gap-1.5">
-              <AlertTriangle size={14} color={COLORS.warning} />
-              <Text className="text-[11px] font-sans text-warning flex-1">
-                Live progress stream disconnected; batch job is still running on server...
-              </Text>
-            </View>
-          )}
         </Card>
       )}
 
@@ -191,7 +183,7 @@ export default function BatchScreen() {
       <View className="px-3 py-2.5 bg-surface border-b border-border">
         <Text className="text-base font-sans-bold text-text-primary">Batch Candidate Matching</Text>
         <Text className="text-[11px] font-sans text-text-muted">
-          Batch process un-evaluated active candidates against all active vacancies with live WebSocket progress.
+          Queue active candidate CVs through the standard parser and matching pipeline with persistent job progress.
         </Text>
       </View>
 
