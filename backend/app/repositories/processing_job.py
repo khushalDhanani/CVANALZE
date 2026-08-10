@@ -110,7 +110,7 @@ class ProcessingJobRepository:
             now = datetime.now(timezone.utc)
             if state == JobState.PROCESSING and record.started_at is None:
                 updates.setdefault("started_at", now)
-            if state in (JobState.COMPLETED, JobState.FAILED):
+            if state in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED, JobState.FAILED):
                 updates.setdefault("completed_at", now)
             return cls.save(record.model_copy(update={"state": state, **updates}))
 

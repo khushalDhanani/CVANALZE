@@ -110,6 +110,8 @@ export interface CVProcessingResponse {
   failed_step?: string | null;
   error_details?: string | null;
   stage_durations_ms?: Record<string, number>;
+  persistence_status?: 'durable' | 'degraded' | string | null;
+  persistence_error?: string | null;
 }
 
 export interface DualEvidence {
@@ -253,6 +255,8 @@ export interface EnrichedCandidateAnalysis {
   progress?: number | null;
   stage?: string | null;
   is_complete?: boolean | null;
+  persistence_status?: 'durable' | 'degraded' | string | null;
+  persistence_error?: string | null;
   scan_id?: string;
   parsed_at?: string;
   full_name?: string | null;
@@ -362,6 +366,8 @@ export interface CVUploadResponse {
   legacy_cv_keys?: string[] | null;
   text?: string | null;
   status?: string | null;
+  persistence_status?: 'durable' | 'degraded' | string | null;
+  persistence_error?: string | null;
   progress?: number | null;
   is_complete?: boolean | null;
   page_count?: number | null;

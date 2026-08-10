@@ -27,6 +27,8 @@ class CVProcessingResponse(BaseModel):
     )
     execution_mode: str | None = Field(default=None, description="RQ or explicit development fallback execution mode")
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
+    persistence_status: str | None = Field(default=None, description="PostgreSQL result durability status")
+    persistence_error: str | None = Field(default=None, description="Safe persistence failure summary")
 
 
 class CVUploadResponse(BaseModel):
@@ -56,8 +58,10 @@ class CVUploadResponse(BaseModel):
     updated_at: str | None = Field(None, description="ISO timestamp of last update")
     status: str | None = Field(
         None,
-        description="Processing status: CACHE_HIT, NEW_CV, CV_CHANGED, SCHEMA_CHANGED, REPROCESSED",
+        description="Processing status, including COMPLETED or COMPLETED_DEGRADED terminal states",
     )
+    persistence_status: str | None = Field(default=None, description="PostgreSQL result durability status")
+    persistence_error: str | None = Field(default=None, description="Safe persistence failure summary")
     dynamic_profile: DynamicCandidateProfile | None = Field(None, description="Dynamically extracted candidate profile from LLM analysis.")
     quality_metrics: dict[str, Any] | None = Field(
         None,

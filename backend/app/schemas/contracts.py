@@ -19,6 +19,7 @@ class JobState:
     PROCESSING = "PROCESSING"
     RETRYING = "RETRYING"
     COMPLETED = "COMPLETED"
+    COMPLETED_DEGRADED = "COMPLETED_DEGRADED"
     FAILED = "FAILED"
     UNKNOWN = "UNKNOWN"
 
@@ -51,7 +52,7 @@ class ErrorCode(str, Enum):
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
-LEGACY_JOB_STATE_ALIASES: dict[str, JobState] = {
+LEGACY_JOB_STATE_ALIASES: dict[str, str] = {
     "QUEUED": JobState.QUEUED,
     "PROCESSING": JobState.PROCESSING,
     "IN_PROGRESS": JobState.PROCESSING,
@@ -59,6 +60,7 @@ LEGACY_JOB_STATE_ALIASES: dict[str, JobState] = {
     "SCHEMA_CHANGED": JobState.PROCESSING,
     "RETRYING": JobState.RETRYING,
     "COMPLETED": JobState.COMPLETED,
+    "COMPLETED_DEGRADED": JobState.COMPLETED_DEGRADED,
     "NEW_CV": JobState.COMPLETED,
     "REPROCESSED": JobState.COMPLETED,
     "CACHE_HIT": JobState.COMPLETED,
@@ -76,6 +78,8 @@ def normalize_job_state(
     normalized = str(status or "").strip().upper()
     if normalized in ("FAILED", "ERROR"):
         return JobState.FAILED
+    if normalized == JobState.COMPLETED_DEGRADED:
+        return JobState.COMPLETED_DEGRADED
     if is_complete is True:
         return JobState.COMPLETED
     if progress == 100:
@@ -158,6 +162,7 @@ class JobStateResponse(BaseModel):
             JobState.PROCESSING: "processing",
             JobState.RETRYING: "processing",
             JobState.COMPLETED: "COMPLETED",
+            JobState.COMPLETED_DEGRADED: "COMPLETED_DEGRADED",
             JobState.FAILED: "FAILED",
             JobState.UNKNOWN: "processing",
         }[self.state]

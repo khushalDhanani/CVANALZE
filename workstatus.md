@@ -1,6 +1,53 @@
 # Work Status
 
 ## Last Completed Task
+**Fix PostgreSQL result persistence reliability**
+
+### Architecture Impact Analysis
+- Added explicit result durability metadata at the existing result-repository boundary: successful PostgreSQL writes are `durable`, while processing success with a failed PostgreSQL write is `degraded`.
+- Added `COMPLETED_DEGRADED` as a terminal processing-job state and propagated it through job records, status APIs, response schemas, and the upload UI.
+- Kept result identity anchored to the existing deterministic `cv_key` PostgreSQL primary key, so persistence retries update the same logical row rather than inserting duplicate results.
+- Existing stored workflow configurations are upgraded in memory with the degraded state and transitions.
+- No CV parsing, matching, PostgreSQL schema, Ollama integration, request contract, or successful result behavior changed.
+
+### Files Changed
+- Result persistence and retained-source behavior: `backend/app/repositories/result.py`, `backend/app/services/cv_service.py`.
+- Job state and workflow compatibility: `backend/app/schemas/contracts.py`, `backend/app/core/rule_config_manager.py`, `backend/app/repositories/processing_job.py`, `backend/app/services/processing_queue.py`.
+- API visibility and schemas: `backend/app/api/cv.py`, `backend/app/api/analysis.py`, `backend/app/schemas/cv.py`, `backend/app/schemas/analysis.py`.
+- Frontend visibility: `frontend/src/hooks/useCvUpload.ts`, `frontend/src/types/api.ts`.
+- Regression coverage: `backend/tests/test_generation_consistency.py`, `backend/tests/test_phase4_background_processing.py`, `backend/tests/test_rule_config_manager.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Annotate every PostgreSQL result-write attempt with durable or degraded persistence state.
+- Convert otherwise-completed processing to `COMPLETED_DEGRADED` when PostgreSQL persistence fails while preserving Redis/disk fallback data.
+- Surface the degraded terminal state and a safe persistence error through job and result status APIs and the upload UI.
+- Preserve retry input and reuse the deterministic result key so a later successful attempt repairs one logical PostgreSQL row.
+- Add focused regressions for failure visibility, workflow compatibility, and idempotent retry persistence.
+
+### Code Changes
+- `ResultRepository.atomic_save_result` now clears prior degradation before retry, marks successful PostgreSQL persistence as durable, and marks caught PostgreSQL failures as degraded before writing fallback storage.
+- The worker persists `COMPLETED_DEGRADED` with a retryable dependency error instead of silently transitioning to `COMPLETED`.
+- Status APIs no longer normalize degraded results back to full completion; responses expose `persistence_status` and `persistence_error`.
+- Raw-upload cleanup uses the failure-retention policy for degraded persistence, preserving retryability.
+- Retry saves continue to query/update by the `CVResult.cv_key` primary key; regression coverage verifies repeated saves produce one row.
+- The frontend recognizes degraded completion as terminal and displays a PostgreSQL persistence warning.
+
+### Verification Checklist
+- [x] PostgreSQL persistence failure cannot be reported as a fully durable `COMPLETED` result.
+- [x] Fallback Redis/disk results carry `COMPLETED_DEGRADED`, `persistence_status=degraded`, and a safe observable error.
+- [x] Processing-job state and API responses preserve degraded completion.
+- [x] Existing workflow configuration documents are backward-compatible with the new state.
+- [x] Raw upload retention supports a later repair attempt.
+- [x] Retry writes use the deterministic `cv_key` primary key and regression coverage asserts one logical PostgreSQL row.
+- [x] Language-server diagnostics found no new source errors; unresolved dependency imports and existing environment/type diagnostics remain.
+- [x] `git diff --check` passed.
+- [ ] Tests and builds were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Centralized PostgreSQL durability state and the safe persistence error text in `ResultRepository`; no unrelated refactoring was performed.
+
+## Previous Task
 **Fix vacancy DB failure handling**
 
 ### Architecture Impact Analysis

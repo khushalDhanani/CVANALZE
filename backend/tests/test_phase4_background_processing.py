@@ -1,12 +1,14 @@
 import hashlib
 from contextlib import nullcontext
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
 
-from app.core.cache import MemoryCache, processing_job_cache_manager
+from app.core.cache import MemoryCache, cv_result_cache_manager, processing_job_cache_manager
 from app.core.config import settings
+from app.repositories import result as result_repository_module
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.contracts import JobState, ProcessingExecutionMode
@@ -25,7 +27,7 @@ def isolate_processing_jobs(monkeypatch):
     ProcessingQueueService._local_locks.clear()
 
 
-def _submission_kwargs(content: bytes = b"phase-4-cv") -> dict[str, str | None]:
+def _submission_kwargs(content: bytes = b"phase-4-cv") -> dict[str, Any]:
     return {
         "cv_key": "cv_phase_4",
         "content_hash": hashlib.sha256(content).hexdigest(),
@@ -166,6 +168,68 @@ def test_worker_revalidates_source_and_persists_completion(monkeypatch, tmp_path
     assert completed.state == JobState.COMPLETED
     assert completed.progress == 100
     assert completed.attempt == 1
+
+
+def test_worker_exposes_postgres_persistence_failure_as_degraded_completion(monkeypatch, tmp_path):
+    content = b"phase-4-cv"
+    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
+    monkeypatch.setattr(
+        ProcessingQueueService,
+        "_job_lock",
+        classmethod(lambda _cls, *_args: nullcontext()),
+    )
+    submission = ProcessingQueueService.submit_upload(**_submission_kwargs(content))
+    source = StoredUpload(
+        safe_filename="phase_4.pdf",
+        storage_filename=submission.record.storage_filename,
+        detected_content_type="application/pdf",
+        content=content,
+        path=Path(tmp_path / submission.record.storage_filename),
+    )
+    monkeypatch.setattr(UploadService, "load_reprocessable_upload", lambda **_kwargs: source)
+
+    async def fake_process_source(**_kwargs):
+        return {
+            "status": "COMPLETED_DEGRADED",
+            "persistence_status": "degraded",
+            "persistence_error": "PostgreSQL result persistence failed.",
+        }
+
+    monkeypatch.setattr(processing_queue, "_process_source", fake_process_source)
+
+    process_cv_job(submission.record.job_id)
+
+    completed = ProcessingJobRepository.get(submission.record.job_id)
+    assert completed is not None
+    assert completed.state == JobState.COMPLETED_DEGRADED
+    assert completed.stage == "complete_degraded"
+    assert completed.progress == 100
+    assert completed.error is not None
+    assert completed.error.retryable is True
+
+
+def test_result_repository_marks_postgres_failure_and_keeps_fallback(monkeypatch, tmp_path):
+    filename = "cv_persistence_failure.json"
+    result_data = {
+        "id": "cv_persistence_failure",
+        "status": "COMPLETED",
+        "full_name": "Fallback Candidate",
+    }
+
+    def fail_postgres_session():
+        raise RuntimeError("postgres unavailable")
+
+    monkeypatch.setattr(result_repository_module, "PostgresAppSession", fail_postgres_session)
+    monkeypatch.setattr(settings, "RESULTS_DIR", tmp_path)
+
+    ResultRepository.atomic_save_result(filename, result_data)
+
+    assert result_data["status"] == "COMPLETED_DEGRADED"
+    assert result_data["persistence_status"] == ResultRepository.PERSISTENCE_DEGRADED
+    assert result_data["persistence_error"] == ResultRepository.PERSISTENCE_ERROR_MESSAGE
+    assert cv_result_cache_manager.get(filename)["status"] == "COMPLETED_DEGRADED"
+    assert (tmp_path / filename).is_file()
+    cv_result_cache_manager.delete(filename)
 
 
 def test_worker_marks_retry_state_before_rq_rethrows(monkeypatch):

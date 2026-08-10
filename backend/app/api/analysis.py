@@ -131,6 +131,11 @@ async def get_match_status(cv_key: str):
     job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
     exec_mode_val = (job.execution_mode.value if hasattr(job.execution_mode, "value") else str(job.execution_mode)) if job else None
     if result:
+        persistence_degraded = (
+            job_state_val == "COMPLETED_DEGRADED"
+            or result.get("status") == "COMPLETED_DEGRADED"
+            or result.get("persistence_status") == ResultRepository.PERSISTENCE_DEGRADED
+        )
         if result.get("status") == "FAILED":
             if job and job_state_val in ("QUEUED", "PROCESSING", "RETRYING"):
                 return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
@@ -149,7 +154,7 @@ async def get_match_status(cv_key: str):
             )
 
         is_completed = (
-            result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+            result.get("status") in ("COMPLETED", "COMPLETED_DEGRADED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
             or result.get("progress") == 100
             or result.get("is_complete") is True
         ) and result.get("status") != "processing"
@@ -158,9 +163,13 @@ async def get_match_status(cv_key: str):
         if match_analysis and is_completed:
             match_analysis["scan_id"] = result.get("scan_id", result.get("id"))
             match_analysis["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
-            match_analysis["status"] = result.get("status", "COMPLETED")
+            match_analysis["status"] = "COMPLETED_DEGRADED" if persistence_degraded else result.get("status", "COMPLETED")
+            match_analysis["persistence_status"] = (
+                ResultRepository.PERSISTENCE_DEGRADED if persistence_degraded else ResultRepository.PERSISTENCE_DURABLE
+            )
+            match_analysis["persistence_error"] = ResultRepository.PERSISTENCE_ERROR_MESSAGE if persistence_degraded else None
             match_analysis["progress"] = result.get("progress", 100)
-            match_analysis["stage"] = result.get("stage", "complete")
+            match_analysis["stage"] = "complete_degraded" if persistence_degraded else result.get("stage", "complete")
             match_analysis["is_complete"] = result.get("is_complete", True)
             if job:
                 match_analysis.update(
@@ -178,13 +187,17 @@ async def get_match_status(cv_key: str):
             return CVProcessingResponse(
                 message=result.get("message") or "100% - CV parsing & job matching complete!",
                 cv_key=result.get("scan_id") or result.get("id") or cv_key,
-                status="COMPLETED",
+                status="COMPLETED_DEGRADED" if persistence_degraded else "COMPLETED",
                 progress=100,
-                stage="complete",
+                stage="complete_degraded" if persistence_degraded else "complete",
                 job_id=job.job_id if job else None,
-                job_state=job_state_val or "COMPLETED",
+                job_state=job_state_val or ("COMPLETED_DEGRADED" if persistence_degraded else "COMPLETED"),
                 execution_mode=exec_mode_val,
                 retry_count=job.attempt if job else None,
+                persistence_status=(
+                    ResultRepository.PERSISTENCE_DEGRADED if persistence_degraded else ResultRepository.PERSISTENCE_DURABLE
+                ),
+                persistence_error=ResultRepository.PERSISTENCE_ERROR_MESSAGE if persistence_degraded else None,
             )
 
         return CVProcessingResponse(

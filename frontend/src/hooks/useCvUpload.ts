@@ -128,6 +128,7 @@ export function useCvUpload() {
             const resStatus = (res as any).status?.toUpperCase() || '';
             const isFinished =
               (resStatus === 'COMPLETED' ||
+                resStatus === 'COMPLETED_DEGRADED' ||
                 resStatus === 'NEW_CV' ||
                 resStatus === 'REPROCESSED' ||
                 resStatus === 'CACHE_HIT' ||
@@ -175,7 +176,14 @@ export function useCvUpload() {
               setCurrentStepIndex(7);
               
               const isCacheHit = resStatus === 'CACHE_HIT';
-              setStatusMessage(isCacheHit ? 'Loaded from cache instantly!' : 'Candidate analysis & job matching complete!');
+              const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
+              setStatusMessage(
+                isDegraded
+                  ? 'Analysis completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
+                  : isCacheHit
+                    ? 'Loaded from cache instantly!'
+                    : 'Candidate analysis & job matching complete!'
+              );
               
               setStepStates([
                 'completed',
@@ -227,6 +235,7 @@ export function useCvUpload() {
             const resStatus = (res as any).status?.toUpperCase() || '';
             const isFinished =
               (resStatus === 'COMPLETED' ||
+                resStatus === 'COMPLETED_DEGRADED' ||
                 resStatus === 'NEW_CV' ||
                 resStatus === 'REPROCESSED' ||
                 resStatus === 'CACHE_HIT' ||
@@ -272,7 +281,12 @@ export function useCvUpload() {
               setUploading(false);
               setIsComplete(true);
               setCurrentStepIndex(7);
-              setStatusMessage('CV parsing & job matching complete!');
+              const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
+              setStatusMessage(
+                isDegraded
+                  ? 'CV processing completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
+                  : 'CV parsing & job matching complete!'
+              );
               setStepStates([
                 'completed',
                 'completed',

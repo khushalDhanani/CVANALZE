@@ -110,6 +110,11 @@ async def get_cv_status(cv_key: str):
     job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
     exec_mode_val = (job.execution_mode.value if hasattr(job.execution_mode, "value") else str(job.execution_mode)) if job else None
     if result:
+        persistence_degraded = (
+            job_state_val == "COMPLETED_DEGRADED"
+            or result.get("status") == "COMPLETED_DEGRADED"
+            or result.get("persistence_status") == ResultRepository.PERSISTENCE_DEGRADED
+        )
         if result.get("status") == "FAILED":
             if job and job_state_val in ("QUEUED", "PROCESSING", "RETRYING"):
                 return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
@@ -127,7 +132,7 @@ async def get_cv_status(cv_key: str):
                 retry_count=job.attempt if job else None,
             )
         is_completed = (
-            result.get("status") in ("COMPLETED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+            result.get("status") in ("COMPLETED", "COMPLETED_DEGRADED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
             or result.get("progress") == 100
             or result.get("is_complete") is True
         ) and result.get("status") != "processing"
@@ -149,9 +154,11 @@ async def get_cv_status(cv_key: str):
             result["scan_id"] = result["id"]
         if "parsed_at" not in result and "scanned_at" in result:
             result["parsed_at"] = result["scanned_at"]
-        result["status"] = "COMPLETED"
+        result["status"] = "COMPLETED_DEGRADED" if persistence_degraded else "COMPLETED"
+        result["persistence_status"] = ResultRepository.PERSISTENCE_DEGRADED if persistence_degraded else ResultRepository.PERSISTENCE_DURABLE
+        result["persistence_error"] = ResultRepository.PERSISTENCE_ERROR_MESSAGE if persistence_degraded else None
         result["progress"] = 100
-        result["stage"] = "complete"
+        result["stage"] = "complete_degraded" if persistence_degraded else "complete"
         if job:
             result.update(
                 job_id=job.job_id,

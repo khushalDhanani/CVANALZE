@@ -175,7 +175,7 @@ async def process_cv_file(
                     await asyncio.to_thread(
                         UploadService.cleanup_after_processing,
                         storage_filename,
-                        succeeded=True,
+                        succeeded=existing_data.get("persistence_status") == ResultRepository.PERSISTENCE_DURABLE,
                     )
                     return existing_data
 
@@ -470,7 +470,7 @@ async def process_cv_file(
             await asyncio.to_thread(
                 UploadService.cleanup_after_processing,
                 storage_filename,
-                succeeded=True,
+                succeeded=result_data.get("persistence_status") == ResultRepository.PERSISTENCE_DURABLE,
             )
 
             return result_data

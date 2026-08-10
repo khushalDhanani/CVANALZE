@@ -139,6 +139,8 @@ class EnrichedCandidateAnalysis(BaseModel):
     job_state: str | None = Field(default=None, description="Canonical background processing state")
     execution_mode: str | None = Field(default=None, description="Background execution mode")
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
+    persistence_status: str | None = Field(default=None, description="PostgreSQL result durability status")
+    persistence_error: str | None = Field(default=None, description="Safe persistence failure summary")
     full_name: str | None = Field(default=None, description="Extracted candidate full name")
     candidate_name: str | None = Field(default=None, description="Extracted candidate name")
     primary_department: str | None = Field(default=None, description="Top recommended department for candidate")

@@ -218,6 +218,21 @@ def test_custom_business_states_can_be_added_to_workflow():
     assert "AWAITING_APPROVAL" in new_config.workflow.job_state_transitions["COMPLETED"]
     assert new_config.workflow.job_state_transitions["AWAITING_APPROVAL"] == ["ARCHIVED"]
 
+
+def test_legacy_workflow_config_is_upgraded_with_degraded_completion_state():
+    raw_dict = RuleConfigManager.get_config().model_dump()
+    candidate_dict = copy.deepcopy(raw_dict)
+    workflow = candidate_dict["workflow"]
+    workflow["allowed_job_states"].remove("COMPLETED_DEGRADED")
+    workflow["job_state_transitions"]["PROCESSING"].remove("COMPLETED_DEGRADED")
+    workflow["job_state_transitions"].pop("COMPLETED_DEGRADED")
+
+    loaded = UnifiedRuleConfig.model_validate(candidate_dict)
+
+    assert "COMPLETED_DEGRADED" in loaded.workflow.allowed_job_states
+    assert "COMPLETED_DEGRADED" in loaded.workflow.job_state_transitions["PROCESSING"]
+    assert loaded.workflow.job_state_transitions["COMPLETED_DEGRADED"] == ["COMPLETED_DEGRADED", "QUEUED"]
+
 def test_tenant_isolation_in_active_configs():
     raw_dict = RuleConfigManager.get_config().model_dump()
     tenant_a_dict = copy.deepcopy(raw_dict)
@@ -244,4 +259,3 @@ def test_cache_fallback_handles_missing_db():
     config = RuleConfigManager.load_config(tenant_id="missing_tenant")
     assert config is not None
     assert config.version is not None
-

@@ -155,6 +155,7 @@ class ProcessingQueueService:
     def legacy_status_payload(record: ProcessingJobRecord) -> dict[str, Any]:
         status = {
             JobState.COMPLETED: "COMPLETED",
+            JobState.COMPLETED_DEGRADED: "COMPLETED_DEGRADED",
             JobState.FAILED: "FAILED",
         }.get(record.state, "processing")
         return {
@@ -169,6 +170,8 @@ class ProcessingQueueService:
             "job_state": record.state,
             "execution_mode": record.execution_mode.value,
             "retry_count": record.attempt,
+            "persistence_status": "degraded" if record.state == JobState.COMPLETED_DEGRADED else None,
+            "persistence_error": record.error.message if record.state == JobState.COMPLETED_DEGRADED and record.error else None,
         }
 
     @classmethod
@@ -348,14 +351,30 @@ def process_cv_job(job_id: str) -> dict[str, Any]:
                 outcome = ProcessingOutcome(raw_outcome)
             except ValueError:
                 outcome = None
+            persistence_degraded = (
+                result.get("persistence_status") == ResultRepository.PERSISTENCE_DEGRADED
+                or str(result.get("status") or "").upper() == JobState.COMPLETED_DEGRADED
+            )
+            completed_state = JobState.COMPLETED_DEGRADED if persistence_degraded else JobState.COMPLETED
+            persistence_error = None
+            if persistence_degraded:
+                persistence_error = CanonicalError(
+                    code=ErrorCode.DEPENDENCY_UNAVAILABLE,
+                    message=ResultRepository.PERSISTENCE_ERROR_MESSAGE,
+                    retryable=True,
+                )
             ProcessingJobRepository.transition(
                 job_id,
-                JobState.COMPLETED,
+                completed_state,
                 progress=100,
-                stage="complete",
-                message=result.get("message") or "100% - CV processing complete.",
+                stage="complete_degraded" if persistence_degraded else "complete",
+                message=(
+                    "CV processing completed, but PostgreSQL result persistence failed."
+                    if persistence_degraded
+                    else result.get("message") or "100% - CV processing complete."
+                ),
                 outcome=outcome,
-                error=None,
+                error=persistence_error,
             )
             return result
         except Exception as exc:

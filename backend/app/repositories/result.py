@@ -21,6 +21,9 @@ class ResultRepository:
     """
 
     CACHE_TTL_SECONDS = 604800
+    PERSISTENCE_DURABLE = "durable"
+    PERSISTENCE_DEGRADED = "degraded"
+    PERSISTENCE_ERROR_MESSAGE = "PostgreSQL result persistence failed; the result is available only from fallback storage."
 
     @classmethod
     def _extract_canonical_business_payload(cls, data: dict[str, Any]) -> dict[str, Any]:
@@ -140,6 +143,11 @@ class ResultRepository:
     def atomic_save_result(cls, filename: str, data: dict[str, Any]) -> str:
         cls.ensure_canonical_metadata(data)
         cv_key = filename.removesuffix(".json")
+        if str(data.get("status") or "").upper() == "COMPLETED_DEGRADED":
+            data["status"] = "COMPLETED"
+        data["persistence_status"] = cls.PERSISTENCE_DURABLE
+        data.pop("persistence_error", None)
+        data["payload_checksum"] = cls.compute_payload_checksum(data)
         status = data.get("status")
         full_name = data.get("candidate_name") or data.get("full_name")
         candidate_id = cls._optional_str(data.get("candidate_id"))
@@ -200,9 +208,13 @@ class ResultRepository:
                 session.commit()
                 logger.info(f"Atomically saved result to PostgreSQL 'cv_results' for cv_key '{cv_key}' (gen={data.get('result_generation_id')}, seq={data.get('generation_sequence')}).")
         except Exception as exc:
-            logger.error(f"Failed to save CV result {cv_key} to PostgreSQL: {exc}")
-
-
+            data["persistence_status"] = cls.PERSISTENCE_DEGRADED
+            data["persistence_error"] = cls.PERSISTENCE_ERROR_MESSAGE
+            if str(status or "").upper() == "COMPLETED":
+                data["status"] = "COMPLETED_DEGRADED"
+                data["message"] = "CV processing completed, but PostgreSQL result persistence failed."
+            data["payload_checksum"] = cls.compute_payload_checksum(data)
+            logger.exception(f"Failed to save CV result {cv_key} to PostgreSQL; fallback result marked degraded: {exc}")
 
         cv_result_cache_manager.set(filename, data, ttl=cls.CACHE_TTL_SECONDS)
         for legacy_key in data.get("legacy_cv_keys") or []:

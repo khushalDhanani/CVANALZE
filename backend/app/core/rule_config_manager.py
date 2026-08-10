@@ -215,18 +215,30 @@ class DomainEmbeddingRules(BaseModel):
 
 class WorkflowRules(BaseModel):
     allowed_job_states: list[str] = Field(
-        default_factory=lambda: ["QUEUED", "PROCESSING", "RETRYING", "COMPLETED", "FAILED", "UNKNOWN"]
+        default_factory=lambda: ["QUEUED", "PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED", "UNKNOWN"]
     )
     job_state_transitions: dict[str, list[str]] = Field(
         default_factory=lambda: {
             "QUEUED": ["QUEUED", "PROCESSING", "RETRYING", "FAILED"],
-            "PROCESSING": ["PROCESSING", "RETRYING", "COMPLETED", "FAILED"],
+            "PROCESSING": ["PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED"],
             "RETRYING": ["RETRYING", "PROCESSING", "FAILED"],
             "COMPLETED": ["COMPLETED", "QUEUED"],
+            "COMPLETED_DEGRADED": ["COMPLETED_DEGRADED", "QUEUED"],
             "FAILED": ["FAILED", "QUEUED"],
             "UNKNOWN": ["QUEUED", "FAILED"],
         }
     )
+
+    @model_validator(mode="after")
+    def include_persistence_degraded_state(self) -> "WorkflowRules":
+        """Upgrade stored workflow configurations created before degraded completion existed."""
+        if "COMPLETED_DEGRADED" not in self.allowed_job_states:
+            self.allowed_job_states.append("COMPLETED_DEGRADED")
+        processing_targets = self.job_state_transitions.setdefault("PROCESSING", [])
+        if "COMPLETED_DEGRADED" not in processing_targets:
+            processing_targets.append("COMPLETED_DEGRADED")
+        self.job_state_transitions.setdefault("COMPLETED_DEGRADED", ["COMPLETED_DEGRADED", "QUEUED"])
+        return self
 
 
 class ScoringRules(BaseModel):

@@ -129,6 +129,26 @@ def test_atomic_save_result_uses_db_sequence_for_new_rows():
     cv_result_cache_manager.delete(fn)
 
 
+def test_retrying_result_persistence_updates_one_logical_row():
+    cv_key = "cv_test_idempotent_persistence_1"
+    fn = f"{cv_key}.json"
+    first = create_sample_result_data(cv_key=cv_key, gen_id="gen_retry_1", exp_years=5.0)
+    retried = create_sample_result_data(cv_key=cv_key, gen_id="gen_retry_2", exp_years=6.0)
+
+    ResultRepository.atomic_save_result(fn, first)
+    ResultRepository.atomic_save_result(fn, retried)
+
+    try:
+        with PostgresAppSession() as session:
+            rows = session.query(CVResult).filter(CVResult.cv_key == cv_key).all()
+            assert len(rows) == 1
+            assert rows[0].raw_data["result_generation_id"] == "gen_retry_2"
+            session.delete(rows[0])
+            session.commit()
+    finally:
+        cv_result_cache_manager.delete(fn)
+
+
 def test_redis_rehydrate_on_generation_mismatch():
     cv_key = "cv_test_mismatch_gen_1"
     fn = f"{cv_key}.json"
@@ -368,6 +388,5 @@ def test_same_millisecond_starts_and_db_monotonic_ordering():
     except Exception:
         pass
     cv_result_cache_manager.delete(fn)
-
 
 
