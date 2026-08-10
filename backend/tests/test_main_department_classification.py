@@ -4,6 +4,8 @@ from unittest.mock import patch, MagicMock
 
 from app.schemas.classification_types import MainDepartmentClassificationResult, MatchStatus
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
+from app.schemas.domain import DepartmentDomain
+from app.repositories.department_domain import DepartmentDomainRepository, department_domain_repository
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.match_service import MatchService
 from app.services.recommendation_service import RecommendationService
@@ -26,12 +28,31 @@ def test_internal_name_differs_from_industry_role(sample_main_departments):
     Test 5: Internal department name (e.g. 'CIS Team') differs from industry role (e.g. 'Senior Flutter & Mobile Developer').
     Semantic mapping must resolve the candidate to MainDeptID=10, DeptName='CIS Team'.
     """
-    result = DynamicTaxonomyService.classify_main_department(
-        role_or_summary="Senior Flutter & Mobile Developer",
-        skills=["Flutter", "Dart", "BLoC", "REST API", "Mobile App Development"],
-        domain="Information Technology",
-        main_departments=sample_main_departments,
-    )
+    configured_domains = [
+        DepartmentDomain(
+            department_id=10,
+            department_name="CIS Team",
+            domain_name="Information Technology",
+            keywords=["software", "mobile development", "programming"],
+            default_roles=["Mobile Application Developer"],
+        ),
+        DepartmentDomain(
+            department_id=5,
+            department_name="Production Team",
+            domain_name="Manufacturing",
+            keywords=["plant", "production", "manufacturing"],
+            default_roles=["Plant Operator"],
+        ),
+    ]
+    matchers = DepartmentDomainRepository._build_matchers(configured_domains)
+    with patch.object(department_domain_repository, "get_domain_matchers", return_value=matchers), \
+         patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=None):
+        result = DynamicTaxonomyService.classify_main_department(
+            role_or_summary="Senior Mobile Application Developer",
+            skills=["Cross-platform applications", "state management", "REST API"],
+            domain="Information Technology",
+            main_departments=sample_main_departments,
+        )
 
     assert isinstance(result, MainDepartmentClassificationResult)
     assert result.match_status == "MATCHED"
@@ -232,4 +253,3 @@ def test_embedding_based_ambiguous_match(sample_main_departments):
         assert result.main_department_id is None
         assert result.main_department_name == "NO_STRONG_MAIN_DEPARTMENT_MATCH"
         assert "Ambiguous candidate profile" in result.reasoning
-

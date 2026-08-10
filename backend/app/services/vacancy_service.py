@@ -13,8 +13,10 @@ from app.models.mssql.organization import (
     OrgJobProfileMst,
     OrgLocationMst,
     OrgMainDepartmentMst,
+    OrgJobProfileQualificationDet,
 )
-from app.models.mssql.vacancy import RecruitVacancyRequest
+from app.models.mssql.taxonomy import QualificationMst
+from app.models.mssql.vacancy import RecruitVacancyRequest, RecruitVacancyRequriedQualificationDet
 from app.schemas.job import JobOpening
 from app.services.department_normalizer import DepartmentNormalizer
 
@@ -96,9 +98,50 @@ class VacancyService:
         except Exception as e:
             logger.warning(f"Could not preload OrgMainDepartmentMst: {e}")
 
+        vacancy_qualifications: dict[int, list[str]] = {}
+        profile_qualifications: dict[int, list[str]] = {}
+        vacancy_ids = [int(vacancy.VacancyRequestID) for vacancy in results if vacancy.VacancyRequestID is not None]
+        profile_ids = [int(vacancy.JobProfileID) for vacancy in results if vacancy.JobProfileID is not None]
+        try:
+            if vacancy_ids:
+                qualification_rows = self.db.execute(
+                    select(
+                        RecruitVacancyRequriedQualificationDet.VacancyRequestID,
+                        QualificationMst.QualificationName,
+                    )
+                    .join(QualificationMst, RecruitVacancyRequriedQualificationDet.RequriedQualificationID == QualificationMst.QualificationID)
+                    .where(RecruitVacancyRequriedQualificationDet.VacancyRequestID.in_(vacancy_ids))
+                ).all()
+                for vacancy_id, qualification_name in qualification_rows:
+                    if vacancy_id is not None and qualification_name:
+                        vacancy_qualifications.setdefault(int(vacancy_id), []).append(str(qualification_name))
+            if profile_ids:
+                profile_qualification_rows = self.db.execute(
+                    select(
+                        OrgJobProfileQualificationDet.JobProfileID,
+                        QualificationMst.QualificationName,
+                    )
+                    .join(QualificationMst, OrgJobProfileQualificationDet.QualificationID == QualificationMst.QualificationID)
+                    .where(
+                        OrgJobProfileQualificationDet.JobProfileID.in_(profile_ids),
+                        or_(
+                            OrgJobProfileQualificationDet.QualificationIsDeleted == False,
+                            OrgJobProfileQualificationDet.QualificationIsDeleted.is_(None),
+                        ),
+                    )
+                ).all()
+                for profile_id, qualification_name in profile_qualification_rows:
+                    if profile_id is not None and qualification_name:
+                        profile_qualifications.setdefault(int(profile_id), []).append(str(qualification_name))
+        except Exception as e:
+            logger.warning(f"Could not preload vacancy qualification requirements: {e}")
+
         job_openings = []
         for vacancy in results:
-            job_openings.append(self.map_to_job_requirement(vacancy, biz_groups=biz_groups, main_depts=main_depts))
+            qualifications = vacancy_qualifications.get(int(vacancy.VacancyRequestID), [])
+            if not qualifications and vacancy.JobProfileID is not None:
+                qualifications = profile_qualifications.get(int(vacancy.JobProfileID), [])
+            job_openings.append(self.map_to_job_requirement(vacancy, biz_groups=biz_groups, main_depts=main_depts, qualifications=qualifications))
 
         unique_dept_ids = sorted({j.department_id for j in job_openings if j.department_id is not None})
         logger.info(f"Active Vacancies: {len(job_openings)} | Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}")
@@ -109,6 +152,7 @@ class VacancyService:
         vacancy: RecruitVacancyRequest,
         biz_groups: dict[int, str] | None = None,
         main_depts: dict[int, str] | None = None,
+        qualifications: list[str] | None = None,
     ) -> JobOpening:
         # Determine title dynamically: JobProfile -> Designation -> Fallback
         if vacancy.job_profile and vacancy.job_profile.JobProfileName:
@@ -211,11 +255,13 @@ class VacancyService:
             job_description=job_desc,
             responsibilities=job_desc,
             required_skills=skills,
+            required_skills_are_mandatory=False,
             preferred_keywords=[],
             min_experience_years=min_exp,
             max_experience_years=max_exp,
             min_ctc=min_ctc,
             max_ctc=max_ctc,
+            education=" / ".join(dict.fromkeys(qualifications or [])) or None,
             preferred_gender=vacancy.PreferedGender,
             company_name=comp_name,
             location_name=loc_name,
@@ -236,4 +282,3 @@ class VacancyService:
             industry_title=industry_title_result.get("industry_designation"),
             industry_department=industry_dept_result.get("industry_department"),
         )
-

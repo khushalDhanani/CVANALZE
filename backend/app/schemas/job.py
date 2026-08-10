@@ -7,6 +7,7 @@ class JobOpening(BaseModel):
     title: str = Field(..., description="Job position title")
     department: str = Field(..., description="Department hosting this role")
     required_skills: list[str] = Field(default_factory=list, description="List of required skills")
+    required_skills_are_mandatory: bool = Field(default=True, description="Whether missing required-skill items are hard disqualifiers")
     preferred_keywords: list[str] = Field(default_factory=list, description="List of preferred keywords")
     min_experience_years: float | None = Field(None, description="Minimum experience required")
     max_experience_years: float | None = Field(None, description="Maximum experience required")

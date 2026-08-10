@@ -151,8 +151,9 @@ class MatchService:
         # Pre-compute hierarchy classification for vacancy scoring & hierarchy fit evaluation
         hierarchy_res = DynamicTaxonomyService.classify_organization_hierarchy(
             role_or_summary=candidate_context.current_role or "",
-            skills=list(candidate_context.cand_families),
-            domain=candidate_context.cand_tax_domain,
+            skills=candidate_context.professional_skills,
+            domain=candidate_context.cand_domain or candidate_context.cand_tax_domain,
+            experience_years=candidate_context.candidate_experience,
             cv_text=cv_text,
         )
         candidate_context.cand_hierarchy = hierarchy_res
@@ -334,6 +335,9 @@ class MatchService:
                         location_id=job_match.location_id,
                         score=job_match.score,
                         overall_score=job_match.overall_score,
+                        vacancy_fit_score=job_match.vacancy_fit_score,
+                        score_breakdown=job_match.score_breakdown,
+                        vacancy_match_status=job_match.vacancy_match_status,
                         role_score=job_match.role_score,
                         skills_score=job_match.skills_score,
                         experience_score=job_match.experience_score,
@@ -378,15 +382,18 @@ class MatchService:
                 except Exception as e:
                     logger.error(f"Error in LLM-enriched matching for job {job.get('id') or job.get('vacancy_id')}: {e}", exc_info=True)
 
-            evaluated_matches.sort(key=lambda m: m.score, reverse=True)
+            evaluated_matches.sort(key=lambda m: m.vacancy_fit_score or m.score, reverse=True)
 
             if evaluated_matches:
                 logger.debug("MATCHING PIPELINE DEBUG OUTPUT")
                 for i, m in enumerate(evaluated_matches):
                     if i == 0:
-                        m.ranking_reason = f"Ranked #1 with highest verified score of {m.score}%."
+                        m.ranking_reason = f"Ranked #1 with highest verified fit score of {m.vacancy_fit_score or m.score}%."
                     else:
-                        m.ranking_reason = f"Ranked #{i + 1} due to lower score ({m.score}% vs top {evaluated_matches[0].score}%)."
+                        m.ranking_reason = (
+                            f"Ranked #{i + 1} due to lower fit score ({m.vacancy_fit_score or m.score}% vs top "
+                            f"{evaluated_matches[0].vacancy_fit_score or evaluated_matches[0].score}%)."
+                        )
 
                     evidence_snippet = "; ".join(f"{ev.cv_evidence}" for ev in m.evidence.values())
                     if len(evidence_snippet) > 150:
@@ -522,14 +529,16 @@ class MatchService:
         # Hierarchy-constrained organization classification: MainDept -> Dept -> Desig
         hierarchy_res = candidate_context.cand_hierarchy or DynamicTaxonomyService.classify_organization_hierarchy(
             role_or_summary=candidate_context.current_role or professional_domain or recommended_dept,
-            skills=list(candidate_context.cand_families),
+            skills=candidate_context.professional_skills,
             domain=professional_domain,
+            experience_years=candidate_context.candidate_experience,
             cv_text=cv_text,
         )
         main_dept_res = DynamicTaxonomyService.classify_main_department(
             role_or_summary=candidate_context.current_role or professional_domain or recommended_dept,
-            skills=list(candidate_context.cand_families),
+            skills=candidate_context.professional_skills,
             domain=professional_domain,
+            experience_years=candidate_context.candidate_experience,
             cv_text=cv_text,
         )
 

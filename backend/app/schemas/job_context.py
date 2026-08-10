@@ -28,6 +28,7 @@ class JobEvaluationContext:
     department_lower: str
     dept_terms: list[str]
     required_skills: list[str]
+    required_skills_are_mandatory: bool
     preferred_keywords: list[str]
     min_experience_years: float | None
     max_experience_years: float | None
@@ -45,6 +46,13 @@ class JobEvaluationContext:
 
     @classmethod
     def create(cls, job: dict[str, Any]) -> "JobEvaluationContext":
+        def as_string_list(value: Any) -> list[str]:
+            if isinstance(value, str):
+                return [value] if value.strip() else []
+            if isinstance(value, (list, tuple, set)):
+                return [str(item) for item in value if item is not None and str(item).strip()]
+            return []
+
         job_id = str(job.get("id") or job.get("vacancy_id") or "")
         title = str(job.get("title") or "")
         title_lower = title.strip().lower()
@@ -69,15 +77,16 @@ class JobEvaluationContext:
         dept_terms = CandidateDomainService.extract_department_domain_terms(department)
         dept_term_patterns = [re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in dept_terms]
 
-        required_skills = list(job.get("required_skills") or [])
-        preferred_keywords = list(job.get("preferred_keywords") or [])
+        required_skills = as_string_list(job.get("required_skills"))
+        required_skills_are_mandatory = bool(job.get("required_skills_are_mandatory", True))
+        preferred_keywords = as_string_list(job.get("preferred_keywords"))
         min_experience_years = job.get("min_experience_years")
         max_experience_years = job.get("max_experience_years")
         max_ctc = job.get("max_ctc")
-        education_requirements = job.get("education_requirements") or job.get("required_education")
+        education_requirements = job.get("education_requirements") or job.get("required_education") or job.get("education")
         certifications = job.get("certifications") or job.get("required_certifications")
-        technologies = list(job.get("technologies") or [])
-        responsibilities = list(job.get("responsibilities") or [])
+        technologies = as_string_list(job.get("technologies"))
+        responsibilities = as_string_list(job.get("responsibilities") or job.get("job_description") or job.get("description"))
 
         # 1. Pre-classify Vacancy Taxonomy
         pre_domain = job.get("_precomputed_domain") or job.get("domain")
@@ -102,6 +111,7 @@ class JobEvaluationContext:
             dept_terms=dept_terms,
             dept_term_patterns=dept_term_patterns,
             required_skills=required_skills,
+            required_skills_are_mandatory=required_skills_are_mandatory,
             preferred_keywords=preferred_keywords,
             min_experience_years=min_experience_years,
             max_experience_years=max_experience_years,

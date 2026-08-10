@@ -386,11 +386,14 @@ class TaxonomyClassifier:
         Returns True if candidate_families contains or is compatible with job_family via DynamicTaxonomyService or legacy config map.
         Preserves 100% backward compatibility.
         """
+        from app.core.rule_config_manager import RuleConfigManager
+
+        compatibility_threshold = RuleConfigManager.get_taxonomy_rules().family_compatibility_min_score
         for cand_fam in candidate_families:
             if cand_fam == job_family:
                 return True
             is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(cand_fam, job_family)
-            if is_compat and score is not None and score > 0.4:
+            if is_compat and score is not None and score > compatibility_threshold:
                 return True
         return False
 

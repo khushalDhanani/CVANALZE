@@ -35,11 +35,14 @@ class DynamicTaxonomyService:
         cls,
         role_or_summary: str,
         skills: list[str] | None = None,
-        threshold: float = 0.70,
+        threshold: float | None = None,
     ) -> NormalizedClassification:
         """
         Resolves candidate's domain, job family, and designation dynamically without hardcoded keyword lists.
         """
+        from app.core.rule_config_manager import RuleConfigManager
+
+        threshold = threshold if threshold is not None else RuleConfigManager.get_taxonomy_rules().semantic_match_threshold
         clean_text = role_or_summary.strip()
         if not clean_text:
             return NormalizedClassification(
@@ -100,8 +103,8 @@ class DynamicTaxonomyService:
         domain: str | None = None,
         experience_years: float | None = None,
         cv_text: str | None = None,
-        threshold: float = 0.55,
-        ambiguity_gap: float = 0.05,
+        threshold: float | None = None,
+        ambiguity_gap: float | None = None,
         main_departments: list[Any] | None = None,
         db_session: Any = None,
     ) -> MainDepartmentClassificationResult:
@@ -115,6 +118,11 @@ class DynamicTaxonomyService:
         4. Apply similarity threshold and ambiguity gap checks across Top-K candidates.
         5. If vector embedding is unavailable/offline, fall back gracefully to rule-based semantic matching.
         """
+        from app.core.rule_config_manager import RuleConfigManager
+
+        taxonomy_rules = RuleConfigManager.get_taxonomy_rules()
+        threshold = threshold if threshold is not None else taxonomy_rules.main_department_match_threshold
+        ambiguity_gap = ambiguity_gap if ambiguity_gap is not None else taxonomy_rules.hierarchy_ambiguity_gap
         depts_to_evaluate: list[dict[str, Any]] = []
 
         if main_departments is not None:
@@ -185,16 +193,9 @@ class DynamicTaxonomyService:
                 match_status="NO_STRONG_MAIN_DEPARTMENT_MATCH",
             )
 
-        INTERNAL_NAME_SEMANTIC_MAP: dict[str, list[str]] = {
-            "cis team": ["software", "developer", "flutter", "react", "node", "python", ".net", "c#", "java", "frontend", "backend", "full stack", "devops", "cloud", "cis", "it", "information technology", "systems", "web", "programmer", "software engineer"],
-            "quality control": ["quality control", "qc", "qc chemist", "lab chemist", "analytical", "microbiology", "testing", "lab analyst", "qc executive", "qa", "quality assurance", "validation", "lab assistant"],
-            "manufacturing": ["manufacturing", "production", "plant", "chemical operator", "process engineer", "maintenance", "shopfloor", "production executive", "factory", "plant engineer", "production engineer"],
-            "research & development": ["research", "r&d", "formulation", "synthesis", "chemist", "scientist", "research associate", "organic chemistry", "analytical r&d"],
-            "human resources": ["human resources", "hr", "talent acquisition", "recruiter", "payroll", "people ops", "hr executive", "hr manager"],
-            "finance & accounts": ["finance", "accounts", "chartered accountant", "ca", "audit", "taxation", "billing", "bookkeeping", "financial analyst", "accountant"],
-            "supply chain": ["supply chain", "logistics", "warehouse", "procurement", "purchase", "inventory", "vendor", "dispatch"],
-            "sales & marketing": ["sales", "business development", "marketing", "commercial", "account manager", "sales executive"],
-        }
+        from app.repositories.department_domain import department_domain_repository
+
+        domain_matchers = department_domain_repository.get_domain_matchers()
 
         # 1. Build Candidate Professional Profile Text & Embedding
         skills_str = ", ".join(skills_list[:15]) if skills_list else ""
@@ -227,11 +228,27 @@ class DynamicTaxonomyService:
             norm_info = DepartmentNormalizer.normalize_department(dept_name)
             ind_dept = norm_info.get("industry_department") or ""
 
-            semantic_keywords = list(INTERNAL_NAME_SEMANTIC_MAP.get(dept_name_clean, []))
-            if not semantic_keywords:
-                for key_dept, kw_list in INTERNAL_NAME_SEMANTIC_MAP.items():
-                    if key_dept in dept_name_clean or dept_name_clean in key_dept:
-                        semantic_keywords.extend(kw_list)
+            semantic_keywords: list[str] = []
+            for matcher in domain_matchers:
+                domain = matcher.domain
+                configured_name = domain.department_name.strip().lower()
+                configured_domain = domain.domain_name.strip().lower()
+                normalized_department = str(ind_dept).strip().lower()
+                is_named_department = configured_name == dept_name_clean
+                is_domain_match = bool(configured_domain and normalized_department and configured_domain == normalized_department)
+                if is_named_department or is_domain_match or matcher.keyword_match_count(dept_name_clean) > 0:
+                    semantic_keywords.extend(domain.keywords)
+                    semantic_keywords.extend(domain.default_roles)
+                    semantic_keywords.extend([domain.department_name, domain.domain_name])
+            semantic_keywords = list(dict.fromkeys(keyword.strip().lower() for keyword in semantic_keywords if keyword and keyword.strip()))
+            stop_words = set(RuleConfigManager.get_prefilter_rules().stop_words)
+            keyword_tokens = [
+                token
+                for keyword in semantic_keywords
+                for token in keyword.split()
+                if len(token) > 2 and token not in stop_words
+            ]
+            semantic_keywords = list(dict.fromkeys([*semantic_keywords, *keyword_tokens]))
             kw_str = ", ".join(semantic_keywords[:12]) if semantic_keywords else ""
 
             dept_profile_text = (
@@ -268,7 +285,7 @@ class DynamicTaxonomyService:
             else:
                 # Rule-based fallback if vector service is offline
                 if dept_name_clean in combined_text:
-                    score += 0.50
+                    score += taxonomy_rules.hierarchy_exact_name_score
                     reasons.append(f"Direct match on department name '{dept_name}'")
 
                 sem_score_acc = 0.0
@@ -277,25 +294,25 @@ class DynamicTaxonomyService:
                     if kw in seen_kws:
                         continue
                     if kw in role_str.lower():
-                        sem_score_acc += 0.25
+                        sem_score_acc += taxonomy_rules.hierarchy_role_keyword_score
                         seen_kws.add(kw)
                     elif kw in domain_str.lower():
-                        sem_score_acc += 0.20
+                        sem_score_acc += taxonomy_rules.hierarchy_domain_keyword_score
                         seen_kws.add(kw)
                     elif any(kw in s for s in skills_list):
-                        sem_score_acc += 0.15
+                        sem_score_acc += taxonomy_rules.hierarchy_skill_keyword_score
                         seen_kws.add(kw)
                     elif kw in cv_snippet:
-                        sem_score_acc += 0.10
+                        sem_score_acc += taxonomy_rules.hierarchy_cv_keyword_score
                         seen_kws.add(kw)
 
                 if sem_score_acc > 0:
-                    semantic_score = min(0.80, sem_score_acc)
+                    semantic_score = min(taxonomy_rules.hierarchy_rule_score_cap, sem_score_acc)
                     score += semantic_score
                     reasons.append(f"Semantic match ({len(seen_kws)} keyword hit(s)) for '{dept_name}'")
 
                 if ind_dept and ind_dept.lower() in combined_text:
-                    score += 0.25
+                    score += taxonomy_rules.hierarchy_normalized_name_score
                     reasons.append(f"Industry normalized department '{ind_dept}' matched candidate profile")
 
             dept_scores.append({
@@ -323,12 +340,15 @@ class DynamicTaxonomyService:
         if len(dept_scores) > 1:
             second = dept_scores[1]
             gap = top_score - second["score"]
-            if gap < ambiguity_gap and second["score"] > 0.35:
+            if gap < ambiguity_gap and second["score"] > taxonomy_rules.hierarchy_ambiguity_candidate_min_score:
                 return MainDepartmentClassificationResult(
                     main_department_id=None,
                     main_department_name="NO_STRONG_MAIN_DEPARTMENT_MATCH",
                     confidence=round(top_score, 2),
-                    reasoning=f"Ambiguous candidate profile matching '{top['name']}' (score: {top_score:.2f}) and '{second['name']}' (score: {second['score']:.2f}) with gap ({gap:.2f}) below threshold ({ambiguity_gap}).",
+                    reasoning=(
+                        f"Ambiguous candidate profile matching '{top['name']}' (score: {top_score:.2f}) and "
+                        f"'{second['name']}' (score: {second['score']:.2f}) with gap ({gap:.2f}) below threshold ({ambiguity_gap})."
+                    ),
                     match_status="NO_STRONG_MAIN_DEPARTMENT_MATCH",
                 )
 
@@ -370,8 +390,8 @@ class DynamicTaxonomyService:
         domain: str | None = None,
         experience_years: float | None = None,
         cv_text: str | None = None,
-        threshold: float = 0.55,
-        ambiguity_gap: float = 0.05,
+        threshold: float | None = None,
+        ambiguity_gap: float | None = None,
         main_departments: list[Any] | None = None,
         departments: list[Any] | None = None,
         designations: list[Any] | None = None,
@@ -389,6 +409,11 @@ class DynamicTaxonomyService:
         5. Validates final resolved hierarchy via OrganizationSourceRepository.validate_hierarchy().
         6. Caches master-data embeddings by ID + profile hash + model version.
         """
+        from app.core.rule_config_manager import RuleConfigManager
+
+        taxonomy_rules = RuleConfigManager.get_taxonomy_rules()
+        threshold = threshold if threshold is not None else taxonomy_rules.main_department_match_threshold
+        ambiguity_gap = ambiguity_gap if ambiguity_gap is not None else taxonomy_rules.hierarchy_ambiguity_gap
         main_dept_res = cls.classify_main_department(
             role_or_summary=role_or_summary,
             skills=skills,
@@ -559,12 +584,12 @@ class DynamicTaxonomyService:
                 reasons.append(f"Vector similarity ({sim:.2f}) with Department '{d_name}'")
             else:
                 if d_name_clean in combined_text or any(part in combined_text for part in d_name_clean.split() if len(part) >= 3):
-                    score += 0.60
+                    score += taxonomy_rules.hierarchy_exact_name_score
                     reasons.append(f"Direct match on department name '{d_name}'")
                 norm_res = DepartmentNormalizer.normalize_department(d_name)
                 ind_d = (norm_res.get("industry_department") or "").lower()
                 if ind_d and ind_d in combined_text:
-                    score += 0.40
+                    score += taxonomy_rules.hierarchy_normalized_name_score
                     reasons.append(f"Industry normalized match '{ind_d}'")
 
             dept_scores.append({
@@ -585,7 +610,7 @@ class DynamicTaxonomyService:
         if len(dept_scores) > 1:
             second_d = dept_scores[1]
             gap_d = top_d_score - second_d["score"]
-            if gap_d < ambiguity_gap and second_d["score"] > 0.35:
+            if gap_d < ambiguity_gap and second_d["score"] > taxonomy_rules.hierarchy_ambiguity_candidate_min_score:
                 dept_is_ambiguous = True
 
         if top_d_score < threshold or dept_is_ambiguous:
@@ -729,12 +754,12 @@ class DynamicTaxonomyService:
                 reasons.append(f"Vector similarity ({sim:.2f}) with Designation '{ds_name}'")
             else:
                 if ds_name_clean in combined_text:
-                    score += 0.65
+                    score += taxonomy_rules.hierarchy_exact_name_score
                     reasons.append(f"Direct match on designation name '{ds_name}'")
                 norm_res = DepartmentNormalizer.normalize_designation(ds_name)
                 ind_ds = (norm_res.get("industry_designation") or "").lower()
                 if ind_ds and ind_ds in combined_text:
-                    score += 0.35
+                    score += taxonomy_rules.hierarchy_normalized_name_score
                     reasons.append(f"Industry normalized designation match '{ind_ds}'")
 
             desig_scores.append({
@@ -755,7 +780,7 @@ class DynamicTaxonomyService:
         if len(desig_scores) > 1:
             second_ds = desig_scores[1]
             gap_ds = top_ds_score - second_ds["score"]
-            if gap_ds < ambiguity_gap and second_ds["score"] > 0.35:
+            if gap_ds < ambiguity_gap and second_ds["score"] > taxonomy_rules.hierarchy_ambiguity_candidate_min_score:
                 desig_is_ambiguous = True
 
         if top_ds_score < threshold or desig_is_ambiguous:
@@ -840,7 +865,7 @@ class DynamicTaxonomyService:
         department: str = "",
         description: str = "",
         required_skills: list[str] | None = None,
-        threshold: float = 0.70,
+        threshold: float | None = None,
         skip_vector: bool = False,
     ) -> NormalizedClassification:
         """
@@ -848,6 +873,9 @@ class DynamicTaxonomyService:
         Pass `skip_vector=True` during bulk preprocessing to bypass Ollama embedding lookup and avoid blocking
         per-vacancy HTTP calls to Ollama when loading the vacancy list.
         """
+        from app.core.rule_config_manager import RuleConfigManager
+
+        threshold = threshold if threshold is not None else RuleConfigManager.get_taxonomy_rules().semantic_match_threshold
         clean_title = title.strip()
         if not clean_title:
             return NormalizedClassification(
@@ -903,6 +931,7 @@ class DynamicTaxonomyService:
                 ],
             )
         elif ind_dept:
+            partial_confidence = RuleConfigManager.get_taxonomy_rules().normalizer_partial_match_confidence
             return NormalizedClassification(
                 db_department_id=dept_norm.get("db_department_id"),
                 db_department_name=clean_dept,
@@ -912,14 +941,14 @@ class DynamicTaxonomyService:
                 industry_designation=ind_desig,
                 industry_domain=ind_dept,
                 match_status=MatchStatus.PARTIAL_MATCH,
-                confidence=0.85,
+                confidence=partial_confidence,
                 match_source="DepartmentNormalizer",
                 evidence=[
                     ClassificationEvidence(
                         source="DepartmentNormalizer",
                         matched_term=clean_dept,
                         matched_against=ind_dept,
-                        confidence=0.85,
+                        confidence=partial_confidence,
                     )
                 ],
             )
@@ -1155,7 +1184,11 @@ class DynamicTaxonomyService:
         return None
 
     @classmethod
-    def _resolve_postgres_vector(cls, query_text: str, threshold: float = 0.70) -> NormalizedClassification | None:
+    def _resolve_postgres_vector(cls, query_text: str, threshold: float | None = None) -> NormalizedClassification | None:
+        if threshold is None:
+            from app.core.rule_config_manager import RuleConfigManager
+
+            threshold = RuleConfigManager.get_taxonomy_rules().semantic_match_threshold
         if PostgresAppSession is None:
             return None
         try:

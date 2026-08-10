@@ -110,6 +110,35 @@ def test_unspecified_education_does_not_reduce_score():
     assert result.score >= 70.0
 
 
+def test_advisory_education_and_upper_experience_conflicts_preserve_professional_match():
+    cv_text = """
+    ## Mobile Application Developer
+    Skills: Cross-platform UI, REST API, state management
+    Experience: 6 years building production mobile applications.
+    Education: Bachelor of Mechanical Engineering
+    """
+    job = {
+        "id": "job_advisory_requirements",
+        "title": "Mobile Application Developer",
+        "department": "Digital Products",
+        "required_skills": ["Cross-platform UI", "REST API", "state management"],
+        "required_skills_are_mandatory": False,
+        "min_experience_years": 3.0,
+        "max_experience_years": 5.0,
+        "education": "Bachelor of Computer Science",
+    }
+
+    result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=6.0)
+
+    assert result.matched_skills == job["required_skills"]
+    assert result.mandatory_failures == []
+    assert result.hr_review_required is True
+    assert any(item.startswith("Education Mismatch") for item in result.missing_criteria)
+    assert any(item.requirement_id == "req_education" and item.status == "FAILED" for item in result.preferred_requirements)
+    assert any(item.requirement_id == "req_max_experience" for item in result.preferred_requirements)
+    assert all(item.requirement_id != "req_seniority_gate" for item in result.mandatory_requirements)
+
+
 def test_dynamic_career_transition_detection():
     cv_text = """
     ## Lead Software Engineer

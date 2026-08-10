@@ -203,6 +203,9 @@ class ConfigurationService:
         tax_comp = RuleComponent(component_type="scoring", component_name="taxonomy", profile_id=profile.profile_id)
         db.add(tax_comp)
         tax_cfg = config.scoring.taxonomy
+        for key, value in tax_cfg.model_dump().items():
+            if isinstance(value, (int, float)):
+                tax_comp.thresholds.append(RuleThreshold(threshold_key=key, threshold_value=float(value)))
         
         tax_defaults = SystemRule(rule_type="taxonomy_defaults", rule_name="defaults", target_value=f"{tax_cfg.default_domain}::{tax_cfg.default_family}")
         if tax_cfg.canonical_domains:

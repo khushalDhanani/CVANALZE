@@ -172,6 +172,19 @@ class TaxonomyRules(BaseModel):
     evidence_weight_skills: float = Field(default=2.0, ge=0.0)
     evidence_weight_summary: float = Field(default=1.5, ge=0.0)
     evidence_weight_education: float = Field(default=1.0, ge=0.0)
+    semantic_match_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+    main_department_match_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
+    hierarchy_ambiguity_gap: float = Field(default=0.05, ge=0.0, le=1.0)
+    hierarchy_ambiguity_candidate_min_score: float = Field(default=0.35, ge=0.0, le=1.0)
+    hierarchy_exact_name_score: float = Field(default=0.60, ge=0.0, le=1.0)
+    hierarchy_normalized_name_score: float = Field(default=0.40, ge=0.0, le=1.0)
+    hierarchy_role_keyword_score: float = Field(default=0.25, ge=0.0, le=1.0)
+    hierarchy_domain_keyword_score: float = Field(default=0.20, ge=0.0, le=1.0)
+    hierarchy_skill_keyword_score: float = Field(default=0.15, ge=0.0, le=1.0)
+    hierarchy_cv_keyword_score: float = Field(default=0.10, ge=0.0, le=1.0)
+    hierarchy_rule_score_cap: float = Field(default=0.80, ge=0.0, le=1.0)
+    family_compatibility_min_score: float = Field(default=0.40, ge=0.0, le=1.0)
+    normalizer_partial_match_confidence: float = Field(default=0.85, ge=0.0, le=1.0)
 
 
 class DensityScoreTier(BaseModel):
@@ -588,6 +601,10 @@ class RuleConfigManager:
                     
                 elif c_name == "taxonomy":
                     tax_dict: dict[str, Any] = base_dict["scoring"].get("taxonomy", {})
+                    for weight in comp.weights:
+                        tax_dict[weight.weight_key] = weight.weight_value
+                    for threshold in comp.thresholds:
+                        tax_dict[threshold.threshold_key] = threshold.threshold_value
                     vac_rules = []
                     cand_rules = []
                     for r in comp.system_rules:
@@ -928,5 +945,3 @@ class RuleConfigManager:
             raise ve
         except Exception as e:
             logger.warning(f"[RULE_CONFIG] Failed to execute DB smoke tests (DB error): {e}")
-
-

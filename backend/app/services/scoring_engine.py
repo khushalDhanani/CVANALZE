@@ -30,28 +30,6 @@ from app.services.match_evaluators import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Sparse-CV maintenance inference constants (module-level for performance)
-# These are used by ScoringEngine._extract_term_matches to infer the presence
-# of trade/maintenance skills on short CVs (<3000 chars).
-# ---------------------------------------------------------------------------
-_MAINTENANCE_CV_SIGNALS: frozenset[str] = frozenset({
-    "fitter", "fitting", "maintenance", "assembly", "mechanical", "iti",
-})
-_MAINTENANCE_INFERRED_TERMS: frozenset[str] = frozenset({
-    "maintenance work", "plant maintenance", "maintenance", "fitter",
-    "fitting", "assembly", "equipment maintenance", "mechanical maintenance",
-    "maintenance and assembly",
-})
-# Terms that must NEVER be credited via inference regardless of CV signals
-_MAINTENANCE_INFERENCE_EXCLUDED: frozenset[str] = frozenset({
-    "chemistry", "chemical", "qa", "quality", "audit", "sap", "erp",
-    "electrical", "electronics", "dcs", "hmi", "plc", "scada",
-    "c&i", "instrumentation", "software", "programming", "coding",
-    "design", "graphic", "payroll", "hr", "recruitment",
-})
-
-
 class ScoringEngine:
     # Repository instance is swappable in tests via dependency injection.
     domain_repository: DepartmentDomainRepository = department_domain_repository
@@ -169,6 +147,19 @@ class ScoringEngine:
         noise_words = list(noise_words)
         aliases = assets["aliases"]
 
+        def normalize_token(token: str) -> str:
+            if len(token) > 4 and token.endswith("ies"):
+                return token[:-3] + "y"
+            for suffix in ("ing", "ed", "s"):
+                if len(token) > len(suffix) + 3 and token.endswith(suffix):
+                    return token[:-len(suffix)]
+            return token
+
+        normalized_cv_tokens = {
+            normalize_token(token)
+            for token in re.findall(r"[a-z0-9]+", normalized_text.lower())
+        }
+
         for term in terms:
             term_clean = term.strip()
             if not term_clean or is_ignorable_requirement(term):
@@ -206,23 +197,10 @@ class ScoringEngine:
                 matched.append(term)
                 continue
 
-            # Sparse-CV domain-aware inference: for short CVs (<3000 chars) where
-            # the candidate's text confirms an industrial-maintenance / trade background,
-            # credit maintenance-adjacent required skills as inferred matches rather than
-            # hard misses.  Non-maintenance skills are never inferred.
-            is_sparse_cv = len(normalized_text) < 3000
-            if is_sparse_cv:
-                cv_has_maintenance_signal = any(
-                    cls._get_compiled_term_pattern(sig).search(normalized_text)
-                    for sig in _MAINTENANCE_CV_SIGNALS
-                )
-                is_maintenance_term = (
-                    term_lower in _MAINTENANCE_INFERRED_TERMS
-                    or any(mt in term_lower for mt in _MAINTENANCE_INFERRED_TERMS)
-                ) and not any(ex in term_lower for ex in _MAINTENANCE_INFERENCE_EXCLUDED)
-                if cv_has_maintenance_signal and is_maintenance_term:
-                    matched.append(term)
-                    continue
+            normalized_sub_tokens = {normalize_token(token) for token in sub_tokens}
+            if 1 <= len(normalized_sub_tokens) <= 3 and normalized_sub_tokens.issubset(normalized_cv_tokens):
+                matched.append(term)
+                continue
 
             missing.append(term)
 
@@ -394,6 +372,8 @@ class ScoringEngine:
             career_transition_detected=transition_detected,
             career_transition_note=transition_note,
             retrieval_source=retrieval_src,
+            candidate_job_family=context.cand_primary_family,
+            vacancy_job_family=job_ctx.vac_family,
         )
 
     @classmethod
@@ -445,7 +425,7 @@ class ScoringEngine:
                 for job_ctx in job_contexts
             ]
 
-        evaluated_matches.sort(key=lambda m: m.score, reverse=True)
+        evaluated_matches.sort(key=lambda m: m.vacancy_fit_score or m.score, reverse=True)
 
         high_threshold = scoring_config.match_high_threshold
         suitable_matches = [

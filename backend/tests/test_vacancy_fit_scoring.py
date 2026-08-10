@@ -80,7 +80,7 @@ def test_1_exact_hierarchy_match(sample_candidate_context, sample_cand_hierarchy
 def test_2_partial_hierarchy_match(sample_candidate_context, sample_cand_hierarchy):
     """
     Test 2: Partial hierarchy match (MainDeptID=10, DeptID=101 match, but DesigID differs: 1002 vs 1001).
-    hierarchy_score=80.0, overall fit score >= 60.0, status="MATCHED".
+    hierarchy score is derived from configured domain/perfect scores, overall fit score >= 60.0, status="MATCHED".
     """
     job_ctx = MagicMock(spec=JobEvaluationContext)
     job_ctx.job_id = "JOB-102"
@@ -114,7 +114,7 @@ def test_2_partial_hierarchy_match(sample_candidate_context, sample_cand_hierarc
         )
 
         assert res.match_status == "MATCHED"
-        assert res.score_breakdown.hierarchy_score == 80.0
+        assert res.score_breakdown.hierarchy_score == 75.0
         assert res.vacancy_fit_score >= 60.0
 
 

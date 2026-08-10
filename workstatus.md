@@ -1,6 +1,53 @@
 # Work Status
 
 ## Last Completed Task
+**Make CV-to-department and active-vacancy matching fully evidence-driven**
+
+### Architecture Impact Analysis
+- Kept `CandidateAnalysisContext`, `CandidateDomainService`, `DynamicTaxonomyService`, `ScoringEngine`, and `VacancyFitEvaluator` as the shared matching pipeline; no candidate-specific branch or second matching engine was introduced.
+- Preserved `app.core.config.settings`, `OllamaLLMService`, `OllamaTransport`, `EmbeddingService`, and their existing cache/retry/timeout paths as the only Ollama integration points.
+- Active MSSQL vacancy qualifications now flow through `VacancyService` into deterministic scoring and the existing optimized prompt.
+- Existing response fields and routes remain backward compatible; one additive vacancy metadata field distinguishes explicit mandatory skills from source-system additional knowledge.
+
+### Files Changed
+- Matching context and domain classification: `backend/app/schemas/candidate_context.py`, `backend/app/services/candidate_domain_service.py`, `backend/app/services/dynamic_taxonomy_service.py`.
+- Vacancy requirements and scoring: `backend/app/schemas/job.py`, `backend/app/schemas/job_context.py`, `backend/app/services/vacancy_service.py`, `backend/app/services/match_evaluators.py`, `backend/app/services/scoring_engine.py`, `backend/app/services/match_service.py`.
+- Configuration and prompt propagation: `backend/app/core/config.py`, `backend/app/core/rule_config_manager.py`, `backend/app/services/configuration_service.py`, `backend/app/prompts/optimized_match.py`.
+- Regression coverage: `backend/tests/test_llm_optimization.py`, `backend/tests/test_main_department_classification.py`, `backend/tests/test_organization_hierarchy.py`, `backend/tests/test_two_stage_matching.py`, `backend/tests/test_vacancy_fit_scoring.py`, `backend/tests/test_vacancy_match_status.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Use parsed professional roles, responsibilities, skills, projects, and education as distinct candidate evidence sources.
+- Resolve department semantics and all match thresholds/weights from configured taxonomy/scoring data.
+- Preserve strong professional matches while surfacing education and upper-experience conflicts for HR review.
+- Rank and select openings using the canonical vacancy-fit result and retain strict rejection for explicit hard requirements or verified hierarchy/domain conflicts.
+
+### Code Changes
+- Added structured professional evidence to the candidate context and corrected enum-based taxonomy fallback selection.
+- Removed the hardcoded internal department/skill semantic map and the hardcoded sparse-maintenance skill inference; department vocabulary now comes from `DepartmentDomainRepository`.
+- Replaced hierarchy and vacancy-fit constants with normalized configuration fields and existing scoring-profile weights/thresholds.
+- Bumped the centralized matching version to `2.2.0` so prior match/LLM cache entries cannot mask the new behavior.
+- Corrected enriched-match propagation so `vacancy_fit_score`, `score_breakdown`, and `vacancy_match_status` are no longer discarded before selection.
+- Loaded vacancy/job-profile qualification names in bulk and propagated them as education requirements to scoring and the optimized prompt.
+- Marked MSSQL `RequestedAdditionalKnowledge` as scored but non-mandatory because the source provides no mandatory flag; explicit `required_skills_are_mandatory=true` inputs retain hard-failure behavior.
+- Changed maximum experience to its existing preferred upper-bound evaluation instead of also applying a duplicate hard seniority rejection.
+- Added configured semantic equivalence and inflection-aware matching for wording variants, while retaining explicit evidence and missing-skill reporting.
+- Education mismatches now appear as `Education Mismatch (...)`, contribute a zero education component, and require HR review without erasing a verified role/skills/experience match.
+
+### Verification Checklist
+- [x] Static source audit found none of the three audit CV IDs in application or test logic.
+- [x] Static source audit confirmed removal of the hardcoded department semantic map, maintenance skill inference, seniority buffer, vacancy-fit weights, and evaluator default thresholds.
+- [x] `git diff --check` passed.
+- [x] Added regression coverage for configured department vocabulary, vacancy qualification propagation, prompt education propagation, advisory education/upper-experience conflicts, and configured vacancy-fit scoring.
+- [ ] Builds and tests were not run because repository instructions require explicit permission.
+- [ ] Stored audit records require reprocessing before their persisted analysis reflects the new matching version.
+
+### Refactoring Performed
+- Consolidated root-family comparison for role, experience, and cross-domain evaluation.
+- Normalized scalar-or-list vacancy fields once in `JobEvaluationContext`.
+- Reused centralized `DomainEmbeddingService`/`EmbeddingService` for semantic skill equivalence instead of creating an Ollama client or endpoint wrapper.
+
+## Previous Task
 **Fix candidate-detail hiring-intelligence column layout**
 
 ### Architecture Impact Analysis

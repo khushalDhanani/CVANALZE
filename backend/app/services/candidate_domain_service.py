@@ -8,6 +8,7 @@ from app.repositories.department_domain import (
     department_domain_repository,
 )
 from app.schemas.analysis import OptimizedCandidateProfile, OptimizedVacancyMatch
+from app.schemas.classification_types import MatchStatus
 from app.schemas.domain import DepartmentDomain
 from app.schemas.profile import DynamicCandidateProfile
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
@@ -37,6 +38,7 @@ class CandidateDomainService:
         skills_set: set[str] = set()
         education_list: list[str] = []
         projects_list: list[str] = []
+        responsibilities_list: list[str] = []
         roles_list: list[str] = []
 
         if optimized_profile:
@@ -76,6 +78,17 @@ class CandidateDomainService:
                         projects_list.append(f"{proj.get('title', '')}: {proj.get('description', '')}")
                     else:
                         projects_list.append(str(proj))
+            experience_items = resume_json.get("work_experience") or resume_json.get("experience") or []
+            if isinstance(experience_items, list):
+                for experience in experience_items:
+                    if not isinstance(experience, dict):
+                        continue
+                    role = experience.get("job_title") or experience.get("title") or experience.get("position")
+                    if role:
+                        roles_list.append(str(role))
+                    for responsibility in experience.get("responsibilities") or []:
+                        if isinstance(responsibility, str) and responsibility.strip():
+                            responsibilities_list.append(responsibility.strip())
 
         # Enforce that education does not override established professional experience
         active_education = []
@@ -85,7 +98,7 @@ class CandidateDomainService:
         combined_text = " ".join(
             filter(
                 None,
-                combined_parts + sorted(skills_set) + active_education + projects_list + roles_list,
+                combined_parts + sorted(skills_set) + active_education + projects_list + responsibilities_list + roles_list,
             )
         ).lower()
 
@@ -98,7 +111,7 @@ class CandidateDomainService:
             skills=sorted(skills_set),
         )
 
-        if dyn_res.match_status not in ("NO_MATCH", "NO_SUITABLE_MATCH"):
+        if dyn_res.match_status in (MatchStatus.DB_MATCH, MatchStatus.PARTIAL_MATCH):
             industry_dept = dyn_res.industry_department or dyn_res.industry_domain or dyn_res.db_department_name
             prof_domain = dyn_res.industry_domain or dyn_res.db_department_name or ""
             recommended_dept = industry_dept or prof_domain
@@ -110,7 +123,7 @@ class CandidateDomainService:
             w_skills = tax_rules.evidence_weight_skills
             
             exp_text = " ".join(roles_list).lower()
-            resp_text = " ".join(projects_list).lower()
+            resp_text = " ".join([*projects_list, *responsibilities_list]).lower()
             skills_text = " ".join(skills_set).lower()
             
             dept_scores: list[tuple[float, DepartmentDomain]] = []
@@ -187,13 +200,13 @@ class CandidateDomainService:
             search_parts.append(cv_text)
 
         if resume_json:
-            for exp in resume_json.get("work_experience") or []:
+            for exp in resume_json.get("work_experience") or resume_json.get("experience") or []:
                 if not isinstance(exp, dict):
                     continue
                 if exp.get("company"):
                     search_parts.append(str(exp["company"]))
-                if exp.get("title") or exp.get("position"):
-                    search_parts.append(str(exp.get("title") or exp.get("position")))
+                if exp.get("job_title") or exp.get("title") or exp.get("position"):
+                    search_parts.append(str(exp.get("job_title") or exp.get("title") or exp.get("position")))
                 if exp.get("description"):
                     search_parts.append(str(exp["description"]))
                 for resp in exp.get("responsibilities") or []:
@@ -269,7 +282,7 @@ class CandidateDomainService:
 
             # Extract experience-based strengths from top responsibilities
             key_responsibilities: list[str] = []
-            for exp in resume_json.get("work_experience") or []:
+            for exp in resume_json.get("work_experience") or resume_json.get("experience") or []:
                 if not isinstance(exp, dict):
                     continue
                 for resp in (exp.get("responsibilities") or [])[:5]:

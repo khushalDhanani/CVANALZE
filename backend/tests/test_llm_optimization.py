@@ -140,6 +140,7 @@ def test_build_optimized_match_prompt():
             "title": "Backend Engineer",
             "department": "Engineering",
             "required_skills": ["Python", "FastAPI"],
+            "education": "Configured Degree",
         }
     ]
 
@@ -147,6 +148,8 @@ def test_build_optimized_match_prompt():
     with patch("app.services.prompt_service.PromptService.get_prompt") as mock_get_prompt:
         mock_get_prompt.return_value = "John Doe Backend Engineer"
         prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
+    prompt_input = mock_get_prompt.call_args.args[1]["input_json"]
+    assert '"education_req":["Configured Degree"]' in prompt_input
     assert "John Doe" in prompt
     assert "Backend Engineer" in prompt
     assert token_est > 0

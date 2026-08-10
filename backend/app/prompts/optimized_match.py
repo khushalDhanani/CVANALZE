@@ -51,8 +51,10 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
             item["preferred_keywords"] = sanitize_string_list(vac.get("preferred_keywords"))
         if vac.get("min_experience_years") is not None:
             item["min_exp"] = vac.get("min_experience_years")
-        if vac.get("education_requirements"):
-            item["education_req"] = sanitize_string_list(vac.get("education_requirements"))
+        education_requirement = vac.get("education_requirements") or vac.get("required_education") or vac.get("education")
+        if education_requirement:
+            education_values = education_requirement if isinstance(education_requirement, (list, tuple, set)) else [education_requirement]
+            item["education_req"] = sanitize_string_list(education_values)
         if vac.get("certifications"):
             item["certifications"] = sanitize_string_list(vac.get("certifications"))
 

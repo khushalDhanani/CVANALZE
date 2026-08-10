@@ -123,6 +123,21 @@ def test_only_verified_high_matches_are_eligible_for_selection():
     assert VacancyFitEvaluator.classify_opening_fit(mandatory_failure, high_threshold=80.0) == "NO_STRONG_MATCH"
 
 
+def test_advisory_education_mismatch_does_not_erase_verified_professional_match():
+    opening = {
+        "vacancy_fit_score": 88.0,
+        "score": 84.0,
+        "classification": "HIGH",
+        "vacancy_match_status": "MATCHED",
+        "mandatory_failures": [],
+        "missing_criteria": ["Education Mismatch (Configured Degree)"],
+        "education_score": 0.0,
+        "hr_review_required": True,
+    }
+
+    assert VacancyFitEvaluator.is_eligible_match(opening, high_threshold=80.0) is True
+
+
 def test_determine_candidate_match_status_all_7_states():
     dummy_vacancies = [{"id": 1, "title": "Software Developer"}]
 

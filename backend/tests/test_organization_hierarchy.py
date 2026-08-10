@@ -157,7 +157,7 @@ def test_vacancy_mapping_populates_full_hierarchy_ids():
     db.scalar.side_effect = scalar_mock
 
     service = VacancyService(db)
-    job_opening = service.map_to_job_requirement(vacancy)
+    job_opening = service.map_to_job_requirement(vacancy, qualifications=["Configured Degree"])
 
     assert job_opening.vacancy_id == 1065
     assert job_opening.job_profile_id == 42
@@ -173,4 +173,5 @@ def test_vacancy_mapping_populates_full_hierarchy_ids():
     assert job_opening.department_name == "Production"
     assert job_opening.designation_id == 500
     assert job_opening.designation_name == "Plant Chemist"
-
+    assert job_opening.required_skills_are_mandatory is False
+    assert job_opening.education == "Configured Degree"

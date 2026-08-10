@@ -8,8 +8,7 @@ from app.schemas.analysis import OptimizedCandidateProfile
 from app.schemas.normalized_resume import NormalizedResume
 from app.schemas.profile import DynamicCandidateProfile
 from app.services.candidate_domain_service import CandidateDomainService
-from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
-from app.services.job_taxonomy import TaxonomyClassifier
+from app.services.job_taxonomy import CandidateResumeDTO, TaxonomyClassifier
 
 
 @dataclass
@@ -36,6 +35,9 @@ class CandidateAnalysisContext:
     cand_tax_domain: str = ""
     cand_families: list[str] = field(default_factory=list)
     cand_primary_family: str | None = None
+    professional_skills: list[str] = field(default_factory=list)
+    experience_titles: list[str] = field(default_factory=list)
+    education_evidence: list[str] = field(default_factory=list)
     domain_candidate_text: str = ""
     is_software_cand: bool = False
     cand_hierarchy: Any | None = None
@@ -151,6 +153,7 @@ class CandidateAnalysisContext:
         norm_text = re.sub(r"\s+", " ", norm_text).strip()
 
         # 2. Taxonomy Classification (cached)
+        resume_evidence = CandidateResumeDTO.from_resume(cv_text, resume_json=resume_json)
         cand_tax_domain, cand_families_list = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
         cand_families = list(cand_families_list)
 
@@ -191,6 +194,14 @@ class CandidateAnalysisContext:
         if optimized_profile and optimized_profile.professional_domains:
             cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
 
+        profile_domain = str(cand_domain_profile.get("professional_domain") or "").strip()
+        profile_department = str(cand_domain_profile.get("recommended_department") or "").strip()
+        if profile_domain:
+            cand_tax_domain = profile_domain
+        if profile_department:
+            cand_families = [profile_department]
+            cand_primary_family = profile_department
+
         cand_domain = cand_domain_profile.get("professional_domain", "")
 
         # 4. Domain Candidate Text Construction
@@ -202,15 +213,10 @@ class CandidateAnalysisContext:
             domain_repository=domain_repository,
         )
 
-        # 5. Software Candidate Guard Flag — use DB family compatibility instead of hardcoded patterns
-        it_software_family = "Software Engineering & Development"
-        is_software_cand = False
-        if cand_primary_family:
-            is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(cand_primary_family, it_software_family)
-            if is_compat and score is not None and score >= 0.4:
-                is_software_cand = True
-        if not is_software_cand:
-            is_software_cand = "Information Technology" in cand_tax_domain or "Software" in cand_tax_domain
+        # 5. Software Candidate Guard Flag from configured evidence patterns.
+        guard_patterns = RuleConfigManager.get_compiled_cross_domain_guard()["software_candidate_patterns"]
+        software_evidence = " ".join([domain_candidate_text, cand_tax_domain, cand_domain, current_role or ""])
+        is_software_cand = any(pattern.search(software_evidence) for pattern in guard_patterns)
 
         return cls(
             cv_text=cv_text,
@@ -227,6 +233,9 @@ class CandidateAnalysisContext:
             cand_tax_domain=cand_tax_domain,
             cand_families=cand_families,
             cand_primary_family=cand_primary_family,
+            professional_skills=resume_evidence.skills,
+            experience_titles=resume_evidence.experience_titles,
+            education_evidence=resume_evidence.education,
             domain_candidate_text=domain_candidate_text,
             is_software_cand=is_software_cand,
         )
@@ -242,6 +251,10 @@ class CandidateAnalysisContext:
             return
 
         self.optimized_profile = optimized_profile
+        self.professional_skills = list(dict.fromkeys([*self.professional_skills, *optimized_profile.core_skills, *optimized_profile.inferred_skills]))
+        if optimized_profile.current_role:
+            self.experience_titles = list(dict.fromkeys([optimized_profile.current_role, *self.experience_titles]))
+        self.education_evidence = list(dict.fromkeys([*self.education_evidence, *optimized_profile.education_domains]))
         if optimized_profile.current_role:
             self.current_role = optimized_profile.current_role
         if self.candidate_experience is None and optimized_profile.relevant_experience_years is not None:
@@ -288,20 +301,18 @@ class CandidateAnalysisContext:
         if optimized_profile.professional_domains:
             self.cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
         self.cand_domain = self.cand_domain_profile.get("professional_domain", self.cand_domain)
+        profile_department = str(self.cand_domain_profile.get("recommended_department") or "").strip()
+        if self.cand_domain:
+            self.cand_tax_domain = self.cand_domain
+        if profile_department:
+            self.cand_families = [profile_department]
+            self.cand_primary_family = profile_department
         self.domain_candidate_text = CandidateDomainService.build_domain_candidate_text(
             cv_text=self.cv_text,
             current_role=self.current_role,
             optimized_profile=optimized_profile,
             domain_repository=domain_repository,
         )
-        guard = RuleConfigManager.get_compiled_cross_domain_guard()
-        # Replace hardcoded patterns with DB family compatibility check
-        it_software_family = "Software Engineering & Development"
-        self.is_software_cand = False
-        if self.cand_primary_family:
-            is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(self.cand_primary_family, it_software_family)
-            if is_compat and score is not None and score >= 0.4:
-                self.is_software_cand = True
-        if not self.is_software_cand:
-            self.is_software_cand = "Information Technology" in self.cand_domain or "Software" in self.cand_domain
-        _ = guard  # retained for backward compat; patterns no longer used for is_software_cand
+        guard_patterns = RuleConfigManager.get_compiled_cross_domain_guard()["software_candidate_patterns"]
+        software_evidence = " ".join([self.domain_candidate_text, self.cand_tax_domain, self.cand_domain, self.current_role or ""])
+        self.is_software_cand = any(pattern.search(software_evidence) for pattern in guard_patterns)
