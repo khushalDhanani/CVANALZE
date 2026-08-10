@@ -1,11 +1,31 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
-
+from sqlalchemy.orm import Session
+from app.core.database import get_mssql_read_db
 from app.repositories.job import JobRepository
 from app.schemas.job import JobOpening
+from app.services.vacancy_service import VacancyService
+from app.core.config import settings
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
+
+# Existing endpoints ... (will be retained) 
+
+@router.get("/active", response_model=list[JobOpening])
+async def list_active_vacancies(db: Session = Depends(get_mssql_read_db)):
+    """Retrieve all active vacancies with organization context."""
+    try:
+        vacancy_service = VacancyService(db)
+        return vacancy_service.get_active_vacancies()
+    except Exception as exc:
+        from app.core.logging import logger
+        logger.exception(f"Failed to list active vacancies: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve active vacancies.") from exc
+
+# Existing routes continue below
+
+# Duplicate router definition removed
 
 
 @router.get("", response_model=list[JobOpening])

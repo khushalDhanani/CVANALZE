@@ -841,9 +841,12 @@ class DynamicTaxonomyService:
         description: str = "",
         required_skills: list[str] | None = None,
         threshold: float = 0.70,
+        skip_vector: bool = False,
     ) -> NormalizedClassification:
         """
         Resolves vacancy's domain and job family dynamically using vector similarity & MSSQL taxonomy hierarchy.
+        Pass `skip_vector=True` during bulk preprocessing to bypass Ollama embedding lookup and avoid blocking
+        per-vacancy HTTP calls to Ollama when loading the vacancy list.
         """
         clean_title = title.strip()
         if not clean_title:
@@ -861,22 +864,83 @@ class DynamicTaxonomyService:
             evidence=[]
         )
 
-        # 1. Check true MSSQL tables first
+        # 1. Fast in-memory check via DepartmentNormalizer & DepartmentDomainRepository matchers
+        clean_dept = department.strip()
+        skills_text = " ".join(required_skills) if required_skills else ""
+        dept_norm = DepartmentNormalizer.normalize_department(clean_dept)
+        title_norm = DepartmentNormalizer.normalize_designation(clean_title)
+        ind_dept = dept_norm.get("industry_department")
+        ind_desig = title_norm.get("industry_designation") or clean_title
+
+        from app.repositories.department_domain import department_domain_repository
+        combined_text = f"{clean_title} {clean_dept} {description} {skills_text}".lower()
+        dept_scores = []
+        for matcher in department_domain_repository.get_domain_matchers():
+            score = matcher.keyword_match_count(combined_text)
+            if score > 0:
+                dept_scores.append((score, matcher.domain))
+
+        if dept_scores:
+            best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+            return NormalizedClassification(
+                db_department_id=dept_norm.get("db_department_id") or best_domain.department_id,
+                db_department_name=clean_dept or best_domain.department_name,
+                db_designation_id=None,
+                db_designation_name=clean_title,
+                industry_department=ind_dept or best_domain.department_name,
+                industry_designation=ind_desig,
+                industry_domain=best_domain.domain_name,
+                match_status=MatchStatus.DB_MATCH,
+                confidence=1.0,
+                match_source="DepartmentDomainMaster",
+                evidence=[
+                    ClassificationEvidence(
+                        source="DepartmentDomainMaster",
+                        matched_term=clean_dept or clean_title,
+                        matched_against=best_domain.domain_name,
+                        confidence=1.0,
+                    )
+                ],
+            )
+        elif ind_dept:
+            return NormalizedClassification(
+                db_department_id=dept_norm.get("db_department_id"),
+                db_department_name=clean_dept,
+                db_designation_id=None,
+                db_designation_name=clean_title,
+                industry_department=ind_dept,
+                industry_designation=ind_desig,
+                industry_domain=ind_dept,
+                match_status=MatchStatus.PARTIAL_MATCH,
+                confidence=0.85,
+                match_source="DepartmentNormalizer",
+                evidence=[
+                    ClassificationEvidence(
+                        source="DepartmentNormalizer",
+                        matched_term=clean_dept,
+                        matched_against=ind_dept,
+                        confidence=0.85,
+                    )
+                ],
+            )
+
+        # 2. Check true MSSQL tables
         mssql_res = cls._resolve_mssql_source_ids(clean_title)
         if mssql_res:
             return mssql_res
 
-        # 2. Check Postgres alias mapping
+        # 3. Check Postgres alias mapping
         alias_res = cls._resolve_postgres_alias(clean_title)
         if alias_res:
             return alias_res
 
-        # 3. Vector search on combined title + department + top skills
-        skills_text = " ".join(required_skills) if required_skills else ""
-        query_text = f"{clean_title} {department} {skills_text}".strip().lower()
-        vector_res = cls._resolve_postgres_vector(query_text, threshold=threshold)
-        if vector_res:
-            return vector_res
+        # 4. Vector search on combined title + department + top skills (fallback)
+        # Skip during bulk preprocessing to avoid blocking on per-vacancy Ollama HTTP calls.
+        if not skip_vector:
+            query_text = f"{clean_title} {department} {skills_text}".strip().lower()
+            vector_res = cls._resolve_postgres_vector(query_text, threshold=threshold)
+            if vector_res:
+                return vector_res
 
         from app.core.database import MssqlReadSession
         fallback_status = MatchStatus.SOURCE_DATA_UNAVAILABLE if MssqlReadSession is None else MatchStatus.NO_SUITABLE_MATCH

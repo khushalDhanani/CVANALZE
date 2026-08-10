@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -36,6 +37,10 @@ class OllamaTimeoutError(OllamaError):
 
 
 class OllamaConcurrencyError(OllamaTimeoutError):
+    pass
+
+
+class OllamaCircuitOpenError(OllamaUnavailableError):
     pass
 
 
@@ -118,6 +123,7 @@ class OllamaModelInfo(BaseModel):
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
 
     name: str
+    digest: str = ""
 
     @field_validator("name")
     @classmethod
@@ -177,6 +183,8 @@ class OllamaTransport:
     _client_lock = threading.RLock()
     _operation_lock = threading.RLock()
     _metrics_lock = threading.Lock()
+    _circuit_lock = threading.Lock()
+    _circuit_state: dict[str, dict[str, float | int]] = {}
     _metrics: dict[str, Any] = {
         "requests": 0,
         "successes": 0,
@@ -185,6 +193,8 @@ class OllamaTransport:
         "timeouts": 0,
         "unloads": 0,
         "unload_failures": 0,
+        "residency_skips": 0,
+        "circuit_rejections": 0,
         "response_bytes": 0,
         "lock_wait_ms": 0.0,
         "model_load_duration_ms": 0.0,
@@ -264,14 +274,9 @@ class OllamaTransport:
                 operation=operation,
             ) from exc
         finally:
-            try:
-                if file_lock is not None and file_lock.is_locked:
-                    file_lock.release()
-            finally:
-                try:
-                    cls.close()
-                finally:
-                    cls._operation_lock.release()
+            if file_lock is not None and file_lock.is_locked:
+                file_lock.release()
+            cls._operation_lock.release()
 
     @classmethod
     def execute(
@@ -316,6 +321,7 @@ class OllamaTransport:
         started = time.perf_counter()
         operation_deadline = deadline if deadline is not None else started + timeout_seconds
         last_error: OllamaError | None = None
+        cls._circuit_before_request(operation)
 
         num_ctx = (payload or {}).get("options", {}).get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
         logger.info(
@@ -348,6 +354,7 @@ class OllamaTransport:
                 value = parser(response_data)
                 duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
                 cls._record_success(operation, duration_ms, response_bytes, response_data)
+                cls._circuit_success(operation)
                 logger.info(
                     f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} status=SUCCESS "
                     f"duration_ms={duration_ms} response_bytes={response_bytes}"
@@ -387,6 +394,7 @@ class OllamaTransport:
                 break
             cls._record_retry()
             backoff = max(0.0, settings.OLLAMA_RETRY_BACKOFF_SECONDS) * (2 ** (attempt - 1))
+            backoff += random.uniform(0.0, max(0.0, settings.OLLAMA_RETRY_JITTER_SECONDS))
             remaining = operation_deadline - time.perf_counter()
             if backoff <= 0:
                 continue
@@ -403,6 +411,8 @@ class OllamaTransport:
         cls._record_failure(operation, duration_ms)
         if last_error is None:
             last_error = OllamaUnavailableError("Ollama request failed.", operation=operation)
+        if last_error.retryable and isinstance(last_error, (OllamaUnavailableError, OllamaTimeoutError, OllamaHTTPError)):
+            cls._circuit_failure(operation)
         logger.error(f"[OLLAMA] operation={operation} status=FAILED duration_ms={duration_ms} error={type(last_error).__name__}")
         raise last_error
 
@@ -609,6 +619,11 @@ class OllamaTransport:
 
     @classmethod
     def _unload_safely(cls, model: str, *, parent_operation: str) -> None:
+        if settings.OLLAMA_RESIDENCY_ENABLED:
+            with cls._metrics_lock:
+                cls._metrics["residency_skips"] += 1
+            logger.info(f"[OLLAMA] operation={parent_operation} model='{model}' status=RESIDENT keep_alive={settings.OLLAMA_KEEP_ALIVE}")
+            return
         try:
             cls._unload_request(model)
             with cls._metrics_lock:
@@ -655,20 +670,35 @@ class OllamaTransport:
     @staticmethod
     def extract_json(text: str, *, operation: str) -> Any:
         cleaned = text.strip()
+        repaired = False
         if cleaned.startswith("```"):
             first_newline = cleaned.find("\n")
             cleaned = cleaned[first_newline + 1 :] if first_newline >= 0 else cleaned[3:]
             cleaned = cleaned.removesuffix("```")
             cleaned = cleaned.strip()
+            repaired = True
         try:
-            return json.loads(cleaned)
+            value = json.loads(cleaned)
+            if repaired:
+                from app.services.quality_metrics import QualityMetrics
+
+                QualityMetrics.record("structured_output", deterministic_repairs=1)
+            return value
         except json.JSONDecodeError as original_error:
+            if not settings.LLM_STRUCTURED_REPAIR_ENABLED:
+                raise OllamaInvalidResponseError(
+                    "Ollama generation did not contain valid structured JSON.",
+                    operation=operation,
+                ) from original_error
             decoder = json.JSONDecoder()
             for index, character in enumerate(cleaned):
                 if character not in "[{":
                     continue
                 try:
                     value, _ = decoder.raw_decode(cleaned[index:])
+                    from app.services.quality_metrics import QualityMetrics
+
+                    QualityMetrics.record("structured_output", deterministic_repairs=1)
                     return value
                 except json.JSONDecodeError:
                     continue
@@ -684,7 +714,16 @@ class OllamaTransport:
             metrics["operations"] = {operation: operation_metrics.copy() for operation, operation_metrics in cls._metrics["operations"].items()}
             completed = int(metrics["successes"]) + int(metrics["failures"])
             metrics["average_duration_ms"] = round(float(metrics["total_duration_ms"]) / completed, 2) if completed else 0.0
-            return metrics
+        now = time.monotonic()
+        with cls._circuit_lock:
+            metrics["circuits"] = {
+                operation: {
+                    "state": "open" if float(state.get("opened_until", 0.0)) > now else "half_open" if state.get("opened_until") else "closed",
+                    "failures": int(state.get("failures", 0)),
+                }
+                for operation, state in cls._circuit_state.items()
+            }
+        return metrics
 
     @classmethod
     def reset_metrics(cls) -> None:
@@ -697,6 +736,8 @@ class OllamaTransport:
                 "timeouts": 0,
                 "unloads": 0,
                 "unload_failures": 0,
+                "residency_skips": 0,
+                "circuit_rejections": 0,
                 "response_bytes": 0,
                 "lock_wait_ms": 0.0,
                 "model_load_duration_ms": 0.0,
@@ -705,6 +746,44 @@ class OllamaTransport:
                 "total_duration_ms": 0.0,
                 "operations": {},
             }
+        with cls._circuit_lock:
+            cls._circuit_state.clear()
+
+    @classmethod
+    def _circuit_before_request(cls, operation: str) -> None:
+        if operation == "unload":
+            return
+        threshold = max(1, settings.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD)
+        now = time.monotonic()
+        with cls._circuit_lock:
+            state = cls._circuit_state.get(operation)
+            if not state:
+                return
+            opened_until = float(state.get("opened_until", 0.0))
+            if opened_until > now:
+                with cls._metrics_lock:
+                    cls._metrics["circuit_rejections"] += 1
+                raise OllamaCircuitOpenError("Ollama circuit breaker is open.", operation=operation)
+            if opened_until:
+                state["opened_until"] = 0.0
+                state["failures"] = threshold - 1
+
+    @classmethod
+    def _circuit_success(cls, operation: str) -> None:
+        with cls._circuit_lock:
+            cls._circuit_state.pop(operation, None)
+
+    @classmethod
+    def _circuit_failure(cls, operation: str) -> None:
+        if operation == "unload":
+            return
+        threshold = max(1, settings.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD)
+        with cls._circuit_lock:
+            state = cls._circuit_state.setdefault(operation, {"failures": 0, "opened_until": 0.0})
+            failures = int(state.get("failures", 0)) + 1
+            state["failures"] = failures
+            if failures >= threshold:
+                state["opened_until"] = time.monotonic() + max(0.1, settings.OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS)
 
     @classmethod
     def _operation_timeout(cls, operation: str) -> float:

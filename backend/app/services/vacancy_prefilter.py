@@ -16,6 +16,7 @@ from app.services.dynamic_scoring_prefilter_service import (
 )
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
 from app.services.job_taxonomy import TaxonomyClassifier
+from app.services.quality_metrics import QualityMetrics
 
 
 @dataclass
@@ -134,7 +135,7 @@ class ReciprocalRankFusionService:
             rrf_details = {"lexical_rank": l_rank, "vector_rank": v_rank}
             rrf_scored.append((fused_score, rrf_details, job))
 
-        rrf_scored.sort(key=lambda item: item[0], reverse=True)
+        rrf_scored.sort(key=lambda item: (-item[0], item[2].job_id))
         return rrf_scored
 
 
@@ -194,9 +195,16 @@ class VacancyPreFilter:
 
         # Fast exit if total openings <= limit
         if len(job_contexts) <= limit:
-            if return_contexts:
-                return job_contexts
-            return [j.raw_job if isinstance(j.raw_job, dict) and j.raw_job else j.__dict__ for j in job_contexts]
+            results = []
+            ordered_contexts = sorted(job_contexts, key=lambda item: item.job_id)
+            for context in ordered_contexts:
+                job_dict = dict(context.raw_job) if isinstance(context.raw_job, dict) and context.raw_job else dict(context.__dict__)
+                job_dict["_prefilter_score"] = 100.0
+                job_dict["_rrf_details"] = {"rrf_score": 1.0, "stage0_compatible": True, "retrieval_path": "all_openings"}
+                context.raw_job = job_dict
+                results.append(job_dict)
+            QualityMetrics.record("retrieval", openings=len(job_contexts), selected=len(results), stage0_exclusions=0, vector_coverage=0)
+            return ordered_contexts if return_contexts else results
 
         # Load prefilter configuration rules ONCE (dynamic MSSQL stop_words & weights)
         prefilter_rules: PrefilterRules = DynamicScoringAndPrefilterService.get_prefilter_rules()
@@ -228,12 +236,20 @@ class VacancyPreFilter:
         if len(stage0_jobs) <= limit:
             logger.info(f"[PREFILTER_ADAPTIVE] Stage 0 compatible openings ({len(stage0_jobs)}) <= limit ({limit}). Skipping Stage 1 & 2 retrieval.")
             res_jobs = []
+            stage0_jobs = sorted(stage0_jobs, key=lambda item: item.job_id)
             for j in stage0_jobs:
                 job_dict = dict(j.raw_job) if isinstance(j.raw_job, dict) and j.raw_job else dict(j.__dict__)
                 job_dict["_prefilter_score"] = 100.0
-                job_dict["_rrf_details"] = {"rrf_score": 1.0, "stage0_compatible": True}
+                job_dict["_rrf_details"] = {"rrf_score": 1.0, "stage0_compatible": True, "retrieval_path": "taxonomy"}
                 j.raw_job = job_dict
                 res_jobs.append(job_dict)
+            QualityMetrics.record(
+                "retrieval",
+                openings=len(job_contexts),
+                selected=len(res_jobs),
+                stage0_exclusions=len(job_contexts) - len(stage0_jobs),
+                vector_coverage=0,
+            )
             return stage0_jobs if return_contexts else res_jobs
 
         # STAGE 1: Semantic Vector Retrieval (Single pgvector Query Reuse)
@@ -259,6 +275,7 @@ class VacancyPreFilter:
 
         # Extract precompiled vector ranks dict from the single query result
         vec_ranks = {vid: rank for vid, rank, dist in vector_results_tuple} if vector_results_tuple else {}
+        vec_distances = {vid: dist for vid, rank, dist in vector_results_tuple} if vector_results_tuple else {}
 
         # Compute Lexical Scores using Fast Token Set Intersections
         lexical_scored: list[tuple[float, JobEvaluationContext]] = []
@@ -309,7 +326,7 @@ class VacancyPreFilter:
             lexical_scored.append((score, job))
 
         # Sort descending to establish 1-indexed lexical ranks
-        lexical_scored.sort(key=lambda item: item[0], reverse=True)
+        lexical_scored.sort(key=lambda item: (-item[0], item[1].job_id))
         lex_ranks = {job.job_id: rank for rank, (s, job) in enumerate(lexical_scored, 1)}
 
         t_lexical_ms = round((time.perf_counter() - t2) * 1000.0, 2)
@@ -330,6 +347,9 @@ class VacancyPreFilter:
         keyword_only, vector_only, both = 0, 0, 0
 
         for fused_score, rrf_details, job in rrf_scored[:limit]:
+            rrf_details["rrf_score"] = fused_score
+            rrf_details["vector_distance"] = vec_distances.get(job.job_id)
+            rrf_details["stage0_compatible"] = True
             has_l = rrf_details.get("lexical_rank") is not None
             has_v = rrf_details.get("vector_rank") is not None
             if has_l and has_v:
@@ -354,6 +374,16 @@ class VacancyPreFilter:
             f"{len(stage1_jobs)} Stage 1 -> {len(selected_results)} final selected (Top K={limit}) in {total_ms} ms. "
             f"Composition: Both={both}, Keyword-Only={keyword_only}, Vector-Only={vector_only} | "
             f"Timings: Stage0={t_stage0_ms}ms, Stage1={t_stage1_ms}ms, Lexical={t_lexical_ms}ms, RRF={t_rrf_ms}ms"
+        )
+        QualityMetrics.record(
+            "retrieval",
+            openings=len(job_contexts),
+            selected=len(selected_results),
+            stage0_exclusions=len(job_contexts) - len(stage0_jobs),
+            vector_coverage=len(vec_ranks),
+            lexical_and_vector=both,
+            lexical_only=keyword_only,
+            vector_only=vector_only,
         )
 
         if return_contexts:

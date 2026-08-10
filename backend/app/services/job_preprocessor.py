@@ -47,8 +47,8 @@ class JobPreprocessor:
         pref_keywords = job.get("preferred_keywords", [])
         job["_precomputed_pref_keywords"] = [k.lower() for k in pref_keywords if isinstance(k, str)]
 
-        # 5. Populate Taxonomy Metadata
-        domain, job_family = TaxonomyClassifier.classify_vacancy(job)
+        # 5. Populate Taxonomy Metadata (skip_vector=True avoids blocking Ollama HTTP calls during bulk vacancy load)
+        domain, job_family = TaxonomyClassifier.classify_vacancy(job, skip_vector=True)
         job["domain"] = domain
         job["job_family"] = job_family
         job["_precomputed_domain"] = domain

@@ -217,7 +217,7 @@ class TaxonomyClassifier:
     """
 
     @classmethod
-    def classify_vacancy_dto(cls, dto: VacancyDTO) -> TaxonomyClassification:
+    def classify_vacancy_dto(cls, dto: VacancyDTO, skip_vector: bool = False) -> TaxonomyClassification:
         """Strongly-typed classification of VacancyDTO returning TaxonomyClassification via DynamicTaxonomyService."""
         t0 = time.perf_counter()
 
@@ -227,6 +227,7 @@ class TaxonomyClassifier:
             department=dto.department,
             description=dto.description,
             required_skills=dto.required_skills,
+            skip_vector=skip_vector,
         )
 
         if dyn_res.match_status in (MatchStatus.DB_MATCH, MatchStatus.PARTIAL_MATCH):
@@ -244,6 +245,28 @@ class TaxonomyClassifier:
                 matched_keywords=(matched_kw,) if matched_kw else (),
             )
 
+        from app.repositories.department_domain import department_domain_repository
+        
+        combined_text = f"{dto.title_lower} {dto.department_lower} {dto.normalized_description} {dto.normalized_required_skills}".lower()
+        dept_scores = []
+        for matcher in department_domain_repository.get_domain_matchers():
+            score = matcher.keyword_match_count(combined_text)
+            if score > 0:
+                dept_scores.append((score, matcher.domain))
+
+        if dept_scores:
+            best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
+            return TaxonomyClassification(
+                domain=best_domain.domain_name,
+                job_family=best_domain.department_name or dto.department or "Unknown",
+                compatible_families=(best_domain.department_name or dto.department or "Unknown",),
+                matched_rule="domain_repository_keyword_fallback",
+                matched_branch=0,
+                matched_keywords=(),
+            )
+
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
         return TaxonomyClassification(
@@ -256,14 +279,15 @@ class TaxonomyClassifier:
         )
 
     @classmethod
-    def classify_vacancy(cls, job: dict[str, Any] | VacancyDTO | Any) -> tuple[str, str]:
+    def classify_vacancy(cls, job: dict[str, Any] | VacancyDTO | Any, skip_vector: bool = False) -> tuple[str, str]:
         """
         Classifies a job opening into (domain, job_family).
         Accepts VacancyDTO, JobEvaluationContext, or raw dicts.
         Preserves 100% backward compatibility.
+        Pass `skip_vector=True` during bulk preprocessing to avoid blocking Ollama calls.
         """
         dto = VacancyDTO.from_job(job)
-        classification = cls.classify_vacancy_dto(dto)
+        classification = cls.classify_vacancy_dto(dto, skip_vector=skip_vector)
         return (classification.domain, classification.job_family)
 
     @classmethod

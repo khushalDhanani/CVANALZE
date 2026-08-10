@@ -104,18 +104,22 @@ class TestExperienceCalculatorFullScan:
 
 class TestSectionAwareProfileExtraction:
     def test_late_sections_included_in_profile_prompt(self):
-        """Certifications and Education appearing past char 20,000 must be in section-aware payload."""
+        """Late sections survive token-aware packing without silent character slicing."""
+        from app.services.context_packer import estimate_tokens
+
         payload = _build_section_aware_cv_text(VERY_LONG_CV, max_chars=settings.LLM_PROFILE_MAX_CHARS)
-        assert len(payload) <= settings.LLM_PROFILE_MAX_CHARS + 500
+        assert estimate_tokens(payload) <= settings.LLM_PROFILE_TOKEN_BUDGET + 20
         # Education and Certifications from the end of the 25k CV must be present
         assert "Education" in payload or "Stanford" in payload
         assert "Certifications" in payload or "CISSP" in payload
         assert "Work Experience" in payload or "Enterprise Corp" in payload
 
     def test_short_cv_returns_unmodified(self):
-        """Short CV under limit returns 100% full text without modification."""
+        """Short CVs retain all content inside an explicit untrusted-data boundary."""
         payload = _build_section_aware_cv_text(SHORT_CV, max_chars=settings.LLM_PROFILE_MAX_CHARS)
-        assert payload == SHORT_CV
+        assert SHORT_CV in payload
+        assert payload.startswith("<UNTRUSTED_CV_DATA>")
+        assert payload.endswith("</UNTRUSTED_CV_DATA>")
 
 
 # ---------------------------------------------------------------------------

@@ -92,3 +92,45 @@
 - Result: **TOTAL=13 | PASS=9 | WARNING=4 | FAIL=0**.
 - The `WARNING`s were expected cases of "Zero skills extracted" for certain malformed CVs.
 - DB cleanup and reprocessing is complete, and `cv_results` is now fully synchronized with the fixes.
+
+---
+
+## Dynamic Match Quality Fixes (2026-08-10)
+
+### Root Causes Fixed
+
+Triggered by `cv_1761281901_CandidateCVFileName_13595` (Shubham Gavhane — ITI Fitter) surfacing
+72.3% POTENTIAL_MATCH for "Plant Assistant - I (Maintenance)" but 0% everywhere else.
+
+1. **Job title label-prefix denylist** — `resume_field_extractor.py`
+   - Added module-level `_LABEL_PREFIX_DENYLIST` frozenset (duration, period, designation, position, etc.).
+   - `is_valid_job_title()` now rejects any candidate string that is a bare label token (e.g. `"Duration:"` → False).
+   - `_extract_employment()` enhanced to extract an embedded role title from compound Duration bullets: `"Duration :- Fitter Executive , July 2021 - Present"` now correctly sets `job_title = "Fitter Executive"`.
+
+2. **Sparse-CV maintenance skill inference** — `scoring_engine.py`
+   - Three module-level frozensets added (`_MAINTENANCE_CV_SIGNALS`, `_MAINTENANCE_INFERRED_TERMS`, `_MAINTENANCE_INFERENCE_EXCLUDED`).
+   - `_extract_term_matches()` now credits maintenance-family required skills (e.g. "Plant Maintenance", "Fitter", "Maintenance Work") as inferred matches for CVs < 3000 chars that contain ITI/trade signal words.
+   - Non-maintenance skills (chemistry, QA, SAP, electrical, etc.) are never inferred.
+
+3. **Sub-family domain mismatch relaxation** — `match_evaluators.py`
+   - Added `CrossDomainGuardEvaluator._share_root_family()` static method.
+   - Vacancies whose family is a numbered sub-team of the candidate's root family (e.g. `"Maintenance Team - 1 (Ramesh Maurya)"` vs `"Maintenance Team"`) no longer trigger the -50pt domain mismatch cap.
+   - The check strips trailing parenthetical owner qualifiers and trailing `-N` suffixes before comparing roots.
+
+4. **Promote MEDIUM scores to suitable_openings** — `scoring_engine.py`
+   - `analyze_cv()` now includes MEDIUM-classified matches (score ≥ `match_medium_threshold`, not domain-capped, no mandatory failures) in `suitable_openings`.
+   - `best_match` will now point to the highest-scoring MEDIUM match when no HIGH match exists, making `has_genuine_match = True` for candidates like Shubham.
+
+### Files Changed
+- `backend/app/services/resume_field_extractor.py`
+- `backend/app/services/scoring_engine.py`
+- `backend/app/services/match_evaluators.py`
+
+### Verification
+- All 3 files pass Python AST syntax check (`python3 -c "import ast; ast.parse(...)`).
+- **Pending**: restart backend API, delete CV cache, reprocess `cv_1761281901_CandidateCVFileName_13595`, confirm:
+  - `work_experience[*].job_title` = `"Fitter Executive"` (not `"Duration:"`)
+  - `suitable_openings` count ≥ 1
+  - `has_genuine_match = true`
+  - `domain_mismatch_capped = false` on Maintenance sub-team vacancies
+

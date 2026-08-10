@@ -727,6 +727,24 @@ class ComponentScoreEvaluator:
 class CrossDomainGuardEvaluator:
     """Evaluates taxonomy family compatibility and applies cross-domain score caps and mismatch penalties."""
 
+    @staticmethod
+    def _share_root_family(cand_family: str | None, vac_family: str | None) -> bool:
+        """Returns True when vac_family is a named sub-team of cand_family (or vice-versa).
+
+        Handles patterns such as:
+          cand='Maintenance Team', vac='Maintenance Team - 1 (Ramesh Maurya)' -> True
+          cand='Production Team',  vac='Maintenance Team - 1'                 -> False
+        """
+        if not cand_family or not vac_family:
+            return False
+        # Strip trailing parenthetical owner qualifiers e.g. "(Ramesh Maurya)"
+        _paren = re.compile(r"\s*\([^)]*\)", re.IGNORECASE)
+        cand_root = _paren.sub("", cand_family).split("-")[0].strip().lower()
+        vac_root = _paren.sub("", vac_family).split("-")[0].strip().lower()
+        if not cand_root or not vac_root:
+            return False
+        return cand_root == vac_root or cand_root in vac_root or vac_root in cand_root
+
     @classmethod
     def evaluate(
         cls,
@@ -755,11 +773,14 @@ class CrossDomainGuardEvaluator:
         domain_mismatch = False
         if vac_family not in (None, "Unknown") and context.cand_primary_family not in (None, "Unknown"):
             if not is_tax_compat:
-                domain_mismatch = True
+                # Don't cap sub-families of the same root department
+                if not cls._share_root_family(context.cand_primary_family, vac_family):
+                    domain_mismatch = True
             elif context.cand_primary_family and vac_family:
                 is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(context.cand_primary_family, vac_family)
-                if not is_compat or (score is not None and score < 0.4):
+                if (not is_compat or (score is not None and score < 0.4)) and not cls._share_root_family(context.cand_primary_family, vac_family):
                     domain_mismatch = True
+
         cand_domain = context.cand_domain or context.cand_tax_domain
         if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
             cand_d_norm = cand_domain.strip().lower()
@@ -1154,9 +1175,30 @@ class VacancyFitEvaluator:
         cls,
         opening: dict[str, Any] | Any,
         high_threshold: float = 70.0,
+        potential_threshold: float = 50.0,
     ) -> bool:
-        """Returns True if the opening is classified as a canonical MATCHED result."""
-        return cls.classify_opening_fit(opening, high_threshold=high_threshold) == VacancyMatchStatus.MATCHED.value
+        """Returns True if the opening is a canonical MATCHED or qualifying POTENTIAL_MATCH result.
+
+        A POTENTIAL_MATCH is included as eligible when:
+        - Score >= potential_threshold (default 50)
+        - Not domain-mismatch-capped
+        - No mandatory requirement failures
+        This allows near-match candidates (e.g. 72.3% MEDIUM) to surface in suitable_openings
+        rather than being buried in unsuitable_openings.
+        """
+        fit = cls.classify_opening_fit(opening, high_threshold=high_threshold, potential_threshold=potential_threshold)
+        if fit == VacancyMatchStatus.MATCHED.value:
+            return True
+        if fit == VacancyMatchStatus.POTENTIAL_MATCH.value:
+            # Promote POTENTIAL_MATCH to eligible only if it has no hard disqualifiers
+            if isinstance(opening, dict):
+                is_capped = bool(opening.get("domain_mismatch_capped") or opening.get("is_cross_domain"))
+                failures = opening.get("mandatory_failures") or opening.get("mandatory_fails") or []
+            else:
+                is_capped = bool(getattr(opening, "domain_mismatch_capped", False) or getattr(opening, "is_cross_domain", False))
+                failures = getattr(opening, "mandatory_failures", []) or getattr(opening, "mandatory_fails", [])
+            return not is_capped and not failures
+        return False
 
     @classmethod
     def determine_candidate_match_status(

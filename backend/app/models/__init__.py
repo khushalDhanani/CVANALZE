@@ -4,6 +4,7 @@ from app.models.domain import DepartmentDomainMaster
 from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading
 from app.models.pg import CandidateEmbedding, DomainEmbedding, VacancyEmbedding
 from app.models.prompts import PromptTemplateMaster
+from app.models.llm_trace import LLMExecutionTraceRecord
 from app.models.mssql.candidate import RecruitCandidateMst
 from app.models.rules import RuleConfigProfile, RuleValidationTestCase
 from app.models.scoring_profile import ScoringProfileMaster, StopWord
@@ -50,6 +51,7 @@ __all__ = [
     "GeoLocation",
     "HRFeedback",
     "JobFamilyMaster",
+    "LLMExecutionTraceRecord",
     "NameDenylist",
     "PromptTemplateMaster",
     "RuleConfigProfile",

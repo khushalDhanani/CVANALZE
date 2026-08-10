@@ -20,6 +20,8 @@ from app.schemas.job_context import JobEvaluationContext
 from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import ResumeJsonExtractor
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
+from app.services.confidence_calibration import ConfidenceCalibrationService
+from app.services.llm_grounding_service import GroundingReport, LLMGroundingService
 from app.services.llm_service import OllamaLLMService
 from app.services.resume_normalizer import ResumeNormalizer
 from app.services.scoring_engine import ScoringEngine
@@ -41,6 +43,7 @@ class MatchService:
         resume_json: dict[str, Any] | None = None,
         normalized_resume: NormalizedResume | None = None,
         deterministic_experience: float | None = None,
+        _shadow_run: bool = False,
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
         profiler.metrics.upload_ms = upload_ms
@@ -184,6 +187,7 @@ class MatchService:
         optimized_response = None
         optimized_profile = None
         llm_matches_map = {}
+        grounding_report = GroundingReport()
 
         if not llm_skipped:
             # 4. Reduce LLM input to Top-N by deterministic score (full scoring already computed above).
@@ -217,10 +221,9 @@ class MatchService:
                 profiler.metrics.prompt_input_tokens = token_est
 
             full_cv_chars = len(cv_text)
-            llm_cv_chars = min(full_cv_chars, settings.LLM_CV_MAX_CHARS)
             logger.info(
                 f"[LLM_INPUT] doc={document_hash[:12]}... "
-                f"full_cv_chars={full_cv_chars} llm_chars={llm_cv_chars} "
+                f"full_cv_chars={full_cv_chars} cv_token_budget={settings.LLM_CONTEXT_CV_TOKEN_BUDGET} "
                 f"vacancies_prefiltered={len(filtered_job_contexts)} "
                 f"vacancies_sent_to_llm={vacancy_count} prompt_chars={char_count} estimated_tokens={token_est}"
             )
@@ -246,6 +249,26 @@ class MatchService:
                 cache_key,
                 profiler,
             )
+
+            if optimized_response:
+                optimized_response, grounding_report = LLMGroundingService.validate_optimized_response(
+                    optimized_response,
+                    cv_text=cv_text,
+                    vacancies=llm_vacancy_dicts,
+                )
+                OllamaLLMService.record_quality_trace(
+                    operation="optimized_match_grounding",
+                    prompt=prompt,
+                    prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
+                    source_hash=cache_key,
+                    quality_metadata={
+                        "grounding_ratio": round(grounding_report.ratio, 4),
+                        "assertions": grounding_report.assertions,
+                        "grounded_assertions": grounding_report.grounded_assertions,
+                        "invalid_vacancy_ids": len(grounding_report.invalid_vacancy_ids),
+                        "unsupported_claims": len(grounding_report.unsupported_claims),
+                    },
+                )
 
             optimized_profile = optimized_response.candidate_profile if optimized_response else None
             candidate_context.apply_optimized_profile(
@@ -280,6 +303,24 @@ class MatchService:
                     # Wrap into EnrichedJobMatchResult
                     llm_reason = llm_match.semantic_reason if llm_match else ""
                     inferred_skills = llm_match.inferred_skills if llm_match else (optimized_profile.inferred_skills if optimized_profile else [])
+                    deterministic_skills = {skill.strip().lower() for skill in job_match.matched_skills if skill.strip()}
+                    llm_skills = {skill.strip().lower() for skill in (llm_match.matched_skills if llm_match else []) if skill.strip()}
+                    agreement = 1.0 if llm_skipped else (len(deterministic_skills & llm_skills) / len(llm_skills) if llm_skills else 0.5)
+                    calibration = ConfidenceCalibrationService.calculate(
+                        evidence_coverage=job_match.coverage,
+                        grounding_ratio=grounding_report.ratio,
+                        rule_llm_agreement=agreement,
+                        validation_passed=llm_skipped or optimized_response is not None,
+                    )
+                    retrieval_provenance = dict(job.get("_rrf_details") or {})
+                    has_lexical = retrieval_provenance.get("lexical_rank") is not None
+                    has_vector = retrieval_provenance.get("vector_rank") is not None
+                    retrieval_source = "both" if has_lexical and has_vector else "vector" if has_vector else "keyword"
+                    quality_flags = []
+                    if calibration.review_recommended:
+                        quality_flags.append("LOW_CALIBRATED_CONFIDENCE")
+                    if grounding_report.unsupported_claims:
+                        quality_flags.append("UNSUPPORTED_LLM_CLAIMS_REMOVED")
 
                     enriched_match = EnrichedJobMatchResult(
                         job_id=job_match.job_id,
@@ -320,11 +361,18 @@ class MatchService:
                         hr_review_required=job_match.hr_review_required,
                         domain_mismatch_capped=job_match.domain_mismatch_capped,
                         domain_mismatch_reason=job_match.domain_mismatch_reason,
+                        retrieval_source=retrieval_source,
+                        candidate_job_family=job_match.candidate_job_family,
+                        vacancy_job_family=job_match.vacancy_job_family,
                         reason=job_match.reason or llm_reason,
                         career_transition_detected=job_match.career_transition_detected,
                         career_transition_note=job_match.career_transition_note,
                         llm_reason=llm_reason,
                         inferred_skills=inferred_skills,
+                        calibrated_confidence=calibration.score,
+                        calibration_version=calibration.calibration_version,
+                        quality_flags=quality_flags,
+                        retrieval_provenance=retrieval_provenance,
                     )
                     evaluated_matches.append(enriched_match)
                 except Exception as e:
@@ -542,6 +590,17 @@ class MatchService:
             main_department_classification=main_dept_res,
             ai_career_suggestions=ai_career_suggestions,
             experience_gap_analysis=gap_analysis,
+            source_watermark=vacancy_version,
+            quality_metadata={
+                "matching_version": settings.MATCHING_VERSION,
+                "model_identifier_hash": hashlib.sha256(settings.OLLAMA_MODEL.encode("utf-8")).hexdigest(),
+                "grounding_ratio": round(grounding_report.ratio, 4),
+                "grounded_assertions": grounding_report.grounded_assertions,
+                "grounding_assertions": grounding_report.assertions,
+                "invalid_vacancy_ids_removed": len(grounding_report.invalid_vacancy_ids),
+                "unsupported_claims_removed": len(grounding_report.unsupported_claims),
+                "quality_shadow_mode": settings.LLM_SHADOW_QUALITY_ENABLED,
+            },
         )
 
         # Cache the match result for instant repeat searches if worker generation is current
@@ -557,7 +616,7 @@ class MatchService:
             logger.warning(f"[STALE_GENERATION_WRITE_REJECTED] resource=match_result doc={document_hash[:12]}")
 
 
-        if getattr(settings, "SHADOW_MODE_ENABLED", False) and candidate_id:
+        if getattr(settings, "SHADOW_MODE_ENABLED", False) and candidate_id and not _shadow_run:
             from app.services.shadow_validation_service import ShadowValidationService
             try:
                 numeric_cand_id = int(candidate_id)

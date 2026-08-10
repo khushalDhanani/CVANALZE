@@ -124,6 +124,10 @@ class PipelineStageMetrics(BaseModel):
 class EnrichedJobMatchResult(JobMatchResult):
     llm_reason: str = Field(default="", description="Qwen's semantic explanation of the fit")
     inferred_skills: list[str] = Field(default_factory=list, description="Additional skills inferred by Qwen")
+    calibrated_confidence: float | None = Field(default=None, ge=0.0, le=1.0, description="Evidence-derived confidence; shadow-only until calibrated")
+    calibration_version: str | None = Field(default=None, description="Version of the offline confidence calibration artifact")
+    quality_flags: list[str] = Field(default_factory=list, description="Non-decisional quality and review signals")
+    retrieval_provenance: dict[str, Any] = Field(default_factory=dict, description="Ranks and scores that caused retrieval of this vacancy")
 
 
 class EnrichedCandidateAnalysis(BaseModel):
@@ -212,6 +216,10 @@ class EnrichedCandidateAnalysis(BaseModel):
         default=None,
         description="Dynamic Experience Gap Analysis for HR",
     )
+    quality_metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additive privacy-safe quality lineage; does not contain prompts, CV text, or hidden reasoning",
+    )
 
 
 class HRReviewRequest(BaseModel):
@@ -252,4 +260,3 @@ class TrainingExample(BaseModel):
 
 
 EnrichedCandidateAnalysis.model_rebuild()
-

@@ -53,6 +53,19 @@ class EmbeddingSyncService:
         model = settings.EMBEDDING_MODEL
         uncached: list[tuple[int, dict[str, Any], str, str]] = []  # (vac_id, job, canonical_text, content_hash)
 
+        from app.core.database import PostgresAppSession
+        from app.models.pg import VacancyEmbedding
+
+        existing_pg_embeddings: dict[int, VacancyEmbedding] = {}
+        if PostgresAppSession is not None:
+            try:
+                with PostgresAppSession() as pg_db:
+                    records = pg_db.query(VacancyEmbedding).all()
+                    for rec in records:
+                        existing_pg_embeddings[rec.vacancy_id] = rec
+            except Exception as exc:
+                logger.warning(f"[EMBEDDING_SYNC] Could not pre-fetch VacancyEmbedding rows: {exc}")
+
         for job in job_dicts:
             vac_id = job.get("vacancy_id") or job.get("id")
             try:
@@ -70,17 +83,16 @@ class EmbeddingSyncService:
 
             # Check if embedding already exists in cache or DB for this model and content hash
             cached_emb = _ecm.get(f"{model}:vac:{content_hash}")
-            if cached_emb is None and vac_id_int > 0:
-                pg_emb, stored_hash = get_vacancy_embedding(vac_id_int)
-                if pg_emb is not None and stored_hash == content_hash:
-                    existing_meta = get_vacancy_embedding_metadata(vac_id_int)
-                    source_watermark = existing_meta.get("source_watermark") if existing_meta else None
+            if cached_emb is None and vac_id_int > 0 and vac_id_int in existing_pg_embeddings:
+                rec = existing_pg_embeddings[vac_id_int]
+                if rec.embedding is not None and rec.content_hash == content_hash:
+                    source_watermark = rec.source_watermark
                     job_updated_at = job.get("updated_at") or job.get("VacancyRequestCreatedAt")
                     
                     dt_source = _parse_dt(source_watermark)
                     dt_job = _parse_dt(job_updated_at)
                     if not job_updated_at or (dt_source and dt_job and dt_source >= dt_job):
-                        cached_emb = pg_emb
+                        cached_emb = [float(x) for x in list(rec.embedding)]
                         _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
 
             if cached_emb is None:

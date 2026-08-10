@@ -148,7 +148,8 @@ def execute_shadow_pipeline(candidate_id: int, vacancy_id: Optional[int], prod_r
     try:
         shadow_result = asyncio.run(MatchService.analyze_single_cv(
             cv_text=cv_text,
-            candidate_id=str(candidate_id)
+            candidate_id=str(candidate_id),
+            _shadow_run=True,
         ))
     except Exception as e:
         logger.error(f"Shadow pipeline execution failed: {e}")

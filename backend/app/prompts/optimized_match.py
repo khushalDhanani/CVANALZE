@@ -4,6 +4,8 @@ import re
 from typing import Any
 
 from app.core.config import settings
+from app.services.context_packer import estimate_tokens, pack_cv_context
+from app.services.llm_input_security import harden_prompt, sanitize_string_list, sanitize_untrusted_text
 
 PROMPT_VERSION = settings.OPTIMIZED_PROMPT_VERSION
 
@@ -27,26 +29,32 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
 
     Returns: (prompt_str, estimated_token_count, char_count)
     """
-    cleaned_cv = _clean_cv_text(cv_text)[:settings.LLM_CV_MAX_CHARS]
+    packed_context = pack_cv_context(
+        _clean_cv_text(cv_text),
+        max_tokens=settings.LLM_CONTEXT_CV_TOKEN_BUDGET,
+        deidentify=settings.LLM_DEIDENTIFY_MATCHING_INPUTS,
+    )
+    cleaned_cv = packed_context.text
 
     compact_vacancies = []
-    for vac in filtered_vacancies:
+    ordered_vacancies = sorted(filtered_vacancies, key=lambda vac: str(vac.get("vacancy_id") or vac.get("id") or ""))
+    for vac in ordered_vacancies:
         vac_id = vac.get("vacancy_id") or vac.get("id")
         item = {
             "vacancy_id": vac_id,
-            "title": vac.get("title") or vac.get("job_title"),
-            "department": vac.get("department_name") or vac.get("department"),
+            "title": sanitize_untrusted_text(str(vac.get("title") or vac.get("job_title") or "")).text,
+            "department": sanitize_untrusted_text(str(vac.get("department_name") or vac.get("department") or "")).text,
         }
         if vac.get("required_skills"):
-            item["required_skills"] = vac.get("required_skills")
+            item["required_skills"] = sanitize_string_list(vac.get("required_skills"))
         if vac.get("preferred_keywords"):
-            item["preferred_keywords"] = vac.get("preferred_keywords")
+            item["preferred_keywords"] = sanitize_string_list(vac.get("preferred_keywords"))
         if vac.get("min_experience_years") is not None:
             item["min_exp"] = vac.get("min_experience_years")
         if vac.get("education_requirements"):
-            item["education_req"] = vac.get("education_requirements")
+            item["education_req"] = sanitize_string_list(vac.get("education_requirements"))
         if vac.get("certifications"):
-            item["certifications"] = vac.get("certifications")
+            item["certifications"] = sanitize_string_list(vac.get("certifications"))
 
         compact_vacancies.append(item)
 
@@ -85,8 +93,8 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
         }
     )
 
+    prompt = harden_prompt(prompt)
     char_count = len(prompt)
-    token_estimate = max(1, char_count // 4)
+    token_estimate = max(1, estimate_tokens(prompt))
 
     return prompt, token_estimate, char_count
-

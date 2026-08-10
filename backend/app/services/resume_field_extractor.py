@@ -21,6 +21,17 @@ _TITLE_KEYWORD_SPLIT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Field-label tokens that should never be treated as a job title.
+# CVs formatted like "Duration: July 2021" or "Designation: Fitter" use
+# these words as section labels — not as role titles.
+_LABEL_PREFIX_DENYLIST: frozenset[str] = frozenset({
+    "duration", "period", "tenure", "date", "from", "to",
+    "organization", "company", "employer", "institution",
+    "designation", "position", "role", "department",
+    "location", "address", "place", "city",
+    "qualification", "education", "degree", "board", "institute",
+})
+
 
 class classproperty:
     def __init__(self, func):
@@ -253,6 +264,10 @@ class ResumeFieldExtractor:
         max_chars = config.downstream_gates.max_char_length or 60
         if not candidate or len(candidate) < 2 or len(candidate) > max_chars or candidate.endswith(".") or candidate.count(",") > 2:
             return False
+        # Reject bare label tokens (e.g. "Duration:", "Designation:", "Period")
+        stripped_colon = candidate.rstrip(":").strip().lower()
+        if stripped_colon in _LABEL_PREFIX_DENYLIST:
+            return False
         title_without_dates = cls._DATE_RANGE.sub("", candidate).strip(" ()-|–—")
         tokens = [token.lower() for token in re.split(r"[\s/\-&()]+", title_without_dates) if token]
         if not (1 <= len(tokens) <= max_words) or tokens[0] in cls.NARRATIVE_SENTENCE_STARTERS:
@@ -479,15 +494,20 @@ class ResumeFieldExtractor:
             if line.startswith(("-", "•")):
                 clean_bullet = line.lstrip("-• \uf0b7").strip()
                 # Handle structured bullet CVs: "Duration :- dd/mm/yyyy to dd/mm/yyyy"
+                # Also handles "Duration :- Fitter Executive , July 2021 - Present"
                 duration_match = re.search(r"(?:duration|period|tenure)\s*[:\-]+\s*(.+)$", clean_bullet, re.IGNORECASE)
                 if duration_match:
                     from app.services.date_interval_parser import DateIntervalParser
-                    date_str = duration_match.group(1).strip()
-                    d_match = cls._DATE_RANGE.search(date_str)
+                    remainder = duration_match.group(1).strip()
+                    d_match = cls._DATE_RANGE.search(remainder)
                     if d_match:
                         if current.get("dates") and (current.get("company") or current.get("job_title")):
                             commit()
                         current["dates"] = d_match.group(0).strip(" ()")
+                        # Try to extract a title from the text before the date
+                        pre_date = remainder[: remainder.index(d_match.group(0))].strip(", :-")
+                        if pre_date and not current.get("job_title") and cls.is_valid_job_title(pre_date):
+                            current["job_title"] = pre_date
                         continue
                 # Handle "Organization :- XYZ Ltd" bullets
                 org_match = re.search(r"(?:organization|company|employer)\s*[:\-]+\s*(.+)$", clean_bullet, re.IGNORECASE)
@@ -514,6 +534,16 @@ class ResumeFieldExtractor:
                     commit()
 
                 if not current.get("job_title") and cls.is_valid_job_title(line):
+                    # Strip label prefix if line is formatted as "Designation: Fitter Executive"
+                    _desig_prefix_re = re.compile(
+                        r"^(?:designation|job\s+title|role|position)\s*[:\-]+\s*",
+                        re.IGNORECASE,
+                    )
+                    clean_line = _desig_prefix_re.sub("", line).strip()
+                    if clean_line and clean_line != line:
+                        # Use the stripped value; validate it is still a valid title
+                        if cls.is_valid_job_title(clean_line):
+                            line = clean_line
                     if cls._looks_like_company(line) and not cls._looks_like_title(line):
                         if not current.get("company"):
                             current["company"] = line

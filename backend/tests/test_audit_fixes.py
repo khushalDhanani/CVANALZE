@@ -57,8 +57,8 @@ def test_document_cache_miss_fallback():
     assert cached is None
 
 
-def test_llm_cache_entry_full_metadata():
-    """Test that LLMCacheEntry stores and retrieves all metadata fields."""
+def test_llm_cache_entry_excludes_sensitive_prompt_and_reasoning():
+    """Long-lived cache records retain validated output, not raw CV-bearing model inputs."""
     from app.repositories.llm_cache import LLMCacheEntry
 
     entry = LLMCacheEntry(
@@ -83,10 +83,10 @@ def test_llm_cache_entry_full_metadata():
 
     cached = LLMCacheRepository.get_cached_entry(key)
     assert cached is not None
-    assert cached.prompt == entry.prompt
-    assert cached.raw_response == entry.raw_response
+    assert cached.prompt == ""
+    assert cached.raw_response == ""
     assert cached.structured_data == entry.structured_data
-    assert cached.reasoning == entry.reasoning
+    assert cached.reasoning == ""
     assert cached.processing_time_ms == entry.processing_time_ms
     assert cached.token_count == entry.token_count
     assert cached.inference_time_ms == entry.inference_time_ms

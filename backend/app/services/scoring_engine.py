@@ -29,6 +29,28 @@ from app.services.match_evaluators import (
 )
 
 
+# ---------------------------------------------------------------------------
+# Sparse-CV maintenance inference constants (module-level for performance)
+# These are used by ScoringEngine._extract_term_matches to infer the presence
+# of trade/maintenance skills on short CVs (<3000 chars).
+# ---------------------------------------------------------------------------
+_MAINTENANCE_CV_SIGNALS: frozenset[str] = frozenset({
+    "fitter", "fitting", "maintenance", "assembly", "mechanical", "iti",
+})
+_MAINTENANCE_INFERRED_TERMS: frozenset[str] = frozenset({
+    "maintenance work", "plant maintenance", "maintenance", "fitter",
+    "fitting", "assembly", "equipment maintenance", "mechanical maintenance",
+    "maintenance and assembly",
+})
+# Terms that must NEVER be credited via inference regardless of CV signals
+_MAINTENANCE_INFERENCE_EXCLUDED: frozenset[str] = frozenset({
+    "chemistry", "chemical", "qa", "quality", "audit", "sap", "erp",
+    "electrical", "electronics", "dcs", "hmi", "plc", "scada",
+    "c&i", "instrumentation", "software", "programming", "coding",
+    "design", "graphic", "payroll", "hr", "recruitment",
+})
+
+
 class ScoringEngine:
     # Repository instance is swappable in tests via dependency injection.
     domain_repository: DepartmentDomainRepository = department_domain_repository
@@ -183,9 +205,29 @@ class ScoringEngine:
                 matched.append(term)
                 continue
 
+            # Sparse-CV domain-aware inference: for short CVs (<3000 chars) where
+            # the candidate's text confirms an industrial-maintenance / trade background,
+            # credit maintenance-adjacent required skills as inferred matches rather than
+            # hard misses.  Non-maintenance skills are never inferred.
+            is_sparse_cv = len(normalized_text) < 3000
+            if is_sparse_cv:
+                cv_has_maintenance_signal = any(
+                    cls._get_compiled_term_pattern(sig).search(normalized_text)
+                    for sig in _MAINTENANCE_CV_SIGNALS
+                )
+                is_maintenance_term = (
+                    term_lower in _MAINTENANCE_INFERRED_TERMS
+                    or any(mt in term_lower for mt in _MAINTENANCE_INFERRED_TERMS)
+                ) and not any(ex in term_lower for ex in _MAINTENANCE_INFERENCE_EXCLUDED)
+                if cv_has_maintenance_signal and is_maintenance_term:
+                    matched.append(term)
+                    continue
+
             missing.append(term)
 
+
         return matched, missing
+
 
     @classmethod
     def evaluate_job_match(
@@ -405,13 +447,26 @@ class ScoringEngine:
         evaluated_matches.sort(key=lambda m: m.score, reverse=True)
 
         high_threshold = scoring_config.match_high_threshold
+        medium_threshold = scoring_config.match_medium_threshold
         suitable_matches = [
             m
             for m in evaluated_matches
-            if m.score >= high_threshold and m.classification == "HIGH" and not m.domain_mismatch_capped
+            if (
+                # Original: strong, non-domain-capped HIGH matches
+                (m.score >= high_threshold and m.classification == "HIGH" and not m.domain_mismatch_capped)
+                or
+                # Extended: MEDIUM matches that are domain-aligned and pass all mandatory gates
+                (
+                    m.score >= medium_threshold
+                    and m.classification == "MEDIUM"
+                    and not m.domain_mismatch_capped
+                    and not m.mandatory_failures
+                )
+            )
         ]
         unsuitable_matches = [m for m in evaluated_matches if m not in suitable_matches]
         best_match = suitable_matches[0] if suitable_matches else None
+
 
         return CandidateMatchAnalysis(
             primary_department=best_match.department if best_match else "",

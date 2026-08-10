@@ -11,7 +11,9 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.metrics import _metrics
 from app.core.profiler import PipelineProfiler
+from app.core.request_context import get_request_context_ids
 from app.repositories.llm_cache import LLMCacheEntry, LLMCacheRepository
+from app.repositories.llm_trace import LLMTraceRepository
 from app.schemas.analysis import (
     DynamicMappingResponse,
     OptimizedLLMMatchResponse,
@@ -22,8 +24,10 @@ from app.schemas.work_experience_llm import LLMWorkExperienceExtraction
 from app.services.ollama_transport import (
     OllamaError,
     OllamaGenerateEnvelope,
+    OllamaInvalidResponseError,
     OllamaTransport,
 )
+from app.schemas.llm_trace import LLMExecutionTrace
 
 TModel = TypeVar("TModel", bound=BaseModel)
 
@@ -45,15 +49,94 @@ class _StructuredGeneration:
 
 
 class OllamaLLMService:
+    _model_digests: dict[str, str] = {}
+
+    @staticmethod
+    def _model_identifier_hash(model: str) -> str:
+        return hashlib.sha256(model.strip().encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _trace(
+        cls,
+        *,
+        operation: str,
+        model: str,
+        prompt_version: str,
+        prompt_hash: str,
+        source_hash: str,
+        cache_status: str,
+        validation_status: str,
+        fallback_used: bool,
+        duration_ms: float = 0.0,
+        inference_ms: float = 0.0,
+        validation_ms: float = 0.0,
+        attempts: int = 0,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        completion_reason: str = "",
+        error_class: str = "",
+        quality_metadata: dict[str, Any] | None = None,
+    ) -> None:
+        request_id, correlation_id = get_request_context_ids()
+        normalized_source_hash = source_hash if len(source_hash) <= 64 else hashlib.sha256(source_hash.encode("utf-8")).hexdigest()
+        LLMTraceRepository.save(
+            LLMExecutionTrace(
+                request_id=request_id,
+                correlation_id=correlation_id,
+                operation=operation,
+                model_identifier_hash=cls._model_identifier_hash(model),
+                model_digest=cls._model_digests.get(model, ""),
+                prompt_version=prompt_version,
+                prompt_hash=prompt_hash,
+                source_hash=normalized_source_hash,
+                source_freshness="versioned" if normalized_source_hash else "unknown",
+                cache_status=cache_status,
+                validation_status=validation_status,
+                fallback_used=fallback_used,
+                duration_ms=duration_ms,
+                inference_ms=inference_ms,
+                validation_ms=validation_ms,
+                attempts=attempts,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                completion_reason=completion_reason,
+                error_class=error_class,
+                quality_metadata=quality_metadata or {},
+            )
+        )
+
     @classmethod
     def get_status(cls) -> tuple[bool, list[str]]:
         """Return Ollama reachability and normalized models from one tags request."""
         try:
             result = OllamaTransport.get_tags()
+            cls._model_digests = {model.name: model.digest for model in result.value.models if model.digest}
             return True, [model.name for model in result.value.models]
         except OllamaError as exc:
             logger.warning(f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__}")
             return False, []
+
+    @classmethod
+    def record_quality_trace(
+        cls,
+        *,
+        operation: str,
+        prompt: str,
+        prompt_version: str,
+        source_hash: str,
+        quality_metadata: dict[str, Any],
+    ) -> None:
+        cls._trace(
+            operation=operation,
+            model=settings.OLLAMA_MODEL,
+            prompt_version=prompt_version,
+            prompt_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            source_hash=source_hash,
+            cache_status="BYPASS",
+            validation_status="VALID",
+            fallback_used=False,
+            quality_metadata=quality_metadata,
+        )
 
     @classmethod
     def check_health(cls) -> bool:
@@ -192,8 +275,20 @@ class OllamaLLMService:
         profiler: PipelineProfiler | None = None,
     ) -> TModel | None:
         model = settings.OLLAMA_MODEL
+        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         if not settings.LLM_ENABLED:
             logger.info(f"[OLLAMA] operation={operation} model='{model}' status=DISABLED_FALLBACK")
+            cls._trace(
+                operation=operation,
+                model=model,
+                prompt_version=prompt_version,
+                prompt_hash=prompt_hash,
+                source_hash=cache_key,
+                cache_status="BYPASS",
+                validation_status="NOT_RUN",
+                fallback_used=True,
+                error_class="LLMDisabled",
+            )
             return None
 
         resolved_cache_key = cache_key or LLMCacheRepository.extraction_cache_key(
@@ -214,6 +309,19 @@ class OllamaLLMService:
                     profiler.metrics.ollama_request_ms = cached_entry.processing_time_ms
                     profiler.metrics.model_inference_ms = cached_entry.inference_time_ms
                     profiler.metrics.token_count = cached_entry.token_count
+                cls._trace(
+                    operation=operation,
+                    model=model,
+                    prompt_version=prompt_version,
+                    prompt_hash=prompt_hash,
+                    source_hash=resolved_cache_key,
+                    cache_status="HIT",
+                    validation_status="VALID",
+                    fallback_used=False,
+                    duration_ms=cached_entry.processing_time_ms,
+                    inference_ms=float(cached_entry.inference_time_ms),
+                    output_tokens=cached_entry.token_count,
+                )
                 return cached
             except (ValidationError, TypeError, ValueError) as exc:
                 logger.warning(f"[OLLAMA] operation={operation} model='{model}' cache=INVALID error={type(exc).__name__}")
@@ -232,6 +340,11 @@ class OllamaLLMService:
 
         def parse(data: dict[str, Any]) -> _StructuredGeneration:
             envelope = OllamaGenerateEnvelope.model_validate(data)
+            if envelope.done_reason.lower() == "length":
+                raise OllamaInvalidResponseError(
+                    "Ollama generation reached the output limit and is incomplete.",
+                    operation=operation,
+                )
             raw_response = envelope.response.strip() or envelope.thinking.strip()
             structured_data = OllamaTransport.extract_json(raw_response, operation=operation)
             if not isinstance(structured_data, dict):
@@ -268,6 +381,19 @@ class OllamaLLMService:
             )
             if profiler:
                 profiler.metrics.ollama_request_ms = duration_ms
+            cls._trace(
+                operation=operation,
+                model=model,
+                prompt_version=prompt_version,
+                prompt_hash=prompt_hash,
+                source_hash=resolved_cache_key,
+                cache_status="MISS",
+                validation_status="INVALID" if "InvalidResponse" in type(exc).__name__ or "Schema" in type(exc).__name__ else "NOT_RUN",
+                fallback_used=True,
+                duration_ms=duration_ms,
+                input_tokens=max(1, prompt_chars // 4),
+                error_class=type(exc).__name__,
+            )
             return None
 
         generation = transport_result.value
@@ -286,6 +412,24 @@ class OllamaLLMService:
             f"input_tokens={generation.envelope.prompt_eval_count} "
             f"output_tokens={generation.envelope.eval_count} "
             f"inference_ms={inference_ms}"
+        )
+
+        cls._trace(
+            operation=operation,
+            model=model,
+            prompt_version=prompt_version,
+            prompt_hash=prompt_hash,
+            source_hash=resolved_cache_key,
+            cache_status="MISS",
+            validation_status="VALID",
+            fallback_used=False,
+            duration_ms=transport_result.duration_ms,
+            inference_ms=inference_ms,
+            validation_ms=generation.validation_ms,
+            attempts=transport_result.attempts,
+            input_tokens=generation.envelope.prompt_eval_count,
+            output_tokens=generation.envelope.eval_count,
+            completion_reason=generation.envelope.done_reason,
         )
 
         LLMCacheRepository.save_cached_entry(

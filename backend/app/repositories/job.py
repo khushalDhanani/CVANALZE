@@ -90,11 +90,12 @@ class JobRepository:
     _VACANCY_CACHE_KEY = VACANCY_CACHE_KEY
     _VERSION_CACHE_KEY = "all_jobs_version"
     _STALENESS_CACHE: ClassVar[dict[str, tuple[float, bool]]] = {}
-    _STALENESS_TTL = 10.0
+    _STALENESS_TTL = 30.0
     _VACANCY_EMBEDDINGS_CACHED = False
 
     @classmethod
     def invalidate_cache(cls) -> None:
+        cls._STALENESS_CACHE.clear()
         CacheInvalidator.invalidate_vacancies()
         logger.info("JobRepository.invalidate_cache: Cache invalidated.")
 
@@ -179,8 +180,16 @@ class JobRepository:
             cls._VACANCY_CACHE_KEY,
             {"jobs": job_dicts_to_return, "version": version},
         )
-        # Delegate embedding sync to EmbeddingSyncService
-        EmbeddingSyncService.sync_vacancy_embeddings(job_dicts_to_return)
+        cls._STALENESS_CACHE[version] = (time.monotonic(), False)
+        # Delegate embedding sync to EmbeddingSyncService in a background thread
+        # so the HTTP response is returned immediately without blocking on Ollama calls.
+        _sync_thread = threading.Thread(
+            target=EmbeddingSyncService.sync_vacancy_embeddings,
+            args=(list(job_dicts_to_return),),
+            daemon=True,
+            name="vacancy-embedding-sync",
+        )
+        _sync_thread.start()
         cls._VACANCY_EMBEDDINGS_CACHED = True
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -227,14 +236,23 @@ class JobRepository:
             return False
 
         try:
-            from sqlalchemy import select
+            from sqlalchemy import or_, select
             from app.models.mssql.vacancy import RecruitVacancyRequest
 
             stmt = select(RecruitVacancyRequest.VacancyRequestID).where(
-                (RecruitVacancyRequest.VacancyRequestIsActive == True) | (RecruitVacancyRequest.VacancyRequestIsActive.is_(None)),
-                (RecruitVacancyRequest.VacancyRequestIsDeleted == False) | (RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None)),
-                (RecruitVacancyRequest.VacancyRequestClose == False) | (RecruitVacancyRequest.VacancyRequestClose.is_(None)),
-                (RecruitVacancyRequest.VacancyRequestIsForceClosed == False) | (RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None))
+                RecruitVacancyRequest.VacancyRequestIsActive == True,
+                or_(
+                    RecruitVacancyRequest.VacancyRequestIsDeleted == False,
+                    RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None),
+                ),
+                or_(
+                    RecruitVacancyRequest.VacancyRequestClose == False,
+                    RecruitVacancyRequest.VacancyRequestClose.is_(None),
+                ),
+                or_(
+                    RecruitVacancyRequest.VacancyRequestIsForceClosed == False,
+                    RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None),
+                ),
             ).order_by(RecruitVacancyRequest.VacancyRequestID)
             
             rows = db.execute(stmt).scalars().all()
@@ -244,6 +262,10 @@ class JobRepository:
                 stored_ids = sorted(str(j.get("vacancy_id") or j.get("id")) for j in stored_jobs)
                 stored_ids_version = hashlib.sha256(json.dumps(stored_ids).encode()).hexdigest()
                 is_stale_result = db_version != stored_ids_version
+                if is_stale_result:
+                    logger.info(f"[STALENESS_DEBUG] db_count={len(db_pairs)} stored_count={len(stored_ids)} db_diff={set(db_pairs)-set(stored_ids)} stored_diff={set(stored_ids)-set(db_pairs)}")
+                else:
+                    logger.info(f"[STALENESS_DEBUG] Staleness check matched! count={len(db_pairs)}")
             else:
                 is_stale_result = False
 
@@ -270,6 +292,10 @@ class JobRepository:
                         or_(
                             RecruitVacancyRequest.VacancyRequestClose == False,
                             RecruitVacancyRequest.VacancyRequestClose.is_(None),
+                        ),
+                        or_(
+                            RecruitVacancyRequest.VacancyRequestIsForceClosed == False,
+                            RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None),
                         ),
                     )
                     .scalar()

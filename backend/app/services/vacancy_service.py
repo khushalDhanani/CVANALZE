@@ -27,6 +27,8 @@ class VacancyService:
         """
         Fetch all active, non-closed, non-deleted vacancies with full organization context.
         """
+        from sqlalchemy.orm import contains_eager
+
         stmt = (
             select(RecruitVacancyRequest)
             .join(
@@ -54,6 +56,13 @@ class VacancyService:
                 RecruitVacancyRequest.RequestForLocationID == OrgLocationMst.LocID,
                 isouter=True,
             )
+            .options(
+                contains_eager(RecruitVacancyRequest.job_profile),
+                contains_eager(RecruitVacancyRequest.designation),
+                contains_eager(RecruitVacancyRequest.company),
+                contains_eager(RecruitVacancyRequest.department),
+                contains_eager(RecruitVacancyRequest.location),
+            )
             .where(
                 RecruitVacancyRequest.VacancyRequestIsActive == True,
                 or_(
@@ -71,17 +80,36 @@ class VacancyService:
             )
         )
 
-        results = self.db.execute(stmt).scalars().all()
+        results = self.db.execute(stmt).unique().scalars().all()
+
+        biz_groups: dict[int, str] = {}
+        try:
+            bg_rows = self.db.execute(select(OrgBusinessGroupMst)).scalars().all()
+            biz_groups = {bg.BusinessGrpID: bg.BusinessGrpName for bg in bg_rows if bg.BusinessGrpID is not None}
+        except Exception as e:
+            logger.warning(f"Could not preload OrgBusinessGroupMst: {e}")
+
+        main_depts: dict[int, str] = {}
+        try:
+            md_rows = self.db.execute(select(OrgMainDepartmentMst)).scalars().all()
+            main_depts = {md.MainDeptID: md.DeptName for md in md_rows if md.MainDeptID is not None}
+        except Exception as e:
+            logger.warning(f"Could not preload OrgMainDepartmentMst: {e}")
 
         job_openings = []
         for vacancy in results:
-            job_openings.append(self.map_to_job_requirement(vacancy))
+            job_openings.append(self.map_to_job_requirement(vacancy, biz_groups=biz_groups, main_depts=main_depts))
 
         unique_dept_ids = sorted({j.department_id for j in job_openings if j.department_id is not None})
         logger.info(f"Active Vacancies: {len(job_openings)} | Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}")
         return job_openings
 
-    def map_to_job_requirement(self, vacancy: RecruitVacancyRequest) -> JobOpening:
+    def map_to_job_requirement(
+        self,
+        vacancy: RecruitVacancyRequest,
+        biz_groups: dict[int, str] | None = None,
+        main_depts: dict[int, str] | None = None,
+    ) -> JobOpening:
         # Determine title dynamically: JobProfile -> Designation -> Fallback
         if vacancy.job_profile and vacancy.job_profile.JobProfileName:
             title = vacancy.job_profile.JobProfileName
@@ -128,9 +156,12 @@ class VacancyService:
         biz_group_id = vacancy.company.BusinessGrpID if vacancy.company else None
         biz_group_name = None
         if biz_group_id is not None:
-            biz_grp = self.db.scalar(select(OrgBusinessGroupMst).where(OrgBusinessGroupMst.BusinessGrpID == biz_group_id))
-            if biz_grp:
-                biz_group_name = biz_grp.BusinessGrpName
+            if biz_groups is not None:
+                biz_group_name = biz_groups.get(biz_group_id)
+            else:
+                biz_grp = self.db.scalar(select(OrgBusinessGroupMst).where(OrgBusinessGroupMst.BusinessGrpID == biz_group_id))
+                if biz_grp:
+                    biz_group_name = biz_grp.BusinessGrpName
 
         main_dept_id = vacancy.RequestForMainDeptID
         if main_dept_id is None and vacancy.department:
@@ -140,9 +171,12 @@ class VacancyService:
 
         main_dept_name = None
         if main_dept_id is not None:
-            main_dept = self.db.scalar(select(OrgMainDepartmentMst).where(OrgMainDepartmentMst.MainDeptID == main_dept_id))
-            if main_dept:
-                main_dept_name = main_dept.DeptName
+            if main_depts is not None:
+                main_dept_name = main_depts.get(main_dept_id)
+            else:
+                main_dept = self.db.scalar(select(OrgMainDepartmentMst).where(OrgMainDepartmentMst.MainDeptID == main_dept_id))
+                if main_dept:
+                    main_dept_name = main_dept.DeptName
 
         # Convert Decimals to float safely
         def _safe_float_db(val: Any) -> float | None:

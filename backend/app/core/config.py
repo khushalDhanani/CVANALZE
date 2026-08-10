@@ -110,13 +110,17 @@ class Settings(BaseSettings):
     OLLAMA_UNLOAD_TIMEOUT_SECONDS: float = 10.0
     OLLAMA_MAX_RETRIES: int = 0
     OLLAMA_RETRY_BACKOFF_SECONDS: float = 0.5
+    OLLAMA_RETRY_JITTER_SECONDS: float = 0.1
     OLLAMA_KEEP_ALIVE: str = "1m"
+    OLLAMA_RESIDENCY_ENABLED: bool = True
     OLLAMA_UNLOAD_ON_SHUTDOWN: bool = True
     OLLAMA_MAX_CONNECTIONS: int = 1
     OLLAMA_MAX_KEEPALIVE_CONNECTIONS: int = 1
     OLLAMA_MAX_RESPONSE_BYTES: int = 4 * 1024 * 1024
     OLLAMA_LOCK_FILE: Path = Path("uploads/.locks/ollama.lock")
     OLLAMA_LOCK_TIMEOUT_SECONDS: float = 65.0
+    OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 3
+    OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS: float = 60.0
     OLLAMA_EMBED_BATCH_SIZE: int = 10
     OLLAMA_EMBED_MIN_SPLIT_SIZE: int = 2
     OLLAMA_EMBEDDING_EXPECTED_DIMENSION: int = 768
@@ -127,8 +131,18 @@ class Settings(BaseSettings):
     OLLAMA_OPTIMIZED_NUM_PREDICT: int = 2048
     PREFILTER_TOP_K: int = 60
     LLM_TOP_N: int = 12
-    LLM_CV_MAX_CHARS: int = 4000          # Truncation for optimized_match prompt ONLY
-    LLM_PROFILE_MAX_CHARS: int = 7500     # Budget cap for section-aware profile_extraction prompt
+    LLM_CV_MAX_CHARS: int = 4000          # Deprecated compatibility setting; token budgets are authoritative
+    LLM_PROFILE_MAX_CHARS: int = 7500     # Deprecated compatibility setting; token budgets are authoritative
+    LLM_CONTEXT_CV_TOKEN_BUDGET: int = 1200
+    LLM_PROFILE_TOKEN_BUDGET: int = 1900
+    LLM_PROMPT_SECURITY_ENABLED: bool = True
+    LLM_DEIDENTIFY_MATCHING_INPUTS: bool = True
+    LLM_GROUNDING_ENABLED: bool = True
+    LLM_STRUCTURED_REPAIR_ENABLED: bool = True
+    LLM_TRACE_ENABLED: bool = True
+    LLM_TRACE_RETENTION_DAYS: int = 30
+    LLM_SHADOW_QUALITY_ENABLED: bool = True
+    LLM_CONFIDENCE_CALIBRATION_PATH: Path = Path("app/data/evaluations/confidence_calibration.json")
     OPTIMIZED_PROMPT_VERSION: str = "3.5"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 
@@ -142,9 +156,6 @@ class Settings(BaseSettings):
     SEMANTIC_RETRIEVAL_TOP_N: int = 150
     SIMILAR_CANDIDATE_THRESHOLD: float = 0.85
     SIMILAR_CANDIDATE_MAX_MATCHES: int = 5
-
-    # Matching Logic Version (bump when scoring/ranking logic changes)
-    MATCHING_VERSION: str = "1.0.0"
 
     # Recommendation Engine Configuration
     CAREER_TRANSITION_MIN_OVERLAP: float = 40.0

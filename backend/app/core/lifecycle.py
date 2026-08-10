@@ -117,9 +117,11 @@ def start_cache_warmup() -> None:
 
 def _run_cache_warmup() -> None:
     try:
+        from app.repositories.llm_trace import LLMTraceRepository
         from app.services.cache_warmer import warm_all
 
         warm_all()
+        LLMTraceRepository.purge_expired()
     except Exception as exc:
         logger.warning(f"[WARMUP] Background warmup failed: {type(exc).__name__}")
 
