@@ -182,6 +182,7 @@ class ProcessingJobRecord(BaseModel):
     storage_filename: str
     content_type: str | None = None
     candidate_id: str | None = None
+    source_candidate_id: int | None = None
     cv_id: str | None = None
     parser_version: str
     schema_version: str

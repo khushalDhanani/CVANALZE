@@ -82,7 +82,8 @@ async def match_candidates_against_vacancies(limit: int = 10, db: Session = Depe
         analysis = await MatchService.analyze_single_cv(
             cv_text=cv_text,
             job_openings=job_dicts,
-            candidate_id=str(candidate.CandidateID) if candidate.CandidateID is not None else "",
+            cv_key=f"airis_candidate_{candidate.CandidateID}" if candidate.CandidateID is not None else "",
+            source_candidate_id=candidate.CandidateID,
             candidate_experience=float(candidate.CandidateTotExperience) if candidate.CandidateTotExperience else None,
             candidate_ctc=float(candidate.CandidateExpectedCtc) if candidate.CandidateExpectedCtc else None,
         )

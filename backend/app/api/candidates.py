@@ -200,6 +200,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         "filename": filename,
         "storage_filename": retained_upload.storage_filename,
         "candidate_id": existing_result.get("candidate_id"),
+        "source_candidate_id": existing_result.get("source_candidate_id"),
         "cv_id": existing_result.get("cv_id"),
         "cv_hash": cv_hash,
         "identity": existing_result.get("identity"),
@@ -220,6 +221,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
             content_type=content_type,
             force_reprocess=True,
             candidate_id=existing_result.get("candidate_id"),
+            source_candidate_id=existing_result.get("source_candidate_id"),
             cv_id=existing_result.get("cv_id"),
             storage_filename=retained_upload.storage_filename,
         )

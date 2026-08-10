@@ -1,6 +1,49 @@
 # Work Status
 
 ## Last Completed Task
+**Separate CV identity from AIRIS/MSSQL candidate identity in shadow validation**
+
+### Architecture Impact Analysis
+- Kept `cv_key` as the document, cache, generation, and matching identity throughout the normal CV pipeline.
+- Added a distinct validated `source_candidate_id` for AIRIS/MSSQL-only shadow validation and persisted it through processing jobs and result payloads.
+- Manual uploads without an AIRIS candidate ID continue through normal matching with `source_candidate_id=None`; only shadow validation is skipped.
+- Existing candidate/CV identity fields and the legacy `MatchService.candidate_id` argument remain backward compatible, but they no longer trigger shadow validation.
+- No matching algorithm, role authorization, database model, API response removal, or Ollama integration changed.
+
+### Files Changed
+- Identity and processing contracts: `backend/app/core/cv_identity.py`, `backend/app/schemas/contracts.py`.
+- Upload, queue, and result propagation: `backend/app/api/cv.py`, `backend/app/api/candidates.py`, `backend/app/services/processing_queue.py`, `backend/app/services/cv_service.py`.
+- Matching and shadow flow: `backend/app/services/match_service.py`, `backend/app/services/shadow_validation_service.py`, `backend/app/api/batch.py`.
+- Regression coverage: `backend/tests/test_shadow_validation.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Normalize only explicitly supplied AIRIS/MSSQL candidate IDs into positive integers.
+- Carry `cv_key` and `source_candidate_id` as independent values across upload, queue, matching, reprocessing, and batch flows.
+- Gate shadow validation exclusively on `source_candidate_id` and remove conversion of the CV key.
+- Preserve legacy callers while preventing their `candidate_id` cache alias from enabling shadow validation.
+
+### Code Changes
+- Added `normalize_source_candidate_id` and exposed the validated value through `CVIdentity.source_candidate_id` and identity metadata.
+- Added `source_candidate_id` to `ProcessingJobRecord`, queue submission, worker handoff, interim/final/failure results, cache-hit results, and reprocessing markers.
+- Added explicit `cv_key` and `source_candidate_id` inputs to `MatchService`; matching and cache operations now use `cv_key` while shadow enqueue uses only `source_candidate_id`.
+- Removed `int(candidate_id)` from the shadow-validation trigger; no CV key is converted to an integer.
+- AIRIS batch processing now supplies an explicit source candidate ID, while the shadow worker uses a separate shadow-specific CV key.
+- Added regressions proving a numeric-looking CV key does not trigger shadow validation and an explicit source candidate ID does.
+
+### Verification Checklist
+- [x] Confirmed there is no `int(cv_key)`, `int(candidate_id)`, or legacy numeric-candidate conversion in the shadow trigger.
+- [x] Confirmed manual upload/match paths do not synthesize a source candidate ID from `cv_key`.
+- [x] Confirmed AIRIS batch and identified CV upload paths pass the source ID separately.
+- [x] Confirmed reprocessing and result-file enrichment preserve the two identities independently.
+- [x] Added focused shadow-validation regression coverage.
+- [x] `git diff --check` passed.
+- [ ] Tests were not run because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Centralized source candidate ID normalization in the existing CV identity module and renamed shadow-service boundaries to make their MSSQL identity semantics explicit.
+
+## Previous Task
 **Fix organization filters by separating GET query parameters from headers**
 
 ### Architecture Impact Analysis

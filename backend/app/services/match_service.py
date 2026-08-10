@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from app.core.cache import CacheIndex, CacheKey, match_result_cache_manager
 from app.core.config import settings
+from app.core.cv_identity import normalize_source_candidate_id
 from app.core.logging import logger
 from app.core.profiler import PipelineProfiler
 from app.core.rule_config_manager import RuleConfigManager
@@ -37,6 +38,8 @@ class MatchService:
         candidate_ctc: float | None = None,
         document_hash: str = "",
         candidate_id: str = "",
+        cv_key: str = "",
+        source_candidate_id: int | None = None,
         upload_ms: float = 0.0,
         docling_extraction_ms: float = 0.0,
         cv_embedding: list[float] | None = None,
@@ -58,7 +61,8 @@ class MatchService:
             raise ValueError("CV document is a scanned image with no extractable text. OCR could not extract any meaningful content.")
 
         document_hash = (document_hash or "").strip() or hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
-        candidate_id = str(candidate_id).strip() if candidate_id else ""
+        cv_key = str(cv_key or candidate_id).strip()
+        source_candidate_id = normalize_source_candidate_id(source_candidate_id)
         extraction_version = f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
 
         # 2. JSON Loading stage timing (parsing CV text input)
@@ -97,7 +101,7 @@ class MatchService:
         t_cache_start = asyncio.get_event_loop().time()
         match_cache_key = CacheKey.for_match_result(
             document_hash=document_hash,
-            candidate_id=candidate_id,
+            candidate_id=cv_key,
             vacancy_version=vacancy_version,
             vacancy_ids=vacancy_ids,
             prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
@@ -233,7 +237,7 @@ class MatchService:
             filtered_vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in llm_vacancy_dicts]
             cache_key = LLMCacheRepository.compute_composite_hash(
                 document_hash=document_hash,
-                candidate_id=candidate_id,
+                candidate_id=cv_key,
                 vacancy_ids=filtered_vacancy_ids,
                 vacancy_version=vacancy_version,
                 prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
@@ -614,31 +618,30 @@ class MatchService:
 
         # Cache the match result for instant repeat searches if worker generation is current
         from app.repositories.result import ResultRepository
-        cv_key_stem = str(candidate_id or document_hash)
+        cv_key_stem = str(cv_key or document_hash)
         if ResultRepository.is_generation_current(cv_key_stem, incoming_generation="", resource="match_result"):
             match_result_cache_manager.set(match_cache_key, result.model_dump())
             CacheIndex.add("match_by_doc", document_hash, match_cache_key)
-            if candidate_id:
-                CacheIndex.add("match_by_cand", candidate_id, match_cache_key)
+            if cv_key:
+                CacheIndex.add("match_by_cand", cv_key, match_cache_key)
             logger.info(f"[MATCH_CACHE_SET] Cached match result for doc={document_hash[:12]}...")
         else:
             logger.warning(f"[STALE_GENERATION_WRITE_REJECTED] resource=match_result doc={document_hash[:12]}")
 
 
-        if getattr(settings, "SHADOW_MODE_ENABLED", False) and candidate_id and not _shadow_run:
+        if getattr(settings, "SHADOW_MODE_ENABLED", False) and source_candidate_id is not None and not _shadow_run:
             from app.services.shadow_validation_service import ShadowValidationService
             try:
-                numeric_cand_id = int(candidate_id)
                 vacancy_id = result.best_match.vacancy_id if result.best_match else None
                 numeric_vac_id = int(vacancy_id) if vacancy_id else None
                 ShadowValidationService.enqueue_shadow_validation(
-                    candidate_id=numeric_cand_id,
+                    source_candidate_id=source_candidate_id,
                     vacancy_id=numeric_vac_id,
                     prod_result_dict=result.model_dump(),
                     cv_text=cv_text
                 )
             except ValueError:
-                logger.warning(f"Could not enqueue shadow validation for non-numeric candidate_id: {candidate_id}")
+                logger.warning(f"Could not enqueue shadow validation for non-numeric vacancy_id: {vacancy_id}")
 
         return result
 
@@ -763,12 +766,14 @@ class MatchService:
             raise ValueError("No markdown text found in the result file.")
 
         cv_hash = data.get("cv_hash", "")
-        cand_id = data.get("candidate_id", "")
+        cv_key = str(data.get("id") or data.get("scan_id") or Path(result_json_path).stem)
+        source_candidate_id = data.get("source_candidate_id")
         stored_normalized_resume = NormalizedResume.model_validate(data["normalized_resume"]) if data.get("normalized_resume") else None
         enriched_analysis = await MatchService.analyze_single_cv(
             cv_text,
             document_hash=cv_hash,
-            candidate_id=cand_id,
+            cv_key=cv_key,
+            source_candidate_id=source_candidate_id,
             resume_json=data.get("resume_json"),
             normalized_resume=stored_normalized_resume,
             deterministic_experience=(stored_normalized_resume.experience.deterministic_years if stored_normalized_resume else ((data.get("quality_metrics") or {}).get("experience_years") or None)),

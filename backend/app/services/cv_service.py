@@ -11,7 +11,7 @@ from rq import Queue
 
 from app.core.cache import CacheIndex, CacheInvalidator, CacheKey, doc_cache_manager
 from app.core.config import settings
-from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
+from app.core.cv_identity import CVIdentityCollisionError, normalize_source_candidate_id, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.result import ResultRepository
 from app.schemas.normalized_resume import NormalizedResume
@@ -89,12 +89,14 @@ async def process_cv_file(
     content_type: str | None = None,
     timeout_seconds: float | None = None,
     candidate_id: str | int | None = None,
+    source_candidate_id: str | int | None = None,
     cv_id: str | int | None = None,
     force_reprocess: bool = False,
     storage_filename: str | None = None,
 ) -> dict[str, Any]:
     identity = resolve_cv_identity(filename, candidate_id, cv_id)
     cv_key = identity.canonical_key
+    source_candidate_id = normalize_source_candidate_id(source_candidate_id if source_candidate_id is not None else identity.candidate_id)
     cv_hash = hashlib.sha256(content).hexdigest()
     result_filename = f"{cv_key}.json"
     identity_metadata = identity.to_metadata()
@@ -137,6 +139,7 @@ async def process_cv_file(
                     existing_data["is_complete"] = True
                     existing_data["storage_filename"] = storage_filename or existing_data.get("storage_filename")
                     existing_data["identity"] = identity_metadata
+                    existing_data["source_candidate_id"] = source_candidate_id
                     existing_data["legacy_cv_keys"] = legacy_cv_keys
 
                     # 1. Disk/Cache Persistence Parity
@@ -205,6 +208,7 @@ async def process_cv_file(
                     "filename": filename,
                     "storage_filename": storage_filename,
                     "candidate_id": identity.candidate_id,
+                    "source_candidate_id": source_candidate_id,
                     "cv_id": identity.cv_id,
                     "cv_hash": cv_hash,
                     "identity": identity_metadata,
@@ -315,7 +319,8 @@ async def process_cv_file(
             match_analysis = await MatchService.analyze_single_cv(
                 extraction.markdown,
                 document_hash=cv_hash,
-                candidate_id=cv_key,
+                cv_key=cv_key,
+                source_candidate_id=source_candidate_id,
                 docling_extraction_ms=docling_duration_ms,
                 cv_embedding=cv_embedding,
                 resume_json=resume_json,
@@ -391,6 +396,7 @@ async def process_cv_file(
 
                 "parsed_at": now_iso,
                 "candidate_id": identity.candidate_id,
+                "source_candidate_id": source_candidate_id,
                 "cv_id": identity.cv_id,
                 "filename": filename,
                 "storage_filename": storage_filename,
@@ -496,6 +502,7 @@ async def process_cv_file(
                 "identity": identity_metadata,
                 "legacy_cv_keys": legacy_cv_keys,
                 "candidate_id": identity.candidate_id,
+                "source_candidate_id": source_candidate_id,
                 "cv_id": identity.cv_id,
                 "parsed_at": now_iso,
                 "created_at": now_iso,

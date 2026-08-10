@@ -197,3 +197,44 @@ async def test_shadow_validation_no_suitable_vacancy(shadow_jobs):
         
         old_analysis = ScoringEngine.evaluate_job_match(cv_no_suitable, shadow_jobs[0], candidate_experience=5.0)
         assert old_analysis.classification == "LOW"
+
+
+@pytest.mark.asyncio
+async def test_shadow_validation_does_not_treat_cv_key_as_source_candidate_id(shadow_jobs, monkeypatch):
+    mock_emb = [0.1] * 768
+    enqueue = patch("app.services.shadow_validation_service.ShadowValidationService.enqueue_shadow_validation")
+    monkeypatch.setattr("app.services.match_service.settings.SHADOW_MODE_ENABLED", True)
+
+    with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb), \
+         patch("app.services.match_service.OllamaLLMService.run_optimized_match", return_value=None), \
+         enqueue as enqueue_mock:
+        await MatchService.analyze_single_cv(
+            cv_text=cv_correct_department,
+            job_openings=shadow_jobs,
+            document_hash="manual-upload-shadow-identity",
+            cv_key="123",
+            cv_embedding=mock_emb,
+        )
+
+    enqueue_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_shadow_validation_uses_explicit_source_candidate_id(shadow_jobs, monkeypatch):
+    mock_emb = [0.1] * 768
+    enqueue = patch("app.services.shadow_validation_service.ShadowValidationService.enqueue_shadow_validation")
+    monkeypatch.setattr("app.services.match_service.settings.SHADOW_MODE_ENABLED", True)
+
+    with patch("app.services.embedding_service.EmbeddingService.generate_embedding", return_value=mock_emb), \
+         patch("app.services.match_service.OllamaLLMService.run_optimized_match", return_value=None), \
+         enqueue as enqueue_mock:
+        await MatchService.analyze_single_cv(
+            cv_text=cv_correct_department,
+            job_openings=shadow_jobs,
+            document_hash="airis-upload-shadow-identity",
+            cv_key="cv_candidate_42_document_7",
+            source_candidate_id=42,
+            cv_embedding=mock_emb,
+        )
+
+    assert enqueue_mock.call_args.kwargs["source_candidate_id"] == 42

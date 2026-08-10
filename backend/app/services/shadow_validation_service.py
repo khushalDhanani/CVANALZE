@@ -43,7 +43,7 @@ class ShadowEvaluator:
     @classmethod
     def evaluate(
         cls, 
-        candidate_id: int, 
+        source_candidate_id: int,
         vacancy_id: Optional[int], 
         old_result: Optional[EnrichedCandidateAnalysis], 
         new_result: EnrichedCandidateAnalysis,
@@ -136,7 +136,7 @@ class ShadowEvaluator:
 
         return result
 
-def execute_shadow_pipeline(candidate_id: int, vacancy_id: Optional[int], prod_result_dict: dict, cv_text: str):
+def execute_shadow_pipeline(source_candidate_id: int, vacancy_id: Optional[int], prod_result_dict: dict, cv_text: str):
     import asyncio
     from app.services.match_service import MatchService
     from app.schemas.analysis import EnrichedCandidateAnalysis
@@ -148,7 +148,8 @@ def execute_shadow_pipeline(candidate_id: int, vacancy_id: Optional[int], prod_r
     try:
         shadow_result = asyncio.run(MatchService.analyze_single_cv(
             cv_text=cv_text,
-            candidate_id=str(candidate_id),
+            cv_key=f"shadow_source_candidate_{source_candidate_id}",
+            source_candidate_id=source_candidate_id,
             _shadow_run=True,
         ))
     except Exception as e:
@@ -162,14 +163,14 @@ def execute_shadow_pipeline(candidate_id: int, vacancy_id: Optional[int], prod_r
             if vacancy_id:
                 with MssqlReadSession() as mssql_db:
                     mapping = mssql_db.query(RecruitVacancyCandidateList).filter(
-                        RecruitVacancyCandidateList.CandidateID == candidate_id,
+                        RecruitVacancyCandidateList.CandidateID == source_candidate_id,
                         RecruitVacancyCandidateList.VacancyRequestID == vacancy_id
                     ).first()
                     if mapping:
                         airis_status_id = mapping.StatusID
 
             run = ShadowValidationRun(
-                candidate_id=candidate_id,
+                candidate_id=source_candidate_id,
                 vacancy_id=vacancy_id,
                 is_historical=False,
                 status="RUNNING"
@@ -178,7 +179,7 @@ def execute_shadow_pipeline(candidate_id: int, vacancy_id: Optional[int], prod_r
             pg_db.flush()
 
             eval_result = ShadowEvaluator.evaluate(
-                candidate_id=candidate_id,
+                source_candidate_id=source_candidate_id,
                 vacancy_id=vacancy_id,
                 old_result=prod_result,
                 new_result=shadow_result,
@@ -200,7 +201,7 @@ class ShadowValidationService:
     @classmethod
     def enqueue_shadow_validation(
         cls, 
-        candidate_id: int, 
+        source_candidate_id: int,
         vacancy_id: Optional[int], 
         prod_result_dict: dict,
         cv_text: str
@@ -221,7 +222,7 @@ class ShadowValidationService:
             queue = Queue("shadow_validation", connection=connection)
             queue.enqueue(
                 execute_shadow_pipeline,
-                candidate_id=candidate_id,
+                source_candidate_id=source_candidate_id,
                 vacancy_id=vacancy_id,
                 prod_result_dict=prod_result_dict,
                 cv_text=cv_text,

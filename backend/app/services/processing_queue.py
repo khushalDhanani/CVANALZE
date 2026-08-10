@@ -13,6 +13,7 @@ from redis import Redis
 from rq import Queue, Retry
 
 from app.core.config import settings
+from app.core.cv_identity import normalize_source_candidate_id
 from app.core.logging import logger
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
@@ -55,6 +56,7 @@ class ProcessingQueueService:
         storage_filename: str,
         content_type: str | None,
         candidate_id: str | int | None = None,
+        source_candidate_id: str | int | None = None,
         cv_id: str | int | None = None,
         force_reprocess: bool = False,
     ) -> QueueSubmission:
@@ -75,6 +77,7 @@ class ProcessingQueueService:
                 storage_filename=storage_filename,
                 content_type=content_type,
                 candidate_id=str(candidate_id) if candidate_id is not None else None,
+                source_candidate_id=normalize_source_candidate_id(source_candidate_id if source_candidate_id is not None else candidate_id),
                 cv_id=str(cv_id) if cv_id is not None else None,
                 parser_version=settings.EXTRACTION_PARSER_VERSION,
                 schema_version=settings.EXTRACTION_SCHEMA_VERSION,
@@ -393,6 +396,7 @@ async def _process_source(
         content=content,
         content_type=content_type,
         candidate_id=record.candidate_id,
+        source_candidate_id=record.source_candidate_id,
         cv_id=record.cv_id,
         force_reprocess=record.force_reprocess,
         storage_filename=storage_filename,

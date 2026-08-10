@@ -37,6 +37,7 @@ async def upload_cv(
                 filename=accepted.safe_filename,
                 content_type=accepted.detected_content_type,
                 candidate_id=candidate_id,
+                source_candidate_id=identity.source_candidate_id,
                 cv_id=cv_id,
                 storage_filename=accepted.storage_filename,
             )
