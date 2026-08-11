@@ -13,6 +13,7 @@ const payload = {
   redis: 'online',
   ollama_llm: 'online',
   rule_configuration: 'unavailable',
+  prompt_configuration: 'PROMPT_NOT_READY',
 };
 
 assertEquals(getDegradedSystemHealth(new ApiError('Service unavailable', 503, payload)), payload);

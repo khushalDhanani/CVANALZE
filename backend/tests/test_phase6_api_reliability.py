@@ -57,6 +57,7 @@ async def test_health_reports_configured_dependencies_online(monkeypatch):
     monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
     monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
     monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
     monkeypatch.setattr(settings, "LLM_ENABLED", False)
     monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
 
@@ -70,6 +71,7 @@ async def test_health_reports_configured_dependencies_online(monkeypatch):
     assert payload["redis"] == "online"
     assert payload["ollama_llm"] == "disabled"
     assert payload["rule_configuration"] == "online"
+    assert payload["prompt_configuration"] == "online"
 
 
 @pytest.mark.asyncio
@@ -80,6 +82,7 @@ async def test_health_returns_service_unavailable_for_offline_dependency(monkeyp
     monkeypatch.setattr(main_module, "_database_health", database_health)
     monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
     monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
     monkeypatch.setattr(settings, "LLM_ENABLED", False)
     monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
 
@@ -100,6 +103,7 @@ async def test_health_requires_ollama_when_llm_capability_is_enabled(monkeypatch
     monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
     monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
     monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
     monkeypatch.setattr(settings, "LLM_ENABLED", True)
     monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
     monkeypatch.setattr(OllamaLLMService, "check_health", classmethod(lambda _cls: False))
@@ -117,6 +121,7 @@ async def test_health_is_unavailable_without_active_rule_configuration(monkeypat
     monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
     monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
     monkeypatch.setattr(main_module, "_rule_config_health", lambda: "unavailable")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
     monkeypatch.setattr(settings, "LLM_ENABLED", False)
     monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
 
@@ -126,6 +131,22 @@ async def test_health_is_unavailable_without_active_rule_configuration(monkeypat
     assert response.status_code == 503
     assert payload["status"] == "unhealthy"
     assert payload["rule_configuration"] == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_health_reports_prompt_not_ready(monkeypatch):
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "PROMPT_NOT_READY")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert payload["prompt_configuration"] == "PROMPT_NOT_READY"
 
 
 def test_redis_health_distinguishes_disabled_and_unavailable(monkeypatch):

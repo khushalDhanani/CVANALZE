@@ -94,12 +94,17 @@ def mock_prompt_service(monkeypatch, request):
     if request.module and "test_prompt_service" in request.module.__name__:
         return
         
-    from app.services.prompt_service import PromptService
+    from app.services.prompt_service import PromptReadiness, PromptService
     
     def mocked_fetch_prompt_from_db(cls, prompt_name, tenant_id, model, target_schema, language, environment):
         return "NO_SUITABLE_MATCH recommended_department MUST be selected from EVIDENCE CITATION"
         
     monkeypatch.setattr(PromptService, "_fetch_prompt_from_db", classmethod(mocked_fetch_prompt_from_db))
+    monkeypatch.setattr(
+        PromptService,
+        "check_required_optimized_match_prompt",
+        classmethod(lambda _cls: PromptReadiness(True, "READY")),
+    )
 
 
 @pytest.fixture(autouse=True)

@@ -118,13 +118,14 @@ async def health() -> JSONResponse:
     pg_status = _database_health(postgres_app_engine, "PostgreSQL")
     redis_status = _redis_health()
     rule_config_status = _rule_config_health()
+    prompt_status = _prompt_health()
     ollama_status = "disabled"
     if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         from app.services.llm_service import OllamaLLMService
 
         ollama_status = "online" if OllamaLLMService.check_health() else "offline"
 
-    dependency_statuses = (db_status, pg_status, redis_status, ollama_status, rule_config_status)
+    dependency_statuses = (db_status, pg_status, redis_status, ollama_status, rule_config_status, prompt_status)
     overall_status = "ok" if all(status in ("online", "disabled") for status in dependency_statuses) else "unhealthy"
     payload = {
         "status": overall_status,
@@ -134,6 +135,7 @@ async def health() -> JSONResponse:
         "redis": redis_status,
         "ollama_llm": ollama_status,
         "rule_configuration": rule_config_status,
+        "prompt_configuration": prompt_status,
     }
     return JSONResponse(status_code=200 if overall_status == "ok" else 503, content=payload)
 
@@ -172,3 +174,9 @@ def _rule_config_health() -> str:
     if RuleConfigManager.is_config_loaded(tenant_id=None):
         return "online"
     return "online" if try_load_active_rule_config(process_name="HEALTH", log_unavailable=False) else "unavailable"
+
+
+def _prompt_health() -> str:
+    from app.services.prompt_service import PromptService
+
+    return "online" if PromptService.check_required_optimized_match_prompt().ready else "PROMPT_NOT_READY"

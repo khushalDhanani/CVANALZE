@@ -16,10 +16,10 @@ client = TestClient(app)
 def test_start_worker_queue_configuration():
     """Verify the CV worker listens only to the configured FIFO CV queue."""
     from start_worker import main
-    with patch("start_worker.Worker") as mock_worker:
+    with patch("start_worker.RuntimeDependencyWorker") as mock_worker:
         with patch("start_worker.Redis"), patch("start_worker.settings.RQ_WORKER_MAX_JOBS", 0), \
              patch("start_worker.settings.CV_PROCESSING_CONCURRENCY", 1), \
-             patch("start_worker.wait_for_active_rule_config") as wait_for_config, \
+             patch("start_worker.wait_for_cv_runtime_dependencies") as wait_for_config, \
              patch("start_worker.start_config_invalidation_listener") as start_listener:
             mock_worker.return_value.work.return_value = None
             main()

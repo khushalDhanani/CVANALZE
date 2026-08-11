@@ -9,12 +9,30 @@ if os.environ.get("OBJC_DISABLE_INITIALIZE_FORK_SAFETY") != "YES":
 
 from redis import Redis
 from rq import Queue, Worker
+from rq.intermediate_queue import IntermediateQueue
 
 from app.core.config import settings
 from app.core.config_listener import start_config_invalidation_listener
 from app.core.logging import logger
-from app.core.rule_config_readiness import wait_for_active_rule_config
+from app.core.rule_config_readiness import RUNTIME_READY, cv_runtime_readiness, wait_for_cv_runtime_dependencies
 from app.services.processing_queue import handle_work_horse_killed
+
+
+class RuntimeDependencyWorker(Worker):
+    """Gate each dequeue so runtime configuration changes fail closed."""
+
+    def dequeue_job_and_maintain_ttl(self, timeout, max_idle_time=None):
+        while True:
+            wait_for_cv_runtime_dependencies(process_name="CV_WORKER", on_wait=self.heartbeat)
+            result = super().dequeue_job_and_maintain_ttl(timeout, max_idle_time)
+            if result is None or cv_runtime_readiness(process_name="CV_WORKER", log_unavailable=False) == RUNTIME_READY:
+                return result
+            job, queue = result
+            pipeline = self.connection.pipeline()
+            pipeline.lrem(IntermediateQueue(queue.key, self.connection).key, 1, job.id)
+            pipeline.lpush(queue.key, job.id)
+            pipeline.execute()
+            logger.warning("[CV_WORKER] Runtime dependency changed during dequeue; restored job '%s' to the FIFO front.", job.id)
 
 
 def main():
@@ -23,11 +41,11 @@ def main():
     logger.info("Starting the single-slot RQ CV worker on queue '%s'.", settings.RQ_QUEUE_NAME)
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
-    wait_for_active_rule_config(process_name="CV_WORKER")
+    wait_for_cv_runtime_dependencies(process_name="CV_WORKER")
     start_config_invalidation_listener()
 
     queue = Queue(settings.RQ_QUEUE_NAME, connection=conn)
-    worker = Worker(
+    worker = RuntimeDependencyWorker(
         [queue],
         connection=conn,
         name=f"{settings.RQ_QUEUE_NAME}-worker-1",

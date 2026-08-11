@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import asyncio
 import hashlib
 from collections.abc import Iterator
@@ -13,6 +14,7 @@ from rq.registry import ScheduledJobRegistry, StartedJobRegistry
 
 from app.core.config import settings
 from app.core.cv_identity import normalize_source_candidate_id
+from app.core.error_handlers import PromptError
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
 from app.repositories.processing_job import ProcessingJobPersistenceError, ProcessingJobRepository
@@ -603,7 +605,7 @@ def process_cv_job(job_id: str, expected_enqueue_count: int | None = None) -> di
     except Exception as exc:
         logger.exception(f"Processing job '{job_id}' failed on attempt {attempt}: {type(exc).__name__}")
         current = ProcessingJobRepository.get(job_id) or record
-        will_retry = attempt < current.max_attempts
+        will_retry = not isinstance(exc, PromptError) and attempt < current.max_attempts
         state = JobState.RETRYING if will_retry else JobState.FAILED
         error = _safe_processing_error(exc, retryable=will_retry, correlation_id=current.rq_job_id)
         ProcessingJobRepository.transition(
@@ -616,6 +618,8 @@ def process_cv_job(job_id: str, expected_enqueue_count: int | None = None) -> di
         )
         if not will_retry:
             UploadService.cleanup_after_processing(record.storage_filename, succeeded=False)
+        if isinstance(exc, PromptError):
+            return {"job_id": job_id, "status": JobState.FAILED, "error_code": ErrorCode.PROMPT_UNAVAILABLE.value}
         raise
 
 
@@ -624,6 +628,10 @@ def _safe_processing_error(exc: Exception, *, retryable: bool, correlation_id: s
     if isinstance(exc, FileNotFoundError):
         code = ErrorCode.NOT_FOUND
         message = "The retained CV source was unavailable during processing."
+    elif isinstance(exc, PromptError):
+        code = ErrorCode.PROMPT_UNAVAILABLE
+        message = "CV processing is unavailable because the required optimized matching prompt is not ready."
+        retryable = False
     elif "timeout" in error_name:
         code = ErrorCode.JOB_STUCK
         message = "CV processing exceeded the allowed execution time."

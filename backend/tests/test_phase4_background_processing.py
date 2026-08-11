@@ -10,6 +10,7 @@ from rq.job import Job, NoSuchJobError
 
 from app.core.cache import MemoryCache, cv_result_cache_manager, processing_job_cache_manager
 from app.core.config import settings
+from app.core.error_handlers import PromptError
 from app.repositories import result as result_repository_module
 from app.repositories import processing_job as processing_job_repository_module
 from app.repositories.processing_job import ProcessingJobRepository
@@ -442,6 +443,34 @@ def test_worker_marks_retry_state_before_rq_rethrows(monkeypatch):
     assert retrying.attempt == 1
     assert retrying.error is not None
     assert retrying.error.retryable is True
+
+
+def test_prompt_unavailable_is_persisted_without_retry(monkeypatch, tmp_path):
+    content = b"phase-4-cv"
+    submission = ProcessingQueueService.submit_upload(**_submission_kwargs(content))
+    source = StoredUpload(
+        safe_filename="phase_4.pdf",
+        storage_filename=submission.record.storage_filename,
+        detected_content_type="application/pdf",
+        content=content,
+        path=Path(tmp_path / submission.record.storage_filename),
+    )
+    monkeypatch.setattr(UploadService, "load_reprocessable_upload", lambda **_kwargs: source)
+
+    async def fail_prompt(**_kwargs):
+        raise PromptError("PROMPT_UNAVAILABLE")
+
+    monkeypatch.setattr(processing_queue, "_process_source", fail_prompt)
+    result = process_cv_job(submission.record.job_id)
+
+    failed = ProcessingJobRepository.get(submission.record.job_id)
+    assert result["error_code"] == "PROMPT_UNAVAILABLE"
+    assert failed is not None
+    assert failed.state == JobState.FAILED
+    assert failed.error is not None
+    assert failed.error.code.value == "PROMPT_UNAVAILABLE"
+    assert failed.error.retryable is False
+    assert failed.error.message == "CV processing is unavailable because the required optimized matching prompt is not ready."
 
 
 def test_workhorse_crash_marks_job_retrying_without_blocking_the_worker():

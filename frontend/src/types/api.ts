@@ -605,6 +605,7 @@ export interface SystemHealthResponse {
   redis?: string;
   ollama_llm: string;
   rule_configuration?: string;
+  prompt_configuration?: string;
 }
 
 export interface LlmHealthResponse {

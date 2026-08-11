@@ -1,12 +1,12 @@
+import json
+
 import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-import app.models.mssql.organization
-import app.models.mssql.candidate
+
+from app.core.error_handlers import PromptError
 from app.models.prompts import PromptTemplateMaster
 from app.services.prompt_service import PromptService
-from app.core.error_handlers import PromptError
-from app.core.database import PostgresAppBase
 
 engine = create_engine("sqlite:///:memory:")
 
@@ -18,7 +18,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="function")
 def db_session(monkeypatch):
-    PostgresAppBase.metadata.create_all(bind=engine)
+    PromptTemplateMaster.__table__.create(bind=engine)
     
     import app.services.prompt_service
     monkeypatch.setattr(app.services.prompt_service, "PostgresAppSession", TestingSessionLocal)
@@ -26,7 +26,7 @@ def db_session(monkeypatch):
     with TestingSessionLocal() as session:
         yield session
         
-    PostgresAppBase.metadata.drop_all(bind=engine)
+    PromptTemplateMaster.__table__.drop(bind=engine)
 
 @pytest.fixture(autouse=True)
 def cleanup(db_session):
@@ -106,3 +106,37 @@ def test_activation_validation(db_session):
     
     active_p = PromptService.activate_prompt(db_session, p.prompt_id, {"name"})
     assert active_p.is_active is True
+
+
+def test_required_optimized_match_prompt_validates_version_placeholders_and_schema(db_session, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "OPTIMIZED_PROMPT_VERSION", "3.5")
+    assert PromptService.check_required_optimized_match_prompt().ready is False
+
+    prompt = PromptTemplateMaster(
+        prompt_name="optimized_match",
+        version_tag="3.5",
+        system_instruction="{input_json} {domain_list_str} {dept_list_str}",
+        expected_schema_json=json.dumps(
+            {
+                "$id": PromptService.OPTIMIZED_MATCH_SCHEMA_ID,
+                "type": "object",
+                "required": sorted(PromptService.OPTIMIZED_MATCH_SCHEMA_FIELDS),
+                "properties": {field: {} for field in PromptService.OPTIMIZED_MATCH_SCHEMA_FIELDS},
+            }
+        ),
+        is_active=True,
+    )
+    db_session.add(prompt)
+    db_session.commit()
+
+    assert PromptService.check_required_optimized_match_prompt().ready is True
+    prompt.expected_schema_json = "{}"
+    db_session.commit()
+    assert PromptService.check_required_optimized_match_prompt().ready is False
+    with pytest.raises(PromptError, match="PROMPT_UNAVAILABLE"):
+        PromptService.get_prompt(
+            "optimized_match",
+            {"input_json": "{}", "domain_list_str": "IT", "dept_list_str": "Engineering"},
+        )

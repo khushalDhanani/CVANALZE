@@ -203,6 +203,19 @@ export default function HomeScreen() {
                   : 'warning'
               }
             />
+            <StatCard
+              label="Matching Prompt"
+              value={healthLoading ? undefined : health?.prompt_configuration === 'online' ? 'ONLINE' : 'REQUIRED'}
+              sublabel={
+                healthLoading
+                  ? 'Checking prompt...'
+                  : health?.prompt_configuration === 'online'
+                  ? 'PostgreSQL Prompt Active'
+                  : 'PROMPT_NOT_READY'
+              }
+              loading={healthLoading}
+              tone={healthLoading ? 'neutral' : health?.prompt_configuration === 'online' ? 'success' : 'warning'}
+            />
           </ResponsiveStatGrid>
 
           {/* Action Shortcuts */}
@@ -457,6 +470,21 @@ export default function HomeScreen() {
                         : 'Activation Required'
                     }
                     tone={healthLoading ? 'neutral' : health?.rule_configuration === 'online' ? 'success' : 'warning'}
+                  />
+                }
+              />
+              <DenseRow
+                title="Optimized Match Prompt"
+                trailing={
+                  <Badge
+                    label={
+                      healthLoading
+                        ? 'Checking...'
+                        : health?.prompt_configuration === 'online'
+                        ? 'Operational'
+                        : 'PROMPT_NOT_READY'
+                    }
+                    tone={healthLoading ? 'neutral' : health?.prompt_configuration === 'online' ? 'success' : 'warning'}
                   />
                 }
               />

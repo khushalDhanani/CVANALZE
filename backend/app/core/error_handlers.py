@@ -167,7 +167,7 @@ async def _custom_exception_handler(request: Request, exc: Exception) -> JSONRes
         status_code=status_code,
         code=code,
         message=str(exc) or "A required service is temporarily unavailable.",
-        retryable=True,
+        retryable=not isinstance(exc, PromptError),
     )
 
 

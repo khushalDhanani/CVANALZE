@@ -319,6 +319,9 @@ After activation, `GET /api/config/rules` returns a deterministic administrator-
 active profile. The `/config` screen renders this inventory directly from PostgreSQL and does not maintain a frontend rule catalog.
 `/health` returns `503` with `rule_configuration: unavailable` until activation. Both RQ workers remain alive but do not open their execution lanes until the active
 profile passes schema validation, safety gates, and synthetic smoke tests. They detect a later activation automatically without requiring a restart.
+Migration `024` seeds the required PostgreSQL-managed `optimized_match` prompt version and response schema. The CV worker additionally reports
+`prompt_configuration: PROMPT_NOT_READY` and leaves FIFO jobs queued whenever that exact active prompt contract is missing or invalid. Prompt activation is detected
+automatically; no worker restart or prompt fallback is required.
 
 The API and CV worker share `backend/uploads`, use the same queue and service configuration, and wait for healthy Redis/PostgreSQL. The scheduler registers recurring
 canonical MSSQL snapshot synchronization and validation metric jobs for the auxiliary worker. The CV worker consumes only `cv-processing`; the auxiliary worker consumes

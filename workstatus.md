@@ -1,6 +1,49 @@
 # Work Status
 
 ## Last Completed Task
+**Enterprise PostgreSQL prompt readiness for the CV queue**
+
+### Architecture Impact Analysis
+- Made the active `optimized_match` prompt version/schema a PostgreSQL runtime dependency alongside the active normalized rule profile.
+- Gated CV worker startup and every FIFO dequeue; a dependency race restores the dequeued RQ job atomically to the queue front before execution.
+- Preserved the existing single-worker matching/scoring pipeline and added no prompt fallback or prompt text to `MatchService`.
+
+### Files Changed
+- Runtime prompt validation/readiness: `backend/app/services/prompt_service.py` and `backend/app/core/rule_config_readiness.py`.
+- FIFO worker/error behavior: `backend/start_worker.py`, `backend/app/services/processing_queue.py`, and `backend/app/core/error_handlers.py`.
+- PostgreSQL bootstrap: migration 024 and its down migration.
+- Health/frontend visibility: `backend/app/main.py`, `frontend/src/types/api.ts`, and `frontend/src/app/index.tsx`.
+- Dependencies, focused contracts, and operations documentation: `backend/pyproject.toml`, `backend/uv.lock`, scoped tests, `README.md`, and `workstatus.md`.
+
+### Implementation Plan
+- Validate the exact active generic production prompt version, placeholders, Draft 2020-12 schema, schema ID, and required response fields.
+- Keep the CV worker alive but idle until rules and prompt are ready, with a post-dequeue race check that preserves FIFO.
+- Seed the default version through an idempotent migration and enforce one active prompt per compatibility scope.
+- Persist escaped `PromptError` failures once as safe, non-retryable configuration errors.
+
+### Code Changes
+- Added `PROMPT_NOT_READY` readiness and `prompt_configuration` health output.
+- Required prompt retrieval now selects `OPTIMIZED_PROMPT_VERSION` exactly and fails closed on an invalid contract.
+- Added `RuntimeDependencyWorker`; it blocks before dequeue and restores raced jobs to the FIFO front.
+- Added migration 024 with table bootstrap, active-scope uniqueness, version `3.5` seed, and schema metadata.
+- Dashboard health now reports the PostgreSQL matching prompt independently; queue reload continues hydrating persisted error codes/messages.
+
+### Verification Checklist
+- [x] Missing/invalid prompt reports `PROMPT_NOT_READY` and prevents execution.
+- [x] Activation is detected automatically without a worker restart.
+- [x] A dependency race restores the first job to the queue front.
+- [x] Existing single-lane verification confirms remaining jobs continue FIFO.
+- [x] Escaped `PROMPT_UNAVAILABLE` persists as non-retryable with a safe frontend-visible reason.
+- [x] Focused backend verification passes: 37 tests.
+- [x] Scoped Ruff, TypeScript `--noEmit`, uv lock consistency, Python compilation, and `git diff --check` pass.
+- [ ] Migration 024 was created but not executed against live PostgreSQL.
+- [ ] Frontend lint could not run because no ESLint configuration exists; Expo's attempted dependency edit was reverted.
+- [ ] One broader pre-existing recovery test has an RQ fake-queue `job_id` signature collision unrelated to this change.
+
+### Refactoring Performed
+- Centralized the required prompt contract in `PromptService` for worker admission, prompt retrieval, and health.
+
+## Previous Task
 **Dynamic active-rule inventory**
 
 ### Architecture Impact Analysis

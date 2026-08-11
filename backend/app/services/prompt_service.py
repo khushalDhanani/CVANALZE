@@ -1,15 +1,38 @@
 from __future__ import annotations
+
+import json
 import string
-from typing import Any, Optional, Set
+from typing import Any, NamedTuple, Optional, Set
+
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 from sqlalchemy.orm import Session
 
 from app.core.cache import config_cache_manager
 from app.core.database import PostgresAppSession
-from app.models.prompts import PromptTemplateMaster
 from app.core.error_handlers import PromptError
 from app.core.logging import logger
+from app.models.prompts import PromptTemplateMaster
+
+
+class PromptReadiness(NamedTuple):
+    ready: bool
+    reason: str
+
 
 class PromptService:
+    OPTIMIZED_MATCH_PROMPT_NAME = "optimized_match"
+    OPTIMIZED_MATCH_LANGUAGE = "en"
+    OPTIMIZED_MATCH_ENVIRONMENT = "production"
+    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v1"
+    OPTIMIZED_MATCH_PLACEHOLDERS = {"input_json", "domain_list_str", "dept_list_str"}
+    OPTIMIZED_MATCH_SCHEMA_FIELDS = {
+        "candidate_profile",
+        "active_vacancy_summary",
+        "ai_career_summary",
+        "matched_vacancies",
+    }
+
     @classmethod
     def get_prompt(
         cls,
@@ -21,6 +44,11 @@ class PromptService:
         language: str = "en",
         environment: str = "production"
     ) -> str:
+        if prompt_name == cls.OPTIMIZED_MATCH_PROMPT_NAME:
+            readiness = cls.check_required_optimized_match_prompt()
+            if not readiness.ready:
+                logger.error("Required optimized_match prompt is not ready: %s", readiness.reason)
+                raise PromptError("PROMPT_UNAVAILABLE")
         cache_key = f"prompt_tmpl:{prompt_name}:{tenant_id or 'none'}:{model or 'none'}:{target_schema or 'none'}:{language}:{environment}"
         
         template = config_cache_manager.get(cache_key)
@@ -59,6 +87,10 @@ class PromptService:
                 PromptTemplateMaster.language == language,
                 PromptTemplateMaster.environment == environment
             )
+            if prompt_name == cls.OPTIMIZED_MATCH_PROMPT_NAME:
+                from app.core.config import settings
+
+                query = query.filter(PromptTemplateMaster.version_tag == settings.OPTIMIZED_PROMPT_VERSION)
             
             # 1. Exact match
             exact_match = query.filter(
@@ -96,6 +128,55 @@ class PromptService:
     def get_placeholders(cls, template: str) -> Set[str]:
         """Extract all format placeholders from the given template string."""
         return {fname for _, fname, _, _ in string.Formatter().parse(template) if fname}
+
+    @classmethod
+    def check_required_optimized_match_prompt(cls) -> PromptReadiness:
+        """Validate the exact active prompt contract required by the CV worker."""
+        from app.core.config import settings
+
+        if PostgresAppSession is None:
+            return PromptReadiness(False, "PostgreSQL prompt storage is not configured.")
+        try:
+            with PostgresAppSession() as db:
+                prompt = (
+                    db.query(PromptTemplateMaster)
+                    .filter(
+                        PromptTemplateMaster.prompt_name == cls.OPTIMIZED_MATCH_PROMPT_NAME,
+                        PromptTemplateMaster.version_tag == settings.OPTIMIZED_PROMPT_VERSION,
+                        PromptTemplateMaster.tenant_id.is_(None),
+                        PromptTemplateMaster.model.is_(None),
+                        PromptTemplateMaster.target_schema.is_(None),
+                        PromptTemplateMaster.language == cls.OPTIMIZED_MATCH_LANGUAGE,
+                        PromptTemplateMaster.environment == cls.OPTIMIZED_MATCH_ENVIRONMENT,
+                        PromptTemplateMaster.is_active.is_(True),
+                    )
+                    .order_by(PromptTemplateMaster.prompt_id.desc())
+                    .first()
+                )
+            if prompt is None:
+                return PromptReadiness(False, f"Required active prompt version {settings.OPTIMIZED_PROMPT_VERSION} is unavailable.")
+            missing_placeholders = cls.OPTIMIZED_MATCH_PLACEHOLDERS - cls.get_placeholders(prompt.system_instruction)
+            if missing_placeholders:
+                return PromptReadiness(False, "Required prompt placeholders are invalid.")
+            try:
+                schema = json.loads(prompt.expected_schema_json or "")
+                Draft202012Validator.check_schema(schema)
+            except (TypeError, ValueError, json.JSONDecodeError, SchemaError):
+                return PromptReadiness(False, "Required prompt response schema is invalid.")
+            required_fields = set(schema.get("required") or []) if isinstance(schema, dict) else set()
+            schema_fields = set(schema.get("properties") or {}) if isinstance(schema, dict) else set()
+            if (
+                not isinstance(schema, dict)
+                or schema.get("$id") != cls.OPTIMIZED_MATCH_SCHEMA_ID
+                or schema.get("type") != "object"
+                or not cls.OPTIMIZED_MATCH_SCHEMA_FIELDS.issubset(required_fields)
+                or not cls.OPTIMIZED_MATCH_SCHEMA_FIELDS.issubset(schema_fields)
+            ):
+                return PromptReadiness(False, "Required prompt response schema is incompatible.")
+            return PromptReadiness(True, "READY")
+        except Exception as exc:
+            logger.error("Could not validate required optimized_match prompt: %s", type(exc).__name__, exc_info=True)
+            return PromptReadiness(False, "Required prompt validation is unavailable.")
 
     @classmethod
     def activate_prompt(
