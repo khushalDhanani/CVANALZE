@@ -1,6 +1,36 @@
 # Work Status
 
 ## Last Completed Task
+**Isolate CV processing tests from shared runtime queues**
+
+### Architecture Impact Analysis
+- Kept production queue hydration and durable PostgreSQL behavior unchanged.
+- Prevented unit tests from writing processing-job fixtures to shared PostgreSQL, Redis, or file-cache providers by replacing both ledger and cache persistence with an in-memory provider.
+
+### Files Changed
+- Global test isolation: `backend/tests/conftest.py`.
+- Task record: `workstatus.md`.
+
+### Implementation Plan
+- Reproduce the stale `job_test_123` identity across PostgreSQL, Redis, and file cache.
+- Isolate the global processing-job test fixture from every shared persistence provider.
+- Remove only the exact leaked fixture and verify it does not return after rerunning the test.
+
+### Code Changes
+- `isolate_processing_job_ledger` now uses a per-test `MemoryCache` in addition to disabling PostgreSQL persistence.
+- Removed the exact `job_test_123` row, thirteen Redis aliases, and matching file-cache entries.
+
+### Verification Checklist
+- [x] Focused status-resolution test passes.
+- [x] Rerunning the test leaves zero matching PostgreSQL rows.
+- [x] Rerunning the test leaves zero matching Redis keys and file-cache entries.
+- [x] Live health remains HTTP 200 with prompt and rule configuration online.
+- [x] `git diff --check` passes.
+
+### Refactoring Performed
+- Centralized processing-job persistence isolation in the existing global test fixture.
+
+## Previous Task
 **Enterprise PostgreSQL prompt readiness for the CV queue**
 
 ### Architecture Impact Analysis
@@ -36,7 +66,9 @@
 - [x] Escaped `PROMPT_UNAVAILABLE` persists as non-retryable with a safe frontend-visible reason.
 - [x] Focused backend verification passes: 37 tests.
 - [x] Scoped Ruff, TypeScript `--noEmit`, uv lock consistency, Python compilation, and `git diff --check` pass.
-- [ ] Migration 024 was created but not executed against live PostgreSQL.
+- [x] Applied migration 024 to live PostgreSQL and verified active prompt version `3.5` with schema ID `cvai://prompts/optimized_match/response-schema/v1`.
+- [x] Verified live `/health` returns HTTP 200 with `prompt_configuration: online`; the worker automatically opened the FIFO lane and Redis had zero pending CV jobs.
+- [x] Diagnosed the visible `job_test_123` queue row as a stale test fixture persisted directly in PostgreSQL with `rq_job_id = NULL`; frontend reload hydration displays every active ledger row, while reconciliation intentionally returns early for records without an RQ identifier.
 - [ ] Frontend lint could not run because no ESLint configuration exists; Expo's attempted dependency edit was reverted.
 - [ ] One broader pre-existing recovery test has an RQ fake-queue `job_id` signature collision unrelated to this change.
 
