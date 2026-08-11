@@ -1,6 +1,10 @@
+import pytest
+from redis.exceptions import ConnectionError as RedisConnectionError
+
 from app.core import background_tasks
 from app.core.config import settings
-from start_scheduler import register_recurring_jobs
+from rq.cron import CronScheduler
+from start_scheduler import ResilientCronScheduler, register_recurring_jobs
 
 
 class _FakeScheduler:
@@ -9,6 +13,29 @@ class _FakeScheduler:
 
     def register(self, function, **options):
         self.registrations.append((function, options))
+
+
+def test_scheduler_ignores_redis_disconnect_while_registering_death(monkeypatch):
+    scheduler = object.__new__(ResilientCronScheduler)
+    monkeypatch.setattr(
+        CronScheduler,
+        "register_death",
+        lambda _self, _pipeline=None: (_ for _ in ()).throw(RedisConnectionError("offline")),
+    )
+
+    scheduler.register_death()
+
+
+def test_scheduler_preserves_unexpected_register_death_errors(monkeypatch):
+    scheduler = object.__new__(ResilientCronScheduler)
+    monkeypatch.setattr(
+        CronScheduler,
+        "register_death",
+        lambda _self, _pipeline=None: (_ for _ in ()).throw(RuntimeError("unexpected")),
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        scheduler.register_death()
 
 
 def test_scheduler_registers_sync_and_validation_snapshot_jobs(monkeypatch):

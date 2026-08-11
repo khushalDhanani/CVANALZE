@@ -42,6 +42,7 @@ class QueueSubmission:
 class ProcessingQueueService:
     """Persist, enqueue, and execute content-addressed CV processing jobs."""
 
+    _RQ_ENQUEUE_VISIBILITY_GRACE_SECONDS = 30
     _local_locks: dict[str, threading.Lock] = {}
     _local_locks_guard = threading.Lock()
     _MAX_LOCAL_LOCKS = 1000
@@ -65,6 +66,8 @@ class ProcessingQueueService:
 
         with cls._job_lock(f"submit:{job_id}", connection):
             existing = ProcessingJobRepository.get(job_id)
+            if existing:
+                existing = cls.reconcile_job(existing, connection=connection)
             if cls._can_reuse(existing, force_reprocess=force_reprocess):
                 return QueueSubmission(record=existing, reused_existing_job=True)
 
@@ -175,7 +178,7 @@ class ProcessingQueueService:
         }
 
     @classmethod
-    def reconcile_job(cls, record: ProcessingJobRecord) -> ProcessingJobRecord:
+    def reconcile_job(cls, record: ProcessingJobRecord, *, connection: Redis | None = None) -> ProcessingJobRecord:
         """Sync application state with RQ if the job crashed abruptly."""
         if record.execution_mode != ProcessingExecutionMode.RQ or record.state not in (JobState.QUEUED, JobState.PROCESSING, JobState.RETRYING):
             return record
@@ -183,7 +186,7 @@ class ProcessingQueueService:
         if not record.rq_job_id:
             return record
 
-        connection = cls._redis_connection()
+        connection = connection or cls._redis_connection()
         if not connection:
             return record
 
@@ -207,7 +210,22 @@ class ProcessingQueueService:
                         error=error,
                     )
             except NoSuchJobError:
-                pass
+                queued_age = (datetime.now(timezone.utc) - record.updated_at).total_seconds()
+                if record.state == JobState.QUEUED and queued_age < cls._RQ_ENQUEUE_VISIBILITY_GRACE_SECONDS:
+                    return record
+                error = CanonicalError(
+                    code=ErrorCode.PROCESSING_FAILED,
+                    message="The background processing job is no longer available.",
+                    retryable=True,
+                )
+                return ProcessingJobRepository.transition(
+                    record.job_id,
+                    JobState.FAILED,
+                    progress=100,
+                    stage="missing_queue_job",
+                    message="CV processing stopped because its background queue job disappeared. Upload the CV again to retry.",
+                    error=error,
+                )
         except Exception as e:
             logger.warning(f"Failed to reconcile RQ job {record.rq_job_id}: {e}")
 

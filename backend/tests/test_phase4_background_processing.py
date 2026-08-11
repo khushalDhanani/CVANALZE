@@ -1,10 +1,12 @@
 import hashlib
 from contextlib import nullcontext
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi import HTTPException
+from rq.job import Job, NoSuchJobError
 
 from app.core.cache import MemoryCache, cv_result_cache_manager, processing_job_cache_manager
 from app.core.config import settings
@@ -98,6 +100,84 @@ def test_duplicate_force_reprocess_reuses_an_active_job(monkeypatch):
 
     assert first.record.job_id == second.record.job_id
     assert second.reused_existing_job is True
+
+
+def test_missing_processing_rq_job_is_failed(monkeypatch):
+    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
+    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    missing = ProcessingJobRepository.save(
+        submission.record.model_copy(
+            update={
+                "state": JobState.PROCESSING,
+                "execution_mode": ProcessingExecutionMode.RQ,
+                "rq_job_id": f"{submission.record.job_id}-1",
+            }
+        )
+    )
+    monkeypatch.setattr(Job, "fetch", lambda *_args, **_kwargs: (_ for _ in ()).throw(NoSuchJobError()))
+
+    reconciled = ProcessingQueueService.reconcile_job(missing, connection=object())
+
+    assert reconciled.state == JobState.FAILED
+    assert reconciled.progress == 100
+    assert reconciled.stage == "missing_queue_job"
+    assert reconciled.error is not None
+    assert reconciled.error.retryable is True
+
+
+def test_newly_queued_job_has_visibility_grace_when_rq_job_is_not_visible(monkeypatch):
+    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
+    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    queued = ProcessingJobRepository.save(
+        submission.record.model_copy(
+            update={
+                "execution_mode": ProcessingExecutionMode.RQ,
+                "rq_job_id": f"{submission.record.job_id}-1",
+            }
+        )
+    )
+    monkeypatch.setattr(Job, "fetch", lambda *_args, **_kwargs: (_ for _ in ()).throw(NoSuchJobError()))
+
+    reconciled = ProcessingQueueService.reconcile_job(queued, connection=object())
+
+    assert reconciled.state == JobState.QUEUED
+
+
+def test_duplicate_submission_requeues_a_missing_processing_job(monkeypatch):
+    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
+    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    first = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    ProcessingJobRepository.save(
+        first.record.model_copy(
+            update={
+                "state": JobState.PROCESSING,
+                "execution_mode": ProcessingExecutionMode.RQ,
+                "rq_job_id": f"{first.record.job_id}-1",
+                "updated_at": first.record.updated_at - timedelta(minutes=1),
+            }
+        )
+    )
+    enqueued: list[str] = []
+
+    class FakeQueue:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def enqueue(self, _function, _processing_job_id, **options):
+            enqueued.append(options["job_id"])
+
+    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
+    monkeypatch.setattr(Job, "fetch", lambda *_args, **_kwargs: (_ for _ in ()).throw(NoSuchJobError()))
+    monkeypatch.setattr(processing_queue, "Queue", FakeQueue)
+
+    retried = ProcessingQueueService.submit_upload(**_submission_kwargs())
+
+    assert retried.reused_existing_job is False
+    assert retried.record.state == JobState.QUEUED
+    assert retried.record.enqueue_count == 2
+    assert enqueued == [f"{retried.record.job_id}-2"]
 
 
 def test_redis_outage_uses_only_the_explicit_development_fallback(monkeypatch):

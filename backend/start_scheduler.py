@@ -1,9 +1,20 @@
 from redis import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 from rq.cron import CronScheduler
 
 from app.core.background_tasks import run_integration_sync, snapshot_validation_metrics
 from app.core.config import settings
 from app.core.logging import logger
+
+
+class ResilientCronScheduler(CronScheduler):
+    """Allow a clean shutdown when Redis stops before the scheduler."""
+
+    def register_death(self, pipeline=None) -> None:
+        try:
+            super().register_death(pipeline)
+        except RedisConnectionError as exc:
+            logger.warning("Could not unregister RQ cron scheduler during shutdown because Redis is unavailable: %s", exc)
 
 
 def register_recurring_jobs(scheduler: CronScheduler) -> int:
@@ -34,7 +45,7 @@ def register_recurring_jobs(scheduler: CronScheduler) -> int:
 
 def main() -> None:
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
-    scheduler = CronScheduler(connection=Redis.from_url(redis_url), logging_level="INFO")
+    scheduler = ResilientCronScheduler(connection=Redis.from_url(redis_url), logging_level="INFO")
     registered = register_recurring_jobs(scheduler)
     if registered == 0:
         logger.warning("No recurring background jobs are enabled; scheduler will not start.")

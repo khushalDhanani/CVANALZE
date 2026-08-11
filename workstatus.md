@@ -1,6 +1,78 @@
 # Work Status
 
 ## Last Completed Task
+**Recover missing RQ jobs that remain stuck in processing**
+
+### Architecture Impact Analysis
+- Corrected reconciliation at the centralized `ProcessingQueueService` boundary used by match/CV status polling and duplicate upload submission.
+- Preserved RQ queues, retry configuration, processing contracts, result persistence, and Redis-unavailable behavior.
+
+### Files Changed
+- Queue reconciliation and submission reuse: `backend/app/services/processing_queue.py`.
+- Focused regression coverage: `backend/tests/test_phase4_background_processing.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Monitor API, worker, scheduler, and Redis state for `cv_13639_cv_pritesh_gohil_1`.
+- Compare the persisted processing record with its RQ job and worker registries.
+- Fail orphaned active records, protect the initial enqueue race with a visibility grace period, and reconcile before duplicate-job reuse.
+- Deploy the API/worker change, re-enqueue the retained candidate source, and monitor to a terminal state.
+
+### Code Changes
+- Missing `PROCESSING` or `RETRYING` RQ jobs now transition to retryable `FAILED` with stage `missing_queue_job` instead of polling forever.
+- Missing newly queued jobs remain eligible for 30 seconds to cover the normal record-save-before-RQ-enqueue interval.
+- Upload submission now reconciles an existing RQ record before deciding whether it can be reused, allowing orphaned jobs to enqueue a new attempt.
+- Added regression cases for orphan failure, queued-job grace, and duplicate-upload recovery.
+
+### Verification Checklist
+- [x] Confirmed the supplied `200 OK` line was a successful status response rather than an HTTP failure.
+- [x] Confirmed Redis held a stale `PROCESSING` record at 15% while RQ had zero queued, executing, or failed jobs and its referenced RQ job was absent.
+- [x] Rebuilt and restarted the API and worker using the active base-plus-local Compose configuration.
+- [x] Confirmed the deployed API changed the orphan from infinite processing to retryable `FAILED / missing_queue_job`.
+- [x] Re-enqueued the retained source as attempt 2 and monitored it from parsing through successful completion.
+- [x] Final API status is `COMPLETED`, progress 100, stage `complete`, and persistence `durable`.
+- [x] Final RQ state is zero queued/executing/failed jobs; the worker is healthy and idle.
+- [x] `git diff --check` passed before the final status update.
+- [ ] Automated tests were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Reused the existing reconciliation and state-transition services; no new queue client, cache, endpoint, or processing implementation was introduced.
+
+## Previous Task
+**Handle scheduler shutdown when Redis stops first**
+
+### Architecture Impact Analysis
+- Kept recurring-job registration, queue routing, Redis configuration, and background-task behavior unchanged.
+- Added resilience only at the RQ cron scheduler shutdown boundary so an unavailable Redis service cannot turn an otherwise normal SIGTERM shutdown into a traceback.
+
+### Files Changed
+- Scheduler lifecycle handling: `backend/start_scheduler.py`.
+- Focused regression coverage: `backend/tests/test_background_sync_jobs.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Trace the supplied scheduler log through RQ's `CronScheduler.start()` cleanup path.
+- Preserve operational Redis failures while tolerating the specific disconnect raised by `register_death()` during shutdown.
+- Add focused coverage for the tolerated Redis error and propagation of unrelated exceptions.
+
+### Code Changes
+- Added `ResilientCronScheduler`, which catches only `redis.exceptions.ConnectionError` from the RQ death-registration cleanup call.
+- Updated the scheduler entry point to use the resilient subclass without changing registration or execution behavior.
+- Added regression cases confirming Redis shutdown disconnects are ignored and unexpected cleanup errors remain visible.
+
+### Verification Checklist
+- [x] Confirmed both recurring jobs registered and enqueued successfully before the supplied failure.
+- [x] Confirmed the traceback occurs after SIGTERM while RQ unregisters the scheduler from Redis.
+- [x] Confirmed active scheduler-loop failures are not caught by the new cleanup boundary.
+- [x] Confirmed unrelated cleanup exceptions still propagate.
+- [x] `git diff --check` passed.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Running containers were not rebuilt or restarted, so live verification requires the updated scheduler image/process.
+
+### Refactoring Performed
+- Introduced a narrow scheduler subclass to isolate shutdown cleanup behavior; no job, service, queue, or API refactoring was performed.
+
+## Previous Task
 **Restore completed candidates hidden by stale processing placeholders**
 
 ### Architecture Impact Analysis
