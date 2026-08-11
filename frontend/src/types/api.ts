@@ -525,6 +525,49 @@ export interface ConfigVersionActivatedResponse {
   tenant_id: string | null;
 }
 
+export type RuleInventoryKind = 'SYSTEM_RULE' | 'THRESHOLD' | 'PENALTY' | 'WEIGHT';
+
+export interface RuleInventoryItem {
+  id: string;
+  kind: RuleInventoryKind;
+  name: string;
+  rule_type: string | null;
+  value: string | number | null;
+  condition_count: number;
+}
+
+export interface RuleInventoryGroup {
+  component_type: string;
+  component_name: string;
+  rules: RuleInventoryItem[];
+}
+
+export interface RuleInventoryResponse {
+  profile_version: string;
+  total_rules: number;
+  groups: RuleInventoryGroup[];
+}
+
+export interface RuleConfigJsonSchema {
+  $defs?: Record<string, RuleConfigJsonSchema>;
+  $ref?: string;
+  anyOf?: RuleConfigJsonSchema[];
+  type?: string | string[];
+  title?: string;
+  description?: string;
+  properties?: Record<string, RuleConfigJsonSchema>;
+  required?: string[];
+  items?: RuleConfigJsonSchema;
+  additionalProperties?: boolean | RuleConfigJsonSchema;
+  enum?: unknown[];
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  minLength?: number;
+  maxLength?: number;
+  default?: unknown;
+}
+
 export interface BatchCandidateResult {
   candidate_id: number;
   candidate_name: string;

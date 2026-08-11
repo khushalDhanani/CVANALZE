@@ -312,7 +312,11 @@ docker compose up -d api worker auxiliary-worker scheduler
 ```
 
 PostgreSQL normalized rule tables are the only source of CV rule configuration; Redis is a cache and the application has no bundled or hardcoded rule profile. On a
-clean database, the API starts in a fail-closed configuration state so an administrator can create and activate a complete profile through `/api/config/versions`.
+clean database, `/config` directs an administrator to a structured initial setup screen generated from `GET /api/config/schema`. The completed options are validated
+by the authoritative backend model and persisted through `POST /api/config/initialize`; no rule JSON file, test fixture, or frontend seed is used. The setup screen
+starts with one conservative, typed baseline from `GET /api/config/system-default`, which must be reviewed and explicitly activated by an administrator.
+After activation, `GET /api/config/rules` returns a deterministic administrator-only inventory of normalized system rules, thresholds, penalties, and weights for the
+active profile. The `/config` screen renders this inventory directly from PostgreSQL and does not maintain a frontend rule catalog.
 `/health` returns `503` with `rule_configuration: unavailable` until activation. Both RQ workers remain alive but do not open their execution lanes until the active
 profile passes schema validation, safety gates, and synthetic smoke tests. They detect a later activation automatically without requiring a restart.
 

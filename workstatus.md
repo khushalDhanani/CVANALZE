@@ -1,6 +1,163 @@
 # Work Status
 
 ## Last Completed Task
+**Dynamic active-rule inventory**
+
+### Architecture Impact Analysis
+- Added an administrator-only read model over normalized PostgreSQL configuration records without changing rule evaluation, matching, scoring, CV processing, or LLM behavior.
+- Kept the active database profile authoritative and made rule ordering deterministic across API responses and page reloads.
+
+### Files Changed
+- Rule inventory service/API/access policy: `backend/app/services/configuration_service.py`, `backend/app/api/config.py`, and `backend/app/core/access_policy.py`.
+- Frontend contract, retrieval, state, and rendering: `frontend/src/types/api.ts`, `frontend/src/services/configService.ts`, `frontend/src/hooks/useMatchConfig.ts`, and `frontend/src/app/config.tsx`.
+- Focused contracts: `backend/tests/test_configuration_schema.py` and `backend/tests/test_phase6_api_reliability.py`.
+- Documentation: `README.md` and `workstatus.md`.
+
+### Implementation Plan
+- Read the active normalized profile with eager-loaded components and rule relationships.
+- Serialize system rules, thresholds, penalties, and weights into deterministic component groups.
+- Fetch the inventory independently from the editable matching options so an inventory failure cannot discard a valid configuration form.
+- Render the complete active rule list on `/config` with profile version and counts.
+
+### Code Changes
+- Added `GET /api/config/rules` with administrator access and a 404 contract when no active profile exists.
+- Added grouped rule inventory contracts with stable identifiers, kinds, names, safe value previews, and condition counts.
+- Added an “Active Rule List” section sourced entirely from backend persistence.
+- Rule inventory refreshes after page reload, manual reload, and successful configuration version activation.
+
+### Verification Checklist
+- [x] Confirmed all four normalized kinds are included: system rules, thresholds, penalties, and weights.
+- [x] Confirmed groups and rules use deterministic sorting.
+- [x] Confirmed long rule targets are bounded to safe 160-character previews.
+- [x] Confirmed the inventory endpoint requires administrator access.
+- [x] Confirmed `git diff --check` passes; the only over-200-character scoped service line predates this task.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Running services were not rebuilt or restarted.
+
+### Refactoring Performed
+- Centralized normalized rule serialization in `ConfigurationService` and kept frontend rendering free of a duplicated rule catalog.
+
+## Previous Task
+**Resolve configuration activation database-schema mismatch**
+
+### Architecture Impact Analysis
+- Confirmed configuration activation failed at the normalized PostgreSQL persistence boundary, before any profile could be committed or activated.
+- Restored model/database compatibility by applying the pending versioned migration through the existing migration runner.
+
+### Files Changed
+- Task record: `workstatus.md`.
+- No production source files were changed for this operational correction.
+
+### Implementation Plan
+- Trace the safe HTTP 500 to the originating database exception.
+- Rebuild the migration image so it contains migration 023.
+- Apply pending migrations and verify the schema and transaction outcome.
+
+### Code Changes
+- No code changes were required; the running API had been rebuilt before its matching database migration was applied.
+- Rebuilt `migrate-postgres` and successfully applied `023_rule_config_integrity.sql`.
+
+### Verification Checklist
+- [x] Confirmed `cvai.rule_conditions.branch_index` exists with integer type and default zero.
+- [x] Confirmed migration 023 is recorded in `cvai.schema_migrations`.
+- [x] Confirmed all three new configuration uniqueness indexes exist.
+- [x] Confirmed the failed request rolled back completely: zero profiles and zero active profiles remain.
+- [ ] The administrator must retry “Validate and Activate”.
+
+### Refactoring Performed
+- None.
+
+## Previous Task
+**Reviewable system-generated default rules**
+
+### Architecture Impact Analysis
+- Added one conservative baseline through a typed backend factory rather than a bundled JSON document or frontend constants.
+- Kept activation administrator-controlled so generating a baseline cannot silently change production matching behavior.
+- Reused the existing model invariants, synthetic smoke tests, cache compilation, normalized persistence, and activation flow.
+
+### Files Changed
+- Typed baseline factory: `backend/app/services/system_rule_config_factory.py`.
+- Baseline API, validation reuse, and authorization: `backend/app/api/config.py`, `backend/app/services/configuration_service.py`, and `backend/app/core/access_policy.py`.
+- Frontend baseline hydration and reset: `frontend/src/app/config-setup.tsx` and `frontend/src/services/configService.ts`.
+- Focused contracts: `backend/tests/test_configuration_schema.py` and `backend/tests/test_phase6_api_reliability.py`.
+- Documentation: `README.md` and `workstatus.md`.
+
+### Implementation Plan
+- Generate a complete conservative `UnifiedRuleConfig` using typed models.
+- Validate the generated configuration before returning it.
+- Load it into the schema-driven setup form for review and explicit activation.
+- Allow administrators to reset edits to the generated baseline without reloading the page.
+
+### Code Changes
+- Added administrator-only `GET /api/config/system-default`.
+- Added `SystemRuleConfigFactory` with a single versioned `system-default-v1` baseline.
+- Initial setup now loads the backend schema and system baseline together.
+- Added “Reset to System Default” while preserving every structured editing option.
+- Centralized pre-persistence smoke testing and cache compilation in `ConfigurationService.validate_config`.
+
+### Verification Checklist
+- [x] Confirmed the baseline constructs a complete `UnifiedRuleConfig` with required extraction, scoring, taxonomy, resume-quality, embedding, and workflow sections.
+- [x] Confirmed the baseline satisfies all current model safety invariants by construction.
+- [x] Confirmed no production import references `backend/tests/mock_rule_config.py` or a bundled rule configuration file.
+- [x] Confirmed the new endpoint requires administrator access.
+- [x] Confirmed `git diff --check` passes.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Migration 023 remains created but not executed.
+- [ ] Running services were not rebuilt or restarted.
+
+### Refactoring Performed
+- Reused one validation boundary for both generated and administrator-submitted configurations.
+
+## Previous Task
+**Dynamic database-backed initial Engine Configuration**
+
+### Architecture Impact Analysis
+- Preserved the established options-based `/config` editor for active profiles and added a separate structured initialization path only when PostgreSQL has no active profile.
+- Kept PostgreSQL normalized rule tables authoritative; no bundled profile, raw JSON editor, test fixture, or frontend business-rule seed was introduced.
+- Generated the setup controls and defaults from the backend Pydantic validation schema, then reused the existing profile persistence, smoke-test, activation, cache reload, and invalidation services.
+- Added database uniqueness constraints so concurrent administrators cannot create duplicate global versions or multiple active profiles.
+
+### Files Changed
+- Backend schema/initialization API: `backend/app/api/config.py` and `backend/app/core/access_policy.py`.
+- Configuration schema, normalized persistence, and lookup: `backend/app/services/configuration_service.py` and `backend/app/core/rule_config_manager.py`.
+- Database invariants and taxonomy branch fidelity: `backend/app/models/rules.py` and PostgreSQL migration `023` with its down migration.
+- Frontend setup flow: `frontend/src/app/config.tsx`, `frontend/src/app/config-setup.tsx`, `frontend/src/hooks/useMatchConfig.ts`, and `frontend/src/services/configService.ts`.
+- Frontend schema contract/helpers: `frontend/src/types/api.ts` and `frontend/src/utils/ruleConfigSchema.ts`.
+- Focused contracts: `backend/tests/test_configuration_schema.py`, `backend/tests/test_phase6_api_reliability.py`, and `frontend/src/__tests__/ruleConfigSchema.test.ts`.
+- Operations documentation: `README.md` and `workstatus.md`.
+
+### Implementation Plan
+- Treat an active-config 404 as an explicit setup state rather than a generic load failure.
+- Obtain editor structure and model-owned defaults dynamically from the backend schema.
+- Validate the complete configuration on the backend, persist a recoverable draft, activate it, and record the authenticated administrator fingerprint.
+- Enforce global/tenant version and active-profile uniqueness in PostgreSQL.
+
+### Code Changes
+- The disabled “Configuration is Up to Date” action becomes “Create Initial Configuration” only when the backend confirms no active profile exists.
+- The setup screen recursively renders typed object, map, array, enum, boolean, string, integer, and number controls from the backend schema.
+- Schema defaults come from Pydantic fields/default factories and are hydrated into the visible draft so submitted values cannot differ silently from displayed values.
+- Initialization is administrator-only, rejects replacement of an existing active profile, reuses a recoverable draft of the same version, and returns safe conflict/validation errors.
+- Workflow state-machine values now round-trip through normalized PostgreSQL components instead of being silently discarded.
+- Taxonomy conditions retain their branch indexes, preserving alternative-branch semantics after database reconstruction.
+
+### Verification Checklist
+- [x] Confirmed `/config` retains its established options view for active profiles.
+- [x] Confirmed initialization uses no `rule_config.json`, mock profile, or frontend rule values.
+- [x] Confirmed schema and initialization endpoints require administrator access.
+- [x] Confirmed database constraints close concurrent global-version and active-profile races.
+- [x] Confirmed workflow configuration is persisted and reconstructed from PostgreSQL.
+- [x] Confirmed taxonomy branch boundaries are persisted and reconstructed deterministically.
+- [x] Confirmed `git diff --check` passes; the only over-200-character line in scoped files predates this task.
+- [ ] Frontend tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Backend tests were not executed because repository instructions require explicit permission.
+- [ ] Migration 023 was created but not executed.
+- [ ] The frontend process was not restarted.
+
+### Refactoring Performed
+- Extracted schema resolution and schema-default hydration into a reusable frontend utility.
+- Centralized dynamic editor-schema generation and model-owned default discovery in the existing configuration service.
+
+## Previous Task
 **Accurate degraded dependency health rendering**
 
 ### Architecture Impact Analysis

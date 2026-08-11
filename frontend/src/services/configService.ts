@@ -4,6 +4,8 @@ import {
   ConfigVersionCreatedResponse,
   MatchEngineConfigResponse,
   MatchEngineConfigUpdate,
+  RuleInventoryResponse,
+  RuleConfigJsonSchema,
   UnifiedRuleConfig,
 } from '@/types/api';
 
@@ -57,6 +59,23 @@ const applyMatchUpdate = (
 };
 
 export const configService = {
+  getRuleConfigSchema: (): Promise<RuleConfigJsonSchema> => {
+    return apiClient.get<RuleConfigJsonSchema>('/api/config/schema');
+  },
+
+  getSystemDefaultConfig: (): Promise<Record<string, unknown>> => {
+    return apiClient.get<Record<string, unknown>>('/api/config/system-default');
+  },
+
+  getRuleInventory: (): Promise<RuleInventoryResponse> => {
+    return apiClient.get<RuleInventoryResponse>('/api/config/rules');
+  },
+
+  initializeConfig: async (payload: Record<string, unknown>): Promise<MatchEngineConfigResponse> => {
+    await apiClient.post<ConfigVersionActivatedResponse>('/api/config/initialize', payload);
+    return getActiveConfig().then(toMatchEngineConfig);
+  },
+
   /**
    * Retrieve the active versioned rule configuration and map its editable match fields.
    */

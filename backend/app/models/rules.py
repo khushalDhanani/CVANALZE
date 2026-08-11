@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import timezone, datetime
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 from app.core.database import PostgresAppBase
 
@@ -29,6 +29,24 @@ class RuleConfigProfile(PostgresAppBase):
     __tablename__ = "rule_config_profiles"
     __table_args__ = (
         UniqueConstraint("tenant_id", "version_tag", name="uq_rule_config_tenant_version"),
+        Index(
+            "uq_rule_config_global_version",
+            "version_tag",
+            unique=True,
+            postgresql_where=text("tenant_id IS NULL"),
+        ),
+        Index(
+            "uq_rule_config_global_active",
+            "is_active",
+            unique=True,
+            postgresql_where=text("tenant_id IS NULL AND is_active IS TRUE"),
+        ),
+        Index(
+            "uq_rule_config_tenant_active",
+            "tenant_id",
+            unique=True,
+            postgresql_where=text("tenant_id IS NOT NULL AND is_active IS TRUE"),
+        ),
         {"schema": "cvai"}
     )
 
@@ -103,6 +121,7 @@ class RuleCondition(PostgresAppBase):
     condition_scope = Column(String(100), nullable=False)
     condition_mode = Column(String(50), nullable=False, default="any")
     is_negated = Column(Boolean, default=False)
+    branch_index = Column(Integer, nullable=False, default=0)
 
     rule = relationship("SystemRule", back_populates="conditions")
     values = relationship("RuleConditionValue", back_populates="condition", cascade="all, delete-orphan")

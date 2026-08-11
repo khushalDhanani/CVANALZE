@@ -5,7 +5,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { CheckCircle2, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react-native';
+import { CheckCircle2, AlertTriangle, AlertCircle, ListChecks } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMatchConfig } from '@/hooks/useMatchConfig';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -13,10 +14,31 @@ import { MatchComponentWeights } from '@/types/api';
 import { Card, Button, TextField, WeightControlRow, Breadcrumbs, Badge } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
+const formatRuleLabel = (value: string): string => {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+};
+
+const formatRuleValue = (value: string | number | null, conditionCount: number): string => {
+  if (value !== null && value !== '') return String(value);
+  if (conditionCount > 0) return `${conditionCount} condition${conditionCount === 1 ? '' : 's'}`;
+  return 'Configured';
+};
+
 export default function ConfigScreen() {
   usePageTitle('Engine Configuration | AIRIS');
-  const { config, loading, refreshing, updating, error, refreshConfig, updateConfig } =
-    useMatchConfig();
+  const router = useRouter();
+  const {
+    config,
+    loading,
+    refreshing,
+    updating,
+    configurationMissing,
+    ruleInventory,
+    ruleInventoryError,
+    error,
+    refreshConfig,
+    updateConfig,
+  } = useMatchConfig();
 
   // Form states
   const [highThreshold, setHighThreshold] = useState<string>('70');
@@ -147,8 +169,8 @@ export default function ConfigScreen() {
             <View className="flex-row items-center gap-2">
               <Text className="text-base font-sans-bold text-text-primary">Engine Configuration</Text>
               <Badge
-                label={isDirty ? 'Unsaved Changes' : 'Synced with Server'}
-                tone={isDirty ? 'warning' : 'neutral'}
+                label={configurationMissing ? 'Configuration Required' : isDirty ? 'Unsaved Changes' : 'Synced with Server'}
+                tone={configurationMissing || isDirty ? 'warning' : 'neutral'}
               />
             </View>
             <Text className="text-[11px] font-sans text-text-muted">
@@ -191,6 +213,22 @@ export default function ConfigScreen() {
               <Card className="bg-danger/10 border-danger/30 flex-row items-center gap-1.5 p-3">
                 <AlertCircle size={14} color={COLORS.danger} />
                 <Text className="text-xs font-sans-semibold text-danger flex-1">{error}</Text>
+              </Card>
+            )}
+
+            {configurationMissing && (
+              <Card className="bg-warning/10 border-warning/30 p-3 flex-row items-center gap-2">
+                <AlertTriangle size={16} color={COLORS.warning} />
+                <Text className="text-xs font-sans-medium text-warning flex-1">
+                  No active profile exists. Use the structured setup wizard to configure every required rule before activation.
+                </Text>
+              </Card>
+            )}
+
+            {ruleInventoryError && (
+              <Card className="bg-warning/10 border-warning/30 p-3 flex-row items-center gap-2">
+                <AlertTriangle size={16} color={COLORS.warning} />
+                <Text className="text-xs font-sans-medium text-warning flex-1">{ruleInventoryError}</Text>
               </Card>
             )}
 
@@ -292,6 +330,50 @@ export default function ConfigScreen() {
               })}
             </Card>
 
+            {ruleInventory && (
+              <Card className="p-3.5 gap-3.5 shadow-none border-border">
+                <View className="flex-row items-center justify-between gap-2">
+                  <View className="flex-row items-center gap-2">
+                    <ListChecks size={16} color={COLORS.primary} />
+                    <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
+                      4. Active Rule List
+                    </Text>
+                  </View>
+                  <Badge label={`${ruleInventory.total_rules} Rules`} tone="neutral" />
+                </View>
+                <Text className="text-[11px] font-sans text-text-muted">
+                  Active profile: {ruleInventory.profile_version}. This inventory is reconstructed from normalized PostgreSQL records.
+                </Text>
+
+                {ruleInventory.groups.map((group) => (
+                  <View key={`${group.component_type}-${group.component_name}`} className="rounded-md border border-border overflow-hidden">
+                    <View className="flex-row items-center justify-between gap-2 bg-background px-3 py-2 border-b border-border">
+                      <View className="flex-1">
+                        <Text className="text-xs font-sans-semibold text-text-primary">{formatRuleLabel(group.component_name)}</Text>
+                        <Text className="text-[10px] font-sans text-text-muted">{formatRuleLabel(group.component_type)}</Text>
+                      </View>
+                      <Badge label={`${group.rules.length}`} tone="neutral" />
+                    </View>
+                    {group.rules.map((rule, index) => (
+                      <View
+                        key={rule.id}
+                        className={`px-3 py-2 gap-1 ${index < group.rules.length - 1 ? 'border-b border-border' : ''}`}
+                      >
+                        <View className="flex-row items-center justify-between gap-2">
+                          <Text className="text-xs font-sans-medium text-text-primary flex-1">{formatRuleLabel(rule.name)}</Text>
+                          <Badge label={formatRuleLabel(rule.kind)} tone="neutral" />
+                        </View>
+                        <Text className="text-[10px] font-sans text-text-muted" numberOfLines={2}>
+                          {rule.rule_type ? `${formatRuleLabel(rule.rule_type)} · ` : ''}
+                          {formatRuleValue(rule.value, rule.condition_count)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </Card>
+            )}
+
             {/* SAVE BUTTON & VALIDATION WARNING */}
             {!isWeightValid && (
               <Card className="bg-danger/10 border-danger/30 p-3 flex-row items-center gap-2">
@@ -307,13 +389,15 @@ export default function ConfigScreen() {
               label={
                 updating
                   ? 'Saving Configuration...'
+                  : configurationMissing
+                    ? 'Create Initial Configuration'
                   : !isDirty
                     ? 'Configuration is Up to Date'
                     : 'Save Configuration Changes'
               }
-              onPress={handleSave}
+              onPress={configurationMissing ? () => router.push('/config-setup') : handleSave}
               loading={updating}
-              disabled={updating || !isDirty || !isFormValid}
+              disabled={updating || (!configurationMissing && (!isDirty || !isFormValid))}
               size="md"
             />
           </View>

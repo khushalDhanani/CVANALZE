@@ -662,15 +662,21 @@ class RuleConfigManager:
                             rule_obj: dict[str, Any] = {
                                 "name": rule_name,
                                 "domain": domain,
-                                "branches": [{"conditions": []}]
+                                "branches": [],
                             }
+                            branches: dict[int, list[dict[str, Any]]] = {}
                             for c in r.conditions:
-                                rule_obj["branches"][0]["conditions"].append({
+                                branch_index = getattr(c, "branch_index", 0)
+                                branches.setdefault(branch_index, []).append({
                                     "scope": c.condition_scope,
                                     "mode": c.condition_mode,
                                     "negate": c.is_negated,
                                     "keywords": [v.value for v in c.values]
                                 })
+                            rule_obj["branches"] = [
+                                {"conditions": conditions}
+                                for _, conditions in sorted(branches.items())
+                            ]
                                 
                             if r.rule_type == "vacancy_taxonomy":
                                 rule_obj["family"] = families[0] if families else ""
@@ -721,6 +727,18 @@ class RuleConfigManager:
                             elif r.rule_name == "canonical_equivalents" and r.target_value:
                                 de_dict["canonical_equivalents"] = json.loads(r.target_value)
                     base_dict["scoring"]["domain_embedding"] = de_dict
+
+            elif comp.component_type == "workflow":
+                workflow_rule = next(
+                    (
+                        rule
+                        for rule in comp.system_rules
+                        if rule.rule_type == "workflow_state_machine" and rule.rule_name == "job_states" and rule.target_value
+                    ),
+                    None,
+                )
+                if workflow_rule:
+                    base_dict["workflow"] = json.loads(workflow_rule.target_value)
 
         return base_dict
 

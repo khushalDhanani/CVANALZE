@@ -147,6 +147,10 @@ def test_concrete_paths_resolve_characterized_access_tiers():
     assert resolve_access_tier("POST", "/api/master-data/warm") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("POST", "/api/vector-db/sync") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("GET", "/api/batch/jobs/batch-123") == AccessTier.RECRUITER
+    assert resolve_access_tier("GET", "/api/config/schema") == AccessTier.ADMINISTRATOR
+    assert resolve_access_tier("GET", "/api/config/system-default") == AccessTier.ADMINISTRATOR
+    assert resolve_access_tier("GET", "/api/config/rules") == AccessTier.ADMINISTRATOR
+    assert resolve_access_tier("POST", "/api/config/initialize") == AccessTier.ADMINISTRATOR
 
 
 def test_trusted_cors_configuration_never_contains_wildcard():

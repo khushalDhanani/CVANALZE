@@ -1,15 +1,143 @@
 from __future__ import annotations
 import json
-from typing import Optional
+from typing import Any, Optional, get_args, get_origin
+from pydantic import BaseModel
+from pydantic_core import PydanticUndefined
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import selectinload
 
 from app.core.cache import RedisCache
 from app.core.logging import logger
-from app.models.rules import RuleConfigProfile
+from app.models.rules import RuleComponent, RuleConfigProfile, SystemRule
 from app.core.rule_config_manager import UnifiedRuleConfig, RuleConfigManager
 
 class ConfigurationService:
     REDIS_PUBSUB_CHANNEL = "cvai:config:invalidated"
+
+    @classmethod
+    def list_active_rules(cls, db: Session, tenant_id: Optional[str] = None) -> dict[str, Any] | None:
+        query = db.query(RuleConfigProfile).options(
+            selectinload(RuleConfigProfile.components).selectinload(RuleComponent.system_rules).selectinload(SystemRule.conditions),
+            selectinload(RuleConfigProfile.components).selectinload(RuleComponent.thresholds),
+            selectinload(RuleConfigProfile.components).selectinload(RuleComponent.penalties),
+            selectinload(RuleConfigProfile.components).selectinload(RuleComponent.weights),
+        ).filter(RuleConfigProfile.is_active.is_(True))
+        query = query.filter(RuleConfigProfile.tenant_id == tenant_id) if tenant_id else query.filter(RuleConfigProfile.tenant_id.is_(None))
+        profile = query.first()
+        if not profile:
+            return None
+        groups = [cls._serialize_rule_component(component) for component in profile.components]
+        groups.sort(key=lambda group: (group["component_type"], group["component_name"]))
+        return {
+            "profile_version": profile.version_tag,
+            "total_rules": sum(len(group["rules"]) for group in groups),
+            "groups": groups,
+        }
+
+    @staticmethod
+    def _serialize_rule_component(component: RuleComponent) -> dict[str, Any]:
+        rules: list[dict[str, Any]] = []
+        for rule in component.system_rules:
+            target = rule.target_value
+            value = f"{target[:157]}..." if target and len(target) > 160 else target
+            rules.append(
+                {
+                    "id": f"system-{rule.id}",
+                    "kind": "SYSTEM_RULE",
+                    "name": rule.rule_name,
+                    "rule_type": rule.rule_type,
+                    "value": value,
+                    "condition_count": len(rule.conditions),
+                }
+            )
+        for kind, entries, name_attr, value_attr in (
+            ("THRESHOLD", component.thresholds, "threshold_key", "threshold_value"),
+            ("PENALTY", component.penalties, "penalty_key", "penalty_value"),
+            ("WEIGHT", component.weights, "weight_key", "weight_value"),
+        ):
+            for entry in entries:
+                rules.append(
+                    {
+                        "id": f"{kind.lower()}-{entry.id}",
+                        "kind": kind,
+                        "name": getattr(entry, name_attr),
+                        "rule_type": None,
+                        "value": getattr(entry, value_attr),
+                        "condition_count": 0,
+                    }
+                )
+        rules.sort(key=lambda rule: (rule["kind"], rule["name"]))
+        return {
+            "component_type": component.component_type,
+            "component_name": component.component_name,
+            "rules": rules,
+        }
+
+    @classmethod
+    def validate_config(cls, config: UnifiedRuleConfig) -> None:
+        """Run all pre-persistence validation used by generated and submitted profiles."""
+        RuleConfigManager._run_synthetic_smoke_tests(config)
+        RuleConfigManager._build_and_validate_all_caches(config)
+
+    @classmethod
+    def get_editor_schema(cls) -> dict[str, Any]:
+        """Return the validation schema with model-owned defaults for dynamic editors."""
+        schema = UnifiedRuleConfig.model_json_schema()
+        for model in cls._nested_model_types(UnifiedRuleConfig):
+            model_schema = schema if model is UnifiedRuleConfig else schema.get("$defs", {}).get(model.__name__)
+            if not model_schema:
+                continue
+            properties = model_schema.get("properties", {})
+            for field_name, field in model.model_fields.items():
+                if field_name not in properties or field.is_required():
+                    continue
+                try:
+                    default = field.get_default(call_default_factory=True)
+                except (TypeError, ValueError):
+                    continue
+                if default is PydanticUndefined:
+                    continue
+                properties[field_name]["default"] = default.model_dump(mode="json") if isinstance(default, BaseModel) else default
+        return schema
+
+    @staticmethod
+    def _nested_model_types(root: type[BaseModel]) -> list[type[BaseModel]]:
+        discovered: list[type[BaseModel]] = []
+        pending = [root]
+        while pending:
+            model = pending.pop(0)
+            if model in discovered:
+                continue
+            discovered.append(model)
+            for field in model.model_fields.values():
+                for annotation in ConfigurationService._annotation_types(field.annotation):
+                    if isinstance(annotation, type) and issubclass(annotation, BaseModel) and annotation not in discovered:
+                        pending.append(annotation)
+        return discovered
+
+    @staticmethod
+    def _annotation_types(annotation: Any) -> list[Any]:
+        origin = get_origin(annotation)
+        if origin is None:
+            return [annotation]
+        nested: list[Any] = []
+        for argument in get_args(annotation):
+            nested.extend(ConfigurationService._annotation_types(argument))
+        return nested
+
+    @classmethod
+    def get_profile(
+        cls,
+        db: Session,
+        version_tag: str,
+        tenant_id: Optional[str] = None,
+    ) -> Optional[RuleConfigProfile]:
+        query = db.query(RuleConfigProfile).filter(RuleConfigProfile.version_tag == version_tag)
+        if tenant_id:
+            query = query.filter(RuleConfigProfile.tenant_id == tenant_id)
+        else:
+            query = query.filter(RuleConfigProfile.tenant_id.is_(None))
+        return query.first()
 
     @classmethod
     def create_profile(
@@ -25,7 +153,7 @@ class ConfigurationService:
         """Create a new version of the rule config in DRAFT state."""
         
         # Validate that the config is valid before saving
-        RuleConfigManager._run_synthetic_smoke_tests(config)
+        cls.validate_config(config)
         
         from app.models.rules import RuleComponent, SystemRule, RuleCondition, RuleConditionValue, RuleThreshold, RulePenalty, RuleWeight
         
@@ -227,12 +355,13 @@ class ConfigurationService:
             
         for vac_rule in tax_cfg.vacancy_rules:
             sys_rule = SystemRule(rule_type="vacancy_taxonomy", rule_name=vac_rule.name, target_value=f"{vac_rule.domain}::{vac_rule.family}")
-            for branch in vac_rule.branches:
+            for branch_index, branch in enumerate(vac_rule.branches):
                 for cond in branch.conditions:
                     cond_obj = RuleCondition(
                         condition_scope=cond.scope,
                         condition_mode=cond.mode,
                         is_negated=cond.negate,
+                        branch_index=branch_index,
                     )
                     for kw in cond.keywords:
                         cond_obj.values.append(RuleConditionValue(value=kw))
@@ -241,12 +370,13 @@ class ConfigurationService:
 
         for cand_rule in tax_cfg.candidate_rules:
             sys_rule = SystemRule(rule_type="candidate_taxonomy", rule_name=f"cand_{cand_rule.name}", target_value=f"{cand_rule.domain}::{','.join(cand_rule.families)}")
-            for branch in cand_rule.branches:
+            for branch_index, branch in enumerate(cand_rule.branches):
                 for cond in branch.conditions:
                     cond_obj = RuleCondition(
                         condition_scope=cond.scope,
                         condition_mode=cond.mode,
                         is_negated=cond.negate,
+                        branch_index=branch_index,
                     )
                     for kw in cond.keywords:
                         cond_obj.values.append(RuleConditionValue(value=kw))
@@ -303,6 +433,17 @@ class ConfigurationService:
         if de_cfg.canonical_equivalents:
             ce_rule = SystemRule(rule_type="domain_embedding_meta", rule_name="canonical_equivalents", target_value=json.dumps(de_cfg.canonical_equivalents))
             de_comp.system_rules.append(ce_rule)
+
+        # 8. Workflow state machine
+        workflow_comp = RuleComponent(component_type="workflow", component_name="job_states", profile_id=profile.profile_id)
+        workflow_comp.system_rules.append(
+            SystemRule(
+                rule_type="workflow_state_machine",
+                rule_name="job_states",
+                target_value=json.dumps(config.workflow.model_dump()),
+            )
+        )
+        db.add(workflow_comp)
 
         db.commit()
         db.refresh(profile)
