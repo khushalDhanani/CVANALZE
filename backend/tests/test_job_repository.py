@@ -1,6 +1,7 @@
 import pytest
 
 from app.core.cache import vacancy_cache_manager
+from app.core.error_handlers import SystemConfigurationError
 from app.repositories.job import JobRepository, VacancyLoadStatus, VacancySourceUnavailableError
 from app.services.job_preprocessor import JobPreprocessor
 
@@ -40,6 +41,16 @@ def test_job_repository_does_not_cache_mssql_failure_as_empty(monkeypatch):
         JobRepository.load_all_jobs()
 
     assert vacancy_cache_manager.get(JobRepository._VACANCY_CACHE_KEY) is None
+
+
+def test_job_repository_preserves_configuration_unavailable_error(monkeypatch):
+    def fail_for_missing_config(_service):
+        raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
+
+    monkeypatch.setattr("app.repositories.job.VacancyService.get_active_vacancies", fail_for_missing_config)
+
+    with pytest.raises(SystemConfigurationError, match="CONFIGURATION_UNAVAILABLE"):
+        JobRepository.load_all_jobs(db=object())
 
 
 def test_job_repository_caches_legitimate_zero_vacancies(monkeypatch):

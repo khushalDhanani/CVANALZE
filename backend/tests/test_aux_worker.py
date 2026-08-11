@@ -9,7 +9,7 @@ def test_auxiliary_worker_never_subscribes_to_cv_processing_queue():
     with (
         patch.object(start_aux_worker.Redis, "from_url"),
         patch.object(start_aux_worker, "Worker", return_value=worker) as worker_class,
-        patch.object(start_aux_worker.RuleConfigManager, "load_config"),
+        patch.object(start_aux_worker, "wait_for_active_rule_config") as wait_for_config,
         patch.object(start_aux_worker, "start_config_invalidation_listener"),
     ):
         start_aux_worker.main()
@@ -20,5 +20,6 @@ def test_auxiliary_worker_never_subscribes_to_cv_processing_queue():
         start_aux_worker.settings.RQ_SHADOW_QUEUE_NAME,
     ]
     assert start_aux_worker.settings.RQ_QUEUE_NAME not in [queue.name for queue in queues]
+    wait_for_config.assert_called_once_with(process_name="AUXILIARY_WORKER")
     assert worker_class.call_args.kwargs["maintenance_interval"] == start_aux_worker.settings.RQ_MAINTENANCE_INTERVAL_SECONDS
     worker.work.assert_called_once_with(with_scheduler=True)

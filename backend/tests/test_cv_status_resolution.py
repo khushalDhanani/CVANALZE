@@ -19,11 +19,11 @@ def test_start_worker_queue_configuration():
     with patch("start_worker.Worker") as mock_worker:
         with patch("start_worker.Redis"), patch("start_worker.settings.RQ_WORKER_MAX_JOBS", 0), \
              patch("start_worker.settings.CV_PROCESSING_CONCURRENCY", 1), \
-             patch("start_worker.RuleConfigManager.load_config") as load_config, \
+             patch("start_worker.wait_for_active_rule_config") as wait_for_config, \
              patch("start_worker.start_config_invalidation_listener") as start_listener:
             mock_worker.return_value.work.return_value = None
             main()
-            load_config.assert_called_once_with(tenant_id=None)
+            wait_for_config.assert_called_once_with(process_name="CV_WORKER")
             start_listener.assert_called_once_with()
             assert mock_worker.called
             queues = mock_worker.call_args[0][0]

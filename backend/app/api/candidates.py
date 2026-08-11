@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.error_handlers import SystemConfigurationError
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,
@@ -25,6 +26,8 @@ def search_candidates_post(request: CandidateSearchRequest) -> CandidateSearchRe
     """
     try:
         return CandidateSearchService.search_candidates(request)
+    except SystemConfigurationError:
+        raise
     except Exception as exc:
         from app.core.logging import logger
 
@@ -69,6 +72,8 @@ def list_candidates(
         )
         res = CandidateSearchService.search_candidates(req)
         return [item.model_dump() for item in res.candidates]
+    except SystemConfigurationError:
+        raise
     except Exception as exc:
         from app.core.logging import logger
 

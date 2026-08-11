@@ -15,6 +15,7 @@ from app.core.cache import CacheInvalidator, vacancy_cache_manager
 from app.core.database import MssqlReadSession
 
 from app.core.logging import logger
+from app.core.error_handlers import SystemConfigurationError
 from app.services.embedding_sync_service import EmbeddingSyncService
 from app.services.job_preprocessor import JobPreprocessor
 from app.services.vacancy_service import VacancyService
@@ -200,6 +201,8 @@ class JobRepository:
                 f"JobRepository.get_all_jobs: Active Vacancies: {len(job_dicts_to_return)} | "
                 f"Departments: {len(unique_dept_ids)} | Department IDs: {unique_dept_ids}"
             )
+        except SystemConfigurationError:
+            raise
         except Exception as exc:
             logger.error(f"JobRepository.get_all_jobs error querying DB: {exc}")
             if cached_jobs is not None:

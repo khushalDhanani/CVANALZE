@@ -352,6 +352,13 @@ class RuleConfigManager:
     _metrics: MappingProxyType = MappingProxyType({})
 
     @classmethod
+    def is_config_loaded(cls, tenant_id: str | None = None) -> bool:
+        """Return whether a validated configuration is active in this process."""
+        tenant_key = tenant_id or "GLOBAL"
+        with cls._lock:
+            return tenant_key in cls._active_configs
+
+    @classmethod
     def load_config(
         cls,
         tenant_id: str | None = None,

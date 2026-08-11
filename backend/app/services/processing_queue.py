@@ -14,6 +14,7 @@ from rq.registry import ScheduledJobRegistry, StartedJobRegistry
 from app.core.config import settings
 from app.core.cv_identity import normalize_source_candidate_id
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 from app.repositories.processing_job import ProcessingJobPersistenceError, ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.contracts import (
@@ -61,6 +62,11 @@ class ProcessingQueueService:
         cv_id: str | int | None = None,
         force_reprocess: bool = False,
     ) -> QueueSubmission:
+        try:
+            RuleConfigManager.get_config(tenant_id=None)
+        except Exception as exc:
+            raise ProcessingQueueUnavailableError("CV processing configuration is unavailable.") from exc
+
         job_id = ProcessingJobRepository.build_job_id(cv_key, content_hash)
         connection = cls._redis_connection()
         if connection is None:

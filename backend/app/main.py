@@ -117,13 +117,14 @@ async def health() -> JSONResponse:
     db_status = _database_health(mssql_read_engine, "MSSQL")
     pg_status = _database_health(postgres_app_engine, "PostgreSQL")
     redis_status = _redis_health()
+    rule_config_status = _rule_config_health()
     ollama_status = "disabled"
     if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         from app.services.llm_service import OllamaLLMService
 
         ollama_status = "online" if OllamaLLMService.check_health() else "offline"
 
-    dependency_statuses = (db_status, pg_status, redis_status, ollama_status)
+    dependency_statuses = (db_status, pg_status, redis_status, ollama_status, rule_config_status)
     overall_status = "ok" if all(status in ("online", "disabled") for status in dependency_statuses) else "unhealthy"
     payload = {
         "status": overall_status,
@@ -132,6 +133,7 @@ async def health() -> JSONResponse:
         "pg_database": pg_status,
         "redis": redis_status,
         "ollama_llm": ollama_status,
+        "rule_configuration": rule_config_status,
     }
     return JSONResponse(status_code=200 if overall_status == "ok" else 503, content=payload)
 
@@ -161,3 +163,12 @@ def _redis_health() -> str:
     except Exception as exc:
         logger.error(f"Redis health check failed: {type(exc).__name__}")
         return "offline"
+
+
+def _rule_config_health() -> str:
+    from app.core.rule_config_readiness import try_load_active_rule_config
+    from app.core.rule_config_manager import RuleConfigManager
+
+    if RuleConfigManager.is_config_loaded(tenant_id=None):
+        return "online"
+    return "online" if try_load_active_rule_config(process_name="HEALTH", log_unavailable=False) else "unavailable"

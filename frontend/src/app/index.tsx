@@ -3,8 +3,8 @@ import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { FileText, Upload, Plus, CpuIcon, FolderIcon, SlidersIcon, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { apiClient } from '@/services/apiClient';
 import { matchService } from '@/services/matchService';
+import { systemHealthService } from '@/services/systemHealthService';
 import { useJobs } from '@/hooks/useJobs';
 import { useCandidates } from '@/hooks/useCandidates';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -39,14 +39,12 @@ export default function HomeScreen() {
     setHealthError(false);
     try {
       const [sysRes, llmRes] = await Promise.all([
-        apiClient.get<SystemHealthResponse>('/health').catch(() => null),
+        systemHealthService.getHealth().catch(() => null),
         matchService.getLlmHealth().catch(() => null),
       ]);
       setHealth(sysRes);
       setLlmHealth(llmRes);
-      if (!sysRes && !llmRes) {
-        setHealthError(true);
-      }
+      setHealthError(!sysRes);
     } catch (err) {
       setHealth(null);
       setLlmHealth(null);
@@ -87,12 +85,14 @@ export default function HomeScreen() {
                   {BRAND.name}
                 </Text>
               </View>
-              {health?.version ? (
-                <Badge label={`v${health.version}`} tone="info" />
-              ) : healthLoading ? (
+              {healthLoading ? (
                 <Badge label="Checking..." tone="neutral" />
+              ) : health?.status === 'unhealthy' ? (
+                <Badge label="Degraded" tone="warning" />
               ) : healthError || health?.status === 'offline' ? (
                 <Badge label="Offline" tone="warning" />
+              ) : health?.version ? (
+                <Badge label={`v${health.version}`} tone="info" />
               ) : null}
             </View>
             <Text className="text-text-inverse opacity-90 text-sm font-sans leading-5">
@@ -174,6 +174,31 @@ export default function HomeScreen() {
                 healthLoading
                   ? 'neutral'
                   : health?.pg_database === 'online'
+                  ? 'success'
+                : 'warning'
+              }
+            />
+            <StatCard
+              label="Rule Configuration"
+              value={
+                healthLoading
+                  ? undefined
+                  : health?.rule_configuration === 'online'
+                  ? 'ONLINE'
+                  : 'REQUIRED'
+              }
+              sublabel={
+                healthLoading
+                  ? 'Checking configuration...'
+                  : health?.rule_configuration === 'online'
+                  ? 'PostgreSQL Profile Active'
+                  : 'Administrator Activation Required'
+              }
+              loading={healthLoading}
+              tone={
+                healthLoading
+                  ? 'neutral'
+                  : health?.rule_configuration === 'online'
                   ? 'success'
                   : 'warning'
               }
@@ -381,8 +406,24 @@ export default function HomeScreen() {
                 title="FastAPI Server"
                 trailing={
                   <Badge
-                    label={healthLoading ? 'Checking...' : health?.status === 'offline' || healthError ? 'Offline (Start Server)' : 'Operational'}
-                    tone={healthLoading ? 'neutral' : health?.status === 'offline' || healthError ? 'warning' : 'success'}
+                    label={
+                      healthLoading
+                        ? 'Checking...'
+                        : health?.status === 'unhealthy'
+                        ? 'Degraded'
+                        : health?.status === 'offline' || healthError
+                        ? 'Offline (Start Server)'
+                        : 'Operational'
+                    }
+                    tone={
+                      healthLoading
+                        ? 'neutral'
+                        : health?.status === 'unhealthy'
+                        ? 'warning'
+                        : health?.status === 'offline' || healthError
+                        ? 'warning'
+                        : 'success'
+                    }
                   />
                 }
               />
@@ -401,6 +442,21 @@ export default function HomeScreen() {
                   <Badge
                     label={healthLoading ? 'Checking...' : health?.pg_database === 'offline' || healthError ? 'Offline' : 'Operational'}
                     tone={healthLoading ? 'neutral' : health?.pg_database === 'offline' || healthError ? 'warning' : 'success'}
+                  />
+                }
+              />
+              <DenseRow
+                title="Rule Configuration"
+                trailing={
+                  <Badge
+                    label={
+                      healthLoading
+                        ? 'Checking...'
+                        : health?.rule_configuration === 'online'
+                        ? 'Operational'
+                        : 'Activation Required'
+                    }
+                    tone={healthLoading ? 'neutral' : health?.rule_configuration === 'online' ? 'success' : 'warning'}
                   />
                 }
               />

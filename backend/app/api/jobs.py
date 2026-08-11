@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from app.core.database import get_mssql_read_db
+from app.core.error_handlers import SystemConfigurationError
 from app.repositories.job import JobRepository, VacancySourceUnavailableError
 from app.schemas.job import JobOpening
 from app.services.vacancy_service import VacancyService
@@ -18,6 +19,8 @@ async def list_active_vacancies(db: Session = Depends(get_mssql_read_db)):
     try:
         vacancy_service = VacancyService(db)
         return vacancy_service.get_active_vacancies()
+    except SystemConfigurationError:
+        raise
     except Exception as exc:
         from app.core.logging import logger
         logger.exception(f"Failed to list active vacancies: {exc}")
@@ -35,6 +38,8 @@ async def list_jobs(response: Response):
         result = await run_in_threadpool(JobRepository.load_all_jobs)
         response.headers["X-Vacancy-Status"] = result.status.value
         return result.jobs
+    except SystemConfigurationError:
+        raise
     except VacancySourceUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
@@ -56,6 +61,8 @@ async def invalidate_jobs_cache():
         await run_in_threadpool(sync_all_vacancies)
 
         return {"message": "Job cache invalidated and embedding sync enqueued successfully"}
+    except SystemConfigurationError:
+        raise
     except Exception as exc:
         from app.core.logging import logger
 

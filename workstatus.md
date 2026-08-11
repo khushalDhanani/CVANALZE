@@ -1,6 +1,119 @@
 # Work Status
 
 ## Last Completed Task
+**Accurate degraded dependency health rendering**
+
+### Architecture Impact Analysis
+- Preserved backend readiness semantics: `/health` continues returning HTTP 503 when mandatory rule configuration is unavailable.
+- Decoupled overall readiness from individual dependency connectivity in the frontend so an unavailable configuration no longer makes healthy databases appear offline.
+
+### Files Changed
+- Structured degraded-health retrieval: `frontend/src/services/systemHealthService.ts`.
+- Dashboard health rendering: `frontend/src/app/index.tsx`.
+- Health response contract: `frontend/src/types/api.ts`.
+- Focused degraded-response contract: `frontend/src/__tests__/systemHealthService.test.ts`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Trace the dashboard cards from the HTTP client through the `/health` response.
+- Preserve the structured response body carried by an intentional health HTTP 503.
+- Render each dependency independently and surface rule configuration as the actual degraded component.
+
+### Code Changes
+- The frontend health service now accepts a validated structured 503 health payload while still rejecting network failures and malformed errors.
+- MSSQL and PostgreSQL cards use their individual backend statuses even when overall readiness is degraded.
+- Added explicit `Rule Configuration: Activation Required` status and a degraded API badge.
+
+### Verification Checklist
+- [x] Confirmed live PostgreSQL and Redis containers are healthy.
+- [x] Confirmed the backend reports configuration unavailability as the readiness blocker.
+- [x] Confirmed the previous dashboard discarded every non-2xx health response before reading dependency states.
+- [x] Confirmed `git diff --check` and the 200-character line review pass.
+- [ ] Frontend tests/builds were not executed because repository instructions require explicit permission.
+- [ ] The frontend process was not restarted.
+
+### Refactoring Performed
+- Added a focused system-health service so degraded-response handling is not embedded in dashboard rendering.
+
+## Previous Task
+**Canonical configuration-unavailable API error propagation**
+
+### Architecture Impact Analysis
+- Preserved fail-closed PostgreSQL rule-configuration readiness across candidate search and vacancy APIs.
+- Corrected exception ownership so missing rule configuration is not misreported as an internal candidate-search failure or an MSSQL outage.
+
+### Files Changed
+- API exception boundaries: `backend/app/api/candidates.py` and `backend/app/api/jobs.py`.
+- Repository exception boundary: `backend/app/repositories/job.py`.
+- Focused contracts: `backend/tests/test_configuration_error_contracts.py` and `backend/tests/test_job_repository.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Trace the live 500 and 503 responses to their original exception.
+- Preserve `SystemConfigurationError` through API and repository boundaries.
+- Leave the global error handler responsible for the canonical safe HTTP 503 response.
+
+### Code Changes
+- Candidate search and listing no longer convert `CONFIGURATION_UNAVAILABLE` into HTTP 500.
+- Vacancy loading no longer converts missing rule configuration into `VacancySourceUnavailableError`.
+- Job endpoints preserve the configuration exception for canonical global handling.
+
+### Verification Checklist
+- [x] Confirmed live PostgreSQL contains zero rule profiles, zero active profiles, and zero rule components.
+- [x] Confirmed PostgreSQL, Redis, API, workers, and scheduler processes are running.
+- [x] Confirmed CV and auxiliary workers are safely waiting without consuming RQ jobs.
+- [x] Confirmed `git diff --check` passes.
+- [ ] Automated tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Containers were not rebuilt or restarted after the exception-contract correction.
+- [ ] HTTP 200 operation remains blocked until an administrator supplies and activates an authoritative rule profile.
+
+### Refactoring Performed
+- None; the change preserves the existing canonical exception handler instead of duplicating response construction.
+
+## Previous Task
+**Database-only rule configuration startup and worker readiness recovery**
+
+### Architecture Impact Analysis
+- Kept normalized PostgreSQL rule tables as the only authoritative configuration source; no bundled `rule_config.json`, business-rule seed, or silent default was added.
+- Separated API configuration control-plane availability from CV data-plane readiness so a clean database can receive and activate an administrator-supplied profile.
+- Kept both RQ workers alive but idle until a valid active configuration exists, preventing crash loops and preventing CV or auxiliary job consumption without configuration.
+
+### Files Changed
+- Readiness orchestration: `backend/app/core/rule_config_readiness.py`, `backend/app/core/lifecycle.py`, and `backend/app/core/rule_config_manager.py`.
+- Health and queue guard: `backend/app/main.py`, `backend/app/services/processing_queue.py`, and `backend/app/core/config.py`.
+- Settings and deployment: `backend/.env.example`, `docker-compose.yml`, and `docker-compose.local.yml`.
+- Worker startup: `backend/start_worker.py` and `backend/start_aux_worker.py`.
+- Focused contracts: `backend/tests/test_rule_config_readiness.py`, `backend/tests/test_cv_status_resolution.py`, `backend/tests/test_aux_worker.py`, and `backend/tests/test_phase6_api_reliability.py`.
+- Operations documentation: `README.md`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Allow the API to start fail-closed when no active PostgreSQL profile exists so configuration administration remains reachable.
+- Make health/readiness explicitly report unavailable rule configuration.
+- Hold worker execution lanes closed until database configuration activation succeeds, then start normal RQ consumption automatically.
+- Reject CV queue submissions with HTTP 503 while configuration is unavailable.
+
+### Code Changes
+- API startup now logs missing or invalid rule configuration without terminating the FastAPI process; the existing configuration endpoints remain administrator-protected.
+- `/health` includes `rule_configuration` and returns 503 until a validated global profile is loaded.
+- CV and auxiliary workers poll PostgreSQL at a configurable interval and do not instantiate their RQ workers until configuration is valid.
+- Queue submission validates configuration readiness before persisting or enqueueing a new CV job.
+- Added focused regression contracts for degraded API readiness and worker wait/recovery behavior.
+
+### Verification Checklist
+- [x] Confirmed no hardcoded rule profile or configuration seed was introduced.
+- [x] Confirmed PostgreSQL remains authoritative and Redis remains cache-only.
+- [x] Confirmed the CV worker still subscribes only to `cv-processing` after readiness succeeds.
+- [x] Confirmed the auxiliary worker still subscribes only to `default` and `shadow_validation` after readiness succeeds.
+- [x] Confirmed `git diff --check` and the 200-character line review pass.
+- [ ] Automated tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Running containers were not rebuilt or restarted.
+- [ ] A valid administrator-managed rule profile must still be supplied and activated because the local database was intentionally erased.
+
+### Refactoring Performed
+- Centralized non-terminating rule-configuration loading and worker waiting in a shared readiness helper.
+
+## Previous Task
 **Durable CV queue reload reconstruction and stale-job recovery**
 
 ### Architecture Impact Analysis

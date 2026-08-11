@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     RQ_MAX_RETRIES: int = 2
     RQ_RETRY_INTERVAL_SECONDS: int = 30
     RQ_MAINTENANCE_INTERVAL_SECONDS: int = 60
+    RULE_CONFIG_RETRY_INTERVAL_SECONDS: float = 5.0
     CV_JOB_RECONCILIATION_INTERVAL_SECONDS: int = 60
     CV_JOB_STALE_AFTER_SECONDS: int = 1200
     CV_JOB_HISTORY_HOURS: int = 24
@@ -222,6 +223,8 @@ class Settings(BaseSettings):
             raise ValueError("CV_PROCESSING_CONCURRENCY must be 1; parallel CV execution is not supported.")
         if self.CV_QUEUE_MAX_SIZE < 1:
             raise ValueError("CV_QUEUE_MAX_SIZE must be at least 1.")
+        if self.RULE_CONFIG_RETRY_INTERVAL_SECONDS <= 0:
+            raise ValueError("RULE_CONFIG_RETRY_INTERVAL_SECONDS must be greater than zero.")
         if self.IS_PRODUCTION:
             if not self.REDIS_URL:
                 raise ValueError("REDIS_URL must be configured in production environments.")

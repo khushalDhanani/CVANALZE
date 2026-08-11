@@ -308,12 +308,18 @@ Start infrastructure, apply migrations, and then start the application processes
 ```bash
 docker compose up -d pgvector redis
 docker compose --profile tools run --rm migrate-postgres
-docker compose up -d api worker scheduler
+docker compose up -d api worker auxiliary-worker scheduler
 ```
 
-The API and worker share `backend/uploads`, use the same queue and service configuration, wait for healthy Redis/PostgreSQL, and restart unless stopped. The scheduler
-registers recurring canonical MSSQL snapshot synchronization and validation metric jobs, which the worker consumes. The worker
-must retain access to that shared volume because RQ payloads contain only job IDs. The Compose stack expects Ollama on the Docker host by default.
+PostgreSQL normalized rule tables are the only source of CV rule configuration; Redis is a cache and the application has no bundled or hardcoded rule profile. On a
+clean database, the API starts in a fail-closed configuration state so an administrator can create and activate a complete profile through `/api/config/versions`.
+`/health` returns `503` with `rule_configuration: unavailable` until activation. Both RQ workers remain alive but do not open their execution lanes until the active
+profile passes schema validation, safety gates, and synthetic smoke tests. They detect a later activation automatically without requiring a restart.
+
+The API and CV worker share `backend/uploads`, use the same queue and service configuration, and wait for healthy Redis/PostgreSQL. The scheduler registers recurring
+canonical MSSQL snapshot synchronization and validation metric jobs for the auxiliary worker. The CV worker consumes only `cv-processing`; the auxiliary worker consumes
+only `default` and `shadow_validation`. The CV worker must retain access to the shared volume because RQ payloads contain only job IDs. The Compose stack expects Ollama
+on the Docker host by default.
 
 Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `MSSQL_READ_ONLY_URL` to the API/worker through a deployment override.
 
@@ -322,8 +328,8 @@ Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `
 For an 8 GB M1-class Mac, layer the local override over the production-safe base file:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml build api worker scheduler
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker scheduler
+docker compose -f docker-compose.yml -f docker-compose.local.yml build api worker auxiliary-worker scheduler
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker auxiliary-worker scheduler
 ```
 
 The override limits the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.

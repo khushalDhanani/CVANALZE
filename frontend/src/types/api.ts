@@ -561,6 +561,7 @@ export interface SystemHealthResponse {
   pg_database?: string;
   redis?: string;
   ollama_llm: string;
+  rule_configuration?: string;
 }
 
 export interface LlmHealthResponse {
