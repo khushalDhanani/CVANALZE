@@ -10,6 +10,15 @@ from app.services.ollama_transport import OllamaTransport
 
 
 @pytest.fixture(autouse=True)
+def isolate_processing_job_ledger(monkeypatch):
+    """Keep unit tests off the durable PostgreSQL job ledger unless a test opts in explicitly."""
+    from app.repositories import processing_job as processing_job_repository_module
+
+    monkeypatch.setattr(processing_job_repository_module, "PostgresAppSession", None)
+    monkeypatch.setattr(processing_job_repository_module.ProcessingJobRepository, "_legacy_backfill_attempted", False)
+
+
+@pytest.fixture(autouse=True)
 def isolate_ollama_transport(monkeypatch):
     """Keep every ordinary test offline, serialized, and free of shared clients."""
     OllamaTransport.close()
@@ -116,4 +125,3 @@ def cleanup_test_cv_results():
         cv_result_cache_manager.clear()
     except Exception:
         pass
-

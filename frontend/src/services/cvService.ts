@@ -3,10 +3,15 @@ import {
   CandidateMatchAnalysis,
   CVMatchRequest,
   CVProcessingResponse,
+  CVProcessingJobSummary,
   CVUploadResponse,
 } from '@/types/api';
 
 export const cvService = {
+  listProcessingJobs: (): Promise<CVProcessingJobSummary[]> => {
+    return apiClient.get<CVProcessingJobSummary[]>('/api/cv/processing-jobs');
+  },
+
   /**
    * Upload CV file for basic processing.
    */

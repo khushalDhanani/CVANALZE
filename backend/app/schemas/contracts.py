@@ -49,6 +49,8 @@ class ErrorCode(str, Enum):
     CONFIGURATION_UNAVAILABLE = "CONFIGURATION_UNAVAILABLE"
     PROMPT_UNAVAILABLE = "PROMPT_UNAVAILABLE"
     PROCESSING_FAILED = "PROCESSING_FAILED"
+    WORKER_LOST = "WORKER_LOST"
+    JOB_STUCK = "JOB_STUCK"
     RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
@@ -209,9 +211,12 @@ class ProcessingJobRecord(BaseModel):
     force_reprocess: bool = False
     outcome: ProcessingOutcome | None = None
     error: CanonicalError | None = None
+    enqueue_sequence: int | None = None
+    version: int = 1
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: datetime | None = None
+    heartbeat_at: datetime | None = None
     completed_at: datetime | None = None
 
     @field_validator("state")

@@ -4,10 +4,10 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.job import VacancySourceUnavailableError
-from app.repositories.processing_job import ProcessingJobRepository
+from app.repositories.processing_job import ProcessingJobPersistenceError, ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis
-from app.schemas.cv import CVMatchRequest, CVProcessingResponse, CVUploadResponse
+from app.schemas.cv import CVMatchRequest, CVProcessingJobSummary, CVProcessingResponse, CVUploadResponse
 from app.schemas.match import CandidateMatchAnalysis
 from app.services.processing_queue import (
     ProcessingQueueService,
@@ -16,6 +16,39 @@ from app.services.processing_queue import (
 from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/cv", tags=["CV"])
+
+
+@router.get("/processing-jobs", response_model=list[CVProcessingJobSummary])
+async def list_processing_jobs():
+    """Return the durable FIFO CV queue and recent terminal jobs for reload recovery."""
+    try:
+        records = ProcessingQueueService.list_jobs()
+    except ProcessingJobPersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return [
+        CVProcessingJobSummary(
+            job_id=record.job_id,
+            cv_key=record.cv_key,
+            filename=record.filename,
+            job_state=record.state,
+            progress=record.progress,
+            stage=record.stage,
+            message=record.message,
+            execution_mode=record.execution_mode.value,
+            retry_count=record.attempt,
+            max_attempts=record.max_attempts,
+            enqueue_sequence=record.enqueue_sequence,
+            error_code=record.error.code.value if record.error else None,
+            error_message=record.error.message if record.error else None,
+            error_retryable=record.error.retryable if record.error else None,
+            correlation_id=record.error.correlation_id if record.error else None,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+            started_at=record.started_at,
+            completed_at=record.completed_at,
+        )
+        for record in records
+    ]
 
 
 @router.post("/upload", response_model=CVUploadResponse | CVProcessingResponse)
@@ -41,7 +74,6 @@ async def upload_cv(
                 cv_id=cv_id,
                 storage_filename=accepted.storage_filename,
             )
-            ProcessingJobRepository.save(submission.record)
 
             if submission.reused_existing_job and submission.record.state in ("COMPLETED", "COMPLETED_DEGRADED"):
                 return await get_cv_status(submission.record.cv_key)
@@ -72,6 +104,8 @@ async def upload_cv(
             detail=str(exc),
         ) from exc
     except ProcessingQueueUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ProcessingJobPersistenceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     except Exception as exc:
@@ -130,6 +164,10 @@ async def get_cv_status(cv_key: str):
                 stage=result.get("stage"),
                 failed_step=result.get("failed_step"),
                 error_details=None,
+                error_code=job.error.code.value if job and job.error else "PROCESSING_FAILED",
+                error_message=job.error.message if job and job.error else result.get("message") or result.get("error") or "CV processing failed.",
+                error_retryable=job.error.retryable if job and job.error else False,
+                correlation_id=job.error.correlation_id if job and job.error else None,
                 job_id=job.job_id if job else None,
                 job_state=job_state_val or "FAILED",
                 execution_mode=exec_mode_val,

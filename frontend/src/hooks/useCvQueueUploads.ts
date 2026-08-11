@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_CONFIG } from '@/constants/config';
 import { cvService } from '@/services/cvService';
 import { matchService } from '@/services/matchService';
-import type { CVProcessingResponse } from '@/types/api';
+import type { CVProcessingJobSummary, CVProcessingResponse } from '@/types/api';
 import { getCvQueueStateMeta, resolveCvQueueUiState } from '@/utils/cvQueueState';
 import type { CvQueueUiState } from '@/utils/cvQueueState';
 import type { FilePickerAsset } from './useCvUpload';
@@ -20,6 +20,8 @@ export interface CvQueueUploadItem {
   progress: number;
   message: string;
   error?: string;
+  errorCode?: string;
+  syncError?: string;
 }
 
 const TERMINAL_STATES = new Set<CvQueueUiState>(['COMPLETED', 'FAILED']);
@@ -30,6 +32,7 @@ function getResponseKey(response: Record<string, any>): string | undefined {
 
 export function useCvQueueUploads() {
   const [items, setItems] = useState<CvQueueUploadItem[]>([]);
+  const [hydrationError, setHydrationError] = useState<string | null>(null);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const mountedRef = useRef(true);
   const idSequenceRef = useRef(0);
@@ -62,33 +65,22 @@ export function useCvQueueUploads() {
         updateItem(clientId, {
           state,
           progress: state === 'COMPLETED' ? 100 : processingResponse.progress || 0,
-          message: processingResponse.message || meta.label,
-          error: state === 'FAILED' ? processingResponse.message || 'CV processing failed.' : undefined,
+          message: processingResponse.error_message || processingResponse.message || meta.label,
+          error: state === 'FAILED' ? processingResponse.error_message || processingResponse.message || 'CV processing failed.' : undefined,
+          errorCode: processingResponse.error_code || undefined,
+          syncError: undefined,
         });
-        if (!meta.terminal && attempt + 1 < API_CONFIG.MAX_POLL_RETRIES) {
-          schedulePoll(clientId, cvKey, enrichWithLlm, attempt + 1, 0);
-        } else if (!meta.terminal) {
-          timersRef.current.delete(clientId);
-          updateItem(clientId, {
-            state: 'FAILED',
-            message: 'Status polling timed out. The backend may still be processing this CV.',
-            error: 'Status polling timed out.',
-          });
+        if (!meta.terminal) {
+          schedulePoll(clientId, cvKey, enrichWithLlm, (attempt + 1) % API_CONFIG.MAX_POLL_RETRIES, 0);
         } else {
           timersRef.current.delete(clientId);
         }
       } catch (error: any) {
         const nextErrorCount = consecutiveErrors + 1;
-        if (nextErrorCount < 5 && attempt + 1 < API_CONFIG.MAX_POLL_RETRIES) {
-          schedulePoll(clientId, cvKey, enrichWithLlm, attempt + 1, nextErrorCount);
-          return;
-        }
         updateItem(clientId, {
-          state: 'FAILED',
-          message: error?.message || 'Status check failed.',
-          error: error?.message || 'Status check failed.',
+          syncError: nextErrorCount >= 5 ? error?.message || 'Unable to refresh backend status.' : undefined,
         });
-        timersRef.current.delete(clientId);
+        schedulePoll(clientId, cvKey, enrichWithLlm, (attempt + 1) % API_CONFIG.MAX_POLL_RETRIES, nextErrorCount);
       }
     }, API_CONFIG.POLL_INTERVAL_MS);
     timersRef.current.set(clientId, timer);
@@ -114,16 +106,18 @@ export function useCvQueueUploads() {
       try {
         const response = enrichWithLlm ? await matchService.uploadAndAnalyze(file) : await cvService.uploadCv(file);
         const responseRecord = response as CVProcessingResponse & Record<string, any>;
-        const cvKey = getResponseKey(responseRecord);
+        const cvKey = String(getResponseKey(responseRecord) || '');
         if (!cvKey) throw new Error('The upload response did not include a CV tracking key.');
         const state = resolveCvQueueUiState(responseRecord);
         const meta = getCvQueueStateMeta(state);
         updateItem(item.clientId, {
           cvKey,
-          jobId: responseRecord.job_id,
+          jobId: responseRecord.job_id || undefined,
           state,
           progress: state === 'COMPLETED' ? 100 : responseRecord.progress || 0,
           message: responseRecord.message || meta.label,
+          error: state === 'FAILED' ? responseRecord.error_message || responseRecord.message : undefined,
+          errorCode: responseRecord.error_code || undefined,
         });
         if (!meta.terminal) pollItem(item.clientId, cvKey, enrichWithLlm);
       } catch (error: any) {
@@ -136,6 +130,39 @@ export function useCvQueueUploads() {
       }
     }
   }, [pollItem, updateItem]);
+
+  const hydrateQueue = useCallback(async function restoreQueue() {
+    stopPolling('queue-hydration');
+    try {
+      const persistedJobs = await cvService.listProcessingJobs();
+      if (!mountedRef.current) return;
+      const restored = persistedJobs.map((job: CVProcessingJobSummary): CvQueueUploadItem => {
+        const state = resolveCvQueueUiState(job as unknown as CVProcessingResponse & Record<string, any>);
+        return {
+          clientId: `persisted-${job.job_id}`,
+          filename: job.filename,
+          cvKey: job.cv_key,
+          jobId: job.job_id,
+          state,
+          progress: job.progress,
+          message: job.error_message || job.message,
+          error: state === 'FAILED' ? job.error_message || job.message : undefined,
+          errorCode: job.error_code || undefined,
+        };
+      });
+      setItems((current) => [...current.filter((item) => !item.jobId), ...restored]);
+      setHydrationError(null);
+      restored.forEach((item) => {
+        if (!TERMINAL_STATES.has(item.state) && item.cvKey) pollItem(item.clientId, item.cvKey, false);
+      });
+    } catch (error: any) {
+      if (mountedRef.current) {
+        setHydrationError(error?.message || 'Unable to restore the CV processing queue.');
+        const timer = setTimeout(() => void restoreQueue(), API_CONFIG.POLL_INTERVAL_MS);
+        timersRef.current.set('queue-hydration', timer);
+      }
+    }
+  }, [pollItem, stopPolling]);
 
   const summary = useMemo(() => items.reduce(
     (counts, item) => {
@@ -151,12 +178,13 @@ export function useCvQueueUploads() {
 
   useEffect(() => {
     mountedRef.current = true;
+    void hydrateQueue();
     return () => {
       mountedRef.current = false;
       timersRef.current.forEach((timer) => clearTimeout(timer));
       timersRef.current.clear();
     };
-  }, []);
+  }, [hydrateQueue]);
 
   return {
     items,
@@ -164,5 +192,7 @@ export function useCvQueueUploads() {
     isActive: items.some((item) => !TERMINAL_STATES.has(item.state)),
     uploadFiles,
     clearFinished,
+    hydrationError,
+    refreshQueue: hydrateQueue,
   };
 }

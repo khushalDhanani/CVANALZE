@@ -12,6 +12,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _SYNC_LOCK_KEY = "cv-analyzer:background-sync"
+_CV_JOB_RECONCILIATION_LOCK_KEY = "cv-analyzer:cv-job-reconciliation"
 
 
 def _redis_connection() -> Redis:
@@ -64,3 +65,10 @@ def snapshot_validation_metrics() -> dict[str, str]:
     MetricsEngine.snapshot_metrics()
     logger.info("Validation metrics snapshot task completed.")
     return {"status": "completed"}
+
+
+def reconcile_cv_processing_jobs() -> dict[str, Any]:
+    """Repair durable CV job state from RQ without executing CV work in the auxiliary lane."""
+    from app.services.processing_queue import ProcessingQueueService
+
+    return _run_with_lock(_CV_JOB_RECONCILIATION_LOCK_KEY, ProcessingQueueService.reconcile_all_active_jobs)

@@ -24,8 +24,9 @@ def test_worker_uses_one_isolated_rq_worker_for_the_cv_queue():
     worker_class.assert_called_once()
     assert worker_class.call_args.args[0] == [(start_worker.settings.RQ_QUEUE_NAME, redis_connection)]
     assert worker_class.call_args.kwargs["name"] == "cv-processing-worker-1"
+    assert worker_class.call_args.kwargs["maintenance_interval"] == start_worker.settings.RQ_MAINTENANCE_INTERVAL_SECONDS
     assert worker_class.call_args.kwargs["work_horse_killed_handler"] is start_worker.handle_work_horse_killed
-    worker.work.assert_called_once_with(with_scheduler=True, maintenance_interval=start_worker.settings.RQ_MAINTENANCE_INTERVAL_SECONDS)
+    worker.work.assert_called_once_with(with_scheduler=True)
 
 
 def test_worker_refuses_parallel_cv_concurrency_configuration():
@@ -48,6 +49,5 @@ def test_worker_forwards_configured_recycle_limit():
 
     worker.work.assert_called_once_with(
         with_scheduler=True,
-        maintenance_interval=start_worker.settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
         max_jobs=10,
     )

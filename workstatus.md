@@ -1,6 +1,85 @@
 # Work Status
 
 ## Last Completed Task
+**Durable CV queue reload reconstruction and stale-job recovery**
+
+### Architecture Impact Analysis
+- Made PostgreSQL the authoritative CV processing lifecycle ledger while retaining Redis/RQ as the execution transport and the existing cache as a compatibility mirror.
+- Added backend-driven queue reconstruction for frontend reloads, periodic auxiliary reconciliation, worker heartbeat/lease inspection, missing-job recovery, and attempt fencing.
+- Preserved the single `cv-processing` worker lane and did not change CV parsing, matching, scoring, result generation, or LLM logic.
+
+### Files Changed
+- Durable model and migration: `backend/app/models/processing_job.py`, `backend/app/models/__init__.py`, `backend/scripts/migrations/postgres/022_create_cv_processing_jobs.sql`, and its down migration.
+- Ledger, RQ reconciliation, safe errors, and configuration: `backend/app/repositories/processing_job.py`, `backend/app/services/processing_queue.py`, `backend/app/schemas/contracts.py`, `backend/app/schemas/cv.py`, `backend/app/core/config.py`, `backend/app/core/error_handlers.py`.
+- API and recurring recovery: `backend/app/api/cv.py`, `backend/app/api/analysis.py`, `backend/app/core/background_tasks.py`, `backend/start_scheduler.py`.
+- Frontend hydration: `frontend/src/hooks/useCvQueueUploads.ts`, `frontend/src/services/cvService.ts`, `frontend/src/types/api.ts`, `frontend/src/app/cv-match.tsx`.
+- Deployment, documentation, and focused tests: `docker-compose.yml`, `docker-compose.local.yml`, `backend/.env.example`, `README.md`, `backend/tests/conftest.py`, `backend/tests/test_phase4_background_processing.py`, `backend/tests/test_background_sync_jobs.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Persist every logical job and transition in PostgreSQL before or alongside RQ submission.
+- Expose a safe active/recent job-list contract and hydrate the frontend queue from it on mount.
+- Reconcile PostgreSQL state against RQ status, registries, worker heartbeats, durable results, and missing jobs.
+- Recover retryable orphaned jobs idempotently and fail exhausted jobs with safe public reasons.
+- Add periodic auxiliary reconciliation and compatibility import for pre-ledger Redis/file records.
+
+### Code Changes
+- Added `cv_processing_jobs` with deterministic enqueue sequence, state, attempts, RQ identity, progress, safe error metadata, timestamps, heartbeat, and version fields.
+- PostgreSQL writes and transitions use row locks; cache writes occur only after the authoritative transaction commits.
+- Added `GET /api/cv/processing-jobs`, returning every active job plus bounded recent terminal history without exposing stored CV content or technical traces.
+- Reload hydration restores persisted rows and resumes polling; polling/network timeout no longer fabricates a failed job state.
+- Reconciliation now handles queued, scheduled, started, finished, failed, cancelled, missing, and stale-worker cases, with recovery locks and attempt-specific RQ fencing.
+- Added an auxiliary recurring reconciliation job and safe `error_code`, `error_message`, retryability, and correlation fields.
+
+### Verification Checklist
+- [x] Confirmed frontend queue files have no TypeScript diagnostics.
+- [x] Confirmed static backend diagnostics contain only unresolved environment dependencies and no new syntax/symbol errors.
+- [x] Confirmed every active ledger row bypasses the terminal-history result limit.
+- [x] Confirmed CV execution remains isolated to the single `cv-processing` worker.
+- [x] Confirmed `git diff --check` and the 200-character line check pass.
+- [ ] Automated tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Migration 022 was created but not executed.
+- [ ] Containers were not rebuilt or restarted.
+
+### Refactoring Performed
+- Replaced cache-only processing-job persistence with a durable repository boundary while preserving legacy point-cache compatibility.
+- Centralized safe status serialization, active-job listing, reconciliation, recovery enqueueing, and processing-error classification in the existing queue service.
+
+## Previous Task
+**Restore RQ worker startup compatibility**
+
+### Architecture Impact Analysis
+- Preserved the dedicated single-slot `cv-processing` worker and the isolated `default`/`shadow_validation` auxiliary worker.
+- Corrected RQ 2.10 worker configuration placement without changing queue routing, CV processing, matching, scoring, persistence, or LLM behavior.
+
+### Files Changed
+- Worker startup configuration: `backend/start_worker.py`, `backend/start_aux_worker.py`.
+- Focused worker contract coverage: `backend/tests/test_worker_cleanup.py`, `backend/tests/test_aux_worker.py`, `backend/tests/test_cv_status_resolution.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Trace both supplied container restart loops to their shared startup argument.
+- Compare the call site with the pinned RQ 2.10 dependency contract.
+- Move the maintenance interval to worker construction and preserve runtime work options.
+- Update focused assertions for both worker roles.
+
+### Code Changes
+- `maintenance_interval` is now passed to the RQ `Worker` constructor, where RQ 2.10 accepts it.
+- `Worker.work()` now receives only supported runtime options: `with_scheduler` and optional `max_jobs` for the CV worker.
+- The CV worker remains subscribed only to `cv-processing`; the auxiliary worker remains subscribed only to `default` and `shadow_validation`.
+
+### Verification Checklist
+- [x] Confirmed both supplied logs fail with `BaseWorker.work() got an unexpected keyword argument 'maintenance_interval'`.
+- [x] Confirmed the project pins RQ 2.10.0.
+- [x] Updated focused tests to assert the maintenance interval at worker construction.
+- [x] Preserved the single CV worker slot and auxiliary queue isolation.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Running containers were not rebuilt or restarted.
+
+### Refactoring Performed
+- None; this was a narrowly scoped RQ API compatibility correction.
+
+## Previous Task
 **Frontend multi-CV queue experience**
 
 ### Architecture Impact Analysis

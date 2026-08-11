@@ -29,10 +29,8 @@ def test_start_worker_queue_configuration():
             queues = mock_worker.call_args[0][0]
             queue_names = [q.name for q in queues]
             assert queue_names == [settings.RQ_QUEUE_NAME]
-            mock_worker.return_value.work.assert_called_once_with(
-                with_scheduler=True,
-                maintenance_interval=settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
-            )
+            assert mock_worker.call_args.kwargs["maintenance_interval"] == settings.RQ_MAINTENANCE_INTERVAL_SECONDS
+            mock_worker.return_value.work.assert_called_once_with(with_scheduler=True)
 
 
 def test_status_resolution_by_cv_id_alias(tmp_path, monkeypatch):

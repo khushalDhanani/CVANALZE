@@ -31,11 +31,11 @@ def main():
         [queue],
         connection=conn,
         name=f"{settings.RQ_QUEUE_NAME}-worker-1",
+        maintenance_interval=settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
         work_horse_killed_handler=handle_work_horse_killed,
     )
     work_options: dict[str, bool | int] = {
         "with_scheduler": True,
-        "maintenance_interval": settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
     }
     if settings.RQ_WORKER_MAX_JOBS > 0:
         work_options["max_jobs"] = settings.RQ_WORKER_MAX_JOBS

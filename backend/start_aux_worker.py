@@ -15,10 +15,12 @@ def main() -> None:
     queue_names = list(dict.fromkeys([settings.RQ_AUXILIARY_QUEUE_NAME, settings.RQ_SHADOW_QUEUE_NAME]))
     queues = [Queue(name, connection=connection) for name in queue_names]
     logger.info("Starting auxiliary RQ worker on queues: %s", ", ".join(queue_names))
-    Worker(queues, connection=connection, name="cv-analyzer-auxiliary-worker").work(
-        with_scheduler=True,
+    Worker(
+        queues,
+        connection=connection,
+        name="cv-analyzer-auxiliary-worker",
         maintenance_interval=settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
-    )
+    ).work(with_scheduler=True)
 
 
 if __name__ == "__main__":

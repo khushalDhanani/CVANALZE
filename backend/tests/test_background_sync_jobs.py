@@ -38,18 +38,21 @@ def test_scheduler_preserves_unexpected_register_death_errors(monkeypatch):
         scheduler.register_death()
 
 
-def test_scheduler_registers_sync_and_validation_snapshot_jobs(monkeypatch):
+def test_scheduler_registers_reconciliation_sync_and_validation_snapshot_jobs(monkeypatch):
+    monkeypatch.setattr(settings, "CV_JOB_RECONCILIATION_INTERVAL_SECONDS", 60)
     monkeypatch.setattr(settings, "BACKGROUND_SYNC_ENABLED", True)
     monkeypatch.setattr(settings, "VALIDATION_METRICS_SNAPSHOT_ENABLED", True)
     scheduler = _FakeScheduler()
 
-    assert register_recurring_jobs(scheduler) == 2
+    assert register_recurring_jobs(scheduler) == 3
     assert [registration[0] for registration in scheduler.registrations] == [
+        background_tasks.reconcile_cv_processing_jobs,
         background_tasks.run_integration_sync,
         background_tasks.snapshot_validation_metrics,
     ]
     assert scheduler.registrations[0][1]["queue_name"] == settings.RQ_AUXILIARY_QUEUE_NAME
-    assert scheduler.registrations[1][1]["queue_name"] == settings.RQ_SHADOW_QUEUE_NAME
+    assert scheduler.registrations[1][1]["queue_name"] == settings.RQ_AUXILIARY_QUEUE_NAME
+    assert scheduler.registrations[2][1]["queue_name"] == settings.RQ_SHADOW_QUEUE_NAME
 
 
 def test_canonical_sync_runs_all_snapshot_services(monkeypatch):

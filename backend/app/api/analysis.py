@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
 from app.repositories.job import JobRepository, VacancySourceUnavailableError
-from app.repositories.processing_job import ProcessingJobRepository
+from app.repositories.processing_job import ProcessingJobPersistenceError, ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.repositories.training import TrainingRepository
 from app.schemas.analysis import (
@@ -83,7 +83,6 @@ async def upload_and_analyze(
                 content_type=accepted.detected_content_type,
                 storage_filename=accepted.storage_filename,
             )
-            ProcessingJobRepository.save(submission.record)
 
             if submission.reused_existing_job and submission.record.state in ("COMPLETED", "COMPLETED_DEGRADED"):
                 return await get_match_status(submission.record.cv_key)
@@ -112,6 +111,8 @@ async def upload_and_analyze(
     except UploadValidationError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except ProcessingQueueUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ProcessingJobPersistenceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception(f"Failed to process CV upload: {exc}")
@@ -148,6 +149,10 @@ async def get_match_status(cv_key: str):
                 stage=result.get("stage"),
                 failed_step=result.get("failed_step"),
                 error_details=None,
+                error_code=job.error.code.value if job and job.error else "PROCESSING_FAILED",
+                error_message=job.error.message if job and job.error else result.get("message") or result.get("error") or "CV processing failed.",
+                error_retryable=job.error.retryable if job and job.error else False,
+                correlation_id=job.error.correlation_id if job and job.error else None,
                 job_id=job.job_id if job else None,
                 job_state=job_state_val or "FAILED",
                 execution_mode=exec_mode_val,

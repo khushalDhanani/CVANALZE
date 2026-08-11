@@ -20,6 +20,7 @@ from app.models.taxonomy import (
 from app.models.training import HRFeedback
 
 from app.models.result import CVResult
+from app.models.processing_job import CVProcessingJob
 from app.models.integration import (
     SyncRun,
     SyncWatermark,
@@ -40,6 +41,7 @@ from app.models.validation import (
 
 __all__ = [
     "CVResult",
+    "CVProcessingJob",
     "CandidateEmbedding",
     "DepartmentDomainMaster",
     "DesignationMaster",

@@ -20,7 +20,5 @@ def test_auxiliary_worker_never_subscribes_to_cv_processing_queue():
         start_aux_worker.settings.RQ_SHADOW_QUEUE_NAME,
     ]
     assert start_aux_worker.settings.RQ_QUEUE_NAME not in [queue.name for queue in queues]
-    worker.work.assert_called_once_with(
-        with_scheduler=True,
-        maintenance_interval=start_aux_worker.settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
-    )
+    assert worker_class.call_args.kwargs["maintenance_interval"] == start_aux_worker.settings.RQ_MAINTENANCE_INTERVAL_SECONDS
+    worker.work.assert_called_once_with(with_scheduler=True)

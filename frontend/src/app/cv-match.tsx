@@ -77,6 +77,7 @@ export default function CvMatchScreen() {
     isActive: queueIsActive,
     uploadFiles,
     clearFinished,
+    hydrationError: queueHydrationError,
   } = useCvQueueUploads();
 
   const [selectedJobForReview, setSelectedJobForReview] = useState<JobMatchScore | null>(null);
@@ -294,6 +295,13 @@ export default function CvMatchScreen() {
                 />
               )}
 
+              {queueHydrationError && (
+                <ErrorBanner
+                  title="Queue Status Unavailable"
+                  message={queueHydrationError}
+                />
+              )}
+
               {queuedUploads.length > 0 && (
                 <Card className="gap-3">
                   <View className="flex-row items-center justify-between gap-2">
@@ -320,7 +328,7 @@ export default function CvMatchScreen() {
                         <DenseRow
                           key={item.clientId}
                           title={item.filename}
-                          subtitle={`${tracking} · ${item.progress}% · ${item.message}`}
+                          subtitle={`${tracking} · ${item.progress}% · ${item.errorCode ? `${item.errorCode}: ` : ''}${item.message}${item.syncError ? ` · Refresh error: ${item.syncError}` : ''}`}
                           trailing={<Badge label={stateMeta.label} tone={stateMeta.tone} />}
                         />
                       );

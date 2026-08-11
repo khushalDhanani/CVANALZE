@@ -191,8 +191,12 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `RQ_RESULT_TTL_SECONDS` | `604800` | RQ result retention in seconds. |
 | `RQ_MAX_RETRIES` | `2` | Retries after the first attempt. |
 | `RQ_RETRY_INTERVAL_SECONDS` | `30` | Delay between retries. |
+| `CV_JOB_RECONCILIATION_INTERVAL_SECONDS` | `60` | Interval for reconciling durable PostgreSQL job state with Redis/RQ. |
+| `CV_JOB_STALE_AFTER_SECONDS` | `1200` | Maximum inactive processing lease before crash recovery. |
+| `CV_JOB_HISTORY_HOURS` | `24` | Recent terminal-job window returned when the queue UI reloads. |
+| `CV_JOB_LIST_LIMIT` | `100` | Maximum recent terminal jobs returned in addition to every active job. |
 | `RQ_DEVELOPMENT_FALLBACK_ENABLED` | `true` | Allows the in-process fallback only in local/development/test environments. |
-| `PROCESSING_JOB_TTL_SECONDS` | `604800` | Redis processing-record retention. |
+| `PROCESSING_JOB_TTL_SECONDS` | `604800` | Redis/file compatibility-cache retention for PostgreSQL processing records. |
 | `PROCESSING_JOB_LOCK_TIMEOUT_SECONDS` | `1200` | Distributed execution-lock lease. |
 | `JOB_NOT_FOUND_COMPATIBILITY_UNTIL` | unset | Optional ISO-8601 deadline for the legacy unknown-job response. |
 

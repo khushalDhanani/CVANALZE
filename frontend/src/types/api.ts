@@ -109,6 +109,10 @@ export interface CVProcessingResponse {
   is_complete?: boolean;
   failed_step?: string | null;
   error_details?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  error_retryable?: boolean | null;
+  correlation_id?: string | null;
   job_id?: string | null;
   job_state?: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED' | null;
   execution_mode?: 'RQ' | string | null;
@@ -116,6 +120,28 @@ export interface CVProcessingResponse {
   stage_durations_ms?: Record<string, number>;
   persistence_status?: 'durable' | 'degraded' | string | null;
   persistence_error?: string | null;
+}
+
+export interface CVProcessingJobSummary {
+  job_id: string;
+  cv_key: string;
+  filename: string;
+  job_state: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED';
+  progress: number;
+  stage: string;
+  message: string;
+  execution_mode: string;
+  retry_count: number;
+  max_attempts: number;
+  enqueue_sequence?: number | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  error_retryable?: boolean | null;
+  correlation_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
 }
 
 export interface DualEvidence {

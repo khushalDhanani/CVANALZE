@@ -17,6 +17,7 @@ class PromptError(Exception):
     pass
 
 from app.core.logging import logger
+from app.repositories.processing_job import ProcessingJobPersistenceError
 from app.schemas.contracts import CanonicalError, ErrorCode, ErrorResponse
 
 _STATUS_CODES: dict[int, ErrorCode] = {
@@ -35,6 +36,7 @@ _STATUS_CODES: dict[int, ErrorCode] = {
 _EXCEPTION_CODES: dict[type[Exception], tuple[int, ErrorCode]] = {
     SystemConfigurationError: (503, ErrorCode.CONFIGURATION_UNAVAILABLE),
     PromptError: (503, ErrorCode.PROMPT_UNAVAILABLE),
+    ProcessingJobPersistenceError: (503, ErrorCode.DEPENDENCY_UNAVAILABLE),
 }
 
 
@@ -94,6 +96,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, _validation_exception_handler)
     app.add_exception_handler(SystemConfigurationError, _custom_exception_handler)
     app.add_exception_handler(PromptError, _custom_exception_handler)
+    app.add_exception_handler(ProcessingJobPersistenceError, _custom_exception_handler)
     app.add_exception_handler(Exception, _unhandled_exception_handler)
 
 

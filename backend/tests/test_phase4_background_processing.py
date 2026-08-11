@@ -11,6 +11,7 @@ from rq.job import Job, NoSuchJobError
 from app.core.cache import MemoryCache, cv_result_cache_manager, processing_job_cache_manager
 from app.core.config import settings
 from app.repositories import result as result_repository_module
+from app.repositories import processing_job as processing_job_repository_module
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.contracts import JobState, ProcessingExecutionMode
@@ -27,6 +28,7 @@ from app.services.upload_service import StoredUpload, UploadService
 
 @pytest.fixture(autouse=True)
 def isolate_processing_jobs(monkeypatch):
+    monkeypatch.setattr(processing_job_repository_module, "PostgresAppSession", None)
     monkeypatch.setattr(processing_job_cache_manager, "_providers", [MemoryCache(max_size=100)])
     monkeypatch.setattr(settings, "RQ_MAX_RETRIES", 2)
     monkeypatch.setattr(settings, "RQ_RETRY_INTERVAL_SECONDS", 1)
@@ -64,7 +66,7 @@ def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempote
         def __init__(self, *_args, **_kwargs):
             pass
 
-        def enqueue(self, _function, processing_job_id, **kwargs):
+        def enqueue(self, _function, processing_job_id, _enqueue_count, **kwargs):
             persisted = ProcessingJobRepository.get(processing_job_id)
             assert persisted is not None
             assert persisted.state == JobState.QUEUED
@@ -138,6 +140,67 @@ def test_newly_queued_job_has_visibility_grace_when_rq_job_is_not_visible(monkey
     assert reconciled.state == JobState.QUEUED
 
 
+def test_missing_processing_job_is_idempotently_requeued_by_recovery(monkeypatch):
+    submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    processing = ProcessingJobRepository.save(
+        submission.record.model_copy(
+            update={
+                "state": JobState.PROCESSING,
+                "attempt": 1,
+                "updated_at": submission.record.updated_at - timedelta(minutes=5),
+            }
+        )
+    )
+    enqueued = []
+
+    class Lock:
+        @staticmethod
+        def acquire(**_kwargs):
+            return True
+
+        @staticmethod
+        def release():
+            return None
+
+    class Connection:
+        @staticmethod
+        def lock(*_args, **_kwargs):
+            return Lock()
+
+    class RecoveryQueue:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def enqueue(self, _function, job_id, enqueue_count, **options):
+            enqueued.append((job_id, enqueue_count, options["job_id"]))
+
+    monkeypatch.setattr(Job, "fetch", lambda *_args, **_kwargs: (_ for _ in ()).throw(NoSuchJobError()))
+    monkeypatch.setattr(processing_queue, "Queue", RecoveryQueue)
+
+    recovered = ProcessingQueueService.reconcile_job(processing, connection=Connection(), allow_recovery=True)
+
+    assert recovered.state == JobState.RETRYING
+    assert recovered.stage == "recovered_queue"
+    assert recovered.error is not None
+    assert recovered.error.retryable is True
+    assert enqueued == [(recovered.job_id, recovered.enqueue_count, recovered.rq_job_id)]
+
+
+def test_job_listing_reconciles_and_preserves_fifo_sequence(monkeypatch):
+    first = ProcessingQueueService.submit_upload(**_submission_kwargs(b"first"))
+    second = ProcessingQueueService.submit_upload(**_submission_kwargs(b"second"))
+    records = [
+        second.record.model_copy(update={"enqueue_sequence": 2}),
+        first.record.model_copy(update={"enqueue_sequence": 1}),
+    ]
+    monkeypatch.setattr(ProcessingJobRepository, "list_recent", lambda **_kwargs: records)
+    monkeypatch.setattr(ProcessingQueueService, "reconcile_job", classmethod(lambda _cls, record, **_kwargs: record))
+
+    listed = ProcessingQueueService.list_jobs()
+
+    assert [record.job_id for record in listed] == [first.record.job_id, second.record.job_id]
+
+
 @pytest.mark.parametrize(
     ("rq_status", "expected_state"),
     [("queued", JobState.RETRYING), ("scheduled", JobState.RETRYING), ("canceled", JobState.CANCELLED)],
@@ -177,7 +240,7 @@ def test_duplicate_submission_requeues_a_missing_processing_job(monkeypatch):
         def __init__(self, *_args, **_kwargs):
             pass
 
-        def enqueue(self, _function, _processing_job_id, **options):
+        def enqueue(self, _function, _processing_job_id, _enqueue_count, **options):
             enqueued.append(options["job_id"])
 
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
@@ -230,7 +293,7 @@ def test_ten_cv_jobs_execute_fifo_with_only_one_processing_state(monkeypatch, tm
         def __init__(self, *_args, **_kwargs):
             pass
 
-        def enqueue(self, _function, processing_job_id, **_kwargs):
+        def enqueue(self, _function, processing_job_id, _enqueue_count, **_kwargs):
             rq_order.append(processing_job_id)
 
     monkeypatch.setattr(processing_queue, "Queue", OrderedQueue)
@@ -393,6 +456,10 @@ def test_workhorse_crash_marks_job_retrying_without_blocking_the_worker():
     assert retrying.state == JobState.RETRYING
     assert retrying.error is not None
     assert retrying.error.retryable is True
+    payload = ProcessingQueueService.legacy_status_payload(retrying)
+    assert payload["error_code"] == "PROCESSING_FAILED"
+    assert payload["error_message"] == "The CV processing workhorse terminated unexpectedly."
+    assert payload["error_details"] is None
 
 
 @pytest.mark.asyncio
