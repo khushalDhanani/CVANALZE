@@ -1,6 +1,47 @@
 # Work Status
 
 ## Last Completed Task
+**Enterprise MSSQL startup read-only enforcement**
+
+### Architecture Impact Analysis
+- Kept MSSQL access on the existing centralized read engine and startup lifecycle boundary; no MSSQL business query or write path changed.
+- Replaced the incomplete database-permission prefix check with effective server, database, schema, and object permission inspection.
+- Made enforcement explicit, default-on, fail-closed, and impossible to disable in production/staging.
+
+### Files Changed
+- Runtime configuration and validation: `backend/app/core/config.py` and `backend/app/core/lifecycle.py`.
+- Deployment defaults and operations guidance: `backend/.env.example`, `docker-compose.yml`, `docker-compose.local.yml`, and `README.md`.
+- Focused contracts: `backend/tests/test_mssql_readonly_startup.py`.
+- Task record: `workstatus.md`.
+
+### Implementation Plan
+- Audit the configured SQL Server identity, server/database roles, explicit grants, and effective permissions.
+- Detect direct and implied write-capable permissions without logging credentials or connection data.
+- Enforce startup failure by default, permit an explicit warning-only local override, and prohibit the override in production.
+- Verify read-only, enforced write-enabled, and local warning-only behavior with focused tests.
+
+### Code Changes
+- Added `MSSQL_READONLY_ENFORCEMENT=true`, with production validation requiring it to remain enabled.
+- Added fail-closed permission-audit error handling and exact, secret-safe permission reporting.
+- Detects server/database authority and scoped schema/object DML or execution rights; dominant `CONTROL SERVER`/`CONTROL` permissions are reported concisely.
+- Production Compose pins enforcement to `true`; local Compose exposes the explicit default-on override.
+- Documented dedicated-login and least-privilege grant requirements plus role/effective-permission audit SQL.
+
+### Verification Checklist
+- [x] Live audit confirmed the configured credential is `sa`/`dbo`, with `sysadmin`, `db_owner`, and effective write authority; the original failure is not a false positive.
+- [x] Read-only credential contract allows startup.
+- [x] Write-enabled credential with enforcement enabled fails startup and names the permission.
+- [x] Write-enabled credential with enforcement disabled logs a strong warning and allows local startup.
+- [x] Permission-audit failures fail closed when enforcement is enabled and do not expose exception details.
+- [x] Production configuration rejects disabled enforcement.
+- [x] Focused backend verification passes: 10 tests.
+- [x] Live enforced audit rejects the currently configured privileged credential.
+- [ ] A DBA must create/supply the dedicated SELECT-only credential and replace the current MSSQL URL before the real API can start under enforcement.
+
+### Refactoring Performed
+- Centralized MSSQL effective-permission classification in lifecycle helpers and retained the existing engine/session architecture.
+
+## Previous Task
 **Isolate CV processing tests from shared runtime queues**
 
 ### Architecture Impact Analysis

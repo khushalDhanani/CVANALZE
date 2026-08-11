@@ -194,6 +194,7 @@ class Settings(BaseSettings):
 
     # Database Configuration (MSSQL Read-Only)
     MSSQL_READ_ONLY_URL: str = ""
+    MSSQL_READONLY_ENFORCEMENT: bool = True
 
     # Database Configuration (Postgres App Data)
     POSTGRES_APP_URL: str = ""
@@ -226,6 +227,8 @@ class Settings(BaseSettings):
         if self.RULE_CONFIG_RETRY_INTERVAL_SECONDS <= 0:
             raise ValueError("RULE_CONFIG_RETRY_INTERVAL_SECONDS must be greater than zero.")
         if self.IS_PRODUCTION:
+            if not self.MSSQL_READONLY_ENFORCEMENT:
+                raise ValueError("MSSQL_READONLY_ENFORCEMENT must be true in production environments.")
             if not self.REDIS_URL:
                 raise ValueError("REDIS_URL must be configured in production environments.")
             if not self.MSSQL_READ_ONLY_URL:

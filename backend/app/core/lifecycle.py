@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import asyncio
 import threading
 from collections.abc import AsyncIterator
@@ -9,6 +10,35 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.database import init_db, run_auto_migrations
 from app.core.logging import logger
+
+_MSSQL_DATABASE_WRITE_PERMISSIONS = {
+    "ADMINISTER DATABASE BULK OPERATIONS",
+    "CONTROL",
+    "DELETE",
+    "EXECUTE",
+    "INSERT",
+    "REFERENCES",
+    "TAKE OWNERSHIP",
+    "UPDATE",
+}
+_MSSQL_SERVER_WRITE_PERMISSIONS = {
+    "CONTROL SERVER",
+    "CREATE ANY DATABASE",
+    "EXTERNAL ACCESS ASSEMBLY",
+    "IMPERSONATE ANY LOGIN",
+    "SHUTDOWN",
+    "UNSAFE ASSEMBLY",
+}
+_MSSQL_SCOPED_WRITE_PERMISSIONS = {
+    "ALTER",
+    "CONTROL",
+    "DELETE",
+    "EXECUTE",
+    "INSERT",
+    "REFERENCES",
+    "TAKE OWNERSHIP",
+    "UPDATE",
+}
 
 
 @asynccontextmanager
@@ -141,21 +171,73 @@ def close_ollama_lifecycle() -> None:
 
 
 def verify_mssql_readonly() -> None:
-    from app.core.database import mssql_read_engine
     from sqlalchemy import text
-    
-    if mssql_read_engine:
-        try:
-            with mssql_read_engine.connect() as conn:
-                result = conn.execute(text("SELECT permission_name FROM fn_my_permissions(NULL, 'DATABASE')"))
-                permissions = {row[0].upper() for row in result}
-                forbidden_prefixes = ("INSERT", "UPDATE", "DELETE", "ALTER", "CREATE", "DROP")
-                
-                if any(p.startswith(forbidden_prefixes) for p in permissions):
-                    logger.error("[STARTUP] SECURITY WARNING: MSSQL connection has write permissions! This application expects a read-only credential.")
-                    if settings.APP_ENVIRONMENT != "development":
-                        raise RuntimeError("SECURITY WARNING: MSSQL connection has write permissions! This application expects a read-only credential.")
-        except RuntimeError:
-            raise
-        except Exception as exc:
-            logger.warning(f"[STARTUP] Could not verify MSSQL read-only permissions: {type(exc).__name__}")
+
+    from app.core.database import mssql_read_engine
+
+    if not mssql_read_engine:
+        return
+    try:
+        with mssql_read_engine.connect() as conn:
+            permissions = _find_mssql_write_permissions(conn, text)
+    except Exception as exc:
+        message = f"MSSQL read-only permission verification failed ({type(exc).__name__}); startup cannot confirm that the credential is safe."
+        if settings.MSSQL_READONLY_ENFORCEMENT:
+            logger.error("[STARTUP] %s", message)
+            raise RuntimeError(message) from exc
+        logger.warning("[STARTUP] SECURITY WARNING: %s Enforcement is disabled for local development.", message)
+        return
+
+    if not permissions:
+        logger.info("[STARTUP] MSSQL credential verified as read-only.")
+        return
+
+    permission_list = ", ".join(sorted(permissions))
+    message = f"MSSQL credential has write-capable permission(s): {permission_list}. Use a dedicated credential with only required SELECT access."
+    if settings.MSSQL_READONLY_ENFORCEMENT:
+        logger.error("[STARTUP] SECURITY ERROR: %s", message)
+        raise RuntimeError(message)
+    logger.warning("[STARTUP] SECURITY WARNING: %s Enforcement is disabled for local development.", message)
+
+
+def _find_mssql_write_permissions(conn, sql_text) -> set[str]:
+    database_permissions = _permission_names(conn.execute(sql_text("SELECT permission_name FROM fn_my_permissions(NULL, 'DATABASE')")))
+    server_permissions = _permission_names(conn.execute(sql_text("SELECT permission_name FROM fn_my_permissions(NULL, 'SERVER')")))
+    if "CONTROL SERVER" in server_permissions:
+        return {"CONTROL SERVER"}
+    if "CONTROL" in database_permissions:
+        return {"CONTROL"}
+    write_permissions = {
+        permission for permission in database_permissions
+        if permission.startswith(("ALTER", "CREATE")) or permission in _MSSQL_DATABASE_WRITE_PERMISSIONS
+    }
+    write_permissions.update(
+        permission for permission in server_permissions
+        if permission.startswith("ALTER") or permission in _MSSQL_SERVER_WRITE_PERMISSIONS
+    )
+    if write_permissions:
+        return write_permissions
+
+    scoped_query = sql_text(
+        """
+        SELECT DISTINCT permission_name
+        FROM (
+            SELECT permissions.permission_name
+            FROM sys.schemas AS schemas
+            CROSS APPLY fn_my_permissions(QUOTENAME(schemas.name), 'SCHEMA') AS permissions
+            WHERE schemas.schema_id < 16384
+            UNION ALL
+            SELECT permissions.permission_name
+            FROM sys.objects AS objects
+            INNER JOIN sys.schemas AS schemas ON schemas.schema_id = objects.schema_id
+            CROSS APPLY fn_my_permissions(QUOTENAME(schemas.name) + '.' + QUOTENAME(objects.name), 'OBJECT') AS permissions
+            WHERE objects.is_ms_shipped = 0
+        ) AS effective_permissions
+        WHERE permission_name IN ('ALTER', 'CONTROL', 'DELETE', 'EXECUTE', 'INSERT', 'REFERENCES', 'TAKE OWNERSHIP', 'UPDATE')
+        """
+    )
+    return _permission_names(conn.execute(scoped_query)) & _MSSQL_SCOPED_WRITE_PERMISSIONS
+
+
+def _permission_names(rows) -> set[str]:
+    return {str(row[0]).strip().upper() for row in rows if row[0]}

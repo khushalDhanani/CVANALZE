@@ -184,6 +184,7 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | --- | --- | --- |
 | `POSTGRES_APP_URL` | local PostgreSQL URL | PostgreSQL/pgvector connection string. |
 | `MSSQL_READ_ONLY_URL` | empty | MSSQL connection string. Required for enterprise data. |
+| `MSSQL_READONLY_ENFORCEMENT` | `true` | Fails startup when MSSQL write permissions are present or cannot be verified. Production requires `true`; local development may explicitly use `false` with a security warning. |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for RQ, locks, processing records, and cache. |
 | `RQ_QUEUE_NAME` | `cv-processing` | Primary CV-processing queue consumed by the worker. |
 | `RQ_WORKER_MAX_JOBS` | `0` | Optional number of jobs processed before the worker exits and Docker restarts it; zero is unlimited. |
@@ -198,6 +199,24 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `RQ_DEVELOPMENT_FALLBACK_ENABLED` | `true` | Allows the in-process fallback only in local/development/test environments. |
 | `PROCESSING_JOB_TTL_SECONDS` | `604800` | Redis/file compatibility-cache retention for PostgreSQL processing records. |
 | `PROCESSING_JOB_LOCK_TIMEOUT_SECONDS` | `1200` | Distributed execution-lock lease. |
+
+MSSQL must be configured with a dedicated application login, never `sa`, `db_owner`, or another shared operator account. Create a database user for that login, grant `CONNECT`, and grant `SELECT` only on the tables or views read by the MSSQL models. Do not grant broad roles such as `sysadmin`, `db_owner`, `db_datawriter`, or permissions such as `CONTROL`, `ALTER`, `CREATE`, `EXECUTE`, `INSERT`, `UPDATE`, or `DELETE`.
+
+Before deployment, inspect the credential while connected as that credential:
+
+```sql
+SELECT ORIGINAL_LOGIN() AS login_name, USER_NAME() AS database_user, DB_NAME() AS database_name;
+SELECT permission_name FROM fn_my_permissions(NULL, 'SERVER') ORDER BY permission_name;
+SELECT permission_name FROM fn_my_permissions(NULL, 'DATABASE') ORDER BY permission_name;
+SELECT roles.name AS role_name
+FROM sys.database_role_members AS memberships
+INNER JOIN sys.database_principals AS roles ON roles.principal_id = memberships.role_principal_id
+INNER JOIN sys.database_principals AS members ON members.principal_id = memberships.member_principal_id
+WHERE members.name = USER_NAME()
+ORDER BY roles.name;
+```
+
+Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explicit `false` is accepted only outside production/staging and emits a security warning; it is intended solely for temporary local development.
 | `JOB_NOT_FOUND_COMPATIBILITY_UNTIL` | unset | Optional ISO-8601 deadline for the legacy unknown-job response. |
 
 ### Upload policy

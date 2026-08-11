@@ -7,6 +7,7 @@ x-local-backend-environment: &local-backend-environment
   INITIALIZE_DATABASE_ON_STARTUP: "true"
   STARTUP_CACHE_WARMUP_ENABLED: "false"
   MSSQL_READ_ONLY_URL: '${MSSQL_READ_ONLY_URL}'
+  MSSQL_READONLY_ENFORCEMENT: '${MSSQL_READONLY_ENFORCEMENT:-true}'
   POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
   REDIS_URL: 'redis://redis:6379/0'
   RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
