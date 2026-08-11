@@ -2,7 +2,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RequirementTier(str, Enum):
@@ -152,6 +152,20 @@ class JobMatchResult(BaseModel):
     )
     candidate_job_family: str | None = Field(default=None, description="Classified job family of the candidate")
     vacancy_job_family: str | None = Field(default=None, description="Classified job family of the target vacancy")
+
+    @model_validator(mode="after")
+    def synchronize_canonical_score_and_status(self) -> "JobMatchResult":
+        """Keep one final score/status across persistence, APIs, and frontend consumers."""
+        canonical_score = self.vacancy_fit_score
+        if canonical_score == 0.0 and self.score_breakdown is None:
+            canonical_score = self.overall_score if self.overall_score != 0.0 else self.score
+        canonical_score = round(max(0.0, min(100.0, float(canonical_score))), 1)
+        self.vacancy_fit_score = canonical_score
+        self.overall_score = canonical_score
+        self.score = canonical_score
+        if self.mandatory_failures and self.vacancy_match_status == "MATCHED":
+            self.vacancy_match_status = "NO_STRONG_VACANCY_MATCH"
+        return self
 
 
 class CandidateMatchAnalysis(BaseModel):

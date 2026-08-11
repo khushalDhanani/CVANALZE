@@ -940,10 +940,10 @@ export default function CandidateDetailScreen() {
                 <Text className="text-xs font-sans-bold text-text-primary">{data.experience_years} Yrs{cleanCandidateText(data.seniority) ? ` • ${data.seniority}` : ''}</Text>
               </View>
             ) : null}
-            {bestMatch?.overall_score != null ? (
+            {resolveVacancyFitScore(bestMatch) != null ? (
               <View className="items-center px-2.5 py-1 border rounded bg-background border-border">
-                <Text className="text-[11px] text-text-muted uppercase font-sans-bold">AI Match</Text>
-                <Text className="text-xs font-sans-bold text-primary">{Math.round(bestMatch.overall_score)}%</Text>
+                <Text className="text-[11px] text-text-muted uppercase font-sans-bold">Fit Score</Text>
+                <Text className="text-xs font-sans-bold text-primary">{Math.round(resolveVacancyFitScore(bestMatch) ?? 0)}%</Text>
               </View>
             ) : null}
             <View className="flex-row items-center gap-2">

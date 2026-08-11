@@ -180,6 +180,7 @@ export type CanonicalVacancyMatchStatus =
   | 'NO_STRONG_MATCH'
   | 'NO_ACTIVE_VACANCIES'
   | 'ANALYSIS_NOT_AVAILABLE'
+  | 'ANALYSIS_UNAVAILABLE'
   | 'PROCESSING'
   | 'FAILED';
 
@@ -606,6 +607,7 @@ export interface SystemHealthResponse {
   ollama_llm: string;
   rule_configuration?: string;
   prompt_configuration?: string;
+  taxonomy_configuration?: string;
 }
 
 export interface LlmHealthResponse {

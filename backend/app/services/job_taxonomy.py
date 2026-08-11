@@ -92,6 +92,7 @@ class CandidateResumeDTO(BaseModel):
     cv_text: str = ""
     summary: str = ""
     experience_titles: list[str] = Field(default_factory=list)
+    responsibilities: list[str] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
     normalized_full_text: str = ""
@@ -103,16 +104,21 @@ class CandidateResumeDTO(BaseModel):
         exp_titles: list[str] = []
         skills_str: list[str] = []
         edu_str: list[str] = []
+        responsibilities: list[str] = []
 
         if resume_json and isinstance(resume_json, dict):
             summary = str(resume_json.get("summary") or "").lower()
             exp_list = resume_json.get("work_experience", []) or resume_json.get("experience", [])
             if isinstance(exp_list, list):
                 exp_titles = [str(e.get("job_title") or e.get("title") or "").lower() for e in exp_list if isinstance(e, dict)]
-            
-            projects_list = resume_json.get("projects", [])
-            if isinstance(projects_list, list):
-                exp_titles.extend([str(p.get("title") or p.get("project_name") or "").lower() for p in projects_list if isinstance(p, dict)])
+                for experience in exp_list:
+                    if not isinstance(experience, dict):
+                        continue
+                    responsibilities.extend(
+                        str(item).lower()
+                        for item in experience.get("responsibilities") or []
+                        if isinstance(item, str) and item.strip()
+                    )
             
             skills_data = resume_json.get("skills")
             if isinstance(skills_data, dict):
@@ -129,13 +135,14 @@ class CandidateResumeDTO(BaseModel):
             if isinstance(edu_list, list):
                 edu_str = [str(e.get("degree", "")) + " " + str(e.get("field", "")) + " " + str(e.get("institution", "")) if isinstance(e, dict) else str(e).lower() for e in edu_list]
 
-        combined = f"{text_lower} {summary} {' '.join(exp_titles)} {' '.join(skills_str)} {' '.join(edu_str)}"
+        combined = f"{text_lower} {summary} {' '.join(exp_titles)} {' '.join(responsibilities)} {' '.join(skills_str)} {' '.join(edu_str)}"
         norm_full_text = re.sub(r"\s+", " ", combined).strip()
 
         return cls(
             cv_text=cv_text,
             summary=summary,
             experience_titles=exp_titles,
+            responsibilities=responsibilities,
             skills=skills_str,
             education=edu_str,
             normalized_full_text=norm_full_text,
@@ -324,29 +331,44 @@ class TaxonomyClassifier:
         w_summary = tax_rules.evidence_weight_summary
         w_edu = tax_rules.evidence_weight_education
         
-        combined_text = dto.normalized_full_text.lower()
         exp_text = " ".join(dto.experience_titles).lower()
         skills_text = " ".join(dto.skills).lower()
         summary_text = dto.summary.lower() if dto.summary else ""
         edu_text = " ".join(dto.education).lower()
+        responsibilities_text = " ".join(dto.responsibilities).lower()
         
         dept_scores = []
         for matcher in department_domain_repository.get_domain_matchers():
             score = 0.0
-            
-            # Base text match
-            score += matcher.keyword_match_count(combined_text) * 1.0
-            
+            evidence_sources = 0
+            total_matches = 0
             if exp_text:
-                score += matcher.keyword_match_count(exp_text) * w_exp
+                matches = matcher.keyword_match_count(exp_text)
+                score += matches * w_exp
+                evidence_sources += int(matches > 0)
+                total_matches += matches
             if skills_text:
-                score += matcher.keyword_match_count(skills_text) * w_skills
+                matches = matcher.keyword_match_count(skills_text)
+                score += matches * w_skills
+                evidence_sources += int(matches > 0)
+                total_matches += matches
+            if responsibilities_text:
+                matches = matcher.keyword_match_count(responsibilities_text)
+                score += matches * tax_rules.evidence_weight_responsibilities
+                evidence_sources += int(matches > 0)
+                total_matches += matches
             if summary_text:
-                score += matcher.keyword_match_count(summary_text) * w_summary
-            if edu_text:
-                score += matcher.keyword_match_count(edu_text) * w_edu
+                matches = matcher.keyword_match_count(summary_text)
+                score += matches * w_summary
+                evidence_sources += int(matches > 0)
+                total_matches += matches
+            if edu_text and not (exp_text or skills_text or responsibilities_text):
+                matches = matcher.keyword_match_count(edu_text)
+                score += matches * w_edu
+                evidence_sources += int(matches > 0)
+                total_matches += matches
                 
-            if score > 0:
+            if score > 0 and (evidence_sources >= 2 or total_matches >= 2):
                 dept_scores.append((score, matcher.domain))
 
         if dept_scores:

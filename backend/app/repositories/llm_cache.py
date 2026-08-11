@@ -72,6 +72,8 @@ class LLMCacheRepository:
         model_version: str = "",
         extraction_version: str = "",
         matching_version: str = "",
+        rule_version: str = "",
+        taxonomy_version: str = "",
     ) -> str:
         return CacheKey.for_llm_match(
             document_hash=document_hash,
@@ -82,6 +84,8 @@ class LLMCacheRepository:
             model_version=model_version,
             extraction_version=extraction_version,
             matching_version=matching_version,
+            rule_version=rule_version,
+            taxonomy_version=taxonomy_version,
         ).to_key()
 
     @classmethod

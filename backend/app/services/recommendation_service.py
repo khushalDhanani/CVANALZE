@@ -42,7 +42,14 @@ class RecommendationService:
         if not r:
             r = ResultRepository.read_result_by_filename(result_filename)
 
-        all_jobs = JobRepository.get_all_jobs()
+        result_match_status = str((r or {}).get("match_status") or "").upper() if isinstance(r, dict) else ""
+        process_status = str((r or {}).get("status") or "").lower() if isinstance(r, dict) else ""
+        skip_vacancy_lookup = (
+            not r
+            or result_match_status == VacancyMatchStatus.ANALYSIS_UNAVAILABLE.value
+            or process_status in {"processing", "failed", "error"}
+        )
+        all_jobs = [] if skip_vacancy_lookup else JobRepository.get_all_jobs()
         has_active_vacancies = bool(all_jobs)
 
         raw_match = r.get("match_analysis") if isinstance(r, dict) else None
@@ -72,6 +79,7 @@ class RecommendationService:
 
         if canonical_status in {
             VacancyMatchStatus.ANALYSIS_NOT_AVAILABLE.value,
+            VacancyMatchStatus.ANALYSIS_UNAVAILABLE.value,
             VacancyMatchStatus.PROCESSING.value,
             VacancyMatchStatus.FAILED.value,
         }:

@@ -11,6 +11,7 @@ from app.services.prompt_service import PromptService
 RUNTIME_READY = "READY"
 RULE_CONFIG_NOT_READY = "RULE_CONFIG_NOT_READY"
 PROMPT_NOT_READY = "PROMPT_NOT_READY"
+TAXONOMY_NOT_READY = "TAXONOMY_NOT_READY"
 
 
 def try_load_active_rule_config(*, process_name: str, log_unavailable: bool = True) -> bool:
@@ -58,6 +59,15 @@ def cv_runtime_readiness(*, process_name: str, log_unavailable: bool = True) -> 
                 prompt_readiness.reason,
             )
         return PROMPT_NOT_READY
+    from app.repositories.department_domain import department_domain_repository
+
+    if not department_domain_repository.is_ready():
+        if log_unavailable:
+            logger.warning(
+                "[%s] TAXONOMY_NOT_READY: Required taxonomy/domain configuration contains zero active domains. The CV worker will remain idle.",
+                process_name,
+            )
+        return TAXONOMY_NOT_READY
     return RUNTIME_READY
 
 

@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
     EXPERIENCE_CALCULATOR_VERSION: str = "2.0.0"
     TAXONOMY_VERSION: str = "1.5.0"
-    MATCHING_VERSION: str = "2.2.0"
+    MATCHING_VERSION: str = "3.0.6"
     AUTO_OCR_MIN_TEXT_CHARS: int = 100
 
     DOCUMENT_PARSER_WORKERS: int = 1

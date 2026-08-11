@@ -14,7 +14,10 @@ function normalizeCanonicalMatchStatus(rawStatus) {
   if (s === 'NO_ACTIVE_VACANCIES') {
     return 'NO_ACTIVE_VACANCIES';
   }
-  if (s === 'ANALYSIS_NOT_AVAILABLE' || s === 'ANALYSIS UNAVAILABLE' || s === 'N/A') {
+  if (s === 'ANALYSIS_UNAVAILABLE' || s === 'ANALYSIS UNAVAILABLE') {
+    return 'ANALYSIS_UNAVAILABLE';
+  }
+  if (s === 'ANALYSIS_NOT_AVAILABLE' || s === 'N/A') {
     return 'ANALYSIS_NOT_AVAILABLE';
   }
   if (s === 'PROCESSING' || s === 'IN_PROGRESS' || s === 'ANALYZING') {
@@ -152,9 +155,10 @@ test('4. NO_ACTIVE_VACANCIES: normalizes NO_ACTIVE_VACANCIES cleanly', () => {
   assertEquals(normalizeCanonicalMatchStatus('no_active_vacancies'), 'NO_ACTIVE_VACANCIES');
 });
 
-test('5. ANALYSIS_NOT_AVAILABLE: normalizes ANALYSIS_NOT_AVAILABLE and missing payload aliases', () => {
+test('5. ANALYSIS_NOT_AVAILABLE and ANALYSIS_UNAVAILABLE remain distinct', () => {
   assertEquals(normalizeCanonicalMatchStatus('ANALYSIS_NOT_AVAILABLE'), 'ANALYSIS_NOT_AVAILABLE');
-  assertEquals(normalizeCanonicalMatchStatus('ANALYSIS UNAVAILABLE'), 'ANALYSIS_NOT_AVAILABLE');
+  assertEquals(normalizeCanonicalMatchStatus('ANALYSIS UNAVAILABLE'), 'ANALYSIS_UNAVAILABLE');
+  assertEquals(normalizeCanonicalMatchStatus('ANALYSIS_UNAVAILABLE'), 'ANALYSIS_UNAVAILABLE');
   assertEquals(normalizeCanonicalMatchStatus('N/A'), 'ANALYSIS_NOT_AVAILABLE');
   assertEquals(normalizeCanonicalMatchStatus(null), 'NO_STRONG_MATCH');
   assertEquals(normalizeCanonicalMatchStatus(undefined), 'NO_STRONG_MATCH');
@@ -214,6 +218,10 @@ test('12. Metadata: ANALYSIS_NOT_AVAILABLE has danger tone and isError flag', ()
   assertEquals(meta.label, 'ANALYSIS UNAVAILABLE');
   assertEquals(meta.tone, 'danger');
   assertEquals(meta.isError, true);
+});
+
+test('12b. ANALYSIS_UNAVAILABLE remains an explicit upstream failure', () => {
+  assertEquals(normalizeCanonicalMatchStatus('ANALYSIS_UNAVAILABLE'), 'ANALYSIS_UNAVAILABLE');
 });
 
 test('13. Metadata: PROCESSING has info tone and isProcessing flag', () => {

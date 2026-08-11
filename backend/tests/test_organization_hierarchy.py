@@ -151,6 +151,7 @@ def test_vacancy_mapping_populates_full_hierarchy_ids():
         RequestForDeptID=50,
         RequestForDesigID=500,
         PreferedGender="Any",
+        RequestedAdditionalKnowledge="Python, e.g., Job Overview, REST APIs",
     )
     vacancy.company = comp1
     vacancy.location = loc1
@@ -186,4 +187,5 @@ def test_vacancy_mapping_populates_full_hierarchy_ids():
     assert job_opening.designation_id == 500
     assert job_opening.designation_name == "Plant Chemist"
     assert job_opening.required_skills_are_mandatory is False
+    assert job_opening.required_skills == ["Python", "REST APIs"]
     assert job_opening.education == "Configured Degree"

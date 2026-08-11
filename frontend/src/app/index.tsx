@@ -216,6 +216,13 @@ export default function HomeScreen() {
               loading={healthLoading}
               tone={healthLoading ? 'neutral' : health?.prompt_configuration === 'online' ? 'success' : 'warning'}
             />
+            <StatCard
+              label="Matching Taxonomy"
+              value={healthLoading ? undefined : health?.taxonomy_configuration === 'online' ? 'ONLINE' : 'REQUIRED'}
+              sublabel={healthLoading ? 'Checking taxonomy...' : health?.taxonomy_configuration === 'online' ? 'Domain Records Active' : 'TAXONOMY_NOT_READY'}
+              loading={healthLoading}
+              tone={healthLoading ? 'neutral' : health?.taxonomy_configuration === 'online' ? 'success' : 'warning'}
+            />
           </ResponsiveStatGrid>
 
           {/* Action Shortcuts */}
@@ -485,6 +492,15 @@ export default function HomeScreen() {
                         : 'PROMPT_NOT_READY'
                     }
                     tone={healthLoading ? 'neutral' : health?.prompt_configuration === 'online' ? 'success' : 'warning'}
+                  />
+                }
+              />
+              <DenseRow
+                title="Matching Taxonomy"
+                trailing={
+                  <Badge
+                    label={healthLoading ? 'Checking...' : health?.taxonomy_configuration === 'online' ? 'Operational' : 'TAXONOMY_NOT_READY'}
+                    tone={healthLoading ? 'neutral' : health?.taxonomy_configuration === 'online' ? 'success' : 'warning'}
                   />
                 }
               />

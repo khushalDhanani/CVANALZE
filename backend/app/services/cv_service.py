@@ -322,7 +322,7 @@ async def process_cv_file(
                 cv_embedding=cv_embedding,
                 resume_json=resume_json,
                 normalized_resume=normalized_resume,
-                deterministic_experience=normalized_resume.experience.deterministic_years,
+                deterministic_experience=normalized_resume.experience.authoritative_years,
             )
             stage_durations_ms["matching_ms"] = round((asyncio.get_event_loop().time() - t_match_start) * 1000.0, 2)
 

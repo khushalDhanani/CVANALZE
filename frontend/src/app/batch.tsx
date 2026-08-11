@@ -14,6 +14,7 @@ import { BatchCandidateResult } from '@/types/api';
 import { Card, Button, SegmentedControl, EmptyState, Badge, Breadcrumbs, ErrorBanner } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { BATCH_CANDIDATE_LIMITS } from '@/constants/limits';
+import { resolveVacancyFitScore } from '@/utils/candidateDetail';
 
 export default function BatchScreen() {
   usePageTitle('Batch Candidate Matching | AIRIS');
@@ -40,7 +41,7 @@ export default function BatchScreen() {
           </View>
           {bestMatch ? (
             <ScoreBadge
-              score={bestMatch.overall_score}
+              score={resolveVacancyFitScore(bestMatch) ?? 0}
               classification={bestMatch.classification}
             />
           ) : null}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import hashlib
 import re
 import threading
 from collections.abc import Callable
@@ -82,6 +83,26 @@ class DepartmentDomainRepository:
             if self._matchers is None:
                 self._reload_locked()
             return list(self._matchers or [])
+
+    def is_ready(self) -> bool:
+        """Return whether the authoritative taxonomy has active domain records."""
+        return bool(self.get_all_domains())
+
+    def get_version(self) -> str:
+        """Content version for matching caches; changes with any active taxonomy record."""
+        payload = [
+            {
+                "id": domain.id,
+                "department_id": domain.department_id,
+                "department_name": domain.department_name,
+                "domain_name": domain.domain_name,
+                "keywords": sorted(domain.keywords),
+                "default_roles": sorted(domain.default_roles),
+                "priority": domain.priority,
+            }
+            for domain in self.get_all_domains()
+        ]
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
     def refresh_cache(self) -> None:
         with self._lock:

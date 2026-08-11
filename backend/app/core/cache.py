@@ -63,6 +63,8 @@ class CacheKey:
         model_version: str = "",
         extraction_version: str = "",
         matching_version: str = "",
+        rule_version: str = "",
+        taxonomy_version: str = "",
     ) -> "CacheKey":
         components: dict[str, str] = {}
         if document_hash:
@@ -81,6 +83,10 @@ class CacheKey:
             components["extract_ver"] = extraction_version
         if matching_version:
             components["match_ver"] = matching_version
+        if rule_version:
+            components["rule_ver"] = rule_version
+        if taxonomy_version:
+            components["taxonomy_ver"] = taxonomy_version
         return cls(components=components)
 
     @classmethod
@@ -94,6 +100,8 @@ class CacheKey:
         model_version: str = "",
         extraction_version: str = "",
         matching_version: str = "",
+        rule_version: str = "",
+        taxonomy_version: str = "",
     ) -> "CacheKey":
         components: dict[str, str] = {}
         if document_hash:
@@ -112,6 +120,10 @@ class CacheKey:
             components["extract_ver"] = extraction_version
         if matching_version:
             components["match_ver"] = matching_version
+        if rule_version:
+            components["rule_ver"] = rule_version
+        if taxonomy_version:
+            components["taxonomy_ver"] = taxonomy_version
         return cls(components=components)
 
     @classmethod

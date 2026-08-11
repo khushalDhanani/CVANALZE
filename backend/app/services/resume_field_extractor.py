@@ -57,8 +57,7 @@ class ResumeFieldExtractor:
         r"(?:19|20)\d{2}"
         r"|(?:0?[1-9]|[12]\d|3[01])[/\.\-](?:0?[1-9]|1[0-2])[/\.\-](?:19|20)\d{2}"
         r"|"
-        r"(?:19|20)\d{2}"
-        r"|(?:0?[1-9]|1[0-2])[/\.\-](?:19|20)\d{2}"
+        r"(?:0?[1-9]|1[0-2])[/\.\-](?:19|20)\d{2}"
         r"|(?:19|20)\d{2}[/\.\-](?:0?[1-9]|1[0-2])"
         r"|(?:Q[1-4]|Summer|Winter|Spring|Fall)\s+(?:19|20)\d{2}"
         r"|(?:19|20)\d{2}"
@@ -173,7 +172,7 @@ class ResumeFieldExtractor:
             else:
                 # PDF/OCR output commonly places the name and role on one visual line.
                 title_boundary = cls._find_job_title_boundary(candidate)
-                stripped = candidate[:title_boundary].strip(" -|:") if title_boundary is not None else candidate
+                stripped = candidate[:title_boundary].strip(" -|:") if title_boundary is not None and len(candidate) <= 120 else candidate
                 if stripped and stripped != candidate and cls._is_valid_name(stripped, email, phone, location):
                     words = [word.lower() for word in stripped.split()]
                     matches_email = any(
@@ -182,7 +181,7 @@ class ResumeFieldExtractor:
                     )
                     candidates.append((stripped, matches_email, cls._name_structure_score(stripped, index, text_lines)))
 
-            combined_header_name = cls._name_from_combined_header(candidate)
+            combined_header_name = cls._name_from_combined_header(candidate) if len(candidate) <= 120 else None
             if combined_header_name and cls._is_valid_name(combined_header_name, email, phone, location):
                 words = [word.lower() for word in combined_header_name.split()]
                 matches_email = any(
@@ -396,6 +395,8 @@ class ResumeFieldExtractor:
             gen_lines = sections.get("general", [])
             if any(cls._DATE_RANGE.search(line) for line in gen_lines):
                 extracted_exp = cls._extract_employment(gen_lines)
+        extracted_education = cls._extract_education(sections.get("education", []) or text_lines)
+        cls._recover_orphan_employment_dates(text, extracted_exp, extracted_education)
 
         result = {
             "contact_info": {
@@ -419,7 +420,7 @@ class ResumeFieldExtractor:
             },
             "summary": "\n".join(sections.get("summary", [])).strip(),
             "work_experience": extracted_exp,
-            "education": cls._extract_education(sections.get("education", []) or text_lines),
+            "education": extracted_education,
             "skills": cls._extract_skills(sections.get("skills", []) or text_lines),
             "projects": cls._extract_projects(sections.get("projects", [])),
             "certifications": [line.lstrip("-• ").strip() for line in sections.get("certifications", []) if line.strip()],
@@ -432,6 +433,38 @@ class ResumeFieldExtractor:
 
         result["normalized"] = ResumeNormalizer.normalize(result, text).model_dump(mode="json")
         return result
+
+    @classmethod
+    def _recover_orphan_employment_dates(
+        cls,
+        text: str,
+        jobs: list[dict[str, Any]],
+        education: list[dict[str, Any]],
+    ) -> None:
+        """Recover dates displaced by multi-column PDF reading order only when pairing is unambiguous."""
+        undated_jobs = [job for job in jobs if not str(job.get("dates") or "").strip()]
+        if not undated_jobs:
+            return
+
+        orphan_ranges = [match.group(0).strip(" ()") for match in cls._DATE_RANGE.finditer(text)]
+        used_ranges = [
+            str(item.get("dates") or "").strip()
+            for item in [*jobs, *education]
+            if str(item.get("dates") or "").strip()
+        ]
+        for used in used_ranges:
+            used_normalized = re.sub(r"\s+", " ", used).lower()
+            for index, candidate in enumerate(orphan_ranges):
+                if re.sub(r"\s+", " ", candidate).lower() == used_normalized:
+                    orphan_ranges.pop(index)
+                    break
+
+        if len(orphan_ranges) != len(undated_jobs):
+            return
+
+        for job, date_range in zip(undated_jobs, orphan_ranges, strict=True):
+            job["dates"] = date_range
+            job["date_extraction_source"] = "orphan_range_document_order"
 
     @classmethod
     def _split_sections(cls, lines: list[str]) -> dict[str, list[str]]:
@@ -812,8 +845,18 @@ class ResumeFieldExtractor:
         tokens = [token for token in candidate.split() if token]
         if not 1 <= len(tokens) <= 4:
             return False
+        if any(token.startswith(".") for token in tokens):
+            return False
         normalized_candidate = re.sub(r"\s+", " ", candidate.lower().strip(" .:-"))
         if normalized_candidate in _NON_NAME_FIELD_LABELS:
+            return False
+        if cls._SECTION_HEADING.fullmatch(candidate.strip(" #*:-")):
+            return False
+        normalized_headings = {
+            re.sub(r"\s+", " ", str(heading).lower().strip(" #* .:-"))
+            for heading in cls.GENERIC_SECTION_HEADERS | cls.RESUME_HEADER_KEYWORDS
+        }
+        if normalized_candidate in normalized_headings:
             return False
         upper_tokens = [token.upper() for token in tokens]
         denied = cls.JOB_TITLE_KEYWORDS | cls.RESUME_HEADER_KEYWORDS
@@ -828,7 +871,7 @@ class ResumeFieldExtractor:
         if sum(token in denied for token in upper_tokens) >= len(tokens) * 0.5:
             return False
         # Reject configured role phrases without baking industries or technologies into extraction code.
-        role_terms = RuleConfigManager.get_keywords("name", "job_title_denylist")
+        role_terms = cls._configured_job_title_terms()
         for term in role_terms:
             role_pattern = r"\s+".join(re.escape(part) for part in term.split())
             if role_pattern and re.search(rf"\b{role_pattern}\b", candidate, re.IGNORECASE):
@@ -918,7 +961,7 @@ class ResumeFieldExtractor:
         if not value:
             return None
         boundaries: list[tuple[int, int]] = []
-        for raw_term in RuleConfigManager.get_keywords("name", "job_title_denylist"):
+        for raw_term in cls._configured_job_title_terms():
             term = raw_term.strip()
             compact_length = len(re.sub(r"\W", "", term))
             if compact_length < 2:
@@ -928,8 +971,36 @@ class ResumeFieldExtractor:
                 before_is_boundary = match.start() == 0 or not value[match.start() - 1].isalnum()
                 after_is_boundary = match.end() == len(value) or not value[match.end()].isalnum()
                 if after_is_boundary and (before_is_boundary or compact_length >= 4):
-                    boundaries.append((match.start(), -compact_length))
+                    boundary_start = match.start()
+                    seniority_prefix = re.search(
+                        r"\b(?:sr\.?|senior|jr\.?|junior|lead|principal|staff|chief|head)\s+(?:[\w.+#-]+\s+){0,2}$",
+                        value[:match.start()],
+                        re.IGNORECASE,
+                    )
+                    if seniority_prefix:
+                        boundary_start = seniority_prefix.start()
+                    boundaries.append((boundary_start, -compact_length))
         return min(boundaries)[0] if boundaries else None
+
+    @classmethod
+    def _configured_job_title_terms(cls) -> set[str]:
+        """Build name-rejection role terms from governed config and active taxonomy."""
+        terms = set(RuleConfigManager.get_keywords("name", "job_title_denylist"))
+        try:
+            from app.repositories.department_domain import department_domain_repository
+
+            for domain in department_domain_repository.get_all_domains():
+                for role in domain.default_roles:
+                    clean_role = str(role).strip().lower()
+                    if not clean_role:
+                        continue
+                    terms.add(clean_role)
+                    final_token = re.sub(r"[^a-z]", "", clean_role.split()[-1])
+                    if len(final_token) >= 4:
+                        terms.add(final_token)
+        except Exception:
+            pass
+        return terms
 
     @staticmethod
     def _email_name_tokens(email: str | None) -> list[str]:

@@ -299,18 +299,6 @@ class RequirementEvaluator:
 
         # 1. Mandatory Skills
         matched_skills, missing_skills = extract_term_matches_fn(context.norm_text, req_skills)
-        if llm_match and llm_match.matched_skills:
-            for ms in llm_match.matched_skills:
-                if ms not in matched_skills:
-                    matched_skills.append(ms)
-                if ms in missing_skills:
-                    missing_skills.remove(ms)
-
-        if not skills_are_mandatory:
-            semantic_matches = cls._match_semantic_skill_gaps(context, missing_skills)
-            for semantic_match in semantic_matches:
-                matched_skills.append(semantic_match)
-                missing_skills.remove(semantic_match)
 
         results.matched_skills = matched_skills
         results.missing_skills = missing_skills
@@ -982,6 +970,7 @@ class VacancyMatchStatus(str, Enum):
     NO_STRONG_MATCH = "NO_STRONG_MATCH"
     NO_ACTIVE_VACANCIES = "NO_ACTIVE_VACANCIES"
     ANALYSIS_NOT_AVAILABLE = "ANALYSIS_NOT_AVAILABLE"
+    ANALYSIS_UNAVAILABLE = "ANALYSIS_UNAVAILABLE"
     PROCESSING = "PROCESSING"
     FAILED = "FAILED"
 
@@ -1073,17 +1062,18 @@ class VacancyFitEvaluator:
             skills_score = params.domain_default_match_score
 
         # 4. Experience Fit Score (0-100)
+        cand_exp = float(getattr(context, "candidate_experience", 0.0) or 0.0)
+        min_exp = float(getattr(job, "min_experience_years", None) or getattr(job, "min_experience", 0.0) or 0.0)
+        max_exp = getattr(job, "max_experience_years", None)
         experience_score = 0.0
         if comp_results and hasattr(comp_results, "experience_score"):
             experience_score = float(comp_results.experience_score or 0.0)
         else:
-            cand_exp = context.candidate_experience or 0.0
-            min_exp = job.min_experience_years or 0.0
             if cand_exp >= min_exp:
                 experience_score = typed_config.perfect_component_score
             else:
                 experience_score = max(0.0, (cand_exp / min_exp) * params.below_min_exp_multiplier if min_exp > 0 else 0.0)
-            if job.max_experience_years is not None and cand_exp > job.max_experience_years:
+            if max_exp is not None and cand_exp > max_exp:
                 experience_score = max(0.0, experience_score - params.overqualification_penalty)
 
         resps = getattr(job, "responsibilities", []) or []
@@ -1112,13 +1102,25 @@ class VacancyFitEvaluator:
         weights = typed_config.component_weights
         skill_weight = weights.get("skills", 0.0) + weights.get("technology", 0.0)
         semantic_weight = weights.get("responsibilities", 0.0)
-        education_score = float(getattr(comp_results, "education_score", 0.0) or 0.0) if job.education_requirements else 0.0
+        education_score = float(getattr(comp_results, "education_score", 0.0) or 0.0) if getattr(job, "education_requirements", None) else 0.0
         fit_components = [
             (hierarchy_score, weights.get("domain", 0.0), bool(j_dept or v_main_id is not None)),
             (role_score, weights.get("role", 0.0), bool(j_title)),
-            (skills_score, skill_weight, bool(job.required_skills or job.preferred_keywords or job.technologies)),
-            (experience_score, weights.get("experience", 0.0), job.min_experience_years is not None or job.max_experience_years is not None),
-            (education_score, weights.get("education", 0.0), bool(job.education_requirements)),
+            (
+                skills_score,
+                skill_weight,
+                bool(
+                    getattr(job, "required_skills", None)
+                    or getattr(job, "preferred_keywords", None)
+                    or getattr(job, "technologies", None)
+                ),
+            ),
+            (
+                experience_score,
+                weights.get("experience", 0.0),
+                getattr(job, "min_experience_years", None) is not None or getattr(job, "max_experience_years", None) is not None,
+            ),
+            (education_score, weights.get("education", 0.0), bool(getattr(job, "education_requirements", None))),
             (semantic_score, semantic_weight, bool(vac_desc)),
         ]
         active_weight = sum(weight for _, weight, active in fit_components if active and weight > 0.0)
@@ -1126,12 +1128,22 @@ class VacancyFitEvaluator:
         raw_fit_score = weighted_score / active_weight if active_weight > 0.0 else 0.0
 
         # Guardrail: High embedding similarity CANNOT override wrong department / invalid hierarchy
-        hard_failures = mandatory_failures or []
+        hard_failures = list(mandatory_failures or [])
+        if min_exp > 0 and cand_exp < min_exp and not any(
+            str(getattr(failure, "requirement_id", "") or (failure.get("requirement_id") if isinstance(failure, dict) else "")) == "minimum_experience"
+            for failure in hard_failures
+        ):
+            hard_failures.append(
+                {
+                    "requirement_id": "minimum_experience",
+                    "reason": f"Candidate has {cand_exp:.1f} years; vacancy requires {min_exp:.1f} years.",
+                }
+            )
         rejection_cap = max(0.0, typed_config.match_medium_threshold - 0.1)
         if hard_failures:
             final_fit_score = round(min(rejection_cap, max(0.0, raw_fit_score)), 1)
             match_status = "NO_STRONG_VACANCY_MATCH"
-            reason = f"Vacancy fit rejected ({final_fit_score:.1f}/100): {len(hard_failures)} mandatory requirement(s) failed."
+            reason = f"Mandatory requirement failure(s): {len(hard_failures)} hard gate(s) failed; vacancy fit capped at {final_fit_score:.1f}/100."
         elif hierarchy_mismatch:
             mismatch_cap = min(typed_config.max_score_on_failure, rejection_cap)
             final_fit_score = round(min(mismatch_cap, max(0.0, raw_fit_score - hierarchy_penalty)), 1)
@@ -1307,6 +1319,9 @@ class VacancyFitEvaluator:
             potential_threshold = potential_threshold if potential_threshold is not None else scoring_config.match_medium_threshold
 
         proc_status = str(result_data.get("status") or "").lower()
+        result_match_status = str(result_data.get("match_status") or "").upper()
+        if proc_status == "analysis_unavailable" or result_match_status == VacancyMatchStatus.ANALYSIS_UNAVAILABLE.value:
+            return VacancyMatchStatus.ANALYSIS_UNAVAILABLE.value
         if proc_status == "processing":
             return VacancyMatchStatus.PROCESSING.value
         if proc_status in {"failed", "error"}:

@@ -76,8 +76,8 @@
       "department_id": 9,
       "department_name": "CIS Team",
       "domain_name": "Information Technology",
-      "keywords": ["it", "software", "network", "server", "database", "erp", "sap", "helpdesk", "cybersecurity", "infrastructure", "system administration", "it support", "web development", "programming"],
-      "default_roles": ["IT Executive", "System Administrator", "Network Engineer", "Software Developer", "IT Manager"],
+      "keywords": ["it", "software", "software developer", "developer", "programming", "web development", "web developer", "frontend", "front-end", "backend", "full stack", "mobile development", "mobile developer", "javascript", "typescript", "react", "next.js", "flutter", "dart", "asp.net", ".net", "c#", "api development", "firebase", "network", "server", "database", "erp", "sap", "helpdesk", "cybersecurity", "infrastructure", "system administration", "it support"],
+      "default_roles": ["Software Developer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile Application Developer", "IT Executive", "System Administrator", "Network Engineer", "IT Manager"],
       "priority": 1,
       "is_active": true
     },

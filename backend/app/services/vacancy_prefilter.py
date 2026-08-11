@@ -193,19 +193,6 @@ class VacancyPreFilter:
         # Convert openings to JobEvaluationContexts once if needed
         job_contexts: list[JobEvaluationContext] = [j if isinstance(j, JobEvaluationContext) else JobEvaluationContext.create(j) for j in openings]
 
-        # Fast exit if total openings <= limit
-        if len(job_contexts) <= limit:
-            results = []
-            ordered_contexts = sorted(job_contexts, key=lambda item: item.job_id)
-            for context in ordered_contexts:
-                job_dict = dict(context.raw_job) if isinstance(context.raw_job, dict) and context.raw_job else dict(context.__dict__)
-                job_dict["_prefilter_score"] = 100.0
-                job_dict["_rrf_details"] = {"rrf_score": 1.0, "stage0_compatible": True, "retrieval_path": "all_openings"}
-                context.raw_job = job_dict
-                results.append(job_dict)
-            QualityMetrics.record("retrieval", openings=len(job_contexts), selected=len(results), stage0_exclusions=0, vector_coverage=0)
-            return ordered_contexts if return_contexts else results
-
         # Load prefilter configuration rules ONCE (dynamic MSSQL stop_words & weights)
         prefilter_rules: PrefilterRules = DynamicScoringAndPrefilterService.get_prefilter_rules()
 
@@ -221,7 +208,13 @@ class VacancyPreFilter:
         # STAGE 0: Job Taxonomy Search Space Filtering
         t0 = time.perf_counter()
         stage0_jobs = job_contexts
-        if cand_ctx.cand_families and cand_ctx.cand_families != [RuleConfigManager.get_taxonomy_rules().default_family]:
+        default_family = RuleConfigManager.get_taxonomy_rules().default_family
+        candidate_taxonomy_known = bool(
+            cand_ctx.cand_domain not in (None, "", "Unknown", "Not Configured")
+            and cand_ctx.cand_families
+            and cand_ctx.cand_families not in ([default_family], ["Unknown"], ["Not Configured"])
+        )
+        if candidate_taxonomy_known:
             compatible_jobs = [j for j in job_contexts if j.vac_tax_domain in ("Unknown", "Not Configured") or j.vac_family in ("Unknown", "Not Configured") or TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) or j.vac_tax_domain == cand_ctx.cand_domain]
             if compatible_jobs:
                 stage0_jobs = compatible_jobs
@@ -229,7 +222,8 @@ class VacancyPreFilter:
         t_stage0_ms = round((time.perf_counter() - t0) * 1000.0, 2)
         logger.info(
             f"[PREFILTER_STAGE_0] Candidate Domain='{cand_ctx.cand_domain}', Families={cand_ctx.cand_families}. "
-            f"Filtered {len(job_contexts)} initial openings down to {len(stage0_jobs)} taxonomy-compatible vacancies in {t_stage0_ms} ms."
+            f"Filtered {len(job_contexts)} initial openings down to {len(stage0_jobs)} retrieval candidates "
+            f"(candidate_taxonomy_known={candidate_taxonomy_known}) in {t_stage0_ms} ms."
         )
 
         # Adaptive Retrieval Guard: Skip Stage 1 & 2 if Stage 0 count <= limit
@@ -237,10 +231,15 @@ class VacancyPreFilter:
             logger.info(f"[PREFILTER_ADAPTIVE] Stage 0 compatible openings ({len(stage0_jobs)}) <= limit ({limit}). Skipping Stage 1 & 2 retrieval.")
             res_jobs = []
             stage0_jobs = sorted(stage0_jobs, key=lambda item: item.job_id)
-            for j in stage0_jobs:
+            for rank, j in enumerate(stage0_jobs, start=1):
                 job_dict = dict(j.raw_job) if isinstance(j.raw_job, dict) and j.raw_job else dict(j.__dict__)
                 job_dict["_prefilter_score"] = 100.0
-                job_dict["_rrf_details"] = {"rrf_score": 1.0, "stage0_compatible": True, "retrieval_path": "taxonomy"}
+                job_dict["_rrf_details"] = {
+                    "rrf_score": 1.0,
+                    "prefilter_rank": rank,
+                    "stage0_compatible": candidate_taxonomy_known,
+                    "retrieval_path": "taxonomy" if candidate_taxonomy_known else "unclassified_retrieval",
+                }
                 j.raw_job = job_dict
                 res_jobs.append(job_dict)
             QualityMetrics.record(
@@ -347,9 +346,13 @@ class VacancyPreFilter:
         keyword_only, vector_only, both = 0, 0, 0
 
         for fused_score, rrf_details, job in rrf_scored[:limit]:
+            rrf_details["prefilter_rank"] = len(selected_contexts) + 1
             rrf_details["rrf_score"] = fused_score
             rrf_details["vector_distance"] = vec_distances.get(job.job_id)
-            rrf_details["stage0_compatible"] = True
+            rrf_details["stage0_compatible"] = candidate_taxonomy_known and (
+                TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, job.vac_family)
+                or job.vac_tax_domain == cand_ctx.cand_domain
+            )
             has_l = rrf_details.get("lexical_rank") is not None
             has_v = rrf_details.get("vector_rank") is not None
             if has_l and has_v:

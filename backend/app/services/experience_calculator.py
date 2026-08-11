@@ -77,8 +77,10 @@ class ExperienceCalculator:
 
             if isinstance(job, dict):
                 raw_dates = job.get("dates") or (job.get("interval") or {}).get("raw_value")
-                job_title = job.get("job_title") or (job.get("job_title") or {}).get("normalized_value")
-                company = job.get("company") or (job.get("company") or {}).get("normalized_value") or job.get("company_name")
+                raw_title = job.get("job_title") or job.get("title") or job.get("position")
+                raw_company = job.get("company") or job.get("company_name")
+                job_title = raw_title.get("normalized_value") or raw_title.get("raw_value") if isinstance(raw_title, dict) else raw_title
+                company = raw_company.get("normalized_value") or raw_company.get("raw_value") if isinstance(raw_company, dict) else raw_company
                 responsibilities = job.get("responsibilities") or []
                 if not raw_dates and job.get("start_date"):
                     raw_dates = f"{job.get('start_date')} - {job.get('end_date') or 'Present'}"
@@ -119,8 +121,12 @@ class ExperienceCalculator:
                 if end_date < start_date:
                     end_date = start_date
                 end_date = min(end_date, target_ref + timedelta(days=30))
-                valid_intervals.append((start_date, end_date))
                 duration_months = cls.interval_duration_months(start_date, end_date)
+                has_structured_interval = isinstance(job, dict) and bool(job.get("start_date")) and bool(
+                    job.get("end_date") or job.get("is_current")
+                )
+                if has_structured_interval or DateIntervalParser.is_explicit_interval(str(raw_dates or "")):
+                    valid_intervals.append((start_date, end_date))
 
             clean_company = str(company).strip() if company else "Organization"
             clean_title = str(job_title).strip() if job_title else "Position"
@@ -160,16 +166,16 @@ class ExperienceCalculator:
             years_part = total_months // 12
             months_part = total_months % 12
             gross_display = f"{years_part} years {months_part} months"
-        elif canonical_timeline_years > 0:
-            authoritative_years = canonical_timeline_years
-            experience_state = ExperienceState.CALCULATED
+        elif stated_years is not None and stated_years > 0:
+            authoritative_years = stated_years
+            experience_state = ExperienceState.CLAIMED
             total_months = int(round(authoritative_years * 12))
             years_part = total_months // 12
             months_part = total_months % 12
             gross_display = f"{years_part} years {months_part} months"
-        elif stated_years is not None and stated_years > 0:
-            authoritative_years = stated_years
-            experience_state = ExperienceState.CLAIMED
+        elif canonical_timeline_years > 0:
+            authoritative_years = canonical_timeline_years
+            experience_state = ExperienceState.CALCULATED
             total_months = int(round(authoritative_years * 12))
             years_part = total_months // 12
             months_part = total_months % 12
@@ -242,7 +248,7 @@ class ExperienceCalculator:
             "total_experience_years": authoritative_years,
             "total_experience_months": total_months,
             "gross_display": gross_display,
-            "deterministic_years": deterministic_years if deterministic_years is not None else (canonical_timeline_years if canonical_timeline_years > 0 else None),
+            "deterministic_years": deterministic_years,
             "stated_years": stated_years,
             "authoritative_years": authoritative_years,
             "seniority": seniority,

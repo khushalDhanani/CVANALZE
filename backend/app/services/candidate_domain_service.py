@@ -34,6 +34,10 @@ class CandidateDomainService:
         Identifies candidate's most suitable department and professional domain
         from skills, experience, education, and projects.
         """
+        if resume_json is None and cv_text:
+            from app.services.resume_field_extractor import ResumeFieldExtractor
+
+            resume_json = ResumeFieldExtractor.extract(cv_text)
         combined_parts = [cv_text]
         skills_set: set[str] = set()
         education_list: list[str] = []
@@ -90,6 +94,11 @@ class CandidateDomainService:
                         if isinstance(responsibility, str) and responsibility.strip():
                             responsibilities_list.append(responsibility.strip())
 
+        if not skills_set:
+            skills_set.update(cls._extract_cv_skill_lines(cv_text))
+        if not roles_list:
+            roles_list.extend(cls._extract_cv_role_headers(cv_text))
+
         # Enforce that education does not override established professional experience
         active_education = []
         if not roles_list and not projects_list:
@@ -105,7 +114,8 @@ class CandidateDomainService:
         repo = domain_repository or department_domain_repository
 
         # 1. Dynamic Vector & MSSQL taxonomy resolution
-        role_input = " ".join(roles_list) if roles_list else combined_text
+        role_evidence = [*roles_list, *responsibilities_list, *projects_list]
+        role_input = " ".join(role_evidence) if role_evidence else combined_text
         dyn_res = DynamicTaxonomyService.resolve_candidate_role_and_domain(
             role_or_summary=role_input,
             skills=sorted(skills_set),
@@ -129,15 +139,25 @@ class CandidateDomainService:
             dept_scores: list[tuple[float, DepartmentDomain]] = []
             for matcher in repo.get_domain_matchers():
                 score = 0.0
-                score += matcher.keyword_match_count(combined_text) * 1.0
+                evidence_sources = 0
+                total_matches = 0
                 if exp_text:
-                    score += matcher.keyword_match_count(exp_text) * w_exp
+                    matches = matcher.keyword_match_count(exp_text)
+                    score += matches * w_exp
+                    evidence_sources += int(matches > 0)
+                    total_matches += matches
                 if resp_text:
-                    score += matcher.keyword_match_count(resp_text) * w_resp
+                    matches = matcher.keyword_match_count(resp_text)
+                    score += matches * w_resp
+                    evidence_sources += int(matches > 0)
+                    total_matches += matches
                 if skills_text:
-                    score += matcher.keyword_match_count(skills_text) * w_skills
+                    matches = matcher.keyword_match_count(skills_text)
+                    score += matches * w_skills
+                    evidence_sources += int(matches > 0)
+                    total_matches += matches
                     
-                if score > 0:
+                if score > 0 and (evidence_sources >= 2 or total_matches >= 2):
                     dept_scores.append((score, matcher.domain))
 
             if dept_scores:
@@ -327,23 +347,26 @@ class CandidateDomainService:
 
     @classmethod
     def _extract_cv_role_headers(cls, cv_text: str) -> list[str]:
+        from app.services.resume_field_extractor import ResumeFieldExtractor
+
         headers: list[str] = []
         match_rules = RuleConfigManager.get_match_rules()
         section_denylist = {h.lower().strip() for h in match_rules.cv_section_heading_denylist if h}
         compact_denylist = {h.lower().strip() for h in match_rules.cv_section_heading_compact_denylist if h}
         substring_denylist = [h.lower().strip() for h in match_rules.cv_section_heading_substring_denylist if h]
 
-        for raw_line in cv_text.splitlines():
+        for line_index, raw_line in enumerate(cv_text.splitlines()):
             line = raw_line.strip()
-            if not line.startswith("##"):
-                continue
-
-            header = re.sub(r"\s+", " ", line.lstrip("# ").strip())
+            labeled_role = re.match(r"^(?:current\s+role|job\s+title|title|designation|position)\s*:\s*(.+)$", line, re.IGNORECASE)
+            header = labeled_role.group(1).strip() if labeled_role else re.sub(r"\s+", " ", line.lstrip("#-• ").strip())
             normalized_header = header.lower()
             compact_header = re.sub(r"\s+", "", normalized_header)
             if not header or normalized_header in section_denylist or compact_header in compact_denylist or any(term in normalized_header for term in substring_denylist):
                 continue
-            headers.append(header)
+            is_explicit_header = line.startswith("##") or labeled_role is not None
+            is_header_role = line_index < 12 and ResumeFieldExtractor.is_valid_job_title(header)
+            if is_explicit_header or is_header_role:
+                headers.append(header)
 
         return headers
 

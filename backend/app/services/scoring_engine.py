@@ -305,6 +305,12 @@ class ScoringEngine:
             mandatory_failures=req_results.mandatory_failures,
             scoring_config=typed_scoring_config,
         )
+        if guard_results.is_domain_capped and guard_results.final_score < fit_results.vacancy_fit_score:
+            fit_results.vacancy_fit_score = guard_results.final_score
+            fit_results.score_breakdown.overall_fit_score = guard_results.final_score
+            fit_results.score_breakdown.match_status = "NO_STRONG_VACANCY_MATCH"
+            fit_results.match_status = "NO_STRONG_VACANCY_MATCH"
+            fit_results.reason = guard_results.domain_capped_reason or fit_results.reason
 
         # 5. Recommendation & Confidence. Classification is derived from the
         # same canonical score returned to API/UI consumers.
@@ -366,7 +372,10 @@ class ScoringEngine:
                 for f in req_results.mandatory_failures
             ],
             confidence=rec_results.confidence_val,
-            hr_review_required=comp_results.hr_review_required,
+            hr_review_required=bool(req_results.mandatory_failures) or fit_results.match_status != "MATCHED" or any(
+                item.requirement_id == "req_education" and item.status.value == "FAILED"
+                for item in req_results.preferred_reqs
+            ),
             domain_mismatch_capped=guard_results.is_domain_capped,
             domain_mismatch_reason=guard_results.domain_capped_reason,
             reason=rec_results.reason_str,

@@ -9,6 +9,8 @@ class MatchStatus(str, Enum):
     NO_SUITABLE_MATCH = "NO_SUITABLE_MATCH"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
     SOURCE_DATA_UNAVAILABLE = "SOURCE_DATA_UNAVAILABLE"
+    ANALYSIS_UNAVAILABLE = "ANALYSIS_UNAVAILABLE"
+    NO_ACTIVE_VACANCIES = "NO_ACTIVE_VACANCIES"
 
 
 class ClassificationEvidence(BaseModel):
@@ -105,6 +107,4 @@ class NormalizedClassification(BaseModel):
 
 
 NormalizedClassification.model_rebuild()
-
-
 

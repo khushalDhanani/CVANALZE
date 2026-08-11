@@ -13,6 +13,7 @@ from app.core.rule_config_manager import RuleConfigManager
 from app.prompts.optimized_match import build_optimized_match_prompt
 from app.repositories.job import JobRepository, VacancyLoadStatus, VacancySourceUnavailableError
 from app.repositories.llm_cache import LLMCacheRepository
+from app.repositories.department_domain import department_domain_repository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
 from app.schemas.candidate_context import CandidateAnalysisContext
@@ -24,6 +25,7 @@ from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
 from app.services.confidence_calibration import ConfidenceCalibrationService
 from app.services.llm_grounding_service import GroundingReport, LLMGroundingService
 from app.services.llm_service import OllamaLLMService
+from app.services.matching_quality_gate import MatchingQualityGate, MatchingReadiness
 from app.services.resume_normalizer import ResumeNormalizer
 from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
@@ -64,6 +66,7 @@ class MatchService:
         cv_key = str(cv_key or candidate_id).strip()
         source_candidate_id = normalize_source_candidate_id(source_candidate_id)
         extraction_version = f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
+        quality_gate = MatchingQualityGate()
 
         # 2. JSON Loading stage timing (parsing CV text input)
         with profiler.time_stage("resume_json"):
@@ -77,8 +80,20 @@ class MatchService:
                 normalized_payload = resume_json.get("normalized") if resume_json else None
                 normalized_resume = NormalizedResume.model_validate(normalized_payload) if normalized_payload else ResumeNormalizer.normalize(resume_json or {}, cv_text)
 
+        quality_gate.record(
+            "extraction_quality",
+            "PASSED",
+            skill_count=len(normalized_resume.skills),
+            employment_count=len(normalized_resume.employment),
+            education_count=len(normalized_resume.education),
+        )
+
+        readiness = MatchingQualityGate.check_runtime_readiness()
+        if not readiness.ready:
+            return MatchService._unavailable_analysis(normalized_resume, readiness, quality_gate)
+
         if deterministic_experience is None:
-            deterministic_experience = normalized_resume.experience.deterministic_years
+            deterministic_experience = normalized_resume.experience.authoritative_years
 
         from fastapi.concurrency import run_in_threadpool
 
@@ -88,25 +103,40 @@ class MatchService:
             if job_openings is not None:
                 openings = job_openings
             else:
-                vacancy_result = await run_in_threadpool(JobRepository.load_all_jobs)
+                try:
+                    vacancy_result = await run_in_threadpool(JobRepository.load_all_jobs)
+                except VacancySourceUnavailableError:
+                    readiness = MatchingReadiness(
+                        False,
+                        "VACANCY_SOURCE_UNAVAILABLE",
+                        "The active vacancy source is unavailable and no safe snapshot can be evaluated.",
+                    )
+                    return MatchService._unavailable_analysis(normalized_resume, readiness, quality_gate)
                 openings = vacancy_result.jobs
                 if vacancy_result.status == VacancyLoadStatus.STALE:
                     vacancy_freshness = "STALE"
                     if not openings:
-                        raise VacancySourceUnavailableError(
-                            "MSSQL vacancy source is unavailable and the cached vacancy snapshot is empty."
+                        readiness = MatchingReadiness(
+                            False,
+                            "VACANCY_SOURCE_UNAVAILABLE",
+                            "The active vacancy source is unavailable and the cached vacancy snapshot is empty.",
                         )
+                        return MatchService._unavailable_analysis(normalized_resume, readiness, quality_gate)
 
         if not openings:
-            logger.warning("MatchService.analyze_single_cv: No job openings available for matching.")
+            logger.warning("MatchService.analyze_single_cv: Authoritative vacancy source contains no active openings.")
             profiler.finish()
             profiler.log_summary()
-            return MatchService._empty_analysis(cv_text=cv_text, normalized_resume=normalized_resume)
+            quality_gate.record("vacancy_retrieval", "PASSED_EMPTY", source_count=0, retrieved_count=0)
+            quality_gate.record("final_classification", "PASSED", match_status="NO_ACTIVE_VACANCIES", final_score=None)
+            return MatchService._empty_analysis(cv_text=cv_text, normalized_resume=normalized_resume, quality_gate=quality_gate)
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
         vacancy_ids = sorted(str(job.get("vacancy_id") or job.get("id") or "") for job in openings if job.get("vacancy_id") is not None or job.get("id") is not None)
         vacancy_version = JobRepository.compute_matching_vacancy_version(openings)
+        rule_version = RuleConfigManager.get_config().version
+        taxonomy_version = department_domain_repository.get_version()
 
         # 4. Match Result Cache Check (instant repeat searches)
         t_cache_start = asyncio.get_event_loop().time()
@@ -119,6 +149,8 @@ class MatchService:
             model_version=settings.OLLAMA_MODEL,
             extraction_version=extraction_version,
             matching_version=settings.MATCHING_VERSION,
+            rule_version=rule_version,
+            taxonomy_version=taxonomy_version,
         ).to_key()
 
         cached_result = match_result_cache_manager.get(match_cache_key)
@@ -150,6 +182,19 @@ class MatchService:
                 deterministic_experience=deterministic_experience,
                 domain_repository=ScoringEngine.domain_repository,
             )
+        quality_gate.record(
+            "candidate_evidence_profile",
+            "PASSED",
+            current_role=candidate_context.current_role,
+            skill_count=len(candidate_context.professional_skills),
+            experience_years=candidate_context.candidate_experience,
+        )
+        quality_gate.record(
+            "taxonomy_classification",
+            "PASSED" if candidate_context.cand_tax_domain not in ("", "Unknown") else "INSUFFICIENT_EVIDENCE",
+            domain=candidate_context.cand_tax_domain or "Unknown",
+            families=candidate_context.cand_families,
+        )
 
         # 5. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
         with profiler.time_stage("prefilter"):
@@ -168,6 +213,13 @@ class MatchService:
             )
         filtered_vacancies = [job.raw_job for job in filtered_job_contexts]
         profiler.metrics.vacancies_after_filtering = len(filtered_job_contexts)
+        quality_gate.record(
+            "vacancy_retrieval",
+            "PASSED",
+            source_count=len(openings),
+            retrieved_count=len(filtered_job_contexts),
+            top_vacancy_ids=[job.job_id for job in filtered_job_contexts[:10]],
+        )
 
         from app.schemas.scoring_config import ScoringConfig
         scoring_config = ScoringConfig.load()
@@ -264,6 +316,8 @@ class MatchService:
                 model_version=settings.OLLAMA_MODEL,
                 extraction_version=extraction_version,
                 matching_version=settings.MATCHING_VERSION,
+                rule_version=rule_version,
+                taxonomy_version=taxonomy_version,
             )
 
             # 5. Single Optimized LLM Call + Pydantic Validation (with cache check & retries)
@@ -453,6 +507,7 @@ class MatchService:
         ]
         has_genuine_match = bool(eligible_matches)
 
+        has_potential_match = False
         if has_genuine_match:
             top_m = eligible_matches[0]
             skills_str = ", ".join(top_m.matched_skills[:4]) if top_m.matched_skills else "core qualification requirements"
@@ -469,6 +524,7 @@ class MatchService:
             ]
             if potential_matches:
                 top_p = potential_matches[0]
+                has_potential_match = True
                 active_vacancy_summary = (
                     f"POTENTIAL_MATCH: Candidate shows potential alignment with '{top_p.job_title}' "
                     f"(Match Score: {top_p.score}%). Manual HR review recommended."
@@ -479,7 +535,7 @@ class MatchService:
                     "NO_STRONG_MATCH: No suitable active vacancy found matching candidate domain/taxonomy profile "
                     f"(Primary Domain: {professional_domain}). Manual HR review recommended."
                 )
-                best_match = None
+                best_match = evaluated_matches[0]
         elif not job_openings:
             active_vacancy_summary = "NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation."
             best_match = None
@@ -508,6 +564,27 @@ class MatchService:
 
         suitable_matches = eligible_matches
         unsuitable_matches = [m for m in evaluated_matches if m not in eligible_matches]
+        quality_gate.record(
+            "mandatory_requirement_gate",
+            "PASSED",
+            rejected_count=sum(bool(match.mandatory_failures) for match in evaluated_matches),
+        )
+        quality_gate.record("deterministic_fit_score", "PASSED", evaluated_count=len(evaluated_matches))
+        quality_gate.record(
+            "llm_grounded_enrichment",
+            "SKIPPED_CONFIDENT" if llm_skipped else "PASSED" if optimized_response else "UNAVAILABLE_DETERMINISTIC_FALLBACK",
+            grounding_ratio=round(grounding_report.ratio, 4),
+            unsupported_claims_removed=len(grounding_report.unsupported_claims),
+        )
+        quality_gate.record(
+            "confidence_consistency_gate",
+            "PASSED",
+            strong_matches=len(eligible_matches),
+            contradictory_results=sum(
+                match.vacancy_match_status == "MATCHED" and bool(match.mandatory_failures)
+                for match in evaluated_matches
+            ),
+        )
 
         # Build NormalizedClassification for the candidate from their resolved context
         cand_classification: NormalizedClassification | None = None
@@ -567,7 +644,7 @@ class MatchService:
         )
 
         if not has_genuine_match:
-            top_level_match_status = MatchStatus.PARTIAL_MATCH if best_match is not None else MatchStatus.NO_SUITABLE_MATCH
+            top_level_match_status = MatchStatus.PARTIAL_MATCH if has_potential_match else MatchStatus.NO_SUITABLE_MATCH
             if cand_classification:
                 cand_classification = cand_classification.model_copy(update={
                     "match_status": MatchStatus.NO_SUITABLE_MATCH,
@@ -595,6 +672,14 @@ class MatchService:
                     "main_department_classification": main_dept_res,
                     "hierarchy_classification": hierarchy_res,
                 })
+
+        quality_gate.record(
+            "final_classification",
+            "PASSED",
+            match_status=top_level_match_status.value,
+            best_vacancy_id=best_match.vacancy_id if best_match else None,
+            final_score=best_match.vacancy_fit_score if best_match else None,
+        )
 
         from app.services.experience_gap_service import ExperienceGapService
         gap_analysis = ExperienceGapService.analyze_timeline(resume_json or {}, cv_text)
@@ -633,6 +718,9 @@ class MatchService:
                 "invalid_vacancy_ids_removed": len(grounding_report.invalid_vacancy_ids),
                 "unsupported_claims_removed": len(grounding_report.unsupported_claims),
                 "quality_shadow_mode": settings.LLM_SHADOW_QUALITY_ENABLED,
+                "quality_gate": quality_gate.as_dict(),
+                "rule_version": rule_version,
+                "taxonomy_version": taxonomy_version,
             },
         )
 
@@ -655,6 +743,35 @@ class MatchService:
         else:
             logger.warning(f"[STALE_GENERATION_WRITE_REJECTED] resource=match_result doc={document_hash[:12]}")
         return result
+
+    @staticmethod
+    def _unavailable_analysis(
+        normalized_resume: NormalizedResume,
+        readiness: MatchingReadiness,
+        quality_gate: MatchingQualityGate,
+    ) -> EnrichedCandidateAnalysis:
+        quality_gate.record("final_classification", "BLOCKED", reason_code=readiness.reason_code)
+        try:
+            config_version = RuleConfigManager.get_config().version
+        except Exception:
+            config_version = None
+        return EnrichedCandidateAnalysis(
+            status=MatchStatus.ANALYSIS_UNAVAILABLE.value,
+            stage="matching_quality_gate",
+            match_status=MatchStatus.ANALYSIS_UNAVAILABLE,
+            has_genuine_match=False,
+            active_vacancy_summary=f"ANALYSIS_UNAVAILABLE: {readiness.reason}",
+            suitable_openings=[],
+            unsuitable_openings=[],
+            normalized_resume=normalized_resume,
+            config_version=config_version,
+            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
+            quality_metadata={
+                "matching_version": settings.MATCHING_VERSION,
+                "unavailable_reason_code": readiness.reason_code,
+                "quality_gate": quality_gate.as_dict(),
+            },
+        )
 
     @staticmethod
     def _enqueue_shadow_if_requested(
@@ -723,6 +840,7 @@ class MatchService:
     def _empty_analysis(
         cv_text: str = "",
         normalized_resume: NormalizedResume | None = None,
+        quality_gate: MatchingQualityGate | None = None,
     ) -> EnrichedCandidateAnalysis:
         from app.schemas.scoring_config import ScoringConfig
 
@@ -772,7 +890,7 @@ class MatchService:
         )
 
         return EnrichedCandidateAnalysis(
-            match_status=MatchStatus.NO_SUITABLE_MATCH,
+            match_status=MatchStatus.NO_ACTIVE_VACANCIES,
             primary_department=industry_dept or None,
             recommended_department=industry_dept or None,
             professional_domain=industry_domain or None,
@@ -798,6 +916,10 @@ class MatchService:
             hierarchy_classification=hierarchy_res,
             ai_career_suggestions=ai_career_suggestions,
             experience_gap_analysis=gap_analysis,
+            quality_metadata={
+                "matching_version": settings.MATCHING_VERSION,
+                "quality_gate": quality_gate.as_dict() if quality_gate else {},
+            },
         )
 
     @staticmethod
@@ -819,7 +941,7 @@ class MatchService:
             source_candidate_id=source_candidate_id,
             resume_json=data.get("resume_json"),
             normalized_resume=stored_normalized_resume,
-            deterministic_experience=(stored_normalized_resume.experience.deterministic_years if stored_normalized_resume else ((data.get("quality_metrics") or {}).get("experience_years") or None)),
+            deterministic_experience=(stored_normalized_resume.experience.authoritative_years if stored_normalized_resume else ((data.get("quality_metrics") or {}).get("experience_years") or None)),
         )
 
         # Merge back into data

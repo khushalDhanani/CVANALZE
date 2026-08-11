@@ -51,7 +51,10 @@ export function normalizeCanonicalMatchStatus(
   if (s === 'NO_SUITABLE_MATCH') {
     return 'NO_STRONG_MATCH';
   }
-  if (s === 'ANALYSIS_NOT_AVAILABLE' || s === 'ANALYSIS UNAVAILABLE' || s === 'N/A') {
+  if (s === 'ANALYSIS_UNAVAILABLE' || s === 'ANALYSIS UNAVAILABLE') {
+    return 'ANALYSIS_UNAVAILABLE';
+  }
+  if (s === 'ANALYSIS_NOT_AVAILABLE' || s === 'N/A') {
     return 'ANALYSIS_NOT_AVAILABLE';
   }
   if (s === 'PROCESSING' || s === 'IN_PROGRESS' || s === 'ANALYZING') {
@@ -121,13 +124,16 @@ export function getCanonicalMatchStatusMeta(
         isError: false,
       };
 
+    case 'ANALYSIS_UNAVAILABLE':
     case 'ANALYSIS_NOT_AVAILABLE':
       return {
         status,
         label: 'ANALYSIS UNAVAILABLE',
         tone: 'danger',
         icon: (c, s = 12) => <HelpCircle size={s} color={c} />,
-        description: 'Candidate record not found or analysis payload is missing.',
+        description: status === 'ANALYSIS_UNAVAILABLE'
+          ? 'Matching stopped because a required upstream dependency is unavailable.'
+          : 'Candidate record not found or analysis payload is missing.',
         isProcessing: false,
         isError: true,
       };

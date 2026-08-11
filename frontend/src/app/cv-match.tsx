@@ -35,6 +35,7 @@ import {
 import { COLORS } from '@/constants/colors';
 import { SUPPORTED_RESUME_FORMATS } from '@/constants/upload';
 import { getCvQueueStateMeta } from '@/utils/cvQueueState';
+import { resolveVacancyFitScore } from '@/utils/candidateDetail';
 
 const MAX_FILES_PER_SELECTION = 10;
 
@@ -461,7 +462,7 @@ export default function CvMatchScreen() {
                               />
                             )}
                             <ScoreBadge
-                              score={job.overall_score}
+                              score={resolveVacancyFitScore(job) ?? 0}
                               classification={job.classification}
                             />
                           </View>

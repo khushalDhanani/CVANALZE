@@ -16,6 +16,7 @@ from app.core.rule_config_manager import (
     ResumeQualityRules,
     ScoringParameters,
     ScoringRules,
+    TermMatching,
     TaxonomyCondition,
     TaxonomyRuleBranch,
     TaxonomyRules,
@@ -29,7 +30,7 @@ from app.core.rule_config_manager import (
 class SystemRuleConfigFactory:
     """Build the conservative, reviewable baseline used for first-time setup."""
 
-    VERSION = "system-default-v1"
+    VERSION = "system-default-v2"
 
     @classmethod
     def build(cls) -> UnifiedRuleConfig:
@@ -96,6 +97,23 @@ class SystemRuleConfigFactory:
         )
         return ScoringRules(
             match=MatchScoringRules(
+                term_matching=TermMatching(
+                    stop_phrases=["e.g", "eg", "e.g.", "etc", "etc.", "i.e", "i.e."],
+                    noise_words=[
+                        "programming", "language", "framework", "the", "systems", "principles",
+                        "write", "integrating", "with", "services", "backend", "of", "work",
+                        "working", "job", "service", "task", "role", "duty", "item", "helper",
+                    ],
+                    aliases={
+                        "widgets": ["widget", "widgets", "ui"],
+                        "navigation": ["navigation", "route", "routing", "maps", "gps", "directions"],
+                        "restful apis": ["api", "apis", "rest", "restful", "http"],
+                        "json": ["json", "payload"],
+                        "integrating with backend services": ["backend", "api", "apis", "firebase", "http"],
+                        "version control systems": ["git", "github", "gitlab", "versioning", "vcs"],
+                        "problem-solving": ["problem-solving", "problem solving"],
+                    },
+                ),
                 fallback_defaults=FallbackDefaults(
                     recommended_department="General Operations",
                     professional_domain="General Operations",

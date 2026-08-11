@@ -162,7 +162,10 @@ class VacancyService:
         else:
             title = f"Vacancy #{vacancy.VacancyRequestID}"
 
-        # Extract skills/keywords from Additional Knowledge (filtering garbage placeholders)
+        # RequestedAdditionalKnowledge is an unstructured advisory field. It can
+        # contain skills, prose, headings, and examples; the source schema does
+        # not declare the entries mandatory. Preserve useful terms for scoring,
+        # but never manufacture hard requirements from this free-text field.
         GARBAGE_SKILLS = {
             "-",
             ".",
@@ -177,6 +180,14 @@ class VacancyService:
             "0",
             "ok",
             "good",
+            "e.g",
+            "e.g.",
+            "i.e",
+            "i.e.",
+            "job overview",
+            "key responsibilities",
+            "responsibilities",
+            "requirements",
         }
         skills = []
         if vacancy.RequestedAdditionalKnowledge:
@@ -255,7 +266,7 @@ class VacancyService:
             job_description=job_desc,
             responsibilities=job_desc,
             required_skills=skills,
-            required_skills_are_mandatory=True,
+            required_skills_are_mandatory=False,
             preferred_keywords=[],
             min_experience_years=min_exp,
             max_experience_years=max_exp,

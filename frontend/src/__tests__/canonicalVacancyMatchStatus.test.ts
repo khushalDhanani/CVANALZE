@@ -69,9 +69,10 @@ test('4. NO_ACTIVE_VACANCIES: normalizes NO_ACTIVE_VACANCIES cleanly', () => {
   assertEquals(normalizeCanonicalMatchStatus('no_active_vacancies'), 'NO_ACTIVE_VACANCIES');
 });
 
-test('5. ANALYSIS_NOT_AVAILABLE: normalizes ANALYSIS_NOT_AVAILABLE and missing payload aliases', () => {
+test('5. ANALYSIS_NOT_AVAILABLE and ANALYSIS_UNAVAILABLE remain distinct', () => {
   assertEquals(normalizeCanonicalMatchStatus('ANALYSIS_NOT_AVAILABLE'), 'ANALYSIS_NOT_AVAILABLE');
-  assertEquals(normalizeCanonicalMatchStatus('ANALYSIS UNAVAILABLE'), 'ANALYSIS_NOT_AVAILABLE');
+  assertEquals(normalizeCanonicalMatchStatus('ANALYSIS UNAVAILABLE'), 'ANALYSIS_UNAVAILABLE');
+  assertEquals(normalizeCanonicalMatchStatus('ANALYSIS_UNAVAILABLE'), 'ANALYSIS_UNAVAILABLE');
   assertEquals(normalizeCanonicalMatchStatus('N/A'), 'ANALYSIS_NOT_AVAILABLE');
   assertEquals(normalizeCanonicalMatchStatus(null), 'NO_STRONG_MATCH');
   assertEquals(normalizeCanonicalMatchStatus(undefined), 'NO_STRONG_MATCH');
@@ -135,6 +136,13 @@ test('12. Metadata: ANALYSIS_NOT_AVAILABLE has danger tone and isError flag', ()
   assertEquals(meta.label, 'ANALYSIS UNAVAILABLE');
   assertEquals(meta.tone, 'danger');
   assertEquals(meta.isError, true);
+});
+
+test('12b. Metadata: ANALYSIS_UNAVAILABLE explains an upstream readiness failure', () => {
+  const meta = getCanonicalMatchStatusMeta('ANALYSIS_UNAVAILABLE');
+  assertEquals(meta.status, 'ANALYSIS_UNAVAILABLE');
+  assertEquals(meta.isError, true);
+  assertTrue(meta.description.includes('upstream dependency'));
 });
 
 test('13. Metadata: PROCESSING has info tone and isProcessing flag', () => {

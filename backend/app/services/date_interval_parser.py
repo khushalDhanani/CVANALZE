@@ -42,7 +42,7 @@ class DateIntervalParser:
     }
 
     RANGE_SPLIT_REGEX = re.compile(
-        r"(?:\s*(?:[–—~]|->|\bto\b|\btill\b|\buntil\b|\bthrough\b|\bbis\b|\ba\b)\s*|\s*[-–—]\s*|(?<=\d{4})-(?=\d{2,4})|(?<=\d{2}/\d{4})-(?=\d{2}/\d{4}))",
+        r"(?:\s*(?:[–—~]|->|\bto\b|\btill\b|\buntil\b|\bthrough\b|\bbis\b|\ba\b)\s*|\s+-\s+|(?<=\d{4})-(?=\d{4})|(?<=\d{2}/\d{4})-(?=\d{2}/\d{4}))",
         re.IGNORECASE,
     )
 
@@ -52,6 +52,19 @@ class DateIntervalParser:
             return False
         cleaned = text.strip().lower()
         return any(re.search(rf"\b{re.escape(kw)}\b", cleaned) for kw in cls.PRESENT_KEYWORDS)
+
+    @classmethod
+    def is_explicit_interval(cls, text: str | None) -> bool:
+        """Return whether text describes an employment interval rather than one date point."""
+        if not text or not text.strip():
+            return False
+        cleaned = text.strip().lower()
+        parts = cls.RANGE_SPLIT_REGEX.split(cleaned, maxsplit=1)
+        return (
+            (len(parts) >= 2 and bool(parts[0].strip()) and bool(parts[1].strip()))
+            or cls.is_present(cleaned)
+            or bool(re.search(r"\b(?:since|from|starting|as of)\b", cleaned))
+        )
 
     @classmethod
     def parse_date_point(cls, date_str: str, is_end_date: bool = False, ref_date: datetime | None = None) -> tuple[datetime | None, float]:
@@ -185,7 +198,7 @@ class DateIntervalParser:
         end_date, end_conf = None, 0.0
         is_current = cls.is_present(cleaned)
 
-        if len(parts) >= 2 and parts[0].strip() != parts[1].strip():
+        if len(parts) >= 2 and parts[0].strip() and parts[1].strip():
             start_date, start_conf = cls.parse_date_point(parts[0], is_end_date=False, ref_date=target_ref)
             end_date, end_conf = cls.parse_date_point(parts[1], is_end_date=True, ref_date=target_ref)
             if not is_current:

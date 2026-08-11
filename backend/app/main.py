@@ -119,13 +119,16 @@ async def health() -> JSONResponse:
     redis_status = _redis_health()
     rule_config_status = _rule_config_health()
     prompt_status = _prompt_health()
+    from app.repositories.department_domain import department_domain_repository
+
+    taxonomy_status = "online" if department_domain_repository.is_ready() else "configuration_required"
     ollama_status = "disabled"
     if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
         from app.services.llm_service import OllamaLLMService
 
         ollama_status = "online" if OllamaLLMService.check_health() else "offline"
 
-    dependency_statuses = (db_status, pg_status, redis_status, ollama_status, rule_config_status, prompt_status)
+    dependency_statuses = (db_status, pg_status, redis_status, ollama_status, rule_config_status, prompt_status, taxonomy_status)
     overall_status = "ok" if all(status in ("online", "disabled") for status in dependency_statuses) else "unhealthy"
     payload = {
         "status": overall_status,
@@ -136,6 +139,7 @@ async def health() -> JSONResponse:
         "ollama_llm": ollama_status,
         "rule_configuration": rule_config_status,
         "prompt_configuration": prompt_status,
+        "taxonomy_configuration": taxonomy_status,
     }
     return JSONResponse(status_code=200 if overall_status == "ok" else 503, content=payload)
 
