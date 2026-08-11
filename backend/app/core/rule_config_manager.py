@@ -215,16 +215,17 @@ class DomainEmbeddingRules(BaseModel):
 
 class WorkflowRules(BaseModel):
     allowed_job_states: list[str] = Field(
-        default_factory=lambda: ["QUEUED", "PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED", "UNKNOWN"]
+        default_factory=lambda: ["QUEUED", "PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED", "CANCELLED", "UNKNOWN"]
     )
     job_state_transitions: dict[str, list[str]] = Field(
         default_factory=lambda: {
-            "QUEUED": ["QUEUED", "PROCESSING", "RETRYING", "FAILED"],
-            "PROCESSING": ["PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED"],
-            "RETRYING": ["RETRYING", "PROCESSING", "FAILED"],
+            "QUEUED": ["QUEUED", "PROCESSING", "RETRYING", "FAILED", "CANCELLED"],
+            "PROCESSING": ["PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED", "CANCELLED"],
+            "RETRYING": ["RETRYING", "PROCESSING", "FAILED", "CANCELLED"],
             "COMPLETED": ["COMPLETED", "QUEUED"],
             "COMPLETED_DEGRADED": ["COMPLETED_DEGRADED", "QUEUED"],
             "FAILED": ["FAILED", "QUEUED"],
+            "CANCELLED": ["CANCELLED", "QUEUED"],
             "UNKNOWN": ["QUEUED", "FAILED"],
         }
     )
@@ -238,6 +239,13 @@ class WorkflowRules(BaseModel):
         if "COMPLETED_DEGRADED" not in processing_targets:
             processing_targets.append("COMPLETED_DEGRADED")
         self.job_state_transitions.setdefault("COMPLETED_DEGRADED", ["COMPLETED_DEGRADED", "QUEUED"])
+        if "CANCELLED" not in self.allowed_job_states:
+            self.allowed_job_states.append("CANCELLED")
+        for state in ("QUEUED", "PROCESSING", "RETRYING"):
+            targets = self.job_state_transitions.setdefault(state, [])
+            if "CANCELLED" not in targets:
+                targets.append("CANCELLED")
+        self.job_state_transitions.setdefault("CANCELLED", ["CANCELLED", "QUEUED"])
         return self
 
 

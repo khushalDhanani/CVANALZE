@@ -21,11 +21,16 @@ x-backend-environment: &backend-environment
   POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
   REDIS_URL: 'redis://redis:6379/0'
   RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
+  RQ_AUXILIARY_QUEUE_NAME: '${RQ_AUXILIARY_QUEUE_NAME:-default}'
+  RQ_SHADOW_QUEUE_NAME: '${RQ_SHADOW_QUEUE_NAME:-shadow_validation}'
+  CV_PROCESSING_CONCURRENCY: '1'
+  CV_QUEUE_MAX_SIZE: '${CV_QUEUE_MAX_SIZE:-1000}'
   RQ_WORKER_MAX_JOBS: '${RQ_WORKER_MAX_JOBS:-0}'
   RQ_JOB_TIMEOUT_SECONDS: '${RQ_JOB_TIMEOUT_SECONDS:-900}'
   RQ_RESULT_TTL_SECONDS: '${RQ_RESULT_TTL_SECONDS:-604800}'
   RQ_MAX_RETRIES: '${RQ_MAX_RETRIES:-2}'
   RQ_RETRY_INTERVAL_SECONDS: '${RQ_RETRY_INTERVAL_SECONDS:-30}'
+  RQ_MAINTENANCE_INTERVAL_SECONDS: '${RQ_MAINTENANCE_INTERVAL_SECONDS:-60}'
   SHADOW_MODE_ENABLED: '${SHADOW_MODE_ENABLED:-false}'
   BACKGROUND_SYNC_ENABLED: '${BACKGROUND_SYNC_ENABLED:-true}'
   BACKGROUND_SYNC_INTERVAL_SECONDS: '${BACKGROUND_SYNC_INTERVAL_SECONDS:-900}'
@@ -35,7 +40,6 @@ x-backend-environment: &backend-environment
   VALIDATION_METRICS_SNAPSHOT_INTERVAL_SECONDS: '${VALIDATION_METRICS_SNAPSHOT_INTERVAL_SECONDS:-86400}'
   PROCESSING_JOB_TTL_SECONDS: '${PROCESSING_JOB_TTL_SECONDS:-604800}'
   PROCESSING_JOB_LOCK_TIMEOUT_SECONDS: '${PROCESSING_JOB_LOCK_TIMEOUT_SECONDS:-1200}'
-  RQ_DEVELOPMENT_FALLBACK_ENABLED: "false"
   LLM_ENABLED: '${LLM_ENABLED:-true}'
   EMBEDDING_ENABLED: '${EMBEDDING_ENABLED:-true}'
   OLLAMA_BASE_URL: '${OLLAMA_BASE_URL:-http://host.docker.internal:11434}'
@@ -112,11 +116,28 @@ services:
       pgvector:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "rq info --url $$REDIS_URL >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "rq info $$RQ_QUEUE_NAME --url $$REDIS_URL >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  auxiliary-worker:
+    build: ./backend
+    container_name: cv_analyzer_auxiliary_worker
+    command: ["python", "start_aux_worker.py"]
+    environment: *backend-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - huggingface_cache:/root/.cache/huggingface
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      pgvector:
+        condition: service_healthy
 
   scheduler:
     build: ./backend
@@ -164,8 +185,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: cv_analyzer_redis
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
     ports:
       - "6380:6379"
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -177,5 +201,6 @@ services:
 
 volumes:
   pg_data:
+  redis_data:
   docling_cache:
   huggingface_cache:

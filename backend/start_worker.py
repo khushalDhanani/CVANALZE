@@ -8,29 +8,35 @@ if os.environ.get("OBJC_DISABLE_INITIALIZE_FORK_SAFETY") != "YES":
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
 from redis import Redis
-from rq import Queue, SimpleWorker
+from rq import Queue, Worker
 
 from app.core.config import settings
 from app.core.config_listener import start_config_invalidation_listener
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
+from app.services.processing_queue import handle_work_horse_killed
 
 
 def main():
-    logger.info("Starting RQ worker...")
+    if settings.CV_PROCESSING_CONCURRENCY != 1:
+        raise RuntimeError("CV_PROCESSING_CONCURRENCY must be 1.")
+    logger.info("Starting the single-slot RQ CV worker on queue '%s'.", settings.RQ_QUEUE_NAME)
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
     RuleConfigManager.load_config(tenant_id=None)
     start_config_invalidation_listener()
 
-    listen = list(dict.fromkeys([settings.RQ_QUEUE_NAME, "shadow_validation", "default"]))
-    queues = [Queue(name, connection=conn) for name in listen]
-    # RQ's default Worker ends each forked workhorse with os._exit(), which skips
-    # Python finalizers used by docling/PyTorch and leaks their semaphores. The
-    # process is already dedicated to this queue, so execute jobs in-process and
-    # allow normal cleanup instead of merely suppressing resource_tracker output.
-    worker = SimpleWorker(queues, connection=conn)
-    work_options: dict[str, bool | int] = {"with_scheduler": True}
+    queue = Queue(settings.RQ_QUEUE_NAME, connection=conn)
+    worker = Worker(
+        [queue],
+        connection=conn,
+        name=f"{settings.RQ_QUEUE_NAME}-worker-1",
+        work_horse_killed_handler=handle_work_horse_killed,
+    )
+    work_options: dict[str, bool | int] = {
+        "with_scheduler": True,
+        "maintenance_interval": settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
+    }
     if settings.RQ_WORKER_MAX_JOBS > 0:
         work_options["max_jobs"] = settings.RQ_WORKER_MAX_JOBS
     worker.work(**work_options)

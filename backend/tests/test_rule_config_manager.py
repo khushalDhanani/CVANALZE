@@ -233,6 +233,23 @@ def test_legacy_workflow_config_is_upgraded_with_degraded_completion_state():
     assert "COMPLETED_DEGRADED" in loaded.workflow.job_state_transitions["PROCESSING"]
     assert loaded.workflow.job_state_transitions["COMPLETED_DEGRADED"] == ["COMPLETED_DEGRADED", "QUEUED"]
 
+
+def test_legacy_workflow_config_is_upgraded_with_cancelled_state():
+    raw_dict = RuleConfigManager.get_config().model_dump()
+    candidate_dict = copy.deepcopy(raw_dict)
+    workflow = candidate_dict["workflow"]
+    workflow["allowed_job_states"].remove("CANCELLED")
+    workflow["job_state_transitions"]["QUEUED"].remove("CANCELLED")
+    workflow["job_state_transitions"]["PROCESSING"].remove("CANCELLED")
+    workflow["job_state_transitions"]["RETRYING"].remove("CANCELLED")
+    workflow["job_state_transitions"].pop("CANCELLED")
+
+    loaded = UnifiedRuleConfig.model_validate(candidate_dict)
+
+    assert "CANCELLED" in loaded.workflow.allowed_job_states
+    assert "CANCELLED" in loaded.workflow.job_state_transitions["QUEUED"]
+    assert loaded.workflow.job_state_transitions["CANCELLED"] == ["CANCELLED", "QUEUED"]
+
 def test_tenant_isolation_in_active_configs():
     raw_dict = RuleConfigManager.get_config().model_dump()
     tenant_a_dict = copy.deepcopy(raw_dict)

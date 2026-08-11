@@ -1,6 +1,97 @@
 # Work Status
 
 ## Last Completed Task
+**Frontend multi-CV queue experience**
+
+### Architecture Impact Analysis
+- Added a frontend-only queue presentation layer; Redis/RQ remains the sole authority for execution order and concurrency.
+- Preserved the existing detailed single-file upload, progress, result, re-analysis, and HR-review workflow.
+- Multi-file selections use independent backend job IDs and status polling without introducing frontend scheduling or processing logic.
+
+### Files Changed
+- Multi-file selection and queue presentation: `frontend/src/app/cv-match.tsx`.
+- Independent upload and polling state: `frontend/src/hooks/useCvQueueUploads.ts`.
+- Canonical frontend state mapping: `frontend/src/utils/cvQueueState.ts`.
+- Focused state-mapping coverage: `frontend/src/__tests__/cvQueueState.test.ts`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Preserve the current single-file experience and activate queue mode only when multiple CVs are selected.
+- Render all selected files immediately before submission starts.
+- Submit files sequentially in selection order and retain each returned `job_id` and `cv_key`.
+- Poll each accepted job independently and render Pending, Processing, Retrying, Completed, or Failed from backend state.
+
+### Code Changes
+- Web and native document pickers now support selecting up to 10 CVs.
+- Multi-file rows appear immediately and uploads are submitted sequentially to preserve deterministic enqueue order.
+- Each accepted CV retains its own tracking identifiers, progress, message, and non-overlapping polling timer.
+- Queue summary badges show live Processing, Pending, Retrying, Completed, and Failed counts.
+- HTTP 503 `CV_QUEUE_FULL`, cancellation, transient polling failures, and polling timeout are represented as terminal failed rows with safe messages.
+- Completed rows can be cleared after the batch reaches terminal state; the UI never promotes or starts jobs itself.
+
+### Verification Checklist
+- [x] Confirmed single-file selection still uses the existing detailed `useCvUpload` workflow.
+- [x] Confirmed multi-file rows are added before the first upload request awaits a response.
+- [x] Confirmed upload requests are serialized in picker order and status polling is independent per accepted job.
+- [x] Confirmed canonical backend states map to the required frontend labels.
+- [x] Confirmed polling timers are cleared on terminal state and component unmount.
+- [x] `git diff --check` passed.
+- [ ] Frontend tests/builds were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Extracted queue-state normalization and badge metadata into one reusable frontend utility.
+- Kept batch queue state separate from the existing single-upload hook to avoid regressions in detailed result rendering.
+
+## Previous Task
+**Production-grade single-worker Redis/RQ CV processing lane**
+
+### Architecture Impact Analysis
+- Centralized every runtime CV submission path on `ProcessingQueueService` and the single FIFO `cv-processing` queue without changing parsing, matching, scoring, persistence, or LLM behavior.
+- Isolated maintenance, shadow-validation, vacancy-embedding, and batch-coordinator work on auxiliary queues so those workers cannot consume CV jobs.
+- Replaced the in-process RQ fallback and queue-layer thread locks with RQ execution plus a Redis submission lock used only for cross-process idempotency and backpressure.
+- Added Redis AOF persistence and a production RQ worker with workhorse isolation, retry scheduling, crash callbacks, and 60-second registry maintenance.
+
+### Files Changed
+- Queue configuration and deployment: `backend/app/core/config.py`, `backend/start_worker.py`, `backend/start_aux_worker.py`, `backend/start_scheduler.py`, `docker-compose.yml`, `docker-compose.local.yml`.
+- Queue orchestration and state persistence: `backend/app/services/processing_queue.py`, `backend/app/repositories/processing_job.py`, `backend/app/schemas/contracts.py`, `backend/app/core/rule_config_manager.py`, `backend/app/schemas/cv.py`.
+- Submission paths: `backend/app/api/cv.py`, `backend/app/api/analysis.py`, `backend/app/api/candidates.py`, `backend/app/services/cv_service.py`, `backend/app/services/batch_processing_service.py`, `backend/app/core/tasks.py`, `backend/main.py`, `backend/scripts/reprocess_all_cvs.py`.
+- Frontend contract: `frontend/src/types/api.ts`, `frontend/src/services/cvService.ts`, `frontend/src/services/matchService.ts`, `frontend/src/hooks/useCvUpload.ts`.
+- Focused coverage: `backend/tests/test_aux_worker.py`, `backend/tests/test_background_sync_jobs.py`, `backend/tests/test_batch_job_processing.py`, `backend/tests/test_cv_status_resolution.py`, `backend/tests/test_phase0_contracts.py`, `backend/tests/test_phase4_background_processing.py`, `backend/tests/test_rule_config_manager.py`, `backend/tests/test_upload_service.py`, `backend/tests/test_worker_cleanup.py`.
+- `workstatus.md`.
+
+### Implementation Plan
+- Audit every Ollama and CV/RQ integration without changing the CV or LLM pipeline.
+- Enforce one named queue and one configured CV worker slot.
+- Make submissions idempotent, capacity-bounded, Redis-only, and immediately return canonical job IDs.
+- Persist and reconcile queued, processing, retrying, completed, failed, and cancelled states across crashes.
+- Isolate unrelated RQ work, add Redis durability, update frontend state contracts, and add focused regression coverage.
+
+### Code Changes
+- `CV_PROCESSING_CONCURRENCY` is validated as exactly `1`; `RQ_QUEUE_NAME` is fixed to `cv-processing` and the CV worker subscribes only to that queue.
+- RQ job uniqueness, a Redis submission lock, and content-addressed job records prevent concurrent duplicate enqueueing across API processes.
+- `CV_QUEUE_MAX_SIZE` counts ready, active, and delayed-retry jobs; new work receives HTTP 503 with `CV_QUEUE_FULL`, while an existing duplicate is returned even when full.
+- Removed all FastAPI background-task and in-process CV execution fallbacks. Directory scanning and administrative bulk reprocessing now submit through the canonical queue.
+- Added canonical `CANCELLED` state support, RQ retry/cancel/recovered-queue reconciliation, missing-job recovery, and workhorse-crash state handling.
+- Switched the CV worker from `SimpleWorker` to RQ `Worker` for process isolation and crash recovery; a fixed worker identity and deployment configuration preserve one CV slot.
+- Added a non-CV auxiliary worker for `default` and `shadow_validation`; recurring sync and batch coordination no longer occupy the CV queue.
+- Redis now uses a persistent volume with AOF and `appendfsync always` in both base and local Compose configurations.
+- Duplicate completed uploads return the existing result; frontend contracts expose job IDs/states and map queued, processing, retrying, failed, completed, and cancelled responses.
+
+### Verification Checklist
+- [x] Audited Ollama integrations and confirmed generation/embedding remain centralized and unchanged.
+- [x] Confirmed only `ProcessingQueueService` enqueues runtime jobs onto `cv-processing` and only the dedicated CV worker subscribes to it.
+- [x] Confirmed no FastAPI/in-process CV fallback or queue-layer thread lock remains.
+- [x] Added a ten-job FIFO/single-processing-state regression scenario plus idempotency, overload, crash, recovery, cancellation, and worker-isolation coverage.
+- [x] `git diff --check` passed.
+- [ ] Automated tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Containers were not rebuilt or restarted.
+
+### Refactoring Performed
+- Consolidated legacy directory and administrative reprocessing entry points onto the existing canonical queue service.
+- Split non-CV RQ work into an auxiliary worker without changing its business logic.
+- Removed obsolete API background-task parameters, in-process retry runner, and queue repository thread locks.
+
+## Previous Task
 **Recover missing RQ jobs that remain stuck in processing**
 
 ### Architecture Impact Analysis

@@ -31,12 +31,16 @@ class Settings(BaseSettings):
     STARTUP_CACHE_WARMUP_ENABLED: bool = True
     REDIS_URL: Optional[str] = None
     RQ_QUEUE_NAME: str = "cv-processing"
+    RQ_AUXILIARY_QUEUE_NAME: str = "default"
+    RQ_SHADOW_QUEUE_NAME: str = "shadow_validation"
+    CV_PROCESSING_CONCURRENCY: int = 1
+    CV_QUEUE_MAX_SIZE: int = 1000
     RQ_WORKER_MAX_JOBS: int = 0
     RQ_JOB_TIMEOUT_SECONDS: int = 900
     RQ_RESULT_TTL_SECONDS: int = 604800
     RQ_MAX_RETRIES: int = 2
     RQ_RETRY_INTERVAL_SECONDS: int = 30
-    RQ_DEVELOPMENT_FALLBACK_ENABLED: bool = True
+    RQ_MAINTENANCE_INTERVAL_SECONDS: int = 60
     BACKGROUND_SYNC_ENABLED: bool = True
     BACKGROUND_SYNC_INTERVAL_SECONDS: int = 900
     BACKGROUND_SYNC_JOB_TIMEOUT_SECONDS: int = 1800
@@ -208,6 +212,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> "Settings":
+        if self.RQ_QUEUE_NAME != "cv-processing":
+            raise ValueError("RQ_QUEUE_NAME must be 'cv-processing' for the CV processing lane.")
+        if self.CV_PROCESSING_CONCURRENCY != 1:
+            raise ValueError("CV_PROCESSING_CONCURRENCY must be 1; parallel CV execution is not supported.")
+        if self.CV_QUEUE_MAX_SIZE < 1:
+            raise ValueError("CV_QUEUE_MAX_SIZE must be at least 1.")
         if self.IS_PRODUCTION:
             if not self.REDIS_URL:
                 raise ValueError("REDIS_URL must be configured in production environments.")

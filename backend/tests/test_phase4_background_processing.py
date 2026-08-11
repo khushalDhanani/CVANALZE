@@ -15,18 +15,34 @@ from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.contracts import JobState, ProcessingExecutionMode
 from app.services import processing_queue
-from app.services.processing_queue import ProcessingQueueService, process_cv_job
+from app.services.processing_queue import (
+    ProcessingQueueFullError,
+    ProcessingQueueService,
+    ProcessingQueueUnavailableError,
+    handle_work_horse_killed,
+    process_cv_job,
+)
 from app.services.upload_service import StoredUpload, UploadService
 
 
 @pytest.fixture(autouse=True)
 def isolate_processing_jobs(monkeypatch):
     monkeypatch.setattr(processing_job_cache_manager, "_providers", [MemoryCache(max_size=100)])
-    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "development")
-    monkeypatch.setattr(settings, "RQ_DEVELOPMENT_FALLBACK_ENABLED", True)
     monkeypatch.setattr(settings, "RQ_MAX_RETRIES", 2)
     monkeypatch.setattr(settings, "RQ_RETRY_INTERVAL_SECONDS", 1)
-    ProcessingQueueService._local_locks.clear()
+    monkeypatch.setattr(settings, "CV_QUEUE_MAX_SIZE", 1000)
+    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
+    monkeypatch.setattr(ProcessingQueueService, "_submission_lock", classmethod(lambda _cls, *_args: nullcontext()))
+    monkeypatch.setattr(ProcessingQueueService, "_queue_load", staticmethod(lambda *_args: 0))
+
+    class FakeQueue:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def enqueue(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(processing_queue, "Queue", FakeQueue)
 
 
 def _submission_kwargs(content: bytes = b"phase-4-cv") -> dict[str, Any]:
@@ -42,25 +58,19 @@ def _submission_kwargs(content: bytes = b"phase-4-cv") -> dict[str, Any]:
 def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempotent(
     monkeypatch,
 ):
-    enqueued: list[str] = []
+    enqueued: list[tuple[str, dict[str, Any]]] = []
 
     class FakeQueue:
         def __init__(self, *_args, **_kwargs):
             pass
 
-        def enqueue(self, _function, processing_job_id, **_kwargs):
+        def enqueue(self, _function, processing_job_id, **kwargs):
             persisted = ProcessingJobRepository.get(processing_job_id)
             assert persisted is not None
             assert persisted.state == JobState.QUEUED
             assert persisted.execution_mode == ProcessingExecutionMode.RQ
-            enqueued.append(processing_job_id)
+            enqueued.append((processing_job_id, kwargs))
 
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
     monkeypatch.setattr(processing_queue, "Queue", FakeQueue)
 
     first = ProcessingQueueService.submit_upload(**_submission_kwargs())
@@ -68,33 +78,20 @@ def test_job_is_persisted_before_rq_enqueue_and_duplicate_submission_is_idempote
 
     assert first.record.job_id == second.record.job_id
     assert second.reused_existing_job is True
-    assert enqueued == [first.record.job_id]
+    assert [item[0] for item in enqueued] == [first.record.job_id]
+    assert enqueued[0][1]["unique"] is True
 
 
 def test_changed_content_gets_an_isolated_processing_job(monkeypatch):
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
-
     first = ProcessingQueueService.submit_upload(**_submission_kwargs(b"version-one"))
     second = ProcessingQueueService.submit_upload(**_submission_kwargs(b"version-two"))
 
     assert first.record.job_id != second.record.job_id
-    assert first.schedule_development_fallback is True
-    assert second.schedule_development_fallback is True
+    assert first.record.execution_mode == ProcessingExecutionMode.RQ
+    assert second.record.execution_mode == ProcessingExecutionMode.RQ
 
 
 def test_duplicate_force_reprocess_reuses_an_active_job(monkeypatch):
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
-
     first = ProcessingQueueService.submit_upload(**_submission_kwargs(), force_reprocess=True)
     second = ProcessingQueueService.submit_upload(**_submission_kwargs(), force_reprocess=True)
 
@@ -103,8 +100,6 @@ def test_duplicate_force_reprocess_reuses_an_active_job(monkeypatch):
 
 
 def test_missing_processing_rq_job_is_failed(monkeypatch):
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
     missing = ProcessingJobRepository.save(
         submission.record.model_copy(
@@ -127,8 +122,6 @@ def test_missing_processing_rq_job_is_failed(monkeypatch):
 
 
 def test_newly_queued_job_has_visibility_grace_when_rq_job_is_not_visible(monkeypatch):
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
     queued = ProcessingJobRepository.save(
         submission.record.model_copy(
@@ -145,9 +138,28 @@ def test_newly_queued_job_has_visibility_grace_when_rq_job_is_not_visible(monkey
     assert reconciled.state == JobState.QUEUED
 
 
+@pytest.mark.parametrize(
+    ("rq_status", "expected_state"),
+    [("queued", JobState.RETRYING), ("scheduled", JobState.RETRYING), ("canceled", JobState.CANCELLED)],
+)
+def test_rq_recovery_states_are_reflected_in_the_canonical_job(monkeypatch, rq_status, expected_state):
+    submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    processing = ProcessingJobRepository.save(submission.record.model_copy(update={"state": JobState.PROCESSING}))
+
+    class RQJob:
+        @staticmethod
+        def get_status(refresh=True):
+            assert refresh is True
+            return rq_status
+
+    monkeypatch.setattr(Job, "fetch", lambda *_args, **_kwargs: RQJob())
+
+    reconciled = ProcessingQueueService.reconcile_job(processing, connection=object())
+
+    assert reconciled.state == expected_state
+
+
 def test_duplicate_submission_requeues_a_missing_processing_job(monkeypatch):
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(ProcessingQueueService, "_job_lock", classmethod(lambda _cls, *_args: nullcontext()))
     first = ProcessingQueueService.submit_upload(**_submission_kwargs())
     ProcessingJobRepository.save(
         first.record.model_copy(
@@ -180,52 +192,87 @@ def test_duplicate_submission_requeues_a_missing_processing_job(monkeypatch):
     assert enqueued == [f"{retried.record.job_id}-2"]
 
 
-def test_redis_outage_uses_only_the_explicit_development_fallback(monkeypatch):
+def test_redis_outage_never_executes_cv_processing_in_fastapi(monkeypatch):
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
 
-    submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
-
-    assert submission.schedule_development_fallback is True
-    assert submission.record.execution_mode == ProcessingExecutionMode.DEVELOPMENT_FALLBACK
-    assert submission.record.state == JobState.QUEUED
+    with pytest.raises(ProcessingQueueUnavailableError, match="was not queued"):
+        ProcessingQueueService.submit_upload(**_submission_kwargs())
 
 
 def test_production_redis_outage_fails_instead_of_using_fastapi_background_tasks(
     monkeypatch,
 ):
-    from app.services.processing_queue import ProcessingQueueUnavailableError
-
-    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
-    monkeypatch.setattr(settings, "RQ_DEVELOPMENT_FALLBACK_ENABLED", False)
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
 
     with pytest.raises(ProcessingQueueUnavailableError):
         ProcessingQueueService.submit_upload(**_submission_kwargs())
 
     failed = ProcessingJobRepository.get_by_cv_key("cv_phase_4")
-    assert failed is not None
-    assert failed.state == JobState.FAILED
-    assert failed.stage == "enqueue"
+    assert failed is None
+
+
+def test_queue_capacity_rejects_new_work_but_reuses_duplicates(monkeypatch):
+    first = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    monkeypatch.setattr(ProcessingQueueService, "_queue_load", staticmethod(lambda *_args: settings.CV_QUEUE_MAX_SIZE))
+
+    duplicate = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    assert duplicate.record.job_id == first.record.job_id
+    assert duplicate.reused_existing_job is True
+
+    with pytest.raises(ProcessingQueueFullError, match="CV_QUEUE_FULL"):
+        ProcessingQueueService.submit_upload(**_submission_kwargs(b"queue-overflow"))
+
+
+def test_ten_cv_jobs_execute_fifo_with_only_one_processing_state(monkeypatch, tmp_path):
+    rq_order: list[str] = []
+
+    class OrderedQueue:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def enqueue(self, _function, processing_job_id, **_kwargs):
+            rq_order.append(processing_job_id)
+
+    monkeypatch.setattr(processing_queue, "Queue", OrderedQueue)
+    submissions = [
+        ProcessingQueueService.submit_upload(**_submission_kwargs(f"cv-{index}".encode("utf-8")))
+        for index in range(10)
+    ]
+    job_ids = [submission.record.job_id for submission in submissions]
+    assert rq_order == job_ids
+    assert all(ProcessingJobRepository.get(job_id).state == JobState.QUEUED for job_id in job_ids)
+
+    content_by_job = {submission.record.job_id: f"cv-{index}".encode("utf-8") for index, submission in enumerate(submissions)}
+
+    def load_source(**kwargs):
+        job_id = next(job_id for job_id in job_ids if ProcessingJobRepository.get(job_id).storage_filename == kwargs["storage_filename"])
+        content = content_by_job[job_id]
+        return StoredUpload(
+            safe_filename="phase_4.pdf",
+            storage_filename=kwargs["storage_filename"],
+            detected_content_type="application/pdf",
+            content=content,
+            path=Path(tmp_path / kwargs["storage_filename"]),
+        )
+
+    async def observe_single_lane(**kwargs):
+        states = [ProcessingJobRepository.get(job_id).state for job_id in job_ids]
+        assert states.count(JobState.PROCESSING) == 1
+        current_index = job_ids.index(kwargs["record"].job_id)
+        assert all(state == JobState.COMPLETED for state in states[:current_index])
+        assert all(state == JobState.QUEUED for state in states[current_index + 1:])
+        return {"status": "NEW_CV", "message": "complete"}
+
+    monkeypatch.setattr(UploadService, "load_reprocessable_upload", load_source)
+    monkeypatch.setattr(processing_queue, "_process_source", observe_single_lane)
+    for job_id in rq_order:
+        process_cv_job(job_id)
+
+    assert all(ProcessingJobRepository.get(job_id).state == JobState.COMPLETED for job_id in job_ids)
 
 
 def test_worker_revalidates_source_and_persists_completion(monkeypatch, tmp_path):
     content = b"phase-4-cv"
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs(content))
     source = StoredUpload(
         safe_filename="phase_4.pdf",
@@ -252,12 +299,6 @@ def test_worker_revalidates_source_and_persists_completion(monkeypatch, tmp_path
 
 def test_worker_exposes_postgres_persistence_failure_as_degraded_completion(monkeypatch, tmp_path):
     content = b"phase-4-cv"
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs(content))
     source = StoredUpload(
         safe_filename="phase_4.pdf",
@@ -314,12 +355,6 @@ def test_result_repository_marks_postgres_failure_and_keeps_fallback(monkeypatch
 
 def test_worker_marks_retry_state_before_rq_rethrows(monkeypatch):
     content = b"phase-4-cv"
-    monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: None))
-    monkeypatch.setattr(
-        ProcessingQueueService,
-        "_job_lock",
-        classmethod(lambda _cls, *_args: nullcontext()),
-    )
     submission = ProcessingQueueService.submit_upload(**_submission_kwargs(content))
     source = StoredUpload(
         safe_filename="phase_4.pdf",
@@ -342,6 +377,20 @@ def test_worker_marks_retry_state_before_rq_rethrows(monkeypatch):
     assert retrying is not None
     assert retrying.state == JobState.RETRYING
     assert retrying.attempt == 1
+    assert retrying.error is not None
+    assert retrying.error.retryable is True
+
+
+def test_workhorse_crash_marks_job_retrying_without_blocking_the_worker():
+    submission = ProcessingQueueService.submit_upload(**_submission_kwargs())
+    ProcessingJobRepository.transition(submission.record.job_id, JobState.PROCESSING)
+    rq_job = type("RQJob", (), {"args": (submission.record.job_id,), "retries_left": 1})()
+
+    handle_work_horse_killed(rq_job, 123, 9, None)
+
+    retrying = ProcessingJobRepository.get(submission.record.job_id)
+    assert retrying is not None
+    assert retrying.state == JobState.RETRYING
     assert retrying.error is not None
     assert retrying.error.retryable is True
 

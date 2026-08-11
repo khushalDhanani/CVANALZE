@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
@@ -18,9 +18,8 @@ from app.services.upload_service import UploadService, UploadValidationError
 router = APIRouter(prefix="/cv", tags=["CV"])
 
 
-@router.post("/upload", response_model=CVProcessingResponse)
+@router.post("/upload", response_model=CVUploadResponse | CVProcessingResponse)
 async def upload_cv(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     candidate_id: str | None = Form(None),
     cv_id: str | None = Form(None),
@@ -42,10 +41,10 @@ async def upload_cv(
                 cv_id=cv_id,
                 storage_filename=accepted.storage_filename,
             )
-            if submission.schedule_development_fallback:
-                from app.services.processing_queue import run_processing_job_fallback
-                background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
             ProcessingJobRepository.save(submission.record)
+
+            if submission.reused_existing_job and submission.record.state in ("COMPLETED", "COMPLETED_DEGRADED"):
+                return await get_cv_status(submission.record.cv_key)
 
         except Exception:
             if not accepted.was_already_stored:
@@ -110,6 +109,8 @@ async def get_cv_status(cv_key: str):
     """Get the status or result of a background CV processing job."""
     result = ResultRepository.resolve_result(cv_key)
     job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    if job:
+        job = ProcessingQueueService.reconcile_job(job)
     job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
     exec_mode_val = (job.execution_mode.value if hasattr(job.execution_mode, "value") else str(job.execution_mode)) if job else None
     if result:

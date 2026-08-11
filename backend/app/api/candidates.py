@@ -3,7 +3,7 @@ import asyncio
 import hashlib
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
@@ -114,7 +114,7 @@ def get_candidate_detail(candidate_id: str):
 
 
 @router.post("/{candidate_id}/reprocess", response_model=dict[str, Any])
-async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTasks):
+async def reprocess_candidate(candidate_id: str):
     """
     Invalidate and delete all existing cache entries related to candidate CV,
     preserve original CV file, and reprocess CV from scratch using latest pipeline.
@@ -225,9 +225,6 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
             cv_id=existing_result.get("cv_id"),
             storage_filename=retained_upload.storage_filename,
         )
-        if submission.schedule_development_fallback:
-            from app.services.processing_queue import run_processing_job_fallback
-            background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
     except ProcessingQueueUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

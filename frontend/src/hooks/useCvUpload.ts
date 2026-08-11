@@ -18,6 +18,19 @@ export interface FilePickerAsset {
 
 const TOTAL_STEPS = 8;
 
+function getProcessingStateLabel(response: CVProcessingResponse): string {
+  switch (response.job_state) {
+    case 'QUEUED':
+      return 'Pending';
+    case 'RETRYING':
+      return 'Retrying';
+    case 'PROCESSING':
+      return 'Processing';
+    default:
+      return '';
+  }
+}
+
 export function useCvUpload() {
   const [uploading, setUploading] = useState<boolean>(false);
   const [isComplete, setIsComplete] = useState<boolean>(false);
@@ -136,7 +149,7 @@ export function useCvUpload() {
                 (res as any).is_complete === true) &&
               resStatus !== 'PROCESSING';
 
-            if (resStatus === 'FAILED') {
+            if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
               stopPollTimer();
               stopTimer();
               setUploading(false);
@@ -197,7 +210,8 @@ export function useCvUpload() {
               ]);
             } else {
               const procRes = res as CVProcessingResponse;
-              const msg = procRes.message || 'Processing LLM match...';
+              const stateLabel = getProcessingStateLabel(procRes);
+              const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Processing LLM match...';
               setStatusMessage(msg);
 
               const stageMap: Record<string, number> = {
@@ -243,7 +257,7 @@ export function useCvUpload() {
                 (res as any).is_complete === true) &&
               resStatus !== 'PROCESSING';
 
-            if (resStatus === 'FAILED') {
+            if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
               stopPollTimer();
               stopTimer();
               setUploading(false);
@@ -299,7 +313,8 @@ export function useCvUpload() {
               ]);
             } else {
               const procRes = res as CVProcessingResponse;
-              const msg = procRes.message || 'Parsing CV...';
+              const stateLabel = getProcessingStateLabel(procRes);
+              const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Parsing CV...';
               setStatusMessage(msg);
 
               const stageMap: Record<string, number> = {
@@ -390,7 +405,7 @@ export function useCvUpload() {
             'pending',
             'pending',
           ]);
-          pollCvStatus(res.cv_key, true);
+          pollCvStatus((res as any).cv_key || (res as any).scan_id || (res as any).id, true);
         } else {
           const res = await cvService.uploadCv(file);
           setStatusMessage('Document uploaded. Validating format & parsing...');
@@ -405,7 +420,7 @@ export function useCvUpload() {
             'pending',
             'pending',
           ]);
-          pollCvStatus(res.cv_key, false);
+          pollCvStatus((res as any).cv_key || (res as any).scan_id || (res as any).id, false);
         }
       } catch (err: any) {
         stopTimer();

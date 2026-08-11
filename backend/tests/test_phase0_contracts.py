@@ -156,6 +156,7 @@ def test_compatibility_aliases_reference_existing_routes():
 
 def test_legacy_job_states_normalize_to_canonical_states():
     assert normalize_job_state("processing") == JobState.PROCESSING
+    assert normalize_job_state("canceled") == JobState.CANCELLED
     assert normalize_job_state("NEW_CV") == JobState.COMPLETED
     assert normalize_job_state("REPROCESSED") == JobState.COMPLETED
     assert normalize_job_state("CACHE_HIT") == JobState.COMPLETED

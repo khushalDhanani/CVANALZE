@@ -48,8 +48,8 @@ def test_scheduler_registers_sync_and_validation_snapshot_jobs(monkeypatch):
         background_tasks.run_integration_sync,
         background_tasks.snapshot_validation_metrics,
     ]
-    assert scheduler.registrations[0][1]["queue_name"] == settings.RQ_QUEUE_NAME
-    assert scheduler.registrations[1][1]["queue_name"] == "shadow_validation"
+    assert scheduler.registrations[0][1]["queue_name"] == settings.RQ_AUXILIARY_QUEUE_NAME
+    assert scheduler.registrations[1][1]["queue_name"] == settings.RQ_SHADOW_QUEUE_NAME
 
 
 def test_canonical_sync_runs_all_snapshot_services(monkeypatch):

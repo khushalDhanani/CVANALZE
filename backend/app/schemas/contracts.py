@@ -21,6 +21,7 @@ class JobState:
     COMPLETED = "COMPLETED"
     COMPLETED_DEGRADED = "COMPLETED_DEGRADED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
     UNKNOWN = "UNKNOWN"
 
 
@@ -66,6 +67,8 @@ LEGACY_JOB_STATE_ALIASES: dict[str, str] = {
     "CACHE_HIT": JobState.COMPLETED,
     "FAILED": JobState.FAILED,
     "ERROR": JobState.FAILED,
+    "CANCELLED": JobState.CANCELLED,
+    "CANCELED": JobState.CANCELLED,
 }
 
 
@@ -78,6 +81,8 @@ def normalize_job_state(
     normalized = str(status or "").strip().upper()
     if normalized in ("FAILED", "ERROR"):
         return JobState.FAILED
+    if normalized in ("CANCELLED", "CANCELED"):
+        return JobState.CANCELLED
     if normalized == JobState.COMPLETED_DEGRADED:
         return JobState.COMPLETED_DEGRADED
     if is_complete is True:
@@ -164,6 +169,7 @@ class JobStateResponse(BaseModel):
             JobState.COMPLETED: "COMPLETED",
             JobState.COMPLETED_DEGRADED: "COMPLETED_DEGRADED",
             JobState.FAILED: "FAILED",
+            JobState.CANCELLED: "CANCELLED",
             JobState.UNKNOWN: "processing",
         }[self.state]
         payload: dict[str, Any] = {

@@ -26,11 +26,11 @@ def test_batch_submission_enqueues_one_rq_coordinator(monkeypatch):
     enqueued = []
 
     class FakeQueue:
-        def __init__(self, *_args, **_kwargs):
-            pass
+        def __init__(self, name, *_args, **_kwargs):
+            self.name = name
 
         def enqueue(self, function, batch_job_id, **options):
-            enqueued.append((function, batch_job_id, options))
+            enqueued.append((self.name, function, batch_job_id, options))
 
     monkeypatch.setattr(ProcessingQueueService, "_redis_connection", staticmethod(lambda: object()))
     monkeypatch.setattr(batch_processing_service, "Queue", FakeQueue)
@@ -39,8 +39,9 @@ def test_batch_submission_enqueues_one_rq_coordinator(monkeypatch):
 
     assert record.state == "QUEUED"
     assert len(enqueued) == 1
-    assert enqueued[0][0] is process_batch_job
-    assert enqueued[0][1] == record.batch_job_id
+    assert enqueued[0][0] == settings.RQ_AUXILIARY_QUEUE_NAME
+    assert enqueued[0][1] is process_batch_job
+    assert enqueued[0][2] == record.batch_job_id
 
 
 def test_batch_worker_queues_binary_cv_through_standard_processing_pipeline(monkeypatch, tmp_path):
@@ -97,7 +98,6 @@ def test_batch_worker_queues_binary_cv_through_standard_processing_pipeline(monk
         lambda **kwargs: submitted.append(kwargs)
         or SimpleNamespace(
             record=SimpleNamespace(job_id="cv_job_42"),
-            schedule_development_fallback=False,
         ),
     )
 

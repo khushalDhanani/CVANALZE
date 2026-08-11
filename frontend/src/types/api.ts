@@ -109,6 +109,10 @@ export interface CVProcessingResponse {
   is_complete?: boolean;
   failed_step?: string | null;
   error_details?: string | null;
+  job_id?: string | null;
+  job_state?: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED' | null;
+  execution_mode?: 'RQ' | string | null;
+  retry_count?: number | null;
   stage_durations_ms?: Record<string, number>;
   persistence_status?: 'durable' | 'degraded' | string | null;
   persistence_error?: string | null;

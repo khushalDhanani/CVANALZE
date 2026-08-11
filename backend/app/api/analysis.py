@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import timezone, datetime
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
@@ -64,9 +64,8 @@ async def analyze_cv_text(payload: CVMatchRequest):
         raise HTTPException(status_code=500, detail="An internal error occurred during CV analysis.") from exc
 
 
-@router.post("/upload", response_model=CVProcessingResponse)
+@router.post("/upload", response_model=EnrichedCandidateAnalysis | CVProcessingResponse)
 async def upload_and_analyze(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ):
     """Upload CV, parse with Docling, and perform LLM-enriched semantic matching in background."""
@@ -84,10 +83,10 @@ async def upload_and_analyze(
                 content_type=accepted.detected_content_type,
                 storage_filename=accepted.storage_filename,
             )
-            if submission.schedule_development_fallback:
-                from app.services.processing_queue import run_processing_job_fallback
-                background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
             ProcessingJobRepository.save(submission.record)
+
+            if submission.reused_existing_job and submission.record.state in ("COMPLETED", "COMPLETED_DEGRADED"):
+                return await get_match_status(submission.record.cv_key)
 
         except Exception:
             if not accepted.was_already_stored:

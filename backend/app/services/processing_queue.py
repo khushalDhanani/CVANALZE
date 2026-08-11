@@ -1,8 +1,6 @@
 from __future__ import annotations
 import asyncio
 import hashlib
-import threading
-import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -11,6 +9,7 @@ from typing import Any
 
 from redis import Redis
 from rq import Queue, Retry
+from rq.registry import ScheduledJobRegistry, StartedJobRegistry
 
 from app.core.config import settings
 from app.core.cv_identity import normalize_source_candidate_id
@@ -32,10 +31,13 @@ class ProcessingQueueUnavailableError(RuntimeError):
     pass
 
 
+class ProcessingQueueFullError(ProcessingQueueUnavailableError):
+    pass
+
+
 @dataclass(frozen=True)
 class QueueSubmission:
     record: ProcessingJobRecord
-    schedule_development_fallback: bool = False
     reused_existing_job: bool = False
 
 
@@ -43,9 +45,7 @@ class ProcessingQueueService:
     """Persist, enqueue, and execute content-addressed CV processing jobs."""
 
     _RQ_ENQUEUE_VISIBILITY_GRACE_SECONDS = 30
-    _local_locks: dict[str, threading.Lock] = {}
-    _local_locks_guard = threading.Lock()
-    _MAX_LOCAL_LOCKS = 1000
+    _SUBMISSION_LOCK_KEY = "lock:cv-processing:submission"
 
     @classmethod
     def submit_upload(
@@ -63,13 +63,19 @@ class ProcessingQueueService:
     ) -> QueueSubmission:
         job_id = ProcessingJobRepository.build_job_id(cv_key, content_hash)
         connection = cls._redis_connection()
+        if connection is None:
+            raise ProcessingQueueUnavailableError("Redis/RQ is unavailable; CV processing was not queued.")
 
-        with cls._job_lock(f"submit:{job_id}", connection):
+        with cls._submission_lock(connection):
             existing = ProcessingJobRepository.get(job_id)
             if existing:
                 existing = cls.reconcile_job(existing, connection=connection)
             if cls._can_reuse(existing, force_reprocess=force_reprocess):
                 return QueueSubmission(record=existing, reused_existing_job=True)
+
+            queue = Queue(settings.RQ_QUEUE_NAME, connection=connection)
+            if cls._queue_load(queue, connection) >= settings.CV_QUEUE_MAX_SIZE:
+                raise ProcessingQueueFullError("CV_QUEUE_FULL")
 
             enqueue_count = (existing.enqueue_count if existing else 0) + 1
             record = ProcessingJobRecord(
@@ -96,63 +102,51 @@ class ProcessingQueueService:
             )
             record = ProcessingJobRepository.save(record)
 
-            if connection is not None:
-                try:
-                    rq_job_id = f"{job_id}-{enqueue_count}"
-                    record = ProcessingJobRepository.save(
-                        record.model_copy(
-                            update={
-                                "execution_mode": ProcessingExecutionMode.RQ,
-                                "rq_job_id": rq_job_id,
-                                "message": "10% - CV processing is queued in RQ.",
-                            }
-                        )
-                    )
-                    enqueue_options: dict[str, Any] = {
-                        "job_id": rq_job_id,
-                        "job_timeout": settings.RQ_JOB_TIMEOUT_SECONDS,
-                        "result_ttl": settings.RQ_RESULT_TTL_SECONDS,
-                    }
-                    if settings.RQ_MAX_RETRIES > 0:
-                        enqueue_options["retry"] = Retry(
-                            max=settings.RQ_MAX_RETRIES,
-                            interval=max(0, settings.RQ_RETRY_INTERVAL_SECONDS),
-                        )
-                    Queue(settings.RQ_QUEUE_NAME, connection=connection).enqueue(
-                        process_cv_job,
-                        job_id,
-                        **enqueue_options,
-                    )
-                    return QueueSubmission(record=record)
-                except Exception as exc:
-                    logger.warning(f"RQ enqueue failed for '{job_id}': {exc}")
-
-            if cls._development_fallback_allowed():
+            try:
+                rq_job_id = f"{job_id}-{enqueue_count}"
                 record = ProcessingJobRepository.save(
                     record.model_copy(
                         update={
-                            "execution_mode": ProcessingExecutionMode.DEVELOPMENT_FALLBACK,
-                            "message": "10% - Redis unavailable; queued in explicit development fallback.",
+                            "execution_mode": ProcessingExecutionMode.RQ,
+                            "rq_job_id": rq_job_id,
+                            "message": "10% - CV processing is queued in RQ.",
                         }
                     )
                 )
-                logger.warning(f"Using development background fallback for processing job '{job_id}'.")
-                return QueueSubmission(record=record, schedule_development_fallback=True)
-
-            error = CanonicalError(
-                code=ErrorCode.DEPENDENCY_UNAVAILABLE,
-                message="Redis/RQ is unavailable and the development fallback is disabled.",
-                retryable=True,
-            )
-            ProcessingJobRepository.transition(
-                job_id,
-                JobState.FAILED,
-                progress=100,
-                stage="enqueue",
-                message=error.message,
-                error=error,
-            )
-            raise ProcessingQueueUnavailableError(error.message)
+                enqueue_options: dict[str, Any] = {
+                    "job_id": rq_job_id,
+                    "job_timeout": settings.RQ_JOB_TIMEOUT_SECONDS,
+                    "result_ttl": settings.RQ_RESULT_TTL_SECONDS,
+                    "failure_ttl": settings.RQ_RESULT_TTL_SECONDS,
+                    "unique": True,
+                }
+                if settings.RQ_MAX_RETRIES > 0:
+                    enqueue_options["retry"] = Retry(
+                        max=settings.RQ_MAX_RETRIES,
+                        interval=max(0, settings.RQ_RETRY_INTERVAL_SECONDS),
+                    )
+                queue.enqueue(
+                    process_cv_job,
+                    job_id,
+                    **enqueue_options,
+                )
+                return QueueSubmission(record=record)
+            except Exception as exc:
+                logger.exception(f"RQ enqueue failed for '{job_id}': {type(exc).__name__}")
+                error = CanonicalError(
+                    code=ErrorCode.DEPENDENCY_UNAVAILABLE,
+                    message="Redis/RQ rejected the CV processing job.",
+                    retryable=True,
+                )
+                ProcessingJobRepository.transition(
+                    job_id,
+                    JobState.FAILED,
+                    progress=100,
+                    stage="enqueue",
+                    message=error.message,
+                    error=error,
+                )
+                raise ProcessingQueueUnavailableError(error.message) from exc
 
     @staticmethod
     def legacy_status_payload(record: ProcessingJobRecord) -> dict[str, Any]:
@@ -160,6 +154,7 @@ class ProcessingQueueService:
             JobState.COMPLETED: "COMPLETED",
             JobState.COMPLETED_DEGRADED: "COMPLETED_DEGRADED",
             JobState.FAILED: "FAILED",
+            JobState.CANCELLED: "CANCELLED",
         }.get(record.state, "processing")
         return {
             "message": record.message,
@@ -194,7 +189,39 @@ class ProcessingQueueService:
             from rq.job import Job, NoSuchJobError
             try:
                 rq_job = Job.fetch(record.rq_job_id, connection=connection)
-                if rq_job.get_status() == "failed":
+                raw_rq_status = rq_job.get_status(refresh=True)
+                rq_status = str(getattr(raw_rq_status, "value", raw_rq_status)).lower()
+                if rq_status == "started" and record.state != JobState.PROCESSING:
+                    return ProcessingJobRepository.transition(
+                        record.job_id,
+                        JobState.PROCESSING,
+                        progress=max(15, record.progress),
+                        stage="worker_started",
+                        message="CV processing worker started the job.",
+                    )
+                if rq_status == "scheduled" and record.state != JobState.RETRYING:
+                    return ProcessingJobRepository.transition(
+                        record.job_id,
+                        JobState.RETRYING,
+                        stage="retry_wait",
+                        message="CV processing is waiting for its next RQ retry.",
+                    )
+                if rq_status == "queued" and record.state == JobState.PROCESSING:
+                    return ProcessingJobRepository.transition(
+                        record.job_id,
+                        JobState.RETRYING,
+                        stage="recovered_queue",
+                        message="CV processing was recovered and is waiting in the RQ queue.",
+                    )
+                if rq_status in ("canceled", "cancelled", "stopped"):
+                    return ProcessingJobRepository.transition(
+                        record.job_id,
+                        JobState.CANCELLED,
+                        progress=100,
+                        stage="cancelled",
+                        message="CV processing was cancelled.",
+                    )
+                if rq_status == "failed":
                     error_msg = str(rq_job.exc_info or "CV processing failed due to unexpected worker termination.")
                     error = CanonicalError(
                         code=ErrorCode.PROCESSING_FAILED,
@@ -253,19 +280,9 @@ class ProcessingQueueService:
             return existing.execution_mode != ProcessingExecutionMode.PENDING
         if force_reprocess:
             return False
-        if existing.state == JobState.COMPLETED:
+        if existing.state in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED):
             return ResultRepository.resolve_result(existing.cv_key) is not None
         return False
-
-    @staticmethod
-    def _development_fallback_allowed() -> bool:
-        environment = settings.APP_ENVIRONMENT.strip().lower()
-        return settings.RQ_DEVELOPMENT_FALLBACK_ENABLED and environment in {
-            "dev",
-            "development",
-            "local",
-            "test",
-        }
 
     @staticmethod
     def _redis_connection() -> Redis | None:
@@ -284,37 +301,35 @@ class ProcessingQueueService:
             return None
 
     @classmethod
-    def _get_local_lock(cls, key: str) -> threading.Lock:
-        with cls._local_locks_guard:
-            if key not in cls._local_locks:
-                if len(cls._local_locks) >= cls._MAX_LOCAL_LOCKS:
-                    cls._local_locks.pop(next(iter(cls._local_locks)), None)
-                cls._local_locks[key] = threading.Lock()
-            return cls._local_locks[key]
-
-    @classmethod
     @contextmanager
-    def _job_lock(cls, key: str, connection: Redis | None = None) -> Iterator[None]:
-        redis_lock = None
-        if connection is not None:
-            redis_lock = connection.lock(
-                f"lock:processing-job:{key}",
-                timeout=settings.PROCESSING_JOB_LOCK_TIMEOUT_SECONDS,
-                blocking_timeout=10,
-            )
-            if not redis_lock.acquire(blocking=True):
-                raise ProcessingQueueUnavailableError(f"Processing lock for '{key}' is busy.")
-
-        local_lock = cls._get_local_lock(key)
-        with local_lock:
+    def _submission_lock(cls, connection: Redis) -> Iterator[None]:
+        lock = connection.lock(
+            cls._SUBMISSION_LOCK_KEY,
+            timeout=settings.PROCESSING_JOB_LOCK_TIMEOUT_SECONDS,
+            blocking_timeout=10,
+        )
+        try:
+            acquired = lock.acquire(blocking=True)
+        except Exception as exc:
+            raise ProcessingQueueUnavailableError("Redis/RQ is unavailable; CV processing was not queued.") from exc
+        if not acquired:
+            raise ProcessingQueueUnavailableError("CV queue submission is temporarily busy.")
+        try:
+            yield
+        finally:
             try:
-                yield
-            finally:
-                if redis_lock is not None:
-                    try:
-                        redis_lock.release()
-                    except Exception as exc:
-                        logger.warning(f"Could not release processing lock '{key}': {exc}")
+                lock.release()
+            except Exception as exc:
+                logger.warning(f"Could not release the CV queue submission lock: {exc}")
+
+    @staticmethod
+    def _queue_load(queue: Queue, connection: Redis) -> int:
+        try:
+            started = StartedJobRegistry(queue.name, connection=connection).count
+            scheduled = ScheduledJobRegistry(queue.name, connection=connection).count
+            return len(queue) + started + scheduled
+        except Exception as exc:
+            raise ProcessingQueueUnavailableError("Redis/RQ queue capacity is unavailable.") from exc
 
 
 def process_cv_job(job_id: str) -> dict[str, Any]:
@@ -322,100 +337,96 @@ def process_cv_job(job_id: str) -> dict[str, Any]:
     record = ProcessingJobRepository.get(job_id)
     if record is None:
         raise LookupError(f"Processing job '{job_id}' was not found.")
-    connection = ProcessingQueueService._redis_connection()
+    if record.state == JobState.COMPLETED and ResultRepository.resolve_result(record.cv_key):
+        return {"job_id": job_id, "status": JobState.COMPLETED}
+    if record.state == JobState.CANCELLED:
+        return {"job_id": job_id, "status": JobState.CANCELLED}
 
-    with ProcessingQueueService._job_lock(f"execute:{job_id}", connection):
-        record = ProcessingJobRepository.get(job_id)
-        if record is None:
-            raise LookupError(f"Processing job '{job_id}' was not found.")
-        if record.state == JobState.COMPLETED and ResultRepository.resolve_result(record.cv_key):
-            return {"job_id": job_id, "status": JobState.COMPLETED}
+    attempt = record.attempt + 1
+    ProcessingJobRepository.transition(
+        job_id,
+        JobState.PROCESSING,
+        attempt=attempt,
+        progress=max(15, record.progress),
+        stage="source_validation",
+        message=f"Processing attempt {attempt} of {record.max_attempts}.",
+        error=None,
+        completed_at=None,
+    )
 
-        attempt = record.attempt + 1
+    try:
+        source = UploadService.load_reprocessable_upload(
+            storage_filename=record.storage_filename,
+            original_filename=record.filename,
+            cv_key=record.cv_key,
+        )
+        if source is None:
+            raise FileNotFoundError("The retained source CV is unavailable for processing.")
+        source_hash = hashlib.sha256(source.content).hexdigest()
+        if source_hash != record.content_hash:
+            raise ValueError("The retained source CV no longer matches the queued content identity.")
+
+        result = asyncio.run(
+            _process_source(
+                record=record,
+                filename=source.safe_filename,
+                content=source.content,
+                content_type=source.detected_content_type,
+                storage_filename=source.storage_filename,
+            )
+        )
+        raw_outcome = str(result.get("original_status") or result.get("status") or "").upper()
+        try:
+            outcome = ProcessingOutcome(raw_outcome)
+        except ValueError:
+            outcome = None
+        persistence_degraded = (
+            result.get("persistence_status") == ResultRepository.PERSISTENCE_DEGRADED
+            or str(result.get("status") or "").upper() == JobState.COMPLETED_DEGRADED
+        )
+        completed_state = JobState.COMPLETED_DEGRADED if persistence_degraded else JobState.COMPLETED
+        persistence_error = None
+        if persistence_degraded:
+            persistence_error = CanonicalError(
+                code=ErrorCode.DEPENDENCY_UNAVAILABLE,
+                message=ResultRepository.PERSISTENCE_ERROR_MESSAGE,
+                retryable=True,
+            )
         ProcessingJobRepository.transition(
             job_id,
-            JobState.PROCESSING,
-            attempt=attempt,
-            progress=max(15, record.progress),
-            stage="source_validation",
-            message=f"Processing attempt {attempt} of {record.max_attempts}.",
-            error=None,
-            completed_at=None,
+            completed_state,
+            progress=100,
+            stage="complete_degraded" if persistence_degraded else "complete",
+            message=(
+                "CV processing completed, but PostgreSQL result persistence failed."
+                if persistence_degraded
+                else result.get("message") or "100% - CV processing complete."
+            ),
+            outcome=outcome,
+            error=persistence_error,
         )
-
-        try:
-            source = UploadService.load_reprocessable_upload(
-                storage_filename=record.storage_filename,
-                original_filename=record.filename,
-                cv_key=record.cv_key,
-            )
-            if source is None:
-                raise FileNotFoundError("The retained source CV is unavailable for processing.")
-            source_hash = hashlib.sha256(source.content).hexdigest()
-            if source_hash != record.content_hash:
-                raise ValueError("The retained source CV no longer matches the queued content identity.")
-
-            result = asyncio.run(
-                _process_source(
-                    record=record,
-                    filename=source.safe_filename,
-                    content=source.content,
-                    content_type=source.detected_content_type,
-                    storage_filename=source.storage_filename,
-                )
-            )
-            raw_outcome = str(result.get("original_status") or result.get("status") or "").upper()
-            try:
-                outcome = ProcessingOutcome(raw_outcome)
-            except ValueError:
-                outcome = None
-            persistence_degraded = (
-                result.get("persistence_status") == ResultRepository.PERSISTENCE_DEGRADED
-                or str(result.get("status") or "").upper() == JobState.COMPLETED_DEGRADED
-            )
-            completed_state = JobState.COMPLETED_DEGRADED if persistence_degraded else JobState.COMPLETED
-            persistence_error = None
-            if persistence_degraded:
-                persistence_error = CanonicalError(
-                    code=ErrorCode.DEPENDENCY_UNAVAILABLE,
-                    message=ResultRepository.PERSISTENCE_ERROR_MESSAGE,
-                    retryable=True,
-                )
-            ProcessingJobRepository.transition(
-                job_id,
-                completed_state,
-                progress=100,
-                stage="complete_degraded" if persistence_degraded else "complete",
-                message=(
-                    "CV processing completed, but PostgreSQL result persistence failed."
-                    if persistence_degraded
-                    else result.get("message") or "100% - CV processing complete."
-                ),
-                outcome=outcome,
-                error=persistence_error,
-            )
-            return result
-        except Exception as exc:
-            logger.exception(f"Processing job '{job_id}' failed on attempt {attempt}: {type(exc).__name__}")
-            current = ProcessingJobRepository.get(job_id) or record
-            will_retry = attempt < current.max_attempts
-            state = JobState.RETRYING if will_retry else JobState.FAILED
-            error = CanonicalError(
-                code=ErrorCode.PROCESSING_FAILED,
-                message="CV processing failed during background execution.",
-                retryable=will_retry,
-            )
-            ProcessingJobRepository.transition(
-                job_id,
-                state,
-                progress=current.progress if will_retry else 100,
-                stage="retry_wait" if will_retry else "failed",
-                message=(f"Processing attempt {attempt} failed; waiting to retry." if will_retry else f"CV processing failed after {attempt} attempt(s)."),
-                error=error,
-            )
-            if not will_retry:
-                UploadService.cleanup_after_processing(record.storage_filename, succeeded=False)
-            raise
+        return result
+    except Exception as exc:
+        logger.exception(f"Processing job '{job_id}' failed on attempt {attempt}: {type(exc).__name__}")
+        current = ProcessingJobRepository.get(job_id) or record
+        will_retry = attempt < current.max_attempts
+        state = JobState.RETRYING if will_retry else JobState.FAILED
+        error = CanonicalError(
+            code=ErrorCode.PROCESSING_FAILED,
+            message="CV processing failed during background execution.",
+            retryable=will_retry,
+        )
+        ProcessingJobRepository.transition(
+            job_id,
+            state,
+            progress=current.progress if will_retry else 100,
+            stage="retry_wait" if will_retry else "failed",
+            message=(f"Processing attempt {attempt} failed; waiting to retry." if will_retry else f"CV processing failed after {attempt} attempt(s)."),
+            error=error,
+        )
+        if not will_retry:
+            UploadService.cleanup_after_processing(record.storage_filename, succeeded=False)
+        raise
 
 
 async def _process_source(
@@ -440,14 +451,25 @@ async def _process_source(
     )
 
 
-def run_processing_job_fallback(job_id: str) -> None:
-    """Development-only in-process runner with the same persisted retry states as RQ."""
-    while True:
-        try:
-            process_cv_job(job_id)
-            return
-        except Exception:
-            record = ProcessingJobRepository.get(job_id)
-            if record is None or record.state != JobState.RETRYING:
-                return
-            time.sleep(max(0, settings.RQ_RETRY_INTERVAL_SECONDS))
+def handle_work_horse_killed(job, _retpid, _ret_val, _rusage) -> None:
+    """Persist an RQ workhorse crash without preventing the worker from taking the next CV."""
+    if not job.args:
+        return
+    job_id = str(job.args[0])
+    record = ProcessingJobRepository.get(job_id)
+    if record is None or record.state not in (JobState.PROCESSING, JobState.RETRYING):
+        return
+    will_retry = bool(getattr(job, "retries_left", 0))
+    error = CanonicalError(
+        code=ErrorCode.PROCESSING_FAILED,
+        message="The CV processing workhorse terminated unexpectedly.",
+        retryable=will_retry,
+    )
+    ProcessingJobRepository.transition(
+        job_id,
+        JobState.RETRYING if will_retry else JobState.FAILED,
+        progress=record.progress if will_retry else 100,
+        stage="retry_wait" if will_retry else "worker_crash",
+        message="CV processing will retry after a worker crash." if will_retry else "CV processing failed after a worker crash.",
+        error=error,
+    )

@@ -42,7 +42,7 @@ class BatchProcessingService:
                     max=settings.RQ_MAX_RETRIES,
                     interval=max(0, settings.RQ_RETRY_INTERVAL_SECONDS),
                 )
-            Queue(settings.RQ_QUEUE_NAME, connection=connection).enqueue(process_batch_job, batch_job_id, **enqueue_options)
+            Queue(settings.RQ_AUXILIARY_QUEUE_NAME, connection=connection).enqueue(process_batch_job, batch_job_id, **enqueue_options)
             return record
         except Exception as exc:
             logger.exception(f"Failed to enqueue batch job '{batch_job_id}': {type(exc).__name__}")
@@ -216,8 +216,6 @@ def process_batch_job(batch_job_id: str) -> dict[str, str | int]:
                     candidate_id=candidate_id,
                     source_candidate_id=candidate_id,
                 )
-                if submission.schedule_development_fallback:
-                    raise ProcessingQueueUnavailableError("RQ rejected the child CV job.")
                 items.append(
                     BatchJobItem(
                         candidate_id=candidate_id,

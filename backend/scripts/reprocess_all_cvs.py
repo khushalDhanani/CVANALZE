@@ -5,6 +5,7 @@ and generates a per-candidate audit report.
 """
 from __future__ import annotations
 import asyncio
+import hashlib
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,9 +17,12 @@ if str(backend_dir) not in sys.path:
 
 from app.core.database import PostgresAppSession
 from app.models.result import CVResult
+from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
-from app.services.cv_service import process_cv_file
+from app.schemas.contracts import JobState
+from app.services.processing_queue import ProcessingQueueService
 from app.services.recommendation_service import RecommendationService
+from app.services.upload_service import UploadService
 
 
 async def reprocess_all_candidates() -> list[dict[str, Any]]:
@@ -28,7 +32,7 @@ async def reprocess_all_candidates() -> list[dict[str, Any]]:
         cv_keys = [r.cv_key for r in records]
 
     print(f"🔄 Starting bulk reprocessing for {len(cv_keys)} active candidates...")
-    results = []
+    queued_jobs: list[tuple[str, str]] = []
 
     for idx, cv_key in enumerate(cv_keys, 1):
         print(f"\n[{idx}/{len(cv_keys)}] Reprocessing candidate '{cv_key}'...")
@@ -52,32 +56,59 @@ async def reprocess_all_candidates() -> list[dict[str, Any]]:
 
         if not possible_files or not possible_files[0].exists():
             print(f"  ⚠️ Source file not found for '{cv_key}'. Using existing result data for validation.")
-            res = existing
+            continue
         else:
             file_path = possible_files[0]
             content = file_path.read_bytes()
             try:
-                res = await process_cv_file(
+                retained = UploadService.persist_bytes(
                     filename=filename,
                     content=content,
+                    storage_key=cv_key,
+                )
+                submission = ProcessingQueueService.submit_upload(
+                    cv_key=cv_key,
+                    content_hash=hashlib.sha256(content).hexdigest(),
+                    filename=retained.safe_filename,
+                    content_type=retained.detected_content_type,
                     candidate_id=existing.get("candidate_id"),
+                    source_candidate_id=existing.get("source_candidate_id") or existing.get("candidate_id"),
                     cv_id=existing.get("cv_id"),
                     force_reprocess=True,
-                    storage_filename=storage_filename,
+                    storage_filename=retained.storage_filename,
                 )
-                print(f"  ✅ Reprocessed '{cv_key}' successfully.")
+                queued_jobs.append((cv_key, submission.record.job_id))
+                print(f"  📦 Queued '{cv_key}' as job '{submission.record.job_id}'.")
             except Exception as exc:
-                print(f"  ❌ Reprocessing failed for '{cv_key}': {exc}")
-                res = existing
+                print(f"  ❌ Could not queue '{cv_key}': {exc}")
 
-        # Fetch recommendations
-        try:
-            recs = RecommendationService.get_candidate_recommendations(cv_key)
-        except Exception as rec_exc:
-            print(f"  ⚠️ Recommendation generation failed for '{cv_key}': {rec_exc}")
-            recs = {}
+    print(f"\nWaiting for {len(queued_jobs)} queued CV job(s) to complete...")
+    pending = dict(queued_jobs)
+    results = []
+    while pending:
+        for cv_key, job_id in list(pending.items()):
+            record = ProcessingJobRepository.get(job_id)
+            if record is not None:
+                record = ProcessingQueueService.reconcile_job(record)
+            if record is None or record.state not in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED, JobState.FAILED, JobState.CANCELLED):
+                continue
+            result = ResultRepository.resolve_result(cv_key) or {
+                "id": cv_key,
+                "status": record.state,
+                "message": record.message,
+            }
 
-        results.append({"cv_key": cv_key, "result": res, "recommendations": recs})
+            try:
+                recs = RecommendationService.get_candidate_recommendations(cv_key)
+            except Exception as rec_exc:
+                print(f"  ⚠️ Recommendation generation failed for '{cv_key}': {rec_exc}")
+                recs = {}
+
+            results.append({"cv_key": cv_key, "result": result, "recommendations": recs})
+            pending.pop(cv_key)
+            print(f"  ✅ Job '{job_id}' reached {record.state}.")
+        if pending:
+            await asyncio.sleep(1)
 
     return results
 

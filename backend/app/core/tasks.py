@@ -122,7 +122,7 @@ def sync_all_vacancies() -> str:
 
         redis_url = settings.REDIS_URL
         conn = Redis.from_url(redis_url)
-        q = Queue(settings.RQ_QUEUE_NAME, connection=conn)
+        q = Queue(settings.RQ_AUXILIARY_QUEUE_NAME, connection=conn)
         q.enqueue("app.core.tasks.embed_vacancies_batch", valid_jobs)
         return f"Enqueued {count} vacancies for embedding sync."
     except Exception as exc:

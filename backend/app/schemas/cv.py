@@ -23,9 +23,9 @@ class CVProcessingResponse(BaseModel):
     job_id: str | None = Field(default=None, description="Content-addressed background processing job ID")
     job_state: str | None = Field(
         default=None,
-        description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, or FAILED state",
+        description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, FAILED, or CANCELLED state",
     )
-    execution_mode: str | None = Field(default=None, description="RQ or explicit development fallback execution mode")
+    execution_mode: str | None = Field(default=None, description="Background processing execution mode; production CV jobs use RQ")
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
     persistence_status: str | None = Field(default=None, description="PostgreSQL result durability status")
     persistence_error: str | None = Field(default=None, description="Safe persistence failure summary")

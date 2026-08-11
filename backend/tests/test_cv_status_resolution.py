@@ -14,10 +14,11 @@ client = TestClient(app)
 
 
 def test_start_worker_queue_configuration():
-    """Verify start_worker listens to RQ_QUEUE_NAME, shadow_validation, and default queues."""
+    """Verify the CV worker listens only to the configured FIFO CV queue."""
     from start_worker import main
-    with patch("start_worker.SimpleWorker") as mock_worker:
+    with patch("start_worker.Worker") as mock_worker:
         with patch("start_worker.Redis"), patch("start_worker.settings.RQ_WORKER_MAX_JOBS", 0), \
+             patch("start_worker.settings.CV_PROCESSING_CONCURRENCY", 1), \
              patch("start_worker.RuleConfigManager.load_config") as load_config, \
              patch("start_worker.start_config_invalidation_listener") as start_listener:
             mock_worker.return_value.work.return_value = None
@@ -27,10 +28,11 @@ def test_start_worker_queue_configuration():
             assert mock_worker.called
             queues = mock_worker.call_args[0][0]
             queue_names = [q.name for q in queues]
-            assert settings.RQ_QUEUE_NAME in queue_names
-            assert "shadow_validation" in queue_names
-            assert "default" in queue_names
-            mock_worker.return_value.work.assert_called_once_with(with_scheduler=True)
+            assert queue_names == [settings.RQ_QUEUE_NAME]
+            mock_worker.return_value.work.assert_called_once_with(
+                with_scheduler=True,
+                maintenance_interval=settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
+            )
 
 
 def test_status_resolution_by_cv_id_alias(tmp_path, monkeypatch):

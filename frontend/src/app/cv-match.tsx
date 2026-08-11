@@ -13,7 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { CandidateProfileSummary } from '@/components/ui/CandidateProfileSummary';
-import { useCvUpload, FilePickerAsset } from '@/hooks/useCvUpload';
+import { useCvUpload } from '@/hooks/useCvUpload';
+import type { FilePickerAsset } from '@/hooks/useCvUpload';
+import { useCvQueueUploads } from '@/hooks/useCvQueueUploads';
+import type { CvQueueUploadFile } from '@/hooks/useCvQueueUploads';
 import { matchService } from '@/services/matchService';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { CandidateMatchAnalysis, JobMatchScore } from '@/types/api';
@@ -31,6 +34,9 @@ import {
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { SUPPORTED_RESUME_FORMATS } from '@/constants/upload';
+import { getCvQueueStateMeta } from '@/utils/cvQueueState';
+
+const MAX_FILES_PER_SELECTION = 10;
 
 export default function CvMatchScreen() {
   usePageTitle('CV Match Analysis | AIRIS');
@@ -65,12 +71,19 @@ export default function CvMatchScreen() {
     uploadAndProcess,
     forceReanalyze,
   } = useCvUpload();
+  const {
+    items: queuedUploads,
+    summary: queueSummary,
+    isActive: queueIsActive,
+    uploadFiles,
+    clearFinished,
+  } = useCvQueueUploads();
 
   const [selectedJobForReview, setSelectedJobForReview] = useState<JobMatchScore | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<FilePickerAsset | null>(null);
 
-  const isBusy = uploading || analyzingText;
+  const isBusy = uploading || queueIsActive || analyzingText;
 
   const triggerUpload = (file: FilePickerAsset & { size?: number }) => {
     setPickerError(null);
@@ -81,6 +94,25 @@ export default function CvMatchScreen() {
     }
     setSelectedFile(file);
     uploadAndProcess(file, useLlmEnrichment);
+  };
+
+  const triggerUploads = (files: CvQueueUploadFile[]) => {
+    setPickerError(null);
+    if (files.length > MAX_FILES_PER_SELECTION) {
+      setPickerError(`Select up to ${MAX_FILES_PER_SELECTION} CVs at a time.`);
+      return;
+    }
+    const oversized = files.find((file) => (file.size || (file.rawFile && file.rawFile.size) || 0) > SUPPORTED_RESUME_FORMATS.maxSizeBytes);
+    if (oversized) {
+      setPickerError(`${oversized.name} exceeds the maximum size of 10MB.`);
+      return;
+    }
+    if (files.length === 1) {
+      triggerUpload(files[0]);
+      return;
+    }
+    setSelectedFile(null);
+    uploadFiles(files, useLlmEnrichment);
   };
 
   const handleRetry = () => {
@@ -115,16 +147,17 @@ export default function CvMatchScreen() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = SUPPORTED_RESUME_FORMATS.accept;
+      input.multiple = true;
       input.onchange = (e: any) => {
-        const selected = e.target?.files?.[0];
-        if (selected) {
-          triggerUpload({
+        const selectedFiles = Array.from(e.target?.files || []) as File[];
+        if (selectedFiles.length > 0) {
+          triggerUploads(selectedFiles.map((selected) => ({
             uri: URL.createObjectURL(selected),
             name: selected.name,
             type: selected.type || 'application/pdf',
             rawFile: selected,
             size: selected.size,
-          });
+          })));
         }
       };
       input.click();
@@ -133,17 +166,17 @@ export default function CvMatchScreen() {
         const result = await DocumentPicker.getDocumentAsync({
           type: SUPPORTED_RESUME_FORMATS.mimeTypes,
           copyToCacheDirectory: true,
+          multiple: true,
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          const picked = result.assets[0];
-          triggerUpload({
+          triggerUploads(result.assets.map((picked) => ({
             uri: picked.uri,
             name: picked.name,
             type: picked.mimeType || 'application/pdf',
             rawFile: (picked as any).file,
             size: picked.size,
-          });
+          })));
         }
       } catch (err: any) {
         setPickerError(err.message || 'Failed to select document from device storage.');
@@ -236,18 +269,18 @@ export default function CvMatchScreen() {
                   <FileText size={24} color={COLORS.primary} />
                 </View>
                 <Text className="text-sm font-sans-bold text-text-primary">
-                  Select CV Document to Match
+                  Select CV Documents to Match
                 </Text>
                 <Text className="text-xs font-sans text-text-muted text-center max-w-md">
-                  Supported formats: {SUPPORTED_RESUME_FORMATS.label}. Automatic text and section extraction.
+                  Select up to {MAX_FILES_PER_SELECTION} files. Supported formats: {SUPPORTED_RESUME_FORMATS.label}. Files are queued in selection order.
                 </Text>
 
                 <View className="mt-2">
                   <Button
-                    label={uploading ? 'Processing Resume...' : 'Choose File & Match'}
+                    label={isBusy ? 'CV Queue Active...' : 'Choose CVs & Match'}
                     onPress={handlePickAndUploadFile}
-                    loading={uploading}
-                    disabled={uploading}
+                    loading={uploading || queueIsActive}
+                    disabled={isBusy}
                     size="md"
                   />
                 </View>
@@ -259,6 +292,41 @@ export default function CvMatchScreen() {
                   title="Document Selection Error"
                   message={pickerError}
                 />
+              )}
+
+              {queuedUploads.length > 0 && (
+                <Card className="gap-3">
+                  <View className="flex-row items-center justify-between gap-2">
+                    <View className="flex-1">
+                      <Text className="text-sm font-sans-bold text-text-primary">CV Processing Queue</Text>
+                      <Text className="text-xs font-sans text-text-muted">Execution order is controlled exclusively by the backend FIFO worker.</Text>
+                    </View>
+                    {!queueIsActive && (
+                      <Button label="Clear Finished" variant="secondary" size="sm" onPress={clearFinished} />
+                    )}
+                  </View>
+                  <View className="flex-row flex-wrap gap-1.5">
+                    <Badge label={`${queueSummary.PROCESSING} Processing`} tone="info" />
+                    <Badge label={`${queueSummary.PENDING} Pending`} tone="neutral" />
+                    <Badge label={`${queueSummary.RETRYING} Retrying`} tone="warning" />
+                    <Badge label={`${queueSummary.COMPLETED} Completed`} tone="success" />
+                    <Badge label={`${queueSummary.FAILED} Failed`} tone="danger" />
+                  </View>
+                  <View className="gap-1.5">
+                    {queuedUploads.map((item) => {
+                      const stateMeta = getCvQueueStateMeta(item.state);
+                      const tracking = item.jobId ? `Job ${item.jobId}` : 'Preparing upload';
+                      return (
+                        <DenseRow
+                          key={item.clientId}
+                          title={item.filename}
+                          subtitle={`${tracking} · ${item.progress}% · ${item.message}`}
+                          trailing={<Badge label={stateMeta.label} tone={stateMeta.tone} />}
+                        />
+                      );
+                    })}
+                  </View>
+                </Card>
               )}
 
               {/* Step-by-Step Modern Progress UI */}

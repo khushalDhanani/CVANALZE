@@ -6,9 +6,6 @@ from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 
-from redis import Redis
-from rq import Queue
-
 from app.core.cache import CacheIndex, CacheInvalidator, CacheKey, doc_cache_manager
 from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, normalize_source_candidate_id, resolve_cv_identity
@@ -538,44 +535,6 @@ async def process_cv_file(
             raise
 
 
-def process_cv_task_sync(file_path: str) -> dict[str, Any]:
-    import asyncio
-    import json
-
-    path = Path(file_path)
-    filename = path.name
-    content = path.read_bytes()
-
-    redis_url = settings.REDIS_URL
-    conn = Redis.from_url(redis_url)
-
-    try:
-        # Run the existing async processor inside a synchronous event loop for RQ
-        result = asyncio.run(process_cv_file(filename=filename, content=content))
-
-        payload = {
-            "filename": filename,
-            "status": result.get("status", "OK"),
-            "best_match": result.get("match_analysis", {}).get("best_match", {}) if result.get("match_analysis") else {},
-            "llm_skipped": result.get("match_analysis", {}).get("llm_skipped", False) if result.get("match_analysis") else False,
-            "result_file_path": result.get("result_file_path"),
-        }
-        conn.publish("cv_processing_progress", json.dumps(payload))
-        return result
-    except Exception as exc:
-        logger.exception(f"Synchronous CV task failed for '{filename}': {type(exc).__name__}")
-        payload = {
-            "filename": filename,
-            "status": "FAILED",
-            "error": "CV processing failed.",
-        }
-        try:
-            conn.publish("cv_processing_progress", json.dumps(payload))
-        except Exception:
-            pass
-        raise
-
-
 async def scan_uploads_directory(
     uploads_dir: str | Path = settings.UPLOADS_DIR,
     batch_size: int | None = None,
@@ -583,108 +542,48 @@ async def scan_uploads_directory(
     throttle_delay: float | None = None,
 ) -> list[dict[str, Any]]:
     path = Path(uploads_dir)
-    results = []
+    submissions: list[dict[str, Any]] = []
 
     if not path.exists():
         logger.warning(f"Directory '{uploads_dir}' does not exist.")
-        return results
+        return submissions
 
     supported = {f".{ext}" for ext in settings.ALLOWED_EXTENSIONS}
-    files = [f for f in path.iterdir() if f.is_file() and f.suffix.lower() in supported]
+    files = sorted((f for f in path.iterdir() if f.is_file() and f.suffix.lower() in supported), key=lambda item: item.name.casefold())
 
     if not files:
         logger.info(f"No supported CV files found in '{uploads_dir}'.")
-        return results
+        return submissions
 
     logger.info(f"Found {len(files)} CV file(s) in '{uploads_dir}'. Enqueueing to RQ...")
 
-    redis_url = settings.REDIS_URL
-    conn = Redis.from_url(redis_url)
-    q = Queue(settings.RQ_QUEUE_NAME, connection=conn)
+    from app.services.processing_queue import ProcessingQueueService
 
-    import json
-
-    import redis.asyncio as aioredis
-
-    async_redis = aioredis.from_url(redis_url, decode_responses=True)
-    pubsub = async_redis.pubsub()
-    await pubsub.subscribe("cv_processing_progress")
-
-    jobs = []
     for file_obj in files:
-        job = q.enqueue(
-            process_cv_task_sync,
-            str(file_obj.absolute()),
-            job_timeout=settings.EXTRACTION_TIMEOUT_SECONDS,
-            result_ttl=600,
+        content = file_obj.read_bytes()
+        identity = resolve_cv_identity(file_obj.name)
+        retained = UploadService.persist_bytes(
+            filename=file_obj.name,
+            content=content,
+            storage_key=identity.canonical_key,
         )
-        jobs.append((file_obj, job))
+        ResultRepository.assert_identity_available(identity, retained.content_hash)
+        submission = ProcessingQueueService.submit_upload(
+            cv_key=identity.canonical_key,
+            content_hash=retained.content_hash,
+            filename=retained.safe_filename,
+            storage_filename=retained.storage_filename,
+            content_type=retained.detected_content_type,
+        )
+        submissions.append(
+            {
+                "filename": retained.safe_filename,
+                "job_id": submission.record.job_id,
+                "job_state": submission.record.state,
+                "cv_key": submission.record.cv_key,
+                "reused_existing_job": submission.reused_existing_job,
+            }
+        )
 
-    print(f"📦 Enqueued {len(jobs)} file(s). Waiting for RQ workers to process...")
-
-    try:
-        processed_count = 0
-        completed_ids = set()
-
-        while processed_count < len(jobs):
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-            if message:
-                payload = json.loads(message["data"])
-                filename = payload.get("filename")
-
-                # Check if we already processed this (to prevent double counting if fallback also caught it)
-                if filename not in completed_ids:
-                    completed_ids.add(filename)
-                    processed_count += 1
-                    status = payload.get("status", "OK")
-                    best = payload.get("best_match", {})
-                    llm_skipped = payload.get("llm_skipped", False)
-                    fast_track_msg = " [⚡️Fast Track] " if llm_skipped else " "
-
-                    if status != "FAILED":
-                        results.append(payload)
-                        score = best.get("score", 0)
-                        job_title = best.get("job_title", "Unknown")
-                        classification = best.get("classification", "UNKNOWN")
-                        print(
-                            f"   [{processed_count}/{len(files)}] ✅ [{status}]: {filename} | "
-                            f"Top Role: {job_title} ({score}% [{classification}]) |{fast_track_msg}"
-                            f"Saved: {payload.get('result_file_path')}"
-                        )
-                    else:
-                        print(f"   [{processed_count}/{len(files)}] ❌ Error: {filename} failed. {payload.get('error')}")
-
-            # Fallback for hard worker crashes (segfault/OOM) where PubSub message is never sent
-            for file_obj, job in jobs:
-                if file_obj.name not in completed_ids:
-                    try:
-                        job.refresh()
-                        if job.is_failed:
-                            completed_ids.add(file_obj.name)
-                            processed_count += 1
-                            error_msg = job.exc_info or "Worker crashed unexpectedly (e.g. Segfault/OOM)"
-                            print(f"   [{processed_count}/{len(files)}] ❌ Error: {file_obj.name} failed silently in RQ. {error_msg}")
-                    except Exception:
-                        pass
-
-            await asyncio.sleep(0.1)
-    finally:
-        try:
-            await pubsub.unsubscribe("cv_processing_progress")
-        except Exception:
-            pass
-        try:
-            if hasattr(pubsub, "close"):
-                res = pubsub.close()
-                if asyncio.iscoroutine(res):
-                    await res
-        except Exception:
-            pass
-        try:
-            if hasattr(async_redis, "aclose"):
-                await async_redis.aclose()
-        except Exception:
-            pass
-
-    print()
-    return results
+    logger.info("Queued %s CV file(s) for FIFO processing.", len(submissions))
+    return submissions

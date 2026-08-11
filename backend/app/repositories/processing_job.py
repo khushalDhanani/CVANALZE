@@ -1,6 +1,5 @@
 from __future__ import annotations
 import hashlib
-import threading
 from datetime import timezone, datetime
 from typing import Any
 
@@ -12,8 +11,6 @@ from app.core.rule_config_manager import RuleConfigManager
 
 class ProcessingJobRepository:
     """Persist canonical background-job records and their latest CV-key aliases."""
-
-    _lock = threading.RLock()
 
     @staticmethod
     def build_job_id(cv_key: str, content_hash: str) -> str:
@@ -86,13 +83,12 @@ class ProcessingJobRepository:
                 keys_to_alias.add(persisted.candidate_id[3:])
                 keys_to_alias.add(f"cv_candidate_{persisted.candidate_id[3:]}")
 
-        with cls._lock:
-            if job_id_str:
-                processing_job_cache_manager.set(f"job_{job_id_str}", payload, ttl=ttl)
-            for k in keys_to_alias:
-                if isinstance(k, str) and k:
-                    alias = hashlib.sha256(k.encode("utf-8")).hexdigest()
-                    processing_job_cache_manager.set(f"cv_{alias}", payload, ttl=ttl)
+        if job_id_str:
+            processing_job_cache_manager.set(f"job_{job_id_str}", payload, ttl=ttl)
+        for k in keys_to_alias:
+            if isinstance(k, str) and k:
+                alias = hashlib.sha256(k.encode("utf-8")).hexdigest()
+                processing_job_cache_manager.set(f"cv_{alias}", payload, ttl=ttl)
         return persisted
 
     @classmethod
@@ -102,17 +98,16 @@ class ProcessingJobRepository:
         state: str,
         **updates: Any,
     ) -> ProcessingJobRecord:
-        with cls._lock:
-            record = cls.get(job_id)
-            if record is None:
-                raise LookupError(f"Processing job '{job_id}' was not found.")
-            cls._assert_transition(record.state, state)
-            now = datetime.now(timezone.utc)
-            if state == JobState.PROCESSING and record.started_at is None:
-                updates.setdefault("started_at", now)
-            if state in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED, JobState.FAILED):
-                updates.setdefault("completed_at", now)
-            return cls.save(record.model_copy(update={"state": state, **updates}))
+        record = cls.get(job_id)
+        if record is None:
+            raise LookupError(f"Processing job '{job_id}' was not found.")
+        cls._assert_transition(record.state, state)
+        now = datetime.now(timezone.utc)
+        if state == JobState.PROCESSING and record.started_at is None:
+            updates.setdefault("started_at", now)
+        if state in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED, JobState.FAILED, JobState.CANCELLED):
+            updates.setdefault("completed_at", now)
+        return cls.save(record.model_copy(update={"state": state, **updates}))
 
     @staticmethod
     def _validate(payload: Any) -> ProcessingJobRecord | None:

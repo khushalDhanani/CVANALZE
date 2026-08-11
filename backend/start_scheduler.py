@@ -23,7 +23,7 @@ def register_recurring_jobs(scheduler: CronScheduler) -> int:
     if settings.BACKGROUND_SYNC_ENABLED:
         scheduler.register(
             run_integration_sync,
-            queue_name=settings.RQ_QUEUE_NAME,
+            queue_name=settings.RQ_AUXILIARY_QUEUE_NAME,
             interval=settings.BACKGROUND_SYNC_INTERVAL_SECONDS,
             job_timeout=settings.BACKGROUND_SYNC_JOB_TIMEOUT_SECONDS,
             result_ttl=settings.RQ_RESULT_TTL_SECONDS,
@@ -33,7 +33,7 @@ def register_recurring_jobs(scheduler: CronScheduler) -> int:
     if settings.VALIDATION_METRICS_SNAPSHOT_ENABLED:
         scheduler.register(
             snapshot_validation_metrics,
-            queue_name="shadow_validation",
+            queue_name=settings.RQ_SHADOW_QUEUE_NAME,
             interval=settings.VALIDATION_METRICS_SNAPSHOT_INTERVAL_SECONDS,
             job_timeout=settings.RQ_JOB_TIMEOUT_SECONDS,
             result_ttl=settings.RQ_RESULT_TTL_SECONDS,
