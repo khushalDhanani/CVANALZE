@@ -1,22 +1,100 @@
 // API Type Definitions for CV Analyzer Backend Integration
 
 export interface JobOpening {
-  VacancyID: number;
-  VacancyTitle: string;
-  DepartmentID?: number | null;
-  DepartmentName?: string | null;
-  ExperienceYearReqMin?: number | null;
-  ExperienceYearReqMax?: number | null;
-  QualificationReq?: string | null;
-  SalaryMin?: number | null;
-  SalaryMax?: number | null;
-  SkillsReq?: string | null;
-  MandatorySkillsReq?: string | null;
-  JobDescription?: string | null;
-  KeyResponsibilities?: string | null;
-  PreferredKeywords?: string | null;
-  TargetDomainExperience?: string | null;
+  id: string;
+  title: string;
+  department: string;
+  required_skills: string[];
+  preferred_keywords: string[];
+  min_experience_years?: number | null;
+  max_experience_years?: number | null;
+  min_ctc?: number | null;
+  max_ctc?: number | null;
+  preferred_gender?: string | null;
+  company_name?: string | null;
+  location_name?: string | null;
+  
+  job_description?: string | null;
+  responsibilities?: string | null;
+  education?: string | null;
+  certifications?: string | null;
+
+  vacancy_id?: number | null;
+  job_profile_id?: number | null;
+  business_group_id?: number | null;
+  business_group_name?: string | null;
+  company_id?: number | null;
+  company_name_db?: string | null;
+  location_id?: number | null;
+  location_name_db?: string | null;
+  main_department_id?: number | null;
+  main_department_name?: string | null;
+  department_id?: number | null;
+  department_name?: string | null;
+  designation_id?: number | null;
+  designation_name?: string | null;
+
+  domain?: string | null;
+  job_family?: string | null;
+  status?: string | null;
+  is_active?: boolean | null;
+  vacancy_status?: string | null;
 }
+
+export interface BusinessGroupItem {
+  id: number;
+  name: string;
+}
+
+export interface CompanyItem {
+  id: number;
+  name: string;
+  code?: string;
+  business_group_id?: number;
+}
+
+export interface LocationItem {
+  id: number;
+  name: string;
+  code?: string;
+  company_id?: number;
+}
+
+export interface MainDepartmentItem {
+  id: number;
+  name: string;
+}
+
+export interface DepartmentItem {
+  id: number;
+  name: string;
+  company_id?: number;
+  main_department_id?: number;
+}
+
+export interface DesignationItem {
+  id: number;
+  name: string;
+  company_id?: number;
+  department_id?: number;
+  main_department_id?: number;
+}
+
+export interface OrganizationSelection {
+  business_group_id?: number | null;
+  company_id?: number | null;
+  location_id?: number | null;
+  main_department_id?: number | null;
+  department_id?: number | null;
+  designation_id?: number | null;
+}
+
+export interface HierarchyValidationResult {
+  is_valid: boolean;
+  errors: string[];
+  details: Record<string, any>;
+}
+
 
 export interface CVMatchRequest {
   cv_text: string;
@@ -25,8 +103,50 @@ export interface CVMatchRequest {
 export interface CVProcessingResponse {
   message: string;
   cv_key: string;
-  status: 'processing' | 'completed' | 'failed';
+  status: 'processing' | 'completed' | 'COMPLETED' | 'failed' | 'FAILED' | string;
   progress?: number;
+  stage?: string | null;
+  is_complete?: boolean;
+  failed_step?: string | null;
+  error_details?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  error_retryable?: boolean | null;
+  correlation_id?: string | null;
+  job_id?: string | null;
+  job_state?: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED' | null;
+  execution_mode?: 'RQ' | string | null;
+  retry_count?: number | null;
+  stage_durations_ms?: Record<string, number>;
+  persistence_status?: 'durable' | 'degraded' | string | null;
+  persistence_error?: string | null;
+}
+
+export interface CVProcessingJobSummary {
+  job_id: string;
+  cv_key: string;
+  filename: string;
+  job_state: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED';
+  progress: number;
+  stage: string;
+  message: string;
+  execution_mode: string;
+  retry_count: number;
+  max_attempts: number;
+  enqueue_sequence?: number | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  error_retryable?: boolean | null;
+  correlation_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface DualEvidence {
+  cv_evidence: string;
+  vacancy_evidence: string;
 }
 
 export interface MandatoryFailure {
@@ -35,11 +155,46 @@ export interface MandatoryFailure {
   severity: 'HIGH' | 'CRITICAL' | string;
 }
 
+export interface MandatoryFailureDetails {
+  requirement_id: string;
+  description: string;
+  reason: string;
+  score_impact: number;
+}
+
 export interface RequirementEvaluation {
-  requirement: string;
-  score: number;
-  matched: boolean;
-  evidence: string;
+  requirement_id?: string;
+  description?: string;
+  requirement?: string;
+  score?: number;
+  tier?: 'MANDATORY' | 'PREFERRED' | 'OPTIONAL' | string;
+  status?: 'SATISFIED' | 'PARTIALLY_SATISFIED' | 'FAILED' | string;
+  matched?: boolean;
+  evidence?: DualEvidence | string;
+  failure_reason?: string | null;
+}
+
+export type CanonicalVacancyMatchStatus =
+  | 'MATCHED'
+  | 'POTENTIAL_MATCH'
+  | 'NO_STRONG_MATCH'
+  | 'NO_ACTIVE_VACANCIES'
+  | 'ANALYSIS_NOT_AVAILABLE'
+  | 'ANALYSIS_UNAVAILABLE'
+  | 'PROCESSING'
+  | 'FAILED';
+
+export interface VacancyFitScoreBreakdown {
+  hierarchy_score: number;
+  designation_role_score: number;
+  skills_score: number;
+  experience_score: number;
+  education_score?: number;
+  semantic_similarity_score: number;
+  overall_fit_score: number;
+  hierarchy_mismatch_penalty: number;
+  is_hierarchy_valid: boolean;
+  match_status: string;
 }
 
 export interface ComponentBreakdown {
@@ -56,23 +211,63 @@ export interface ComponentBreakdown {
 export interface JobMatchScore {
   job_id: number | string;
   job_title: string;
+  department?: string | null;
+  vacancy_id?: number | string | null;
+  job_profile_id?: number | null;
+  company_id?: number | null;
+  department_id?: number | null;
   department_name?: string | null;
+  location_id?: number | null;
   overall_score: number;
   score?: number;
+  vacancy_fit_score?: number | null;
+  vacancy_match_status?: CanonicalVacancyMatchStatus | string | null;
+  score_breakdown?: VacancyFitScoreBreakdown | null;
+  role_score: number;
+  skills_score: number;
+  experience_score: number;
+  education_score: number;
+  domain_score: number;
+  technology_score: number;
+  certification_score: number;
+  responsibilities_score: number;
+  coverage: number;
   recommendation?: string | null;
   component_scores: ComponentBreakdown;
   mandatory_fails: MandatoryFailure[];
+  mandatory_failures: MandatoryFailureDetails[];
   requirement_evaluations: RequirementEvaluation[];
+  mandatory_requirements: RequirementEvaluation[];
+  preferred_requirements: RequirementEvaluation[];
+  optional_requirements: RequirementEvaluation[];
+  matched_skills: string[];
+  missing_skills: string[];
+  matched_keywords: string[];
+  missing_keywords: string[];
+  matched_criteria: string[];
+  missing_criteria: string[];
+  evidence: Record<string, DualEvidence>;
+  confidence: number;
+  hr_review_required: boolean;
+  reason: string;
   ranking_reason: string;
   llm_reason?: string | null;
   inferred_skills?: string[];
   classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  retrieval_source?: 'keyword' | 'vector' | 'both' | string;
+  vector_score?: number | null;
+  career_transition_detected: boolean;
+  career_transition_note?: string | null;
+  domain_mismatch_capped: boolean;
+  domain_mismatch_reason?: string | null;
 }
 
 
 export interface CandidateMatchAnalysis {
   scan_id: string;
   parsed_at: string;
+  full_name?: string | null;
+  candidate_name?: string | null;
   best_match?: JobMatchScore | null;
   suitable_openings: JobMatchScore[];
   unsuitable_openings?: JobMatchScore[];
@@ -83,15 +278,94 @@ export interface EnrichedJobEvaluation extends JobMatchScore {
   inferred_skills: string[];
   semantic_score_boost: number;
   classification: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  retrieval_source?: 'keyword' | 'vector' | 'both' | string;
+  vector_score?: number | null;
 }
 
 export interface EnrichedCandidateAnalysis {
-  scan_id: string;
-  parsed_at: string;
+  status?: string | null;
+  progress?: number | null;
+  stage?: string | null;
+  is_complete?: boolean | null;
+  persistence_status?: 'durable' | 'degraded' | string | null;
+  persistence_error?: string | null;
+  scan_id?: string;
+  parsed_at?: string;
+  full_name?: string | null;
+  candidate_name?: string | null;
+  primary_department?: string;
+  recommended_department?: string;
+  professional_domain?: string;
+  strengths?: string[];
+  suitable_job_roles?: string[];
+  has_genuine_match?: boolean;
+  active_vacancy_summary?: string;
+  ai_career_summary?: string;
   best_match?: EnrichedJobEvaluation | null;
   suitable_openings: EnrichedJobEvaluation[];
-  unsuitable_openings: EnrichedJobEvaluation[];
-  llm_model_used: string;
+  unsuitable_openings?: EnrichedJobEvaluation[];
+  rejection_policy_note: string;
+  llm_model_used?: string;
+  llm_skipped?: boolean;
+  match_status?: CanonicalVacancyMatchStatus | string | null;
+  hiring_recommendation?: CanonicalVacancyMatchStatus | string | null;
+  normalized_resume?: any;
+}
+
+export interface OptimizedCandidateProfile {
+  core_skills?: string[];
+  inferred_skills?: string[];
+  relevant_experience_years?: number | null;
+  education_domains?: string[];
+  certifications?: string[];
+  current_role?: string | null;
+  professional_domains?: string[];
+  recommended_department?: string | null;
+  professional_domain?: string | null;
+  strengths?: string[];
+  suitable_job_roles?: string[];
+}
+
+export interface OptimizedVacancyMatch {
+  vacancy_id: number | string;
+  semantic_reason?: string;
+  inferred_skills?: string[];
+  matched_skills?: string[];
+  missing_critical?: string[];
+  semantic_fit_score?: number;
+  career_transition_detected?: boolean;
+  career_transition_note?: string | null;
+}
+
+export interface FieldConfidenceTiers {
+  name?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  location?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  job_title?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  company_name?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+}
+
+export interface CandidateResumeContact {
+  name?: string | null;
+  full_name?: string | null;
+  candidate_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
+  field_confidence?: Record<string, number | null> | null;
+  extraction_source?: string | null;
+}
+
+export interface CandidateResumeJson {
+  contact_info?: CandidateResumeContact | null;
+  summary?: string | null;
+  work_experience?: Record<string, unknown>[] | null;
+  experience?: Record<string, unknown>[] | null;
+  education?: Record<string, unknown>[] | null;
+  skills?: string[] | { all_skills?: string[]; categorized?: Record<string, string[]> } | null;
+  projects?: Record<string, unknown>[] | null;
+  certifications?: Array<string | Record<string, unknown>> | null;
 }
 
 export interface CVUploadResponse {
@@ -99,6 +373,50 @@ export interface CVUploadResponse {
   filename: string;
   parsed_at: string;
   markdown: string;
+  full_name?: string | null;
+  candidate_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  job_title?: string | null;
+  company_name?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
+  summary?: string | null;
+  contact_info?: CandidateResumeContact | null;
+  name_confidence?: number | null;
+  name_confidence_tier?: string | null;
+  location_confidence_tier?: string | null;
+  job_title_confidence_tier?: string | null;
+  company_name_confidence_tier?: string | null;
+  field_confidence?: Record<string, number | null> | null;
+  field_confidence_tiers?: FieldConfidenceTiers | null;
+  name_extraction_source?: string | null;
+  id?: string | null;
+  candidate_id?: string | null;
+  cv_id?: string | null;
+  legacy_cv_keys?: string[] | null;
+  text?: string | null;
+  status?: string | null;
+  persistence_status?: 'durable' | 'degraded' | string | null;
+  persistence_error?: string | null;
+  progress?: number | null;
+  is_complete?: boolean | null;
+  page_count?: number | null;
+  is_scanned?: boolean | null;
+  ocr_applied?: boolean | null;
+  scanned_at?: string | null;
+  created_at?: string | null;
+  experience_years?: number | null;
+  seniority?: string | null;
+  work_experience?: Record<string, unknown>[] | null;
+  education?: Array<string | Record<string, unknown>> | null;
+  skills?: string[] | { all_skills?: string[]; skills?: string[]; categorized?: Record<string, string[]> } | null;
+  projects?: Array<string | Record<string, unknown>> | null;
+  certifications?: Array<string | Record<string, unknown>> | Record<string, unknown> | null;
+  resume_json?: CandidateResumeJson | null;
+  normalized_resume?: Record<string, unknown> | null;
+  similar_candidates?: Array<Record<string, any>> | null;
   match_analysis?: CandidateMatchAnalysis | null;
   enriched_match_analysis?: EnrichedCandidateAnalysis | null;
   [key: string]: any;
@@ -106,10 +424,10 @@ export interface CVUploadResponse {
 
 export interface HRReviewRequest {
   scan_id: string;
-  job_id: number;
-  corrected_score: number;
-  corrected_classification: 'HIGH' | 'MEDIUM' | 'LOW' | string;
-  feedback_notes?: string | null;
+  job_id: number | string;
+  corrected_score?: number | null;
+  corrected_classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string | null;
+  feedback_notes: string;
 }
 
 export interface TrainingExample {
@@ -147,8 +465,6 @@ export interface MatchEngineConfigResponse {
   MAX_SCORE_ON_MANDATORY_FAILURE: number;
   LLM_SEMANTIC_WEIGHT: number;
   MAX_LLM_BOOST: number;
-  LLM_SKIP_MARGIN_THRESHOLD: number;
-  LLM_SKIP_COVERAGE_THRESHOLD: number;
   MATCH_COMPONENT_WEIGHTS: MatchComponentWeights;
 }
 
@@ -159,23 +475,122 @@ export interface MatchEngineConfigUpdate {
   MAX_SCORE_ON_MANDATORY_FAILURE?: number;
   LLM_SEMANTIC_WEIGHT?: number;
   MAX_LLM_BOOST?: number;
-  LLM_SKIP_MARGIN_THRESHOLD?: number;
-  LLM_SKIP_COVERAGE_THRESHOLD?: number;
   MATCH_COMPONENT_WEIGHTS?: Partial<MatchComponentWeights>;
+}
+
+export interface UnifiedMatchScoringParameters {
+  career_transition_role_score: number;
+  role_divergence_score: number;
+  default_role_score: number;
+  below_min_exp_multiplier: number;
+  overqualification_penalty: number;
+  domain_default_match_score: number;
+  low_coverage_threshold: number;
+  false_positive_score_cap: number;
+  match_high_threshold: number;
+  match_medium_threshold: number;
+  mandatory_failure_penalty: number;
+  max_score_on_failure: number;
+  llm_semantic_weight: number;
+  max_llm_boost: number;
+  component_weights: MatchComponentWeights;
+}
+
+export interface UnifiedRuleConfig {
+  version: string;
+  description: string;
+  last_updated: string;
+  global_confidence_tiers: Record<string, unknown>;
+  fields: Record<string, unknown>;
+  scoring: {
+    match: Record<string, unknown> & {
+      scoring_parameters: UnifiedMatchScoringParameters;
+    };
+    prefilter: Record<string, unknown>;
+    taxonomy: Record<string, unknown>;
+    resume_quality: Record<string, unknown>;
+    domain_embedding: Record<string, unknown>;
+  };
+  workflow: Record<string, unknown>;
+}
+
+export interface ConfigVersionCreatedResponse {
+  status: string;
+  profile_id: number;
+  version_tag: string;
+}
+
+export interface ConfigVersionActivatedResponse {
+  status: string;
+  activated_version: string;
+  tenant_id: string | null;
+}
+
+export type RuleInventoryKind = 'SYSTEM_RULE' | 'THRESHOLD' | 'PENALTY' | 'WEIGHT';
+
+export interface RuleInventoryItem {
+  id: string;
+  kind: RuleInventoryKind;
+  name: string;
+  rule_type: string | null;
+  value: string | number | null;
+  condition_count: number;
+}
+
+export interface RuleInventoryGroup {
+  component_type: string;
+  component_name: string;
+  rules: RuleInventoryItem[];
+}
+
+export interface RuleInventoryResponse {
+  profile_version: string;
+  total_rules: number;
+  groups: RuleInventoryGroup[];
+}
+
+export interface RuleConfigJsonSchema {
+  $defs?: Record<string, RuleConfigJsonSchema>;
+  $ref?: string;
+  anyOf?: RuleConfigJsonSchema[];
+  type?: string | string[];
+  title?: string;
+  description?: string;
+  properties?: Record<string, RuleConfigJsonSchema>;
+  required?: string[];
+  items?: RuleConfigJsonSchema;
+  additionalProperties?: boolean | RuleConfigJsonSchema;
+  enum?: unknown[];
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  minLength?: number;
+  maxLength?: number;
+  default?: unknown;
 }
 
 export interface BatchCandidateResult {
   candidate_id: number;
   candidate_name: string;
-  analysis: EnrichedCandidateAnalysis;
+  analysis?: EnrichedCandidateAnalysis;
+  status?: string;
+  error?: string;
 }
 
 export interface BatchMatchResponse {
+  batch_job_id: string;
+  status: string;
+  stage?: string;
   message: string;
   matches: BatchCandidateResult[];
+  progress: number;
+  processed: number;
+  total: number;
+  error?: string | null;
 }
 
 export interface BatchProgressMessage {
+  batch_job_id?: string;
   status: string;
   processed?: number;
   total?: number;
@@ -187,7 +602,12 @@ export interface SystemHealthResponse {
   status: string;
   version: string;
   database: string;
+  pg_database?: string;
+  redis?: string;
   ollama_llm: string;
+  rule_configuration?: string;
+  prompt_configuration?: string;
+  taxonomy_configuration?: string;
 }
 
 export interface LlmHealthResponse {
@@ -202,17 +622,371 @@ export interface LlmHealthResponse {
 export interface CandidateSummary {
   id: string;
   filename: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  job_title?: string | null;
+  company_name?: string | null;
+  name_confidence_tier?: string | null;
+  location_confidence_tier?: string | null;
+  job_title_confidence_tier?: string | null;
+  company_name_confidence_tier?: string | null;
+  field_confidence?: Record<string, number | null> | null;
+  field_confidence_tiers?: FieldConfidenceTiers | null;
   parsed_at?: string;
   page_count?: number;
   is_scanned?: boolean;
   ocr_applied?: boolean;
   primary_department?: string | null;
+  similarity_score?: number | null;
+  search_mode?: string;
+  match_status?: CanonicalVacancyMatchStatus | string | null;
   best_match?: {
     job_title?: string;
     department?: string;
     score?: number;
+    vacancy_fit_score?: number | null;
+    vacancy_match_status?: CanonicalVacancyMatchStatus | string | null;
+    match_status?: CanonicalVacancyMatchStatus | string | null;
+    score_breakdown?: VacancyFitScoreBreakdown | null;
     classification?: string;
     recommendation?: string;
+    reason?: string | null;
+    domain_mismatch_capped?: boolean;
+    domain_mismatch_reason?: string | null;
   };
 }
 
+export interface CacheAnalyticsResponse {
+  global_metrics: {
+    total_hits: number;
+    total_misses: number;
+    overall_hit_ratio: number;
+    llm_calls_prevented: number;
+    db_queries_prevented: number;
+  };
+  per_namespace: Record<
+    string,
+    {
+      hits: number;
+      misses: number;
+      hit_ratio: number;
+    }
+  >;
+  system_stats: {
+    redis: {
+      status: string;
+      used_memory_human?: string;
+      used_memory_bytes?: number;
+      total_keys?: number;
+    };
+    memory_cache: {
+      items_count: number;
+      max_size: number;
+    };
+  };
+}
+
+export interface CandidateSearchOptions {
+  query?: string;
+  department?: string;
+  min_experience?: number;
+  max_experience?: number;
+  location?: string;
+  skills?: string[];
+  education?: string;
+  status?: string;
+  min_similarity?: number;
+  limit?: number;
+}
+
+export interface CandidateSearchResponse {
+  total_found: number;
+  search_mode: string;
+  query?: string;
+  candidates: CandidateSummary[];
+}
+
+
+export interface MissingQualification {
+  requirement: string;
+  impact: string;
+  type: string;
+  actionable_suggestion?: string;
+}
+
+export interface CandidateRecommendationsResponse {
+  candidate_id: string;
+  full_name?: string;
+  primary_department?: string;
+  strengths?: string[];
+  overall_match_confidence?: number;
+  best_vacancies?: any[];
+  missing_qualifications?: MissingQualification[];
+  recommended_certifications?: string[];
+  talent_pools?: string[];
+  hiring_recommendation?: CanonicalVacancyMatchStatus | 'Highly Recommended' | 'Recommended' | 'Potential Fit' | 'Needs Further Review' | 'HIRE' | 'CONSIDER' | 'REJECT' | string;
+  role_department_fit?: string;
+  interview_focus_areas?: string[];
+  risk_flags?: string[];
+  experience_assessment?: string;
+  technical_vs_functional_fit?: string;
+  next_steps_for_interviewer?: string[];
+}
+
+export interface SkillGapInsight {
+  skill: string;
+  market_rarity: string;
+  recommendation: string;
+}
+
+export interface VacancyRecommendationsResponse {
+  vacancy_id: string;
+  job_title?: string;
+  department?: string;
+  top_candidate_matches?: any[];
+  similar_candidates?: any[];
+  skill_gap_insights?: SkillGapInsight[];
+  talent_pools?: string[];
+}
+
+
+// ===== Talent Knowledge Graph Types =====
+export interface GraphNode {
+  id: string;
+  type: 'Candidate' | 'Skill' | 'Company' | 'Vacancy' | 'Department' | string;
+  label: string;
+  properties: Record<string, any>;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  relationship: 'HAS_SKILL' | 'WORKED_AT' | 'MATCHES' | 'SEMANTICALLY_SIMILAR' | 'BELONGS_TO' | 'REQUIRES_SKILL' | string;
+  properties: Record<string, any>;
+}
+
+export interface CandidateGraphResponse {
+  candidate_id: string;
+  full_name: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+export interface VacancyGraphResponse {
+  vacancy_id: string;
+  title: string;
+  department: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+export interface SkillGraphResponse {
+  skill: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  metrics: {
+    candidate_supply_count: number;
+    vacancy_demand_count: number;
+    semantic_cluster_count: number;
+  };
+}
+
+export interface RecruitmentAnalyticsGraphResponse {
+  graph_summary: {
+    total_candidates: number;
+    total_vacancies: number;
+    total_skills_tracked: number;
+    total_departments: number;
+    total_graph_nodes: number;
+    total_graph_edges: number;
+  };
+  top_candidate_skills: { skill: string; candidate_count: number; }[];
+  department_distribution: { department: string; candidate_count: number; }[];
+}
+
+// ===== Domain Knowledge Types =====
+export interface DomainEquivalentRequest {
+  term: string;
+  category: string;
+  threshold?: number;
+  limit?: number;
+}
+
+export interface DomainEquivalent {
+  term: string;
+  similarity_score: number;
+}
+
+export interface DomainEquivalentResponse {
+  term: string;
+  category: string;
+  equivalents: DomainEquivalent[];
+}
+
+// ===== Vector DB Types =====
+export interface VectorDbStatusResponse {
+  pgvector_enabled: boolean;
+  pg_database_connected: boolean;
+  embedding_model: string;
+  candidate_embeddings_count: number;
+  vacancy_embeddings_count: number;
+  semantic_retrieval_top_n: number;
+}
+
+export interface VectorDbSyncResponse {
+  message: string;
+  status: string;
+}
+
+// ===== Talent Pools Types =====
+export interface TalentPoolCandidate {
+  candidate_id: string;
+  full_name: string;
+  skills: string[];
+  experience_years: number | null;
+}
+
+export interface TalentPool {
+  pool_name: string;
+  candidate_count: number;
+  sample_candidates: TalentPoolCandidate[];
+}
+
+export interface TalentPoolsResponse {
+  total_pools: number;
+  talent_pools: TalentPool[];
+}
+
+// ===== Experience Gap Analysis Types =====
+export type EmploymentEntityResolution =
+  | 'PARENT_EMPLOYMENT'
+  | 'INTERNAL_ROLE'
+  | 'DEPUTATION'
+  | 'PROMOTION_TRANSFER'
+  | 'INDEPENDENT_CONCURRENT_ROLE'
+  | 'DUPLICATE'
+  | 'INVALID_HEADING';
+
+export interface ChildAssignmentItem {
+  assignment_id: string;
+  title_or_subrole: string;
+  assignment_type: 'DEPUTATION' | 'PROMOTION' | 'TRANSFER' | 'INTERNAL_ASSIGNMENT' | 'SUB_ROLE' | string;
+  entity_resolution: EmploymentEntityResolution;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  details?: string[];
+}
+
+export interface CanonicalJobItem {
+  job_id: string;
+  parent_company: string;
+  primary_title: string;
+  employment_type: string;
+  entity_resolution: EmploymentEntityResolution;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  date_confidence?: 'EXACT' | 'MONTH_ONLY' | 'YEAR_ONLY' | 'UNKNOWN' | string;
+  responsibilities?: string[];
+  child_assignments?: ChildAssignmentItem[];
+}
+
+export interface ExperienceGapItem {
+  gap_id: string;
+  category?: 'EMPLOYMENT_GAP' | string;
+  coverage_status:
+    | 'UNEXPLAINED'
+    | 'EDUCATION_COVERED'
+    | 'FREELANCE_COVERED'
+    | 'CONTRACT_COVERED'
+    | 'CAREER_TRANSITION'
+    | 'TIMELINE_UNCERTAINTY'
+    | string;
+  boundary_reliability?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  start_date?: string | null;
+  end_date?: string | null;
+  duration_days: number;
+  duration_months: number;
+  preceding_role?: string | null;
+  following_role?: string | null;
+  description: string;
+  hr_review_indicator: boolean;
+  hr_review_reason?: string | null;
+}
+
+export interface ExperienceTimelineNodeItem {
+  record_id: string;
+  company: string;
+  job_title: string;
+  employment_type: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  precision?: string;
+  date_confidence?: 'EXACT' | 'MONTH_ONLY' | 'YEAR_ONLY' | 'UNKNOWN' | string;
+  responsibilities?: string[];
+}
+
+export interface ConcurrentRoleClusterItem {
+  cluster_id: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  roles_count: number;
+  child_nodes: ExperienceTimelineNodeItem[];
+}
+
+export interface TimelineEventItem {
+  event_id: string;
+  event_type:
+    | 'EMPLOYMENT_PERIOD'
+    | 'CONCURRENT_CLUSTER'
+    | 'EMPLOYMENT_GAP'
+    | 'COVERED_GAP'
+    | 'TIMELINE_UNCERTAINTY'
+    | string;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  duration_months: number;
+  node?: ExperienceTimelineNodeItem | null;
+  cluster?: ConcurrentRoleClusterItem | null;
+  gap?: ExperienceGapItem | null;
+}
+
+export interface ExperienceTimelineSummaryItem {
+  total_verified_years: number;
+  gross_display: string;
+  timeline_start_date?: string | null;
+  timeline_end_date?: string | null;
+  has_current_employment: boolean;
+  concurrent_roles_count: number;
+  total_employment_gaps_count: number;
+  unexplained_gaps_count: number;
+  significant_gaps_count: number;
+  total_gap_duration_months: number;
+  analysis_confidence: number;
+  timeline_uncertainty_score: number;
+  hr_review_required: boolean;
+  hr_observations?: string[];
+}
+
+export interface ExperienceGapAnalysisData {
+  summary?: ExperienceTimelineSummaryItem;
+  detected_gaps?: ExperienceGapItem[];
+  canonical_jobs?: CanonicalJobItem[];
+  timeline_nodes?: ExperienceTimelineNodeItem[];
+  undated_nodes?: ExperienceTimelineNodeItem[];
+  timeline_events?: TimelineEventItem[];
+  hr_review_indicators?: string[];
+}

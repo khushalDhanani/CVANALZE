@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.database import engine
 
-
 LEADING_PHRASES = (
     "ability to",
     "excellent",
@@ -40,7 +39,7 @@ NOISE_TERMS = {
 
 def _clean_phrase(value: str) -> str:
     phrase = re.sub(r"\s+", " ", value.strip(" >•*.#;:-\t\r\n"))
-    phrase = re.sub(r"^(?:and|or|with|using|particularly)\s+", "", phrase, flags=re.I)
+    phrase = re.sub(r"^(?:and|or|with|using|particularly)\s+", "", phrase, flags=re.IGNORECASE)
 
     lowered = phrase.lower()
     for leading in LEADING_PHRASES:
@@ -48,7 +47,7 @@ def _clean_phrase(value: str) -> str:
             phrase = phrase[len(leading) :].strip(" .;:-")
             break
 
-    phrase = re.sub(r"\b(?:e\.g\.|i\.e\.)\b", "", phrase, flags=re.I)
+    phrase = re.sub(r"\b(?:e\.g\.|i\.e\.)\b", "", phrase, flags=re.IGNORECASE)
     phrase = re.sub(r"\s+", " ", phrase.strip(" .;:-\t\r\n"))
     return phrase
 
@@ -63,7 +62,7 @@ def extract_required_skill_terms(description: str) -> str:
 
         parenthetical_parts = re.findall(r"\(([^)]*)\)", line)
         line = re.sub(r"\(([^)]*)\)", r", \1, ", line)
-        line = re.sub(r"\bincluding\b", ",", line, flags=re.I)
+        line = re.sub(r"\bincluding\b", ",", line, flags=re.IGNORECASE)
 
         fragments = re.split(r",|;|\band\b", line)
         for parenthetical in parenthetical_parts:
@@ -100,12 +99,7 @@ def fit_to_column(value: str, max_length: int | None) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Backfill RecruitVacancyRequest.RequestedAdditionalKnowledge from "
-            "OrgJobProfileMst.JobProfileDesc for rows where the skills field is NULL or blank."
-        )
-    )
+    parser = argparse.ArgumentParser(description=("Backfill RecruitVacancyRequest.RequestedAdditionalKnowledge from OrgJobProfileMst.JobProfileDesc for rows where the skills field is NULL or blank."))
     parser.add_argument("--apply", action="store_true", help="Apply the update. Defaults to dry-run.")
     args = parser.parse_args()
 
@@ -169,10 +163,7 @@ def main() -> None:
         print(f"candidate_rows={len(rows)}")
         print(f"rows_with_extracted_required_skills={len(updates)}")
         for sample in updates[:10]:
-            print(
-                f"sample vacancy_id={sample['vacancy_id']} title={sample['job_title']!r} "
-                f"required_skills={sample['required_skills']!r}"
-            )
+            print(f"sample vacancy_id={sample['vacancy_id']} title={sample['job_title']!r} required_skills={sample['required_skills']!r}")
 
         if not args.apply:
             print("dry_run=true")

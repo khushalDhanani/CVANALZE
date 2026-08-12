@@ -1,48 +1,133 @@
-import React, { useState } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
+import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from 'react-native';
-import { Edit3, Folder, FileText, Award, AlertTriangle, CpuIcon, FolderIcon } from 'lucide-react-native';
+import { Edit3, FileText, FolderIcon, Info } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ComponentScoreBar } from '@/components/ui/ComponentScoreBar';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
+import { CandidateProfileSummary } from '@/components/ui/CandidateProfileSummary';
 import { useCvUpload } from '@/hooks/useCvUpload';
+import type { FilePickerAsset } from '@/hooks/useCvUpload';
+import { useCvQueueUploads } from '@/hooks/useCvQueueUploads';
+import type { CvQueueUploadFile } from '@/hooks/useCvQueueUploads';
 import { matchService } from '@/services/matchService';
-import { CandidateMatchAnalysis, JobMatchScore, MandatoryFailure } from '@/types/api';
-import { Card, Button, TextField, Badge, DenseRow } from '@/components/ui';
+import { usePageTitle } from '@/hooks/usePageTitle';
+import { CandidateMatchAnalysis, JobMatchScore } from '@/types/api';
+import {
+  Card,
+  Button,
+  TextField,
+  Badge,
+  DenseRow,
+  SegmentedControl,
+  MatchAnalysisCard,
+  StepProgressCard,
+  Breadcrumbs,
+  ErrorBanner,
+} from '@/components/ui';
+import { COLORS } from '@/constants/colors';
+import { SUPPORTED_RESUME_FORMATS } from '@/constants/upload';
+import { getCvQueueStateMeta } from '@/utils/cvQueueState';
+import { resolveVacancyFitScore } from '@/utils/candidateDetail';
+
+const MAX_FILES_PER_SELECTION = 10;
 
 export default function CvMatchScreen() {
-  const [activeTab, setActiveTab] = useState<'text' | 'file'>('text');
+  usePageTitle('CV Match Analysis | AIRIS');
+  const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: 'file' | 'text' }>();
+
+  const [activeTab, setActiveTab] = useState<'file' | 'text'>(params.tab || 'file');
+
+  useEffect(() => {
+    if (activeTab) {
+      router.setParams({ tab: activeTab });
+    }
+  }, [activeTab]);
+
   const [cvText, setCvText] = useState<string>('');
   const [useLlmEnrichment, setUseLlmEnrichment] = useState<boolean>(true);
   const [analyzingText, setAnalyzingText] = useState<boolean>(false);
   const [textError, setTextError] = useState<string | null>(null);
-  const [textAnalysis, setTextAnalysis] =
-    useState<CandidateMatchAnalysis | null>(null);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [textAnalysis, setTextAnalysis] = useState<CandidateMatchAnalysis | null>(null);
 
   const {
     uploading,
+    isComplete,
     statusMessage,
     error: uploadError,
     basicResult,
     enrichedResult,
+    elapsedSeconds,
+    currentStepIndex,
+    stepStates,
     uploadAndProcess,
+    forceReanalyze,
   } = useCvUpload();
+  const {
+    items: queuedUploads,
+    summary: queueSummary,
+    isActive: queueIsActive,
+    uploadFiles,
+    clearFinished,
+    hydrationError: queueHydrationError,
+  } = useCvQueueUploads();
 
-  const [selectedJobForReview, setSelectedJobForReview] =
-    useState<JobMatchScore | null>(null);
+  const [selectedJobForReview, setSelectedJobForReview] = useState<JobMatchScore | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
+  const [selectedFile, setSelectedFile] = useState<FilePickerAsset | null>(null);
+
+  const isBusy = uploading || queueIsActive || analyzingText;
+
+  const triggerUpload = (file: FilePickerAsset & { size?: number }) => {
+    setPickerError(null);
+    const size = file.size || (file.rawFile && file.rawFile.size) || 0;
+    if (size > SUPPORTED_RESUME_FORMATS.maxSizeBytes) {
+      setPickerError(`File exceeds maximum size of 10MB (${(size / (1024 * 1024)).toFixed(1)}MB).`);
+      return;
+    }
+    setSelectedFile(file);
+    uploadAndProcess(file, useLlmEnrichment);
+  };
+
+  const triggerUploads = (files: CvQueueUploadFile[]) => {
+    setPickerError(null);
+    if (files.length > MAX_FILES_PER_SELECTION) {
+      setPickerError(`Select up to ${MAX_FILES_PER_SELECTION} CVs at a time.`);
+      return;
+    }
+    const oversized = files.find((file) => (file.size || (file.rawFile && file.rawFile.size) || 0) > SUPPORTED_RESUME_FORMATS.maxSizeBytes);
+    if (oversized) {
+      setPickerError(`${oversized.name} exceeds the maximum size of 10MB.`);
+      return;
+    }
+    if (files.length === 1) {
+      triggerUpload(files[0]);
+      return;
+    }
+    setSelectedFile(null);
+    uploadFiles(files, useLlmEnrichment);
+  };
+
+  const handleRetry = () => {
+    if (selectedFile) {
+      triggerUpload(selectedFile);
+    } else {
+      handlePickAndUploadFile();
+    }
+  };
 
   const handleAnalyzeText = async () => {
     if (!cvText.trim()) {
-      setTextError('Please enter or paste CV text first.');
+      setTextError('Please enter or paste candidate CV text first.');
       return;
     }
 
@@ -50,7 +135,7 @@ export default function CvMatchScreen() {
     setTextError(null);
     try {
       const result = await matchService.analyzeCvText(cvText);
-      setTextAnalysis(result);
+      setTextAnalysis(result as any);
     } catch (err: any) {
       setTextError(err.message || 'Failed to analyze CV text');
     } finally {
@@ -58,116 +143,219 @@ export default function CvMatchScreen() {
     }
   };
 
-  const handlePickAndUploadFile = () => {
+  const handlePickAndUploadFile = async () => {
+    setPickerError(null);
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.pdf,.doc,.docx,.txt';
+      input.accept = SUPPORTED_RESUME_FORMATS.accept;
+      input.multiple = true;
       input.onchange = (e: any) => {
-        const selectedFile = e.target?.files?.[0];
-        if (selectedFile) {
-          uploadAndProcess(
-            {
-              uri: URL.createObjectURL(selectedFile),
-              name: selectedFile.name,
-              type: selectedFile.type || 'application/pdf',
-              rawFile: selectedFile,
-            },
-            useLlmEnrichment
-          );
+        const selectedFiles = Array.from(e.target?.files || []) as File[];
+        if (selectedFiles.length > 0) {
+          triggerUploads(selectedFiles.map((selected) => ({
+            uri: URL.createObjectURL(selected),
+            name: selected.name,
+            type: selected.type || 'application/pdf',
+            rawFile: selected,
+            size: selected.size,
+          })));
         }
       };
       input.click();
     } else {
-      uploadAndProcess(
-        {
-          uri: 'file:///sample.pdf',
-          name: 'Sample_Candidate_CV.pdf',
-          type: 'application/pdf',
-        },
-        useLlmEnrichment
-      );
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: SUPPORTED_RESUME_FORMATS.mimeTypes,
+          copyToCacheDirectory: true,
+          multiple: true,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          triggerUploads(result.assets.map((picked) => ({
+            uri: picked.uri,
+            name: picked.name,
+            type: picked.mimeType || 'application/pdf',
+            rawFile: (picked as any).file,
+            size: picked.size,
+          })));
+        }
+      } catch (err: any) {
+        setPickerError(err.message || 'Failed to select document from device storage.');
+      }
     }
   };
 
   const currentAnalysis =
-    activeTab === 'text'
-      ? textAnalysis
-      : enrichedResult || (basicResult?.match_analysis as any);
+    activeTab === 'file'
+      ? enrichedResult || (basicResult?.match_analysis as any)
+      : textAnalysis;
 
-  const scanId =
-    currentAnalysis?.scan_id || basicResult?.scan_id || 'manual_text_scan';
+  const rawScanId = currentAnalysis?.scan_id || basicResult?.scan_id;
+  const hasPersistedScan =
+    activeTab === 'file' && !!rawScanId && rawScanId !== 'manual_text_scan' && rawScanId !== 'undefined';
+  const scanId = rawScanId || 'manual_text_scan';
+
+  const showProgressCard = activeTab === 'file' && (uploading || isComplete || !!uploadError || currentStepIndex > 0);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <Breadcrumbs items={[{ label: 'CV Match Analysis' }]} />
+
+      {/* Sticky PageHeader */}
+      <View className="px-3 py-2.5 bg-surface border-b border-border">
+        <Text className="text-base font-sans-bold text-text-primary">
+          CV Parsing & Job Match Analysis
+        </Text>
+        <Text className="text-[11px] font-sans text-text-muted">
+          Multi-stage document extraction, rule-based scoring, and semantic LLM enrichment
+        </Text>
+      </View>
+
       <ScrollView className="flex-1 px-3 py-4">
         <View className="gap-4 mb-8">
-          {/* Header */}
-          <View>
-            <Text className="text-xl font-sans-bold text-text-primary mb-1">
-              CV Parsing & Job Match Analysis
-            </Text>
-            <Text className="text-xs font-sans text-text-muted">
-              Analyze candidates against active job vacancies with rule-based scoring and LLM semantic enrichment.
-            </Text>
-          </View>
-
-          {/* Mode Selector Tabs */}
-          <View className="flex-row bg-surface border border-border p-1 rounded-md">
-            <Pressable
-              onPress={() => setActiveTab('text')}
-              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${activeTab === 'text' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
-                }`}
-            >
-              <Edit3
-                size={14}
-                color={activeTab === 'text' ? '#FFFFFF' : '#9CA3AF'}
-              />
-              <Text
-                className={`text-xs font-sans-bold ${activeTab === 'text' ? 'text-text-inverse' : 'text-text-muted'
-                  }`}
-              >
-                Paste Raw CV Text
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setActiveTab('file')}
-              className={`flex-1 py-2 rounded-sm items-center flex-row justify-center gap-1.5 ${activeTab === 'file' ? 'bg-primary active:bg-primary-dark' : 'bg-transparent active:bg-background'
-                }`}
-            >
-              <FolderIcon
-                size={14}
-                color={activeTab === 'file' ? '#FFFFFF' : '#9CA3AF'}
-              />
-              <Text
-                className={`text-xs font-sans-bold ${activeTab === 'file' ? 'text-text-inverse' : 'text-text-muted'
-                  }`}
-              >
-                Upload CV File
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* LLM Enrichment Switch */}
-          <Card className="flex-row items-center justify-between">
-            <View className="flex-1 pr-2">
-              <Text className="text-xs font-sans-bold text-text-primary">
-                Enable LLM Semantic Enrichment
-              </Text>
-              <Text className="text-[11px] font-sans text-text-muted">
-                Uses local Ollama model to infer implicit skills and boost match scores.
-              </Text>
-            </View>
-            <Switch
-              value={useLlmEnrichment}
-              onValueChange={setUseLlmEnrichment}
-              trackColor={{ false: '#E5E7EB', true: '#818CF8' }}
-              thumbColor={useLlmEnrichment ? '#4F46E5' : '#9CA3AF'}
+          {/* Mode Selector Tabs with Processing Lock */}
+          <View className="gap-1.5">
+            <SegmentedControl
+              options={[
+                {
+                  value: 'file',
+                  label: 'Upload CV File',
+                  icon: (props) => <FolderIcon {...props} />,
+                  accessibilityLabel: 'Upload Resume File',
+                },
+                {
+                  value: 'text',
+                  label: 'Paste Raw CV Text',
+                  icon: (props) => <Edit3 {...props} />,
+                  accessibilityLabel: 'Paste Raw CV Text',
+                },
+              ]}
+              value={activeTab}
+              onChange={(val) => !isBusy && setActiveTab(val as 'file' | 'text')}
             />
-          </Card>
+            {isBusy && (
+              <Text className="text-[11px] font-sans text-text-muted pl-1">
+                Tab switching is locked while analysis is in progress.
+              </Text>
+            )}
+          </View>
 
-          {/* TAB 1: Paste Text */}
+          {/* LLM Semantic Enrichment Switch */}
+          {activeTab === 'file' && (
+            <Card className="flex-row items-center justify-between">
+              <View className="flex-1 pr-2">
+                <Text className="text-xs font-sans-bold text-text-primary">
+                  Enable LLM Semantic Enrichment
+                </Text>
+                <Text className="text-[11px] font-sans text-text-muted">
+                  Uses semantic reasoning to infer implicit qualifications and boost score accuracy.
+                </Text>
+              </View>
+              <Switch
+                value={useLlmEnrichment}
+                onValueChange={setUseLlmEnrichment}
+                disabled={isBusy}
+                trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+                thumbColor={useLlmEnrichment ? COLORS.primary : COLORS.textFaint}
+              />
+            </Card>
+          )}
+
+          {/* TAB 1: Upload File */}
+          {activeTab === 'file' && (
+            <View className="gap-3">
+              {/* Document Selection Card */}
+              <Card className="items-center justify-center p-6 gap-2 border-border/80">
+                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-1">
+                  <FileText size={24} color={COLORS.primary} />
+                </View>
+                <Text className="text-sm font-sans-bold text-text-primary">
+                  Select CV Documents to Match
+                </Text>
+                <Text className="text-xs font-sans text-text-muted text-center max-w-md">
+                  Select up to {MAX_FILES_PER_SELECTION} files. Supported formats: {SUPPORTED_RESUME_FORMATS.label}. Files are queued in selection order.
+                </Text>
+
+                <View className="mt-2">
+                  <Button
+                    label={isBusy ? 'CV Queue Active...' : 'Choose CVs & Match'}
+                    onPress={handlePickAndUploadFile}
+                    loading={uploading || queueIsActive}
+                    disabled={isBusy}
+                    size="md"
+                  />
+                </View>
+              </Card>
+
+              {/* Picker Error Banner */}
+              {pickerError && (
+                <ErrorBanner
+                  title="Document Selection Error"
+                  message={pickerError}
+                />
+              )}
+
+              {queueHydrationError && (
+                <ErrorBanner
+                  title="Queue Status Unavailable"
+                  message={queueHydrationError}
+                />
+              )}
+
+              {queuedUploads.length > 0 && (
+                <Card className="gap-3">
+                  <View className="flex-row items-center justify-between gap-2">
+                    <View className="flex-1">
+                      <Text className="text-sm font-sans-bold text-text-primary">CV Processing Queue</Text>
+                      <Text className="text-xs font-sans text-text-muted">Execution order is controlled exclusively by the backend FIFO worker.</Text>
+                    </View>
+                    {!queueIsActive && (
+                      <Button label="Clear Finished" variant="secondary" size="sm" onPress={clearFinished} />
+                    )}
+                  </View>
+                  <View className="flex-row flex-wrap gap-1.5">
+                    <Badge label={`${queueSummary.PROCESSING} Processing`} tone="info" />
+                    <Badge label={`${queueSummary.PENDING} Pending`} tone="neutral" />
+                    <Badge label={`${queueSummary.RETRYING} Retrying`} tone="warning" />
+                    <Badge label={`${queueSummary.COMPLETED} Completed`} tone="success" />
+                    <Badge label={`${queueSummary.FAILED} Failed`} tone="danger" />
+                  </View>
+                  <View className="gap-1.5">
+                    {queuedUploads.map((item) => {
+                      const stateMeta = getCvQueueStateMeta(item.state);
+                      const tracking = item.jobId ? `Job ${item.jobId}` : 'Preparing upload';
+                      return (
+                        <DenseRow
+                          key={item.clientId}
+                          title={item.filename}
+                          subtitle={`${tracking} · ${item.progress}% · ${item.errorCode ? `${item.errorCode}: ` : ''}${item.message}${item.syncError ? ` · Refresh error: ${item.syncError}` : ''}`}
+                          trailing={<Badge label={stateMeta.label} tone={stateMeta.tone} />}
+                        />
+                      );
+                    })}
+                  </View>
+                </Card>
+              )}
+
+              {/* Step-by-Step Modern Progress UI */}
+              {showProgressCard && (
+                <StepProgressCard
+                  currentStepIndex={currentStepIndex}
+                  stepStates={stepStates}
+                  elapsedSeconds={elapsedSeconds}
+                  statusMessage={statusMessage}
+                  error={uploadError}
+                  useLlmEnrichment={useLlmEnrichment}
+                  onRetry={handleRetry}
+                  isProcessing={uploading}
+                  isComplete={isComplete}
+                />
+              )}
+            </View>
+          )}
+
+          {/* TAB 2: Paste Raw CV Text */}
           {activeTab === 'text' && (
             <View className="gap-3">
               <TextField
@@ -177,12 +365,13 @@ export default function CvMatchScreen() {
                 multiline
                 numberOfLines={8}
                 placeholder="Paste candidate resume/CV text here..."
-                style={{ textAlignVertical: 'top', height: 144 }}
+                style={{ textAlignVertical: 'top', minHeight: 140, maxHeight: 280 }}
                 error={textError || undefined}
+                helperText="Paste raw plain-text resume content to perform instant semantic vacancy matching."
               />
 
               <Button
-                label={analyzingText ? 'Analyzing CV...' : 'Run Job Match Analysis'}
+                label={analyzingText ? 'Analyzing CV Content...' : 'Run Job Match Analysis'}
                 onPress={handleAnalyzeText}
                 loading={analyzingText}
                 disabled={analyzingText}
@@ -191,154 +380,53 @@ export default function CvMatchScreen() {
             </View>
           )}
 
-          {/* TAB 2: Upload File */}
-          {activeTab === 'file' && (
-            <View className="gap-3">
-              <View className="bg-surface border-2 border-dashed border-border rounded-md p-6 items-center justify-center">
-                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-2">
-                  <FileText size={24} color="#4F46E5" />
-                </View>
-                <Text className="text-sm font-sans-bold text-text-primary mb-1">
-                  Upload Resume File
-                </Text>
-                <Text className="text-xs font-sans text-text-muted text-center mb-4">
-                  Docling will extract text from PDF, DOCX, or Image resumes automatically.
-                </Text>
-
-                <Button
-                  label={uploading ? 'Processing File...' : 'Select File & Match'}
-                  onPress={handlePickAndUploadFile}
-                  loading={uploading}
-                  disabled={uploading}
-                  size="md"
-                />
-              </View>
-
-              {!!statusMessage && (
-                <Card className="bg-info/10 border-info/30 flex-row items-center gap-2">
-                  {uploading && <ActivityIndicator size="small" color="#2563EB" />}
-                  <Text className="text-xs text-info font-sans-medium">
-                    {statusMessage}
-                  </Text>
-                </Card>
-              )}
-
-              {!!uploadError && (
-                <Card className="bg-danger/10 border-danger/30">
-                  <Text className="text-xs text-danger font-sans-medium">
-                    {uploadError}
-                  </Text>
-                </Card>
-              )}
-            </View>
-          )}
-
           {/* ANALYSIS RESULTS SECTION */}
           {currentAnalysis && (
             <View className="gap-4">
-              <Text className="text-base font-sans-bold text-text-primary border-b border-border pb-2">
-                Match Results Summary
-              </Text>
+              <View className="flex-row items-center justify-between border-b border-border pb-2">
+                <Text className="text-base font-sans-bold text-text-primary">
+                  Match Results Summary
+                </Text>
+                {hasPersistedScan && (
+                  <Button
+                    label="Force Re-analyze"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => forceReanalyze(scanId)}
+                    disabled={uploading}
+                  />
+                )}
+              </View>
+
+              {/* Candidate Profile Details */}
+              <CandidateProfileSummary analysis={currentAnalysis as any} />
 
               {/* Best Match Card */}
-              {currentAnalysis.best_match ? (
-                <Card className="border-primary/40 shadow-sm gap-3">
-                  <View className="flex-row justify-between items-start">
-                    <View className="flex-1 pr-2">
-                      <View className="flex-row items-center gap-1 mb-1">
-                        <Award size={14} color="#4F46E5" />
-                        <Text className="text-xs font-sans-bold text-primary uppercase tracking-wider">
-                          Best Matched Job
-                        </Text>
-                      </View>
-                      <Text className="text-lg font-sans-bold text-text-primary">
-                        {currentAnalysis.best_match.job_title}
-                      </Text>
-                      {!!currentAnalysis.best_match.department_name && (
-                        <Text className="text-xs font-sans-medium text-text-muted">
-                          Dept: {currentAnalysis.best_match.department_name}
-                        </Text>
-                      )}
-                    </View>
-                    <ScoreBadge
-                      score={currentAnalysis.best_match.overall_score}
-                      classification={currentAnalysis.best_match.classification}
-                    />
-                  </View>
+              <MatchAnalysisCard
+                bestMatch={currentAnalysis.best_match}
+                candidateName={currentAnalysis.full_name || currentAnalysis.candidate_name}
+                onReviewPress={
+                  hasPersistedScan
+                    ? () => {
+                        setSelectedJobForReview(currentAnalysis.best_match!);
+                        setReviewModalVisible(true);
+                      }
+                    : undefined
+                }
+              />
 
-                  {/* Ranking reason */}
-                  <View className="bg-background p-2.5 rounded-sm border border-border">
-                    <Text className="text-xs font-sans text-text-muted italic">
-                      "{currentAnalysis.best_match.ranking_reason}"
-                    </Text>
-                  </View>
-
-                  {/* LLM Reason if available */}
-                  {!!currentAnalysis.best_match.llm_reason && (
-                    <Card className="bg-info/10 border-info/30 p-3">
-                      <View className="flex-row items-center gap-1.5 mb-1">
-                        <AlertTriangle size={14} color="#2563EB" />
-                        <Text className="text-xs font-sans-bold text-info">
-                          LLM Reasoning & Synthesis:
-                        </Text>
-                      </View>
-                      <Text className="text-xs font-sans text-info">
-                        {currentAnalysis.best_match.llm_reason}
-                      </Text>
-                    </Card>
-                  )}
-
-                  {/* Mandatory Failures */}
-                  {currentAnalysis.best_match.mandatory_fails?.length > 0 && (
-                    <Card className="bg-danger/10 border-danger/30 p-3">
-                      <View className="flex-row items-center gap-1.5 mb-1">
-                        <CpuIcon size={14} color="#DC2626" />
-                        <Text className="text-xs font-sans-bold text-danger">
-                          Mandatory Requirement Failures:
-                        </Text>
-                      </View>
-                      {currentAnalysis.best_match.mandatory_fails.map(
-                        (fail: MandatoryFailure, idx: number) => (
-                          <Text key={idx} className="text-xs font-sans-medium text-danger">
-                            • {fail.requirement}: {fail.details}
-                          </Text>
-                        )
-                      )}
-                    </Card>
-                  )}
-
-                  {/* Component Breakdown */}
-                  {!!currentAnalysis.best_match.component_scores && (
-                    <View>
-                      <Text className="text-xs font-sans-bold text-text-muted mb-1">
-                        Sub-Score Breakdown:
-                      </Text>
-                      <ComponentScoreBar
-                        scores={currentAnalysis.best_match.component_scores}
-                      />
-                    </View>
-                  )}
-
-                  {/* HR Feedback Trigger */}
-                  <Button
-                    label="Submit HR Review & Correction"
-                    variant="secondary"
-                    onPress={() => {
-                      setSelectedJobForReview(currentAnalysis.best_match!);
-                      setReviewModalVisible(true);
-                    }}
-                  />
-                </Card>
-              ) : (
-                <Card>
-                  <Text className="text-xs font-sans text-text-muted text-center">
-                    No matching jobs met the minimum threshold criteria.
+              {/* Non-persisted scan guidance */}
+              {!hasPersistedScan && (
+                <View className="bg-surface border border-border rounded-md p-2.5 flex-row items-center gap-2">
+                  <Info size={14} color={COLORS.textMuted} />
+                  <Text className="text-xs font-sans text-text-muted flex-1">
+                    HR Review & score corrections are available when analyzing uploaded documents with a persisted scan record.
                   </Text>
-                </Card>
+                </View>
               )}
 
               {/* Other Suitable Openings */}
-              {currentAnalysis.suitable_openings?.length > 1 && (
+              {currentAnalysis.suitable_openings && currentAnalysis.suitable_openings.length > 1 && (
                 <View className="gap-2 mt-2">
                   <Text className="text-xs font-sans-bold text-text-muted uppercase tracking-wider">
                     Other Suitable Vacancies ({currentAnalysis.suitable_openings.length - 1})
@@ -354,15 +442,39 @@ export default function CvMatchScreen() {
                         title={job.job_title}
                         subtitle={job.ranking_reason}
                         trailing={
-                          <ScoreBadge
-                            score={job.overall_score}
-                            classification={job.classification}
-                          />
+                          <View className="flex-row items-center gap-1.5">
+                            {!!job.retrieval_source && (
+                              <Badge
+                                label={
+                                  job.retrieval_source === 'both' || job.retrieval_source === 'hybrid'
+                                    ? 'Hybrid'
+                                    : job.retrieval_source === 'vector'
+                                      ? 'pgvector'
+                                      : 'Keyword'
+                                }
+                                tone={
+                                  job.retrieval_source === 'both' || job.retrieval_source === 'hybrid'
+                                    ? 'success'
+                                    : job.retrieval_source === 'vector'
+                                      ? 'info'
+                                      : 'neutral'
+                                }
+                              />
+                            )}
+                            <ScoreBadge
+                              score={resolveVacancyFitScore(job) ?? 0}
+                              classification={job.classification}
+                            />
+                          </View>
                         }
-                        onPress={() => {
-                          setSelectedJobForReview(job);
-                          setReviewModalVisible(true);
-                        }}
+                        onPress={
+                          hasPersistedScan
+                            ? () => {
+                                setSelectedJobForReview(job);
+                                setReviewModalVisible(true);
+                              }
+                            : undefined
+                        }
                       />
                     ))}
                 </View>
@@ -371,12 +483,14 @@ export default function CvMatchScreen() {
           )}
 
           {/* HR Review Modal */}
-          <HrReviewModal
-            visible={reviewModalVisible}
-            scanId={scanId}
-            job={selectedJobForReview}
-            onClose={() => setReviewModalVisible(false)}
-          />
+          {hasPersistedScan && (
+            <HrReviewModal
+              visible={reviewModalVisible}
+              scanId={scanId}
+              job={selectedJobForReview}
+              onClose={() => setReviewModalVisible(false)}
+            />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

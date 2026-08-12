@@ -6,11 +6,15 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "docling>=2.115.0",
+    "docling-pp-ocrv6[cpu]",
     "fastapi>=0.140.0",
     "filelock>=3.13.1",
     "filetype>=1.2.0",
     "httpx>=0.28.1",
+    "jsonschema>=4.26.0",
     "onnxruntime>=1.28.0",
+    "pgvector>=0.2.5",
+    "psycopg2-binary>=2.9.9",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "pymupdf>=1.28.0",
@@ -20,6 +24,8 @@ dependencies = [
     "redis>=8.0.1",
     "rq>=2.10.0",
     "sqlalchemy>=2.0.51",
+    "torch>=2.2",
+    "torchvision>=0.17",
     "uvicorn>=0.51.0",
 ]
 
@@ -32,4 +38,32 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "integration: requires explicitly provisioned external services",
+    "ollama_live: requires explicit live Ollama authorization and runs serially",
+]
 
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.ruff]
+line-length = 200
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+ignore = [
+    "E712",  # SQLAlchemy boolean column expressions require equality operators.
+    "E731",  # Compact callables in repository test doubles remain readable as lambdas.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]  # Executable scripts add the backend root before importing app modules.
+"start_worker.py" = ["E402"]  # Worker entry point configures process paths before app imports.
+"tests/regression/*.py" = ["E402"]  # Standalone regression runners bootstrap the backend path.

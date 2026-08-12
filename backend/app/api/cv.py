@@ -1,73 +1,122 @@
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, BackgroundTasks
+from __future__ import annotations
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.schemas.cv import CVMatchRequest, CVUploadResponse, CVProcessingResponse
-from app.schemas.match import CandidateMatchAnalysis
-from app.services.cv_service import process_cv_file, get_stable_cv_key
+from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
+from app.core.logging import logger
+from app.repositories.job import VacancySourceUnavailableError
+from app.repositories.processing_job import ProcessingJobPersistenceError, ProcessingJobRepository
 from app.repositories.result import ResultRepository
-from app.services.scoring_engine import ScoringEngine
+from app.schemas.analysis import EnrichedCandidateAnalysis
+from app.schemas.cv import CVMatchRequest, CVProcessingJobSummary, CVProcessingResponse, CVUploadResponse
+from app.schemas.match import CandidateMatchAnalysis
+from app.services.processing_queue import (
+    ProcessingQueueService,
+    ProcessingQueueUnavailableError,
+)
+from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/cv", tags=["CV"])
 
 
-async def background_process_cv(*args, **kwargs):
+@router.get("/processing-jobs", response_model=list[CVProcessingJobSummary])
+async def list_processing_jobs():
+    """Return the durable FIFO CV queue and recent terminal jobs for reload recovery."""
     try:
-        await process_cv_file(*args, **kwargs)
-    except Exception as exc:
-        from app.core.logging import logger
-        logger.exception(f"Background CV processing failed: {exc}")
+        records = ProcessingQueueService.list_jobs()
+    except ProcessingJobPersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return [
+        CVProcessingJobSummary(
+            job_id=record.job_id,
+            cv_key=record.cv_key,
+            filename=record.filename,
+            job_state=record.state,
+            progress=record.progress,
+            stage=record.stage,
+            message=record.message,
+            execution_mode=record.execution_mode.value,
+            retry_count=record.attempt,
+            max_attempts=record.max_attempts,
+            enqueue_sequence=record.enqueue_sequence,
+            error_code=record.error.code.value if record.error else None,
+            error_message=record.error.message if record.error else None,
+            error_retryable=record.error.retryable if record.error else None,
+            correlation_id=record.error.correlation_id if record.error else None,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+            started_at=record.started_at,
+            completed_at=record.completed_at,
+        )
+        for record in records
+    ]
 
 
-@router.post("/upload", response_model=CVProcessingResponse)
+@router.post("/upload", response_model=CVUploadResponse | CVProcessingResponse)
 async def upload_cv(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),  # noqa: B008
+    file: UploadFile = File(...),
     candidate_id: str | None = Form(None),
     cv_id: str | None = Form(None),
 ):
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Filename is required.",
-        )
-
     try:
-        content = await file.read()
-        cv_key = get_stable_cv_key(file.filename, candidate_id, cv_id)
-        
-        background_tasks.add_task(
-            background_process_cv,
-            filename=file.filename,
-            content=content,
-            content_type=file.content_type,
-            candidate_id=candidate_id,
-            cv_id=cv_id,
-        )
+        normalized = UploadService.normalize_filename(file.filename)
+        identity = resolve_cv_identity(normalized.safe_filename, candidate_id, cv_id)
+        cv_key = identity.canonical_key
+        accepted = await UploadService.accept_and_persist(file, storage_key=cv_key)
+        try:
+            ResultRepository.assert_identity_available(identity, accepted.content_hash)
+            submission = ProcessingQueueService.submit_upload(
+                cv_key=cv_key,
+                content_hash=accepted.content_hash,
+                filename=accepted.safe_filename,
+                content_type=accepted.detected_content_type,
+                candidate_id=candidate_id,
+                source_candidate_id=identity.source_candidate_id,
+                cv_id=cv_id,
+                storage_filename=accepted.storage_filename,
+            )
 
+            if submission.reused_existing_job and submission.record.state in ("COMPLETED", "COMPLETED_DEGRADED"):
+                return await get_cv_status(submission.record.cv_key)
+
+        except Exception:
+            if not accepted.was_already_stored:
+                UploadService.remove_stored_upload(accepted.storage_filename)
+            raise
+
+        record_state = submission.record.state.value if hasattr(submission.record.state, "value") else str(submission.record.state)
+        record_exec_mode = submission.record.execution_mode.value if hasattr(submission.record.execution_mode, "value") else str(submission.record.execution_mode)
         return CVProcessingResponse(
-            message="10% - CV processing started in the background...",
-            cv_key=cv_key,
+            message=submission.record.message,
+            cv_key=submission.record.cv_key,
             status="processing",
-            progress=10
+            progress=submission.record.progress,
+            stage=submission.record.stage,
+            job_id=submission.record.job_id,
+            job_state=record_state,
+            execution_mode=record_exec_mode,
+            retry_count=submission.record.attempt,
         )
-
-
-    except HTTPException:
-        raise
-
-    except ValueError as exc:
+    except CVIdentityCollisionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except UploadValidationError as exc:
         raise HTTPException(
-            status_code=400,
+            status_code=exc.status_code,
             detail=str(exc),
         ) from exc
+    except ProcessingQueueUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ProcessingJobPersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     except Exception as exc:
+        logger.exception(f"Failed to process CV: {exc}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process CV: {exc}",
+            detail="An internal error occurred while processing the CV.",
         ) from exc
 
 
-@router.post("/match", response_model=CandidateMatchAnalysis)
+@router.post("/match", response_model=EnrichedCandidateAnalysis | CandidateMatchAnalysis)
 async def match_cv_text(payload: CVMatchRequest):
     if not payload.cv_text or not payload.cv_text.strip():
         raise HTTPException(
@@ -76,27 +125,99 @@ async def match_cv_text(payload: CVMatchRequest):
         )
 
     try:
-        return ScoringEngine.analyze_cv(payload.cv_text)
+        from app.services.match_service import MatchService
+
+        return await MatchService.analyze_single_cv(payload.cv_text)
+    except VacancySourceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception(f"Failed to analyze CV text: {exc}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to analyze CV text: {exc}",
+            detail="An internal error occurred during CV analysis.",
         ) from exc
 
 
 @router.get("/status/{cv_key}", response_model=CVUploadResponse | CVProcessingResponse)
 async def get_cv_status(cv_key: str):
     """Get the status or result of a background CV processing job."""
-    result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
+    result = ResultRepository.resolve_result(cv_key)
+    job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    if job:
+        job = ProcessingQueueService.reconcile_job(job)
+    job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
+    exec_mode_val = (job.execution_mode.value if hasattr(job.execution_mode, "value") else str(job.execution_mode)) if job else None
     if result:
+        persistence_degraded = (
+            job_state_val == "COMPLETED_DEGRADED"
+            or result.get("status") == "COMPLETED_DEGRADED"
+            or result.get("persistence_status") == ResultRepository.PERSISTENCE_DEGRADED
+        )
+        if result.get("status") == "FAILED":
+            if job and job_state_val in ("QUEUED", "PROCESSING", "RETRYING"):
+                return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
+            return CVProcessingResponse(
+                message=result.get("message") or result.get("error") or "CV processing failed.",
+                cv_key=cv_key,
+                status="FAILED",
+                progress=100,
+                stage=result.get("stage"),
+                failed_step=result.get("failed_step"),
+                error_details=None,
+                error_code=job.error.code.value if job and job.error else "PROCESSING_FAILED",
+                error_message=job.error.message if job and job.error else result.get("message") or result.get("error") or "CV processing failed.",
+                error_retryable=job.error.retryable if job and job.error else False,
+                correlation_id=job.error.correlation_id if job and job.error else None,
+                job_id=job.job_id if job else None,
+                job_state=job_state_val or "FAILED",
+                execution_mode=exec_mode_val,
+                retry_count=job.attempt if job else None,
+            )
+        is_completed = (
+            result.get("status") in ("COMPLETED", "COMPLETED_DEGRADED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+            or result.get("progress") == 100
+            or result.get("is_complete") is True
+        ) and result.get("status") != "processing"
+
+        if not is_completed:
+            payload = ProcessingQueueService.legacy_status_payload(job) if job else {}
+            return CVProcessingResponse(
+                message=f"{result.get('progress', 25)}% - {result.get('stage', 'Processing')}...",
+                cv_key=result.get("id") or cv_key,
+                status="processing",
+                progress=result.get("progress", 25),
+                stage=result.get("stage", "processing"),
+                job_id=payload.get("job_id"),
+                job_state=payload.get("job_state", "PROCESSING"),
+                execution_mode=payload.get("execution_mode"),
+                retry_count=payload.get("retry_count"),
+            )
         if "scan_id" not in result and "id" in result:
             result["scan_id"] = result["id"]
         if "parsed_at" not in result and "scanned_at" in result:
             result["parsed_at"] = result["scanned_at"]
+        result["status"] = "COMPLETED_DEGRADED" if persistence_degraded else "COMPLETED"
+        result["persistence_status"] = ResultRepository.PERSISTENCE_DEGRADED if persistence_degraded else ResultRepository.PERSISTENCE_DURABLE
+        result["persistence_error"] = ResultRepository.PERSISTENCE_ERROR_MESSAGE if persistence_degraded else None
+        result["progress"] = 100
+        result["stage"] = "complete_degraded" if persistence_degraded else "complete"
+        if job:
+            result.update(
+                job_id=job.job_id,
+                job_state=job_state_val,
+                execution_mode=exec_mode_val,
+                retry_count=job.attempt,
+            )
         return CVUploadResponse(**result)
-    return CVProcessingResponse(
-        message="25% - CV is still processing or does not exist...",
-        cv_key=cv_key,
-        status="processing",
-        progress=25
-    )
+
+    if job:
+        return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
+    if ProcessingQueueService.unknown_job_compatibility_active():
+        return CVProcessingResponse(
+            message="25% - CV is still processing or does not exist...",
+            cv_key=cv_key,
+            status="processing",
+            progress=25,
+            job_state="UNKNOWN",
+        )
+    raise HTTPException(status_code=404, detail=f"CV processing job '{cv_key}' was not found.")

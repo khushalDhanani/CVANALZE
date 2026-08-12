@@ -4,8 +4,15 @@ import pytest
 from docx import Document
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
-from app.services.document_parser import DocumentParser
+from app.services.document_parser import (
+    MarkdownGenerator,
+    QualityMetricsCalculator,
+    ResumeJsonExtractor,
+    TextSanitizer,
+)
+from app.services.resume_field_extractor import ResumeFieldExtractor
 
 
 @pytest.fixture
@@ -27,56 +34,308 @@ def sample_docx_bytes() -> bytes:
 
 
 def test_document_parser_extracts_docx(sample_docx_bytes: bytes):
-    extraction = DocumentParser.parse("alex_johnson_cv.docx", sample_docx_bytes)
+    extraction = MarkdownGenerator.generate("alex_johnson_cv.docx", sample_docx_bytes)
 
     assert len(extraction.markdown) > 0
     assert "Alex Johnson" in extraction.markdown
-    assert "Skills" in extraction.markdown
+    assert "skills" in extraction.markdown.lower()
     assert "Python" in extraction.markdown
     assert extraction.page_count >= 1
-    assert isinstance(extraction.structured_doc, dict)
+
+
+def test_text_sanitizer_collapses_spaced_headings_and_cleans_images():
+    raw = """
+## CONTACT
+
+<!-- image -->
+
+9998209988
+
+## E D U C A T I O N
+
+- BTech Mechanical
+
+## S K I L L S
+
+- Languages: Dart, Python
+    """
+    clean = TextSanitizer.sanitize(raw)
+
+    assert "<!-- image -->" not in clean
+    assert "## EDUCATION" in clean
+    assert "## SKILLS" in clean
+    assert "BTech Mechanical" in clean
+
+
+def test_quality_metrics_calculator():
+    sample_text = """
+## Tarun Gupta
+Email: tarun.gupta@example.com
+Phone: +91-9998209988
+Location: Surat, Gujarat
+
+## PROFILE SUMMARY
+Experienced Flutter Developer with 3+ years experience.
+
+## WORK EXPERIENCE
+Sr Developer at TechCorp (2022 - Present)
+- Developed mobile applications.
+
+## EDUCATION
+BTech Computer Science (2018 - 2022)
+
+## SKILLS
+Languages: Dart, Python, JavaScript
+    """
+    metrics = QualityMetricsCalculator.compute(
+        text=sample_text,
+        page_count=2,
+        pdf_type="TEXT_PDF",
+        parser_used="docling_fast",
+        ocr_applied=False,
+    )
+
+    assert metrics["pages"] == 2
+    assert metrics["words"] > 20
+    assert "contact" in metrics["sections_detected"]
+    assert "experience" in metrics["sections_detected"]
+    assert "education" in metrics["sections_detected"]
+    assert "skills" in metrics["sections_detected"]
+    assert metrics["has_email"] is True
+    assert metrics["has_phone"] is True
+    assert metrics["completeness_score"] >= 0.70
+
+
+def test_resume_json_extractor():
+    sample_text = """
+## Tarun Gupta
+Email: gtworks05@gmail.com
+Phone: 9998209988
+Location: Surat, Gujarat
+
+## PROFILE SUMMARY
+Results-driven Flutter Developer with 3+ years of experience.
+
+## WORK EXPERIENCE
+## Equal SoftTech
+Sr Developer (2022 - Present)
+- Developed cross-platform apps using Flutter.
+- Integrated Firebase and state management.
+
+## EDUCATION
+## PANDIT DEENDAYAL ENERGY UNIVERSITY
+BTech Mechanical (2018 - 2022)
+
+## SKILLS
+Languages: Dart, HTML, CSS, JavaScript, PHP
+Frameworks: Flutter, Provider, BLoC
+    """
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+
+    assert resume_json["contact_info"]["email"] == "gtworks05@gmail.com"
+    assert resume_json["contact_info"]["phone"] == "9998209988"
+    assert resume_json["summary"].startswith("Results-driven")
+    assert len(resume_json["work_experience"]) > 0
+    assert len(resume_json["education"]) > 0
+    assert "Dart" in resume_json["skills"]["all_skills"]
 
 
 def test_document_parser_rejects_empty_file():
     with pytest.raises(ValueError, match="0 bytes"):
-        DocumentParser.parse("empty.pdf", b"")
+        MarkdownGenerator.generate("empty.pdf", b"")
 
 
 def test_document_parser_rejects_invalid_extension():
     with pytest.raises(ValueError, match="Unsupported file extension"):
-        DocumentParser.parse("resume.txt", b"sample content")
+        MarkdownGenerator.generate("resume.exe", b"sample content")
 
 
-def test_api_upload_cv_endpoint(sample_docx_bytes: bytes):
+def test_api_upload_cv_endpoint(sample_docx_bytes: bytes, monkeypatch, tmp_path):
+    from unittest.mock import patch
+
+    monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
     client = TestClient(app)
-    response = client.post(
-        "/api/cv/upload",
-        files={
-            "file": (
-                "alex_johnson_cv.docx",
-                sample_docx_bytes,
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            )
-        },
+    from app.services.processing_queue import QueueSubmission
+    from app.schemas.contracts import JobState, ProcessingExecutionMode, ProcessingJobRecord
+    dummy_submission = QueueSubmission(
+        record=ProcessingJobRecord(
+            job_id="dummy_job_id",
+            job_state=JobState.QUEUED,
+            execution_mode=ProcessingExecutionMode.RQ.value,
+            target_cv_key="cv_dummy",
+            cv_filename="alex_johnson_cv.docx",
+            cv_key="cv_dummy",
+            content_hash="dummy_hash",
+            filename="alex_johnson_cv.docx",
+            storage_filename="alex_johnson_cv.docx",
+            parser_version="1.0",
+            schema_version="1.0"
+        )
     )
+    with patch("app.services.processing_queue.ProcessingQueueService.submit_upload", return_value=dummy_submission):
+        response = client.post(
+            "/api/cv/upload",
+            files={
+                "file": (
+                    "alex_johnson_cv.docx",
+                    sample_docx_bytes,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
 
-    assert response.status_code == 200
-    data = response.json()
-    assert "id" in data
-    assert data["filename"] == "alex_johnson_cv.docx"
-    assert data["characters"] > 0
-    assert "Alex Johnson" in data["markdown"]
-    assert "structured_doc" in data
-    assert "match_analysis" in data
-    assert data["result_file_path"].endswith(".json")
+        assert response.status_code == 200
+        data = response.json()
+        assert "cv_key" in data
+        assert data["status"] == "processing"
+        assert "message" in data
 
 
 def test_api_upload_rejects_invalid_file_extension():
     client = TestClient(app)
     response = client.post(
         "/api/cv/upload",
-        files={"file": ("invalid.txt", b"hello world", "text/plain")},
+        files={"file": ("invalid.exe", b"hello world", "application/octet-stream")},
     )
 
     assert response.status_code == 400
     assert "Unsupported file extension" in response.json()["detail"]
+
+
+def test_deterministic_name_extraction_rejects_job_titles():
+    sample_text = """
+# IT EXECUTIVE
+John Doe
+Email: john.doe@example.com
+Phone: +1-555-0199
+
+## PROFILE SUMMARY
+Experienced IT Executive and Systems Administrator.
+    """
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+    contact = resume_json["contact_info"]
+
+    assert contact["name"] == "John Doe"
+    assert contact["full_name"] == "John Doe"
+    assert contact["name_confidence"] >= 0.85
+    assert contact["extraction_source"] in [
+        "header_email_validated",
+        "header_contact_section",
+    ]
+
+
+def test_deterministic_name_extraction_email_fallback():
+    sample_text = """
+Contact: alex.johnson@company.org
+Phone: 9876543210
+Location: Chicago, IL
+
+## SUMMARY
+Software engineer with 5 years experience.
+    """
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+    contact = resume_json["contact_info"]
+
+    assert contact["name"] == "Alex Johnson"
+    assert contact["name_confidence"] == 0.30
+    assert contact["extraction_source"] == "email_username_fallback"
+
+
+@pytest.mark.parametrize(
+    ("merged_header", "email", "expected_name"),
+    [
+        ("BRAND J O R D A N LEEPRODUCT MANAGER PROFILE SUMMARY", "applications@sample.org", "Jordan Lee"),
+        ("MARK M A R I A SANTOSSENIOR OFFICER", "contact@sample.org", "Maria Santos"),
+    ],
+)
+def test_deterministic_name_extraction_recovers_structurally_merged_headers(merged_header, email, expected_name):
+    sample_text = f"""
+## CONTACT
++1 202 555 0187
+## {merged_header}
+{email}
+Austin, Texas
+
+## EXPERIENCE
+Five years of relevant experience.
+    """
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+    contact = resume_json["contact_info"]
+
+    assert contact["name"] == expected_name
+    assert contact["name_confidence"] >= 0.85
+    assert contact["extraction_source"] == "header_contact_section"
+
+
+def test_deterministic_name_extraction_recovers_inline_personal_details_name():
+    sample_text = """
+CURRICULUM VITAE
+PERSONAL DETAILS NAME : Mr. VIRAL D. HIRANI PERMANENT ADDRESS : 505 Example Road DATE OF BIRTH : 21/07/1985 CONTACT NO : 9913042301 EMAIL : viralhirani1985@gmail.com
+
+EDUCATION QUALIFICATION: -
+Bachelor of Arts
+    """
+
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+    contact = resume_json["contact_info"]
+
+    assert contact["name"] == "VIRAL D. HIRANI"
+    assert contact["name_confidence"] >= 0.85
+    assert contact["extraction_source"] == "header_email_validated"
+
+
+@pytest.mark.parametrize(
+    ("stale_name", "stale_source"),
+    [
+        ("applications", "email_username_fallback"),
+        ("State:- Texas.", "header_contact_section"),
+        ("EDUCATION QUALIFICATION: -", "header_contact_section"),
+    ],
+)
+def test_candidate_detail_revalidates_fallback_and_structurally_invalid_names(stale_name, stale_source):
+    result = {
+        "id": "cv_generic",
+        "filename": "generic.pdf",
+        "markdown": "## CONTACT\nJordan Lee\napplications@sample.org\n+1 202 555 0187\nAustin, Texas",
+        "full_name": stale_name,
+        "candidate_name": stale_name,
+        "name_confidence": 0.85 if stale_source == "header_contact_section" else 0.3,
+        "name_extraction_source": stale_source,
+        "field_confidence": {"name": 0.3},
+        "field_confidence_tiers": {"name": "LOW"},
+        "resume_json": {
+            "contact_info": {
+                "name": stale_name,
+                "full_name": stale_name,
+                "candidate_name": stale_name,
+                "email": "applications@sample.org",
+                "phone": "+1 202 555 0187",
+                "location": "Austin, Texas",
+                "name_confidence": 0.85 if stale_source == "header_contact_section" else 0.3,
+                "extraction_source": stale_source,
+                "field_confidence": {"name": 0.3},
+            }
+        },
+    }
+
+    ResumeFieldExtractor.revalidate_candidate_name(result)
+
+    assert result["full_name"] == "Jordan Lee"
+    assert result["resume_json"]["contact_info"]["name"] == "Jordan Lee"
+    assert result["name_confidence"] >= 0.85
+
+
+def test_deterministic_name_extraction_filename_fallback():
+    sample_text = """
+Phone: 9876543210
+Location: New York, NY
+
+## SUMMARY
+Senior Analyst.
+    """
+    resume_json = ResumeJsonExtractor.extract(sample_text, filename="Jane_Smith_Resume.pdf")
+    contact = resume_json["contact_info"]
+
+    assert contact["name"] == "Jane Smith"
+    assert contact["name_confidence"] == 0.30
+    assert contact["extraction_source"] == "filename_fallback"

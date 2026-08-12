@@ -1,0 +1,81 @@
+from __future__ import annotations
+from app.models.config import SystemConfig
+from app.models.domain import DepartmentDomainMaster
+from app.models.geo_headings import GeoLocation, NameDenylist, SectionHeading
+from app.models.pg import CandidateEmbedding, DomainEmbedding, VacancyEmbedding
+from app.models.prompts import PromptTemplateMaster
+from app.models.llm_trace import LLMExecutionTraceRecord
+from app.models.mssql.candidate import RecruitCandidateMst
+from app.models.rules import RuleConfigProfile, RuleValidationTestCase
+from app.models.scoring_profile import ScoringProfileMaster, StopWord
+from app.models.taxonomy import (
+    DesignationMaster,
+    DesignationSkill,
+    DesignationSynonym,
+    DesignationAbbreviation,
+    DomainMaster,
+    JobFamilyMaster,
+    SkillMaster,
+)
+from app.models.training import HRFeedback
+
+from app.models.result import CVResult
+from app.models.processing_job import CVProcessingJob
+from app.models.integration import (
+    SyncRun,
+    SyncWatermark,
+    SyncError,
+    DepartmentSnapshot,
+    DesignationSnapshot,
+    JobProfileSnapshot,
+    CandidateSnapshot,
+    VacancySnapshot,
+)
+from app.models.validation import (
+    ShadowValidationRun,
+    ShadowValidationResult,
+    AirisHistoricalBenchmark,
+    ValidationMetricsSnapshot,
+    HRDisagreementReview,
+)
+
+__all__ = [
+    "CVResult",
+    "CVProcessingJob",
+    "CandidateEmbedding",
+    "DepartmentDomainMaster",
+    "DesignationMaster",
+    "DesignationSkill",
+    "DesignationSynonym",
+    "DomainEmbedding",
+    "DomainMaster",
+    "DesignationAbbreviation",
+    "GeoLocation",
+    "HRFeedback",
+    "JobFamilyMaster",
+    "LLMExecutionTraceRecord",
+    "NameDenylist",
+    "PromptTemplateMaster",
+    "RuleConfigProfile",
+    "RuleValidationTestCase",
+    "ScoringProfileMaster",
+    "SectionHeading",
+    "SkillMaster",
+    "StopWord",
+    "SystemConfig",
+    "VacancyEmbedding",
+    "SyncRun",
+    "SyncWatermark",
+    "SyncError",
+    "DepartmentSnapshot",
+    "DesignationSnapshot",
+    "JobProfileSnapshot",
+    "CandidateSnapshot",
+    "VacancySnapshot",
+    "ShadowValidationRun",
+    "ShadowValidationResult",
+    "AirisHistoricalBenchmark",
+    "ValidationMetricsSnapshot",
+    "HRDisagreementReview",
+    "RecruitCandidateMst",
+]

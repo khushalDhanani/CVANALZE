@@ -1,6 +1,9 @@
+from __future__ import annotations
+import json
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
+from typing import Any
 
 from app.core.logging import logger
 from app.schemas.analysis import PipelineStageMetrics
@@ -9,6 +12,8 @@ from app.schemas.analysis import PipelineStageMetrics
 class PipelineProfiler:
     """
     Timer and metrics collector for profiling every stage of the CV matching pipeline.
+    Supports single-stage timing contextmanagers, accumulated multi-vacancy stage timings,
+    and structured telemetry logging.
     """
 
     def __init__(self) -> None:
@@ -22,8 +27,23 @@ class PipelineProfiler:
             yield
         finally:
             duration_ms = round((time.perf_counter() - t0) * 1000.0, 2)
-            if hasattr(self.metrics, f"{stage_name}_ms"):
-                setattr(self.metrics, f"{stage_name}_ms", duration_ms)
+            attr = f"{stage_name}_ms"
+            if hasattr(self.metrics, attr):
+                current_val = getattr(self.metrics, attr, 0.0) or 0.0
+                setattr(self.metrics, attr, round(current_val + duration_ms, 2))
+
+    def add_stage_time(self, stage_name: str, duration_ms: float) -> None:
+        attr = f"{stage_name}_ms"
+        if hasattr(self.metrics, attr):
+            current_val = getattr(self.metrics, attr, 0.0) or 0.0
+            setattr(self.metrics, attr, round(current_val + duration_ms, 2))
+
+    def record_cache_event(self, hit: bool) -> None:
+        if hit:
+            self.metrics.cache_hits += 1
+            self.metrics.cache_hit = True
+        else:
+            self.metrics.cache_misses += 1
 
     def finish(self) -> PipelineStageMetrics:
         self.metrics.total_execution_ms = round((time.perf_counter() - self._start_time) * 1000.0, 2)
@@ -31,21 +51,28 @@ class PipelineProfiler:
             self.metrics.average_cv_processing_ms = self.metrics.total_execution_ms
         return self.metrics
 
+    def to_dict(self) -> dict[str, Any]:
+        return self.metrics.model_dump()
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2)
+
     def log_summary(self) -> None:
-        m = self.metrics
-        llm_time_ms = m.ollama_request_ms + m.model_inference_ms
-        cache_str = "HIT" if m.cache_hit else "MISS"
+        m = self.finish()
+        # ollama_request_ms is now written on both success and failure (OllamaError), so this is always accurate
+        llm_time_ms = m.ollama_request_ms
+        cache_str = f"HITS={m.cache_hits}, MISSES={m.cache_misses}"
+        logger.info("=== CV Analysis & Matching Pipeline Profile ===")
         logger.info(
-            f"=== LLM Pipeline Execution Profile ==="
+            f"[TIMINGS_MS] Docling={m.docling_extraction_ms} | Prefilter={m.prefilter_ms} | "
+            f"CandContext={m.candidate_context_ms} | VacContext={m.vacancy_context_ms} | "
+            f"ScoringTotal={m.scoring_ms} (Req:{m.evaluator_requirement_ms}, Trans:{m.evaluator_transition_ms}, "
+            f"Comp:{m.evaluator_component_ms}, Guard:{m.evaluator_cross_domain_ms}, Rec:{m.evaluator_recommendation_ms}) | "
+            f"LLM={llm_time_ms} (Inference:{m.model_inference_ms}) | Total={m.total_execution_ms}"
         )
         logger.info(
-            f"Stage Timings (ms): JSON Loading={m.json_loading_ms}ms | Vacancy Retrieval={m.vacancy_retrieval_ms}ms | "
-            f"Python Pre-filter={m.prefilter_ms}ms | Prompt Construction={m.prompt_construction_ms}ms | "
-            f"Ollama Request={m.ollama_request_ms}ms | Model Inference={m.model_inference_ms}ms | "
-            f"JSON Validation={m.json_validation_ms}ms | Scoring={m.scoring_ms}ms | Total Execution={m.total_execution_ms}ms"
-        )
-        logger.info(
-            f"Pipeline Stats: LLM Time={llm_time_ms}ms | Tokens={m.token_count} ({m.context_char_count} chars) | "
-            f"Vacancies Before Filter={m.vacancies_before_filtering} | Vacancies After Filter={m.vacancies_after_filtering} | "
-            f"Cache Status={cache_str} | Avg Time per CV={m.average_cv_processing_ms}ms"
+            f"[TELEMETRY] Vacancies: Raw={m.vacancies_before_filtering} -> Filtered={m.vacancies_after_filtering} "
+            f"-> LLM={m.prompt_vacancy_count} | "
+            f"Prompt: chars={m.prompt_input_chars} input_tokens={m.prompt_input_tokens} output_tokens={m.prompt_output_tokens} | "
+            f"Cache: {cache_str} | Total Time={m.total_execution_ms}ms"
         )

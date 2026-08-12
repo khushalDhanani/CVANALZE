@@ -1,12 +1,28 @@
+from __future__ import annotations
 import json
+from app.core.config import settings
+from app.services.context_packer import pack_cv_context
+from app.services.llm_input_security import harden_prompt
 
 PROMPT_VERSION = "1.0"
+
+
+def _build_section_aware_cv_text(cv_text: str, max_chars: int) -> str:
+    """Build the token-aware, section-balanced profile context."""
+    if not cv_text:
+        return cv_text
+    return pack_cv_context(cv_text, max_tokens=settings.LLM_PROFILE_TOKEN_BUDGET, deidentify=False).text
+
 
 def build_profile_extraction_prompt(cv_text: str) -> str:
     """
     Builds a strict JSON-only prompt for Qwen to extract a DynamicCandidateProfile
     from CV text without any hardcoded assumptions.
+    Uses section-aware budget allocation so all sections across multi-page CVs
+    (Experience, Education, Skills, Certifications) are included in the prompt context.
     """
+    cv_payload = _build_section_aware_cv_text(cv_text, max_chars=settings.LLM_PROFILE_MAX_CHARS)
+
     structured_input = {
         "task_instructions": (
             "Act as an expert HR Profile Extraction Engine. "
@@ -19,47 +35,20 @@ def build_profile_extraction_prompt(cv_text: str) -> str:
             "5. Detect career or domain transitions automatically from chronological evidence. "
             "6. Never assume a candidate belongs to a domain based solely on a degree, title, or keyword without supporting evidence. "
             "7. If evidence is insufficient or conflicting, set confidence to 'UNCERTAIN' and explain in evidence_notes. "
-            "8. Calculate relevant_experience_years logically by examining the timeline and durations of roles."
+            "8. Calculate relevant_experience_years logically by examining the timeline and durations of roles. "
+            "9. Do not infer experience or skills not explicitly stated in the CV. "
+            "10. For every extracted field, there must be corresponding evidence in the CV. If no evidence exists, omit the field or set it to empty. "
+            "11. Never use generic terms like 'strong communication skills' unless the CV explicitly mentions them."
         ),
-        "candidate_cv_markdown": cv_text,
+        # Section-aware payload (includes Experience, Education, Skills, Certifications from all pages)
+        "candidate_cv_markdown": cv_payload,
     }
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)
 
-    prompt = f"""{input_json}
-
-Provide your analysis in the EXACT JSON format below.
-DO NOT include any markdown formatting like ```json or ```.
-DO NOT include any thinking tokens or explanations outside the JSON object.
-Return ONLY valid JSON that conforms to this schema:
-
-{{
-  "education_domains": ["List of extracted education domains, e.g. Computer Science"],
-  "professional_domains": ["List of extracted professional domains, e.g. Software Engineering"],
-  "current_domain": "The most recent and primary professional domain",
-  "current_role": "The most recent job title or role",
-  "previous_roles": ["List of previous job titles"],
-  "career_transitions": [
-    {{
-      "from_role": "Previous role or domain",
-      "to_role": "New role or domain",
-      "reason_inferred": "Inferred reason for transition based on CV",
-      "evidence": "Evidence from CV supporting this transition"
-    }}
-  ],
-  "core_skills": ["List of core technical and soft skills demonstrated"],
-  "relevant_experience_years": 5.5,
-  "timeline": [
-    {{
-      "title": "Job Title or Degree",
-      "organization": "Company or University",
-      "start_date": "YYYY-MM",
-      "end_date": "YYYY-MM or null if present",
-      "description": "Brief description of responsibilities or achievements"
-    }}
-  ],
-  "confidence": "HIGH, MEDIUM, LOW, or UNCERTAIN",
-  "evidence_notes": "Explanation of inferences and any conflicting evidence"
-}}
-"""
-    return prompt
+    from app.services.prompt_service import PromptService
+    prompt = PromptService.get_prompt(
+        prompt_name="profile_extraction",
+        placeholders={"input_json": input_json}
+    )
+    return harden_prompt(prompt)

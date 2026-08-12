@@ -12,7 +12,7 @@ const getDefaultApiUrl = (): string => {
 
 export const API_CONFIG = {
   BASE_URL: getDefaultApiUrl(),
-  TIMEOUT_MS: 30000,
+  TIMEOUT_MS: 60000,
   POLL_INTERVAL_MS: 3000,
   MAX_POLL_RETRIES: 250,
 };
