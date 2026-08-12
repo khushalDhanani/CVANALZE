@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { Badge } from './Badge';
 import { VacancyMatchStatusBadge, VacancyFitScoreBreakdownCard, resolveVacancyFitScore } from './VacancyMatchStatusBadge';
 import { ComponentScoreBar } from './ComponentScoreBar';
+import { HiringRisksCard } from './HiringRisksCard';
 import { COLORS } from '@/constants/colors';
 import { JobMatchScore } from '@/types/api';
 
@@ -50,8 +51,8 @@ export function MatchAnalysisCard({
 
   const isDomainCapped = Boolean(
     bestMatch.domain_mismatch_capped ||
-    (bestMatch.mandatory_failures || []).some((f: any) => f.requirement_id === 'req_domain_mismatch') ||
-    (bestMatch.mandatory_fails || []).some((f: any) => (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')
+    (bestMatch.mandatory_failures || []).some((f: any) => f.failure_code === 'DOMAIN_MISMATCH' || f.requirement_id === 'req_domain_mismatch') ||
+    (bestMatch.mandatory_fails || []).some((f: any) => f.failure_code === 'DOMAIN_MISMATCH' || (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')
   );
 
   const matchStatus = bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification;
@@ -160,14 +161,14 @@ export function MatchAnalysisCard({
 
         if (rawFails.length > 0) {
           rawFails.forEach((f: any) => {
-            const title = typeof f === 'string' ? f : (f.requirement || f.description || f.requirement_id || 'Mandatory Requirement');
+            const title = typeof f === 'string' ? f : (f.failure_code || f.requirement || f.description || f.requirement_id || 'Mandatory Requirement');
             const details = typeof f === 'string' ? '' : (f.details || f.reason || f.failure_reason || '');
             failureList.push({ title, details });
           });
         } else if (failedReqs.length > 0) {
           failedReqs.forEach((r: any) => {
             failureList.push({
-              title: r.description || r.requirement_id || 'Mandatory Requirement',
+              title: r.failure_code || r.description || r.requirement_id || 'Mandatory Requirement',
               details: r.failure_reason || r.reason || '',
             });
           });
@@ -198,6 +199,11 @@ export function MatchAnalysisCard({
           </View>
         );
       })()}
+
+      {/* Hiring Risks & Concerns */}
+      {!!bestMatch.hiring_risks && bestMatch.hiring_risks.length > 0 && (
+        <HiringRisksCard risks={bestMatch.hiring_risks} />
+      )}
 
       {/* Skills Analysis */}
       {(() => {

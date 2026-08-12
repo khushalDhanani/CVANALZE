@@ -68,7 +68,7 @@ def mock_department_domain_repo(monkeypatch):
         domains = [
             DepartmentDomain(
                 id=1, department_id=9, department_name="CIS Team", domain_name="Information Technology & Software",
-                keywords=["developer", "flutter", "dotnet", "full stack", "ui/ux", "desktop support", "software engineer", "machine learning"],
+                keywords=["developer", "flutter", "dotnet", "full stack", "ui/ux", "desktop support", "software engineer", "machine learning", {"term": "IT", "match_type": "CASE_SENSITIVE_ACRONYM", "weight": 1.0}, "network", "server", "infrastructure"],
                 default_roles=["Software Developer"], priority=1
             ),
             DepartmentDomain(
@@ -85,7 +85,8 @@ def mock_department_domain_repo(monkeypatch):
             DepartmentDomain(id=5, department_id=5, department_name="HR", domain_name="HR", keywords=["hr"], default_roles=[], priority=5),
             DepartmentDomain(id=6, department_id=6, department_name="Operations", domain_name="Operations", keywords=["operations"], default_roles=[], priority=6),
             DepartmentDomain(id=7, department_id=7, department_name="Legal", domain_name="Legal", keywords=["legal"], default_roles=[], priority=7),
-            DepartmentDomain(id=8, department_id=8, department_name="Other", domain_name="Other", keywords=["other"], default_roles=[], priority=8)
+            DepartmentDomain(id=8, department_id=8, department_name="Other", domain_name="Other", keywords=["other"], default_roles=[], priority=8),
+            DepartmentDomain(id=9, department_id=29, department_name="QA Team", domain_name="Quality Assurance", keywords=["quality assurance", "qa", "validation", "audit", "test cases"], default_roles=["QA Manager"], priority=1)
         ]
         return domains
         

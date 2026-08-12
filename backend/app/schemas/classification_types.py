@@ -61,7 +61,7 @@ class HierarchyClassificationResult(BaseModel):
     main_department: HierarchyMatchNode
     department: HierarchyMatchNode
     designation: HierarchyMatchNode
-    is_hierarchy_valid: bool = Field(True, description="Whether parent-child hierarchy validation passed in MSSQL")
+    is_hierarchy_valid: bool | None = Field(None, description="Whether parent-child hierarchy validation passed in MSSQL")
     validation_errors: List[str] = Field(default_factory=list, description="Validation errors if hierarchy is invalid")
     overall_confidence: float = Field(..., ge=0.0, le=1.0, description="Combined hierarchy confidence score")
 

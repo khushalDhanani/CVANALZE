@@ -1,57 +1,4 @@
-# Work Status
-
-## Work Completed
-- Implemented normalized configuration hydration in `ConfigurationService.create_profile()`.
-- Added PostgreSQL migrations (`008_normalized_rule_tables.sql`) for normalized rule tables.
-- Corrected every MSSQL model by setting `__table_args__ = {"schema": "AIRIS"}` on all classes in `org.py` and `recruit.py`.
-- Replaced aggregates depending on nonexistent tables (removed `workflow_states` from `mssql_aggregates.py`).
-- Fixed the `SkillMaster.designations` mapper relationship in `taxonomy.py` by adding `cascade="all, delete-orphan"`.
-- Removed all executable MSSQL branches from the migration runner (`run_migrations.py`).
-- Added `match_status` to `EnrichedCandidateAnalysis` interface in `frontend/src/types/api.ts`.
-
-## Files Changed
-- `backend/app/services/configuration_service.py`
-- `backend/scripts/migrations/postgres/008_normalized_rule_tables.sql` (NEW)
-- `backend/scripts/migrations/postgres/008_normalized_rule_tables_down.sql` (NEW)
-- `backend/app/models/org.py`
-- `backend/app/models/recruit.py`
-- `backend/app/repositories/mssql_aggregates.py`
-- `backend/app/models/taxonomy.py`
-- `backend/scripts/run_migrations.py`
-- `frontend/src/types/api.ts`
-
-## Pending Work
-- None for the P0 startup fixes.
-
-## Important Decisions
-- To hydrate the normalized `RuleComponent`, `SystemRule`, `RuleCondition`, `RuleThreshold`, `RulePenalty`, `RuleWeight` tables, Pydantic objects from `UnifiedRuleConfig` were flattened and iterated dynamically inside `ConfigurationService.create_profile()`.
-- Due to MSSQL functioning strictly as a read-only data source, all MSSQL-specific execution logic in the migrations runner was stripped out to ensure clarity and safety.
-
----
-
-## Final Evidence-Based Audit (2026-08-07) — No code changed
-
-### Report/DB reconciliation
-- Truth source: `public.cv_results` (15 rows). `cvai.*` taxonomy + `cvai.match_results`/`match_results_history` are empty; `integration.vacancy_snapshots` empty; vacancies live from MSSQL (107 active).
-- 15 rows = 11 fully parsed/matched + 2 alias/orphan rows + 2 processing placeholders.
-- Alias rows still present (script `audit_db_integrity.py` targets but cleanup not run): `cv_gptsuifgr321345678o9p_c369770...` (identical content/score to `cv_gptsuifgr321345678o9p`, 86.9), `cv_document_cv_ut1765894215` (orphan, `cv_id=cv_ut1765894215`, null resume_json).
-- Processing placeholders: `cv_1760668444`, `cv_san1761727581_4f4334...`.
-- Claimed third-pass artifacts (`adversarial_audit_runner.py`, `walkthrough.md`, prior 45,927-byte workstatus narrative) do not exist on disk or in git. `workstatus.md` was later overwritten (HEAD `b58b5dc`); only trace is this session's findings.
-
-### Proven root causes (all reproducible)
-1. **Mitesh Darji 0.1-yr**: header dates detached from 4 jobs (`dates=None`). `_parse_job_dates_strict` (experience_gap_service.py:572-584) parses job bullets via `DateIntervalParser`; bullet token **"RAID-5"** fuzzy-parses to `2000-01-05→2000-01-31` via dateutil `default=datetime(2000,1,1)` (date_interval_parser.py:143-149). Two canonical jobs overlap → 1 block, 1 month, 0.1 yrs, "0 gaps", confidence 1.0 → NO_MATCH with min-experience failures.
-2. **Fabricated skill evidence** (`scoring_engine.py:174-185` sub-token loop): any single token in a sentence-like mandatory skill matches the whole skill at confidence 1.0. "2 to 3 years of experience in chemical plant." matched via the word "experience" for Dixant/PPC/Sandip (vac 1040); "HPLC knowledge" matched via "knowledge" for Urjitkumar (vac 1285); "QA documentation & Audit" via "documentation" for Chaitanya; "Plant Commission" via "plant" for Shahdab. `stop_phrases` (`e.g`, `etc`) auto-satisfy skills (Gtworks "Skill: e.g").
-3. **Name extraction**: full_name = "Sr. Flutter Developer" (Sandip) and "Production Planning & Control" (PPC; actual Sheth Mehulkumar Bhadreshbhai).
-4. **work_experience extraction**: Sandip 0 jobs, PPC 0 jobs (5 table jobs lost; QM 10.0 vs EGA 0.0), Dixant exp 2.0 vs CV ~5.7 yrs (Oct-2020→Jul-2024 + Aug-2024→present), Mitesh 4 jobs w/o dates.
-5. **Cross-domain guard failed**: Utkarsh (software) → Lab Assistant - I (QC) 85.0 with `domain_mismatch_capped=false` (false "Laboratory knowledge" from "lab research"); Software Developer (1334) fails LINQ/ADO.NET not inferred. Chaitanya classified Production/Chemical Manufacturing but best match is QA team; Shahdab classified C&I but best is Process & Project.
-6. **Sandip misclassification chain**: extraction loss → keyword classifier hit "healthcare/safety/environment" from Nurse Calling System project → EHS domain → Plant Assistant 80.7. Active Flutter vacancy (1065) that fits him exists and was matched by Gtworks 86.9.
-7. **Over-correction NOT present**; instead under-correction/entitlement via fabricated matches. Valid NO_MATCHs (Sakshi fresher, Abdul Mannan desktop-support) are correct and auditable via `unsuitable_openings`.
-
-### Files changed
-- None (audit only). Data dumps: `/var/folders/_t/1yldlwc56xx2b79hjv8nxwnh0000gn/T/opencode/cvaudit/`.
-
-### Pending work (fixes NOT applied, per no-code-change scope)
-- Fix sub-token matching to require full-phrase/verified evidence; fix `_parse_job_dates_strict` bullet fallback to reject bogus (year-2000) intervals; attach header dates to jobs; fix name/title extraction; infer absent tech skills (LINQ/ADO.NET); enforce domain guard consistently; re-run `reprocess_all_cvs.py` + `audit_db_integrity.py` cleanup after fixes.
+<truncated 54 lines>
 
 ---
 
@@ -134,3 +81,21 @@ Triggered by `cv_1761281901_CandidateCVFileName_13595` (Shubham Gavhane — ITI 
   - `has_genuine_match = true`
   - `domain_mismatch_capped = false` on Maintenance sub-team vacancies
 
+---
+
+## Domain Taxonomy & LLM Hierarchy Fixes (2026-08-12)
+
+### Root Causes Fixed
+1. **Tri-State Hierarchy Rejection Bug** — `VacancyFitEvaluator`. `is_hierarchy_valid` was incorrectly coercing "Unknown" (insufficient evidence) into `False`, causing strong matches to fail the `has_genuine_match` test. Updated to use tri-state logic (`True`, `False`, `None`) where `None` signifies unknown and DOES NOT block a match. Fixed regression tests accordingly.
+2. **KeywordConfig Schema Mismatch in Legacy Tests** — `test_department_domain_repository.py`. Tests were asserting `assert kw in it.keywords`, but keywords are now modeled as `KeywordConfig` objects instead of strings. Tests have been updated to check `k.term`.
+3. **Gemma Domain Output Override Over Strong Deterministic Domain** — `CandidateAnalysisContext`. The candidate's deterministically classified domain was incorrectly getting overwritten by Gemma's unvalidated `professional_domains` output even when deterministic confidence was high. Implemented strict precedence rules: deterministic classification takes precedence. Gemma can suggest a domain only if it's explicitly backed by keyword evidence from the CV in `CandidateDomainService._has_domain_evidence`. Fixed test environments so that mock domains don't trigger broken Ollama embedding calls.
+
+### Files Changed
+- `backend/app/services/candidate_domain_service.py`
+- `backend/app/services/match_evaluators.py`
+- `backend/tests/test_domain_matching.py`
+- `backend/tests/test_department_domain_repository.py`
+
+### Verification
+- `tests/test_domain_matching.py` successfully passes all regression tests, correctly asserting `None` logic and preventing Gemma hallucinations from overriding deterministic taxonomies.
+- `tests/test_department_domain_repository.py` passes completely. Mock `DynamicTaxonomyService` was put in place to ensure Ollama availability does not fail legacy test suites.

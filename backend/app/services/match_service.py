@@ -130,7 +130,7 @@ class MatchService:
             profiler.log_summary()
             quality_gate.record("vacancy_retrieval", "PASSED_EMPTY", source_count=0, retrieved_count=0)
             quality_gate.record("final_classification", "PASSED", match_status="NO_ACTIVE_VACANCIES", final_score=None)
-            return MatchService._empty_analysis(cv_text=cv_text, normalized_resume=normalized_resume, quality_gate=quality_gate)
+            return MatchService._empty_analysis(cv_text=cv_text, normalized_resume=normalized_resume, quality_gate=quality_gate, is_global_empty=True)
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
@@ -196,22 +196,31 @@ class MatchService:
             domain=candidate_context.cand_tax_domain or "Unknown",
             families=candidate_context.cand_families,
         )
-
+        from app.services.vacancy_prefilter import InsufficientEvidenceError, AnalysisUnavailableError
         # 5. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
         with profiler.time_stage("prefilter"):
-            filtered_job_contexts = cast(
-                list[JobEvaluationContext],
-                VacancyPreFilter.filter_vacancies(
-                    cv_text=cv_text,
-                    openings=openings,
-                    candidate_experience=candidate_context.candidate_experience,
-                    top_k=settings.PREFILTER_TOP_K,
-                    cv_embedding=cv_embedding,
-                    resume_json=resume_json,
-                    analysis_context=candidate_context,
-                    return_contexts=True,
-                ),
-            )
+            try:
+                filtered_job_contexts = cast(
+                    list[JobEvaluationContext],
+                    VacancyPreFilter.filter_vacancies(
+                        cv_text=cv_text,
+                        openings=openings,
+                        candidate_experience=candidate_context.candidate_experience,
+                        top_k=settings.PREFILTER_TOP_K,
+                        cv_embedding=cv_embedding,
+                        resume_json=resume_json,
+                        analysis_context=candidate_context,
+                        return_contexts=True,
+                    ),
+                )
+            except InsufficientEvidenceError as exc:
+                logger.warning(f"Insufficient evidence for candidate match: {exc}")
+                readiness = MatchingReadiness(False, "INSUFFICIENT_EVIDENCE", str(exc))
+                return MatchService._unavailable_analysis(normalized_resume, readiness, quality_gate, status=MatchStatus.INSUFFICIENT_EVIDENCE)
+            except AnalysisUnavailableError as exc:
+                logger.error(f"Analysis unavailable: {exc}")
+                readiness = MatchingReadiness(False, "ANALYSIS_UNAVAILABLE", str(exc))
+                return MatchService._unavailable_analysis(normalized_resume, readiness, quality_gate, status=MatchStatus.ANALYSIS_UNAVAILABLE)
         filtered_vacancies = [job.raw_job for job in filtered_job_contexts]
         profiler.metrics.vacancies_after_filtering = len(filtered_job_contexts)
         quality_gate.record(
@@ -473,6 +482,9 @@ class MatchService:
                             f"Ranked #{i + 1} due to lower fit score ({m.vacancy_fit_score or m.score}% vs top "
                             f"{evaluated_matches[0].vacancy_fit_score or evaluated_matches[0].score}%)."
                         )
+                    
+                    is_h_valid = getattr(m.score_breakdown, "is_hierarchy_valid", None) if m.score_breakdown else None
+                    logger.debug(f"Vacancy {m.vacancy_id} Validity -> domain_validity={not m.domain_mismatch_capped}, hierarchy_validity={is_h_valid}, match_status={m.vacancy_match_status}")
 
                     evidence_snippet = "; ".join(f"{ev.cv_evidence}" for ev in m.evidence.values())
                     if len(evidence_snippet) > 150:
@@ -561,7 +573,8 @@ class MatchService:
                 f"• Suitable Job Roles: {roles_str}"
             )
 
-        logger.info(f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}', has_genuine_match={has_genuine_match}")
+        logger.info(f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}'")
+        logger.info(f"Final Genuine-Match Decision: has_genuine_match={has_genuine_match}")
 
         suitable_matches = eligible_matches
         unsuitable_matches = [m for m in evaluated_matches if m not in eligible_matches]
@@ -750,6 +763,7 @@ class MatchService:
         normalized_resume: NormalizedResume,
         readiness: MatchingReadiness,
         quality_gate: MatchingQualityGate,
+        status: MatchStatus = MatchStatus.ANALYSIS_UNAVAILABLE,
     ) -> EnrichedCandidateAnalysis:
         quality_gate.record("final_classification", "BLOCKED", reason_code=readiness.reason_code)
         try:
@@ -757,11 +771,11 @@ class MatchService:
         except Exception:
             config_version = None
         return EnrichedCandidateAnalysis(
-            status=MatchStatus.ANALYSIS_UNAVAILABLE.value,
+            status=status.value,
             stage="matching_quality_gate",
-            match_status=MatchStatus.ANALYSIS_UNAVAILABLE,
+            match_status=status,
             has_genuine_match=False,
-            active_vacancy_summary=f"ANALYSIS_UNAVAILABLE: {readiness.reason}",
+            active_vacancy_summary=f"{status.value}: {readiness.reason}",
             suitable_openings=[],
             unsuitable_openings=[],
             normalized_resume=normalized_resume,
@@ -842,6 +856,7 @@ class MatchService:
         cv_text: str = "",
         normalized_resume: NormalizedResume | None = None,
         quality_gate: MatchingQualityGate | None = None,
+        is_global_empty: bool = False,
     ) -> EnrichedCandidateAnalysis:
         from app.schemas.scoring_config import ScoringConfig
 
@@ -890,15 +905,18 @@ class MatchService:
             cv_text=cv_text,
         )
 
+        status = MatchStatus.NO_ACTIVE_VACANCIES if is_global_empty else MatchStatus.NO_SUITABLE_MATCH
+        summary = "NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation." if is_global_empty else "NO_SUITABLE_MATCH: No compatible active vacancies found for this candidate profile."
+        
         return EnrichedCandidateAnalysis(
-            match_status=MatchStatus.NO_ACTIVE_VACANCIES,
+            match_status=status,
             primary_department=industry_dept or None,
             recommended_department=industry_dept or None,
             professional_domain=industry_domain or None,
             strengths=strengths,
             suitable_job_roles=roles,
             has_genuine_match=False,
-            active_vacancy_summary="NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation.",
+            active_vacancy_summary=summary,
             scoring_profile_code=scoring_config.profile_code,
             scoring_profile_version=scoring_config.profile_version,
             config_version=RuleConfigManager.get_config().version,

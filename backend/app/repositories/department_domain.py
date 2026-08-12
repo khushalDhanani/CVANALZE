@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.domain import DepartmentDomainMaster
-from app.schemas.domain import DepartmentDomain
+from app.schemas.domain import DepartmentDomain, MatchType
 
 
 
@@ -96,7 +96,7 @@ class DepartmentDomainRepository:
                 "department_id": domain.department_id,
                 "department_name": domain.department_name,
                 "domain_name": domain.domain_name,
-                "keywords": sorted(domain.keywords),
+                "keywords": sorted([kw.model_dump() for kw in domain.keywords], key=lambda k: k["term"]),
                 "default_roles": sorted(domain.default_roles),
                 "priority": domain.priority,
             }
@@ -114,9 +114,22 @@ class DepartmentDomainRepository:
         if not domains:
             logger.warning("[DEPARTMENT_DOMAIN] DB returned 0 domains. Application requires initialized taxonomy in Database!")
             domains = []
+        self._validate_domains(domains)
         self._domains = domains
         self._matchers = self._build_matchers(domains)
         logger.info(f"[DEPARTMENT_DOMAIN] Loaded {len(domains)} active domain(s) from {source}.")
+
+
+    @staticmethod
+    def _validate_domains(domains: list[DepartmentDomain]) -> None:
+        from app.core.rule_config_manager import RuleConfigManager
+        stop_words = set(RuleConfigManager.get_prefilter_rules().stop_words)
+        for domain in domains:
+            for kw in domain.keywords:
+                if kw.term.lower() in stop_words and kw.match_type != MatchType.CASE_SENSITIVE_ACRONYM:
+                    from app.core.logging import logger
+                    logger.error(f"[TAXONOMY_VALIDATION] Ambiguous keyword '{kw.term}' found in domain '{domain.domain_name}'. This keyword matches a common stop word and requires explicit 'CASE_SENSITIVE_ACRONYM' configuration to prevent false positives.")
+                    raise ValueError(f"Unsafe ambiguous keyword '{kw.term}' detected in taxonomy configuration.")
 
     def _create_session(self) -> Session | None:
         if self._db_factory is not None:
@@ -173,20 +186,28 @@ class DepartmentDomainRepository:
 
     @staticmethod
     def _build_matchers(domains: list[DepartmentDomain]) -> list[DomainMatcher]:
-        return [
-            DomainMatcher(
-                domain=domain,
-                _keyword_patterns=tuple(
-                    re.compile(
-                        r"(?:\b|_)" + re.escape(keyword) + r"(?:\b|_)",
-                        re.IGNORECASE,
+        patterns = []
+        for domain in domains:
+            domain_patterns = []
+            keyword_strings = []
+            for kw in domain.keywords:
+                keyword_strings.append(kw.term)
+                if kw.match_type == MatchType.CASE_SENSITIVE_ACRONYM:
+                    domain_patterns.append(
+                        re.compile(r"(?:\b|_)" + re.escape(kw.term) + r"(?:\b|_)")
                     )
-                    for keyword in domain.keywords
-                ),
-                _keyword_words=frozenset(domain.keywords),
+                else:
+                    domain_patterns.append(
+                        re.compile(r"(?:\b|_)" + re.escape(kw.term) + r"(?:\b|_)", re.IGNORECASE)
+                    )
+            patterns.append(
+                DomainMatcher(
+                    domain=domain,
+                    _keyword_patterns=tuple(domain_patterns),
+                    _keyword_words=frozenset(keyword_strings),
+                )
             )
-            for domain in domains
-        ]
+        return patterns
 
 
 department_domain_repository = DepartmentDomainRepository()

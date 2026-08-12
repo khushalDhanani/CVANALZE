@@ -17,6 +17,14 @@ from app.services.dynamic_scoring_prefilter_service import (
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
 from app.services.job_taxonomy import TaxonomyClassifier
 from app.services.quality_metrics import QualityMetrics
+class InsufficientEvidenceError(Exception):
+    """Raised when candidate CV lacks sufficient evidence to determine a safe matching domain."""
+    pass
+
+
+class AnalysisUnavailableError(Exception):
+    """Raised when required taxonomy/configuration is unavailable to perform matching."""
+    pass
 
 
 @dataclass
@@ -207,17 +215,33 @@ class VacancyPreFilter:
 
         # STAGE 0: Job Taxonomy Search Space Filtering
         t0 = time.perf_counter()
-        stage0_jobs = job_contexts
-        default_family = RuleConfigManager.get_taxonomy_rules().default_family
+        taxonomy_rules = RuleConfigManager.get_taxonomy_rules()
+        
+        # 1. Missing Taxonomy
+        if not taxonomy_rules.candidate_rules or not taxonomy_rules.canonical_domains:
+            raise AnalysisUnavailableError("Taxonomy/configuration is unavailable")
+
+        default_family = taxonomy_rules.default_family
         candidate_taxonomy_known = bool(
             cand_ctx.cand_domain not in (None, "", "Unknown", "Not Configured")
             and cand_ctx.cand_families
             and cand_ctx.cand_families not in ([default_family], ["Unknown"], ["Not Configured"])
         )
+
         if candidate_taxonomy_known:
-            compatible_jobs = [j for j in job_contexts if j.vac_tax_domain in ("Unknown", "Not Configured") or j.vac_family in ("Unknown", "Not Configured") or TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) or j.vac_tax_domain == cand_ctx.cand_domain]
-            if compatible_jobs:
-                stage0_jobs = compatible_jobs
+            # 2. Known Candidate Domain
+            stage0_jobs = [
+                j for j in job_contexts 
+                if j.vac_tax_domain in ("Unknown", "Not Configured") 
+                or j.vac_family in ("Unknown", "Not Configured") 
+                or TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) 
+                or j.vac_tax_domain == cand_ctx.cand_domain
+            ]
+            if not stage0_jobs:
+                return []
+        else:
+            # 3. Unknown Candidate Domain
+            raise InsufficientEvidenceError("Candidate domain cannot be resolved with sufficient evidence")
 
         t_stage0_ms = round((time.perf_counter() - t0) * 1000.0, 2)
         logger.info(

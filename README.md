@@ -248,7 +248,7 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `LLM_ENABLED` | `true` | Enables semantic generation; deterministic scoring remains available when disabled. |
 | `EMBEDDING_ENABLED` | `true` | Enables embedding-backed retrieval and related features. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint; Compose defaults to `host.docker.internal`. |
-| `OLLAMA_MODEL` | `gemma3:4b` | Generation model. |
+| `OLLAMA_MODEL` | `gemma3:1b` | Generation model. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model. |
 | `OLLAMA_REQUEST_TIMEOUT` | `60` | Compatibility timeout used by the shared client. |
 | `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout for every Ollama operation. |

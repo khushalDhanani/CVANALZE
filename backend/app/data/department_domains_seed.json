@@ -4,8 +4,74 @@
       "department_id": 1,
       "department_name": "Research & Development Team",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory", "chemical research", "analytical chemistry", "organic chemistry", "process development"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst", "Senior Research Associate"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemical research",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "analytical chemistry",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "organic chemistry",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "process development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst",
+        "Senior Research Associate"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -13,8 +79,69 @@
       "department_id": 2,
       "department_name": "Analytical Development Team",
       "domain_name": "Analytical Chemistry",
-      "keywords": ["analytical", "hplc", "gc", "spectroscopy", "chromatography", "method development", "validation", "analytical development", "instrumentation", "mass spectrometry", "titration"],
-      "default_roles": ["Analytical Chemist", "Senior Analyst", "Method Development Scientist", "Instrument Analyst"],
+      "keywords": [
+        {
+          "term": "analytical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "hplc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "spectroscopy",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chromatography",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "method development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "validation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "analytical development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "instrumentation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "mass spectrometry",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "titration",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Analytical Chemist",
+        "Senior Analyst",
+        "Method Development Scientist",
+        "Instrument Analyst"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -22,8 +149,74 @@
       "department_id": 3,
       "department_name": "Production Team",
       "domain_name": "Chemical Manufacturing",
-      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield", "distillation", "filtration"],
-      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "keywords": [
+        {
+          "term": "production",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "manufacturing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "batch",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "reactor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plant",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "process",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gmp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemical manufacturing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "scale-up",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "yield",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "distillation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "filtration",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Production Engineer",
+        "Plant Operator",
+        "Shift Chemist",
+        "Production Supervisor"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -31,8 +224,69 @@
       "department_id": 4,
       "department_name": "Maintenance Team",
       "domain_name": "Industrial Maintenance",
-      "keywords": ["maintenance", "mechanical", "repair", "preventive maintenance", "breakdown", "equipment", "machinery", "plumbing", "welding", "fitter", "lathe"],
-      "default_roles": ["Maintenance Engineer", "Maintenance Technician", "Mechanical Fitter", "Maintenance Supervisor"],
+      "keywords": [
+        {
+          "term": "maintenance",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "mechanical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "repair",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "preventive maintenance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "breakdown",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "equipment",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "machinery",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plumbing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "welding",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "fitter",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "lathe",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Maintenance Engineer",
+        "Maintenance Technician",
+        "Mechanical Fitter",
+        "Maintenance Supervisor"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -40,8 +294,69 @@
       "department_id": 5,
       "department_name": "Control & Instrumentation Team",
       "domain_name": "Instrumentation & Control",
-      "keywords": ["instrumentation", "control", "plc", "scada", "dcs", "automation", "calibration", "sensors", "control systems", "pid", "process control"],
-      "default_roles": ["Instrumentation Engineer", "Control Systems Engineer", "Automation Engineer", "C&I Technician"],
+      "keywords": [
+        {
+          "term": "instrumentation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "control",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "scada",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "dcs",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "automation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "calibration",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "sensors",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "control systems",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "pid",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "process control",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Instrumentation Engineer",
+        "Control Systems Engineer",
+        "Automation Engineer",
+        "C&I Technician"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -49,8 +364,74 @@
       "department_id": 6,
       "department_name": "EHS Team",
       "domain_name": "Environment Health & Safety",
-      "keywords": ["ehs", "safety", "environment", "health", "fire", "hazard", "risk assessment", "safety audit", "incident", "osha", "iso 14001", "iso 45001"],
-      "default_roles": ["EHS Officer", "Safety Engineer", "Environment Engineer", "EHS Manager"],
+      "keywords": [
+        {
+          "term": "ehs",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "safety",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "environment",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "health",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "fire",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "hazard",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "risk assessment",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "safety audit",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "incident",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "osha",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "iso 14001",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "iso 45001",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "EHS Officer",
+        "Safety Engineer",
+        "Environment Engineer",
+        "EHS Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -58,8 +439,63 @@
       "department_id": 7,
       "department_name": "Board of Directors",
       "domain_name": "Executive Leadership",
-      "keywords": ["director", "board", "ceo", "cfo", "coo", "managing director", "executive", "leadership", "strategy", "governance"],
-      "default_roles": ["Director", "Managing Director", "Chief Executive Officer"],
+      "keywords": [
+        {
+          "term": "director",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "board",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "ceo",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "cfo",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "coo",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "managing director",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "executive",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "leadership",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "strategy",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "governance",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Director",
+        "Managing Director",
+        "Chief Executive Officer"
+      ],
       "priority": 10,
       "is_active": true
     },
@@ -67,8 +503,79 @@
       "department_id": 8,
       "department_name": "Finance Team",
       "domain_name": "Finance & Accounting",
-      "keywords": ["finance", "accounting", "accounts", "taxation", "gst", "tds", "audit", "budgeting", "tally", "sap fico", "payroll", "costing", "financial reporting"],
-      "default_roles": ["Accountant", "Finance Executive", "Accounts Officer", "Finance Manager"],
+      "keywords": [
+        {
+          "term": "finance",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "accounting",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "accounts",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "taxation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gst",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "tds",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "audit",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "budgeting",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "tally",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "sap fico",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "payroll",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "costing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "financial reporting",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Accountant",
+        "Finance Executive",
+        "Accounts Officer",
+        "Finance Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -76,8 +583,189 @@
       "department_id": 9,
       "department_name": "CIS Team",
       "domain_name": "Information Technology",
-      "keywords": ["it", "software", "software developer", "developer", "programming", "web development", "web developer", "frontend", "front-end", "backend", "full stack", "mobile development", "mobile developer", "javascript", "typescript", "react", "next.js", "flutter", "dart", "asp.net", ".net", "c#", "api development", "firebase", "network", "server", "database", "erp", "sap", "helpdesk", "cybersecurity", "infrastructure", "system administration", "it support"],
-      "default_roles": ["Software Developer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile Application Developer", "IT Executive", "System Administrator", "Network Engineer", "IT Manager"],
+      "keywords": [
+        {
+          "term": "IT",
+          "match_type": "CASE_SENSITIVE_ACRONYM",
+          "weight": 1.0
+        },
+        {
+          "term": "software",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "software developer",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "developer",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "programming",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "web development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "web developer",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "frontend",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "front-end",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "backend",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "full stack",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "mobile development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "mobile developer",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "javascript",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "typescript",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "react",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "next.js",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "flutter",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "dart",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "asp.net",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": ".net",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "c#",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "firebase",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "network",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "server",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "database",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "erp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "sap",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "helpdesk",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "cybersecurity",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "infrastructure",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "system administration",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "it support",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Software Developer",
+        "Frontend Developer",
+        "Backend Developer",
+        "Full Stack Developer",
+        "Mobile Application Developer",
+        "IT Executive",
+        "System Administrator",
+        "Network Engineer",
+        "IT Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -85,8 +773,65 @@
       "department_id": 10,
       "department_name": "HR & IR Team",
       "domain_name": "Human Resources",
-      "keywords": ["hr", "human resources", "recruitment", "payroll", "industrial relations", "labor", "compliance", "training", "performance management", "employee engagement"],
-      "default_roles": ["HR Executive", "HR Manager", "IR Officer", "Recruiter", "Training Coordinator"],
+      "keywords": [
+        {
+          "term": "hr",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "human resources",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "recruitment",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "payroll",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "industrial relations",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "labor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "compliance",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "training",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "performance management",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "employee engagement",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "HR Executive",
+        "HR Manager",
+        "IR Officer",
+        "Recruiter",
+        "Training Coordinator"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -94,8 +839,59 @@
       "department_id": 11,
       "department_name": "Procurement Team",
       "domain_name": "Procurement & Supply Chain",
-      "keywords": ["procurement", "purchasing", "vendor", "supplier", "sourcing", "negotiation", "purchase order", "supply chain", "material management"],
-      "default_roles": ["Purchase Executive", "Procurement Officer", "Vendor Manager", "Supply Chain Executive"],
+      "keywords": [
+        {
+          "term": "procurement",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "purchasing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "vendor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "supplier",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "sourcing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "negotiation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "purchase order",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "supply chain",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "material management",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Purchase Executive",
+        "Procurement Officer",
+        "Vendor Manager",
+        "Supply Chain Executive"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -103,8 +899,59 @@
       "department_id": 12,
       "department_name": "Logistic Team",
       "domain_name": "Logistics & Warehousing",
-      "keywords": ["logistics", "warehouse", "transportation", "shipping", "dispatch", "inventory", "freight", "supply chain", "distribution"],
-      "default_roles": ["Logistics Executive", "Warehouse Supervisor", "Dispatch Coordinator", "Logistics Manager"],
+      "keywords": [
+        {
+          "term": "logistics",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "warehouse",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "transportation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "shipping",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "dispatch",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "inventory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "freight",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "supply chain",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "distribution",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Logistics Executive",
+        "Warehouse Supervisor",
+        "Dispatch Coordinator",
+        "Logistics Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -112,8 +959,58 @@
       "department_id": 13,
       "department_name": "Business Development Team",
       "domain_name": "Business Development",
-      "keywords": ["business development", "sales", "marketing", "client", "revenue", "pipeline", "lead generation", "market research", "strategic partnership"],
-      "default_roles": ["Business Development Executive", "BD Manager", "Key Account Manager"],
+      "keywords": [
+        {
+          "term": "business development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "sales",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "marketing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "client",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "revenue",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "pipeline",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "lead generation",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "market research",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "strategic partnership",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Business Development Executive",
+        "BD Manager",
+        "Key Account Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -121,8 +1018,63 @@
       "department_id": 14,
       "department_name": "Environment Team",
       "domain_name": "Environmental Engineering",
-      "keywords": ["environment", "etp", "stp", "pollution", "waste management", "effluent", "emission", "environmental compliance", "pcb", "cpcb"],
-      "default_roles": ["Environmental Engineer", "ETP Operator", "Environmental Officer"],
+      "keywords": [
+        {
+          "term": "environment",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "etp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "stp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "pollution",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "waste management",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "effluent",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "emission",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "environmental compliance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "pcb",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "cpcb",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Environmental Engineer",
+        "ETP Operator",
+        "Environmental Officer"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -130,8 +1082,53 @@
       "department_id": 15,
       "department_name": "Store Team (Engineering)",
       "domain_name": "Stores & Inventory",
-      "keywords": ["stores", "inventory", "stock", "spare parts", "material issue", "bin card", "engineering stores", "asset management"],
-      "default_roles": ["Store Keeper", "Store Supervisor", "Inventory Controller"],
+      "keywords": [
+        {
+          "term": "stores",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "inventory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "stock",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "spare parts",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "material issue",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "bin card",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "engineering stores",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "asset management",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Store Keeper",
+        "Store Supervisor",
+        "Inventory Controller"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -139,8 +1136,64 @@
       "department_id": 16,
       "department_name": "Sales Team",
       "domain_name": "Sales & Marketing",
-      "keywords": ["sales", "marketing", "customer", "revenue", "target", "crm", "export", "domestic sales", "international sales", "key account"],
-      "default_roles": ["Sales Executive", "Area Sales Manager", "Sales Manager", "Marketing Executive"],
+      "keywords": [
+        {
+          "term": "sales",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "marketing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "customer",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "revenue",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "target",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "crm",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "export",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "domestic sales",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "international sales",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "key account",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Sales Executive",
+        "Area Sales Manager",
+        "Sales Manager",
+        "Marketing Executive"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -148,8 +1201,58 @@
       "department_id": 17,
       "department_name": "Commercial Team",
       "domain_name": "Commercial Operations",
-      "keywords": ["commercial", "import", "export", "customs", "documentation", "shipping", "forex", "letter of credit", "trade compliance"],
-      "default_roles": ["Commercial Executive", "Import-Export Coordinator", "Documentation Officer"],
+      "keywords": [
+        {
+          "term": "commercial",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "import",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "export",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "customs",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "documentation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "shipping",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "forex",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "letter of credit",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "trade compliance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Commercial Executive",
+        "Import-Export Coordinator",
+        "Documentation Officer"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -157,8 +1260,48 @@
       "department_id": 18,
       "department_name": "Technical Team",
       "domain_name": "Technical Services",
-      "keywords": ["technical", "process engineering", "technology transfer", "scale-up", "validation", "technical support", "process optimization"],
-      "default_roles": ["Technical Officer", "Process Engineer", "Technical Manager"],
+      "keywords": [
+        {
+          "term": "technical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "process engineering",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "technology transfer",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "scale-up",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "validation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "technical support",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "process optimization",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Technical Officer",
+        "Process Engineer",
+        "Technical Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -166,8 +1309,64 @@
       "department_id": 19,
       "department_name": "Production Team - 1 (Rakesh Modi)",
       "domain_name": "Chemical Manufacturing",
-      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
-      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "keywords": [
+        {
+          "term": "production",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "manufacturing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "batch",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "reactor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plant",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "process",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gmp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemical manufacturing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "scale-up",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "yield",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Production Engineer",
+        "Plant Operator",
+        "Shift Chemist",
+        "Production Supervisor"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -175,8 +1374,64 @@
       "department_id": 20,
       "department_name": "Production Team - 2 (Viral Panchal)",
       "domain_name": "Chemical Manufacturing",
-      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
-      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "keywords": [
+        {
+          "term": "production",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "manufacturing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "batch",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "reactor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plant",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "process",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gmp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemical manufacturing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "scale-up",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "yield",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Production Engineer",
+        "Plant Operator",
+        "Shift Chemist",
+        "Production Supervisor"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -184,8 +1439,64 @@
       "department_id": 21,
       "department_name": "Production Team - 3 (Kalpesh Patel)",
       "domain_name": "Chemical Manufacturing",
-      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
-      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "keywords": [
+        {
+          "term": "production",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "manufacturing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "batch",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "reactor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plant",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "process",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gmp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemical manufacturing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "scale-up",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "yield",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Production Engineer",
+        "Plant Operator",
+        "Shift Chemist",
+        "Production Supervisor"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -193,8 +1504,64 @@
       "department_id": 22,
       "department_name": "Production Team - 4 (Hiren Fultariya)",
       "domain_name": "Chemical Manufacturing",
-      "keywords": ["production", "manufacturing", "batch", "reactor", "plant", "process", "gmp", "chemical manufacturing", "scale-up", "yield"],
-      "default_roles": ["Production Engineer", "Plant Operator", "Shift Chemist", "Production Supervisor"],
+      "keywords": [
+        {
+          "term": "production",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "manufacturing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "batch",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "reactor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plant",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "process",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gmp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemical manufacturing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "scale-up",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "yield",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Production Engineer",
+        "Plant Operator",
+        "Shift Chemist",
+        "Production Supervisor"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -202,8 +1569,53 @@
       "department_id": 23,
       "department_name": "Maintenance Team - 1",
       "domain_name": "Industrial Maintenance",
-      "keywords": ["maintenance", "mechanical", "repair", "preventive maintenance", "breakdown", "equipment", "machinery", "fitter"],
-      "default_roles": ["Maintenance Engineer", "Maintenance Technician", "Mechanical Fitter"],
+      "keywords": [
+        {
+          "term": "maintenance",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "mechanical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "repair",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "preventive maintenance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "breakdown",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "equipment",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "machinery",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "fitter",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Maintenance Engineer",
+        "Maintenance Technician",
+        "Mechanical Fitter"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -211,8 +1623,53 @@
       "department_id": 24,
       "department_name": "Maintenance Team - 2 (Parag Detroja)",
       "domain_name": "Industrial Maintenance",
-      "keywords": ["maintenance", "mechanical", "repair", "preventive maintenance", "breakdown", "equipment", "machinery", "fitter"],
-      "default_roles": ["Maintenance Engineer", "Maintenance Technician", "Mechanical Fitter"],
+      "keywords": [
+        {
+          "term": "maintenance",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "mechanical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "repair",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "preventive maintenance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "breakdown",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "equipment",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "machinery",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "fitter",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Maintenance Engineer",
+        "Maintenance Technician",
+        "Mechanical Fitter"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -220,8 +1677,69 @@
       "department_id": 25,
       "department_name": "Creative Team",
       "domain_name": "Creative & Design",
-      "keywords": ["creative", "design", "graphic", "photoshop", "illustrator", "branding", "ui", "ux", "visual design", "video editing", "photography"],
-      "default_roles": ["Graphic Designer", "Creative Designer", "UI/UX Designer", "Video Editor"],
+      "keywords": [
+        {
+          "term": "creative",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "design",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "graphic",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "photoshop",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "illustrator",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "branding",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "ui",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "ux",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "visual design",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "video editing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "photography",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Graphic Designer",
+        "Creative Designer",
+        "UI/UX Designer",
+        "Video Editor"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -229,8 +1747,68 @@
       "department_id": 26,
       "department_name": "Electrical Team",
       "domain_name": "Electrical Engineering",
-      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear", "ht", "lt", "electrical maintenance", "relay"],
-      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "keywords": [
+        {
+          "term": "electrical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "power",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "transformer",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "motor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "panel",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "wiring",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "switchgear",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "ht",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "lt",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "electrical maintenance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "relay",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Electrical Engineer",
+        "Electrician",
+        "Electrical Supervisor"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -238,8 +1816,59 @@
       "department_id": 27,
       "department_name": "Admin Team",
       "domain_name": "Administration",
-      "keywords": ["admin", "administration", "office", "facility", "housekeeping", "travel", "canteen", "guest house", "security"],
-      "default_roles": ["Admin Executive", "Office Coordinator", "Facility Manager", "Admin Manager"],
+      "keywords": [
+        {
+          "term": "admin",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "administration",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "office",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "facility",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "housekeeping",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "travel",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "canteen",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "guest house",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "security",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Admin Executive",
+        "Office Coordinator",
+        "Facility Manager",
+        "Admin Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -247,8 +1876,64 @@
       "department_id": 28,
       "department_name": "Quality Control Team",
       "domain_name": "Quality Control",
-      "keywords": ["quality control", "qc", "testing", "analysis", "hplc", "gc", "dissolution", "stability", "raw material testing", "finished product testing"],
-      "default_roles": ["QC Analyst", "QC Chemist", "QC Executive", "QC Manager"],
+      "keywords": [
+        {
+          "term": "quality control",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "qc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "testing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "analysis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "hplc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "dissolution",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "stability",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "raw material testing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "finished product testing",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "QC Analyst",
+        "QC Chemist",
+        "QC Executive",
+        "QC Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -256,8 +1941,74 @@
       "department_id": 29,
       "department_name": "QA Team",
       "domain_name": "Quality Assurance",
-      "keywords": ["quality assurance", "qa", "gmp", "documentation", "deviation", "capa", "change control", "validation", "audit", "regulatory", "batch record", "sop"],
-      "default_roles": ["QA Executive", "QA Officer", "QA Manager", "Validation Engineer"],
+      "keywords": [
+        {
+          "term": "quality assurance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "qa",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gmp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "documentation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "deviation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "capa",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "change control",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "validation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "audit",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "regulatory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "batch record",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "sop",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "QA Executive",
+        "QA Officer",
+        "QA Manager",
+        "Validation Engineer"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -265,8 +2016,58 @@
       "department_id": 30,
       "department_name": "Electrical Team - 2 (Deep Parikh)",
       "domain_name": "Electrical Engineering",
-      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear", "ht", "lt"],
-      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "keywords": [
+        {
+          "term": "electrical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "power",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "transformer",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "motor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "panel",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "wiring",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "switchgear",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "ht",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "lt",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Electrical Engineer",
+        "Electrician",
+        "Electrical Supervisor"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -274,8 +2075,58 @@
       "department_id": 31,
       "department_name": "Electrical Team - 1 (Ramesh Maurya)",
       "domain_name": "Electrical Engineering",
-      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear", "ht", "lt"],
-      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "keywords": [
+        {
+          "term": "electrical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "power",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "transformer",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "motor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "panel",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "wiring",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "switchgear",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "ht",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "lt",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Electrical Engineer",
+        "Electrician",
+        "Electrical Supervisor"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -283,8 +2134,58 @@
       "department_id": 32,
       "department_name": "Process & Project Team",
       "domain_name": "Process Engineering",
-      "keywords": ["process", "project", "piping", "p&id", "engineering design", "commissioning", "project management", "capex", "erection"],
-      "default_roles": ["Process Engineer", "Project Engineer", "Project Manager"],
+      "keywords": [
+        {
+          "term": "process",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "project",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "piping",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "p&id",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "engineering design",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "commissioning",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "project management",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "capex",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "erection",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Process Engineer",
+        "Project Engineer",
+        "Project Manager"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -292,8 +2193,58 @@
       "department_id": 33,
       "department_name": "Process & Safety Team",
       "domain_name": "Process Safety",
-      "keywords": ["process safety", "hazop", "hazard", "risk", "safety", "psr", "psm", "incident investigation", "fire safety"],
-      "default_roles": ["Process Safety Engineer", "Safety Officer", "Hazop Leader"],
+      "keywords": [
+        {
+          "term": "process safety",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "hazop",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "hazard",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "risk",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "safety",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "psr",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "psm",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "incident investigation",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "fire safety",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Process Safety Engineer",
+        "Safety Officer",
+        "Hazop Leader"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -301,8 +2252,48 @@
       "department_id": 34,
       "department_name": "Store Team (RM)",
       "domain_name": "Stores & Inventory",
-      "keywords": ["stores", "raw material", "inventory", "stock", "material receipt", "warehousing", "rm stores"],
-      "default_roles": ["Store Keeper", "Store Supervisor", "Material Handler"],
+      "keywords": [
+        {
+          "term": "stores",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "raw material",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "inventory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "stock",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "material receipt",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "warehousing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "rm stores",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Store Keeper",
+        "Store Supervisor",
+        "Material Handler"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -310,8 +2301,53 @@
       "department_id": 35,
       "department_name": "Quality Control Team",
       "domain_name": "Quality Control",
-      "keywords": ["quality control", "qc", "testing", "analysis", "hplc", "gc", "dissolution", "stability"],
-      "default_roles": ["QC Analyst", "QC Chemist", "QC Executive"],
+      "keywords": [
+        {
+          "term": "quality control",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "qc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "testing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "analysis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "hplc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "dissolution",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "stability",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "QC Analyst",
+        "QC Chemist",
+        "QC Executive"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -319,8 +2355,58 @@
       "department_id": 36,
       "department_name": "Quality Assurance Team",
       "domain_name": "Quality Assurance",
-      "keywords": ["quality assurance", "qa", "gmp", "documentation", "deviation", "capa", "change control", "validation", "audit"],
-      "default_roles": ["QA Executive", "QA Officer", "QA Manager"],
+      "keywords": [
+        {
+          "term": "quality assurance",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "qa",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "gmp",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "documentation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "deviation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "capa",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "change control",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "validation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "audit",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "QA Executive",
+        "QA Officer",
+        "QA Manager"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -328,8 +2414,53 @@
       "department_id": 37,
       "department_name": "R&D Team - 1 (Udaysinh Parmar)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -337,8 +2468,53 @@
       "department_id": 38,
       "department_name": "R&D Team - 2 (Mahesh Koladiya)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -346,8 +2522,53 @@
       "department_id": 39,
       "department_name": "R&D Team - 3 (Dr. Anish Patel)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -355,8 +2576,53 @@
       "department_id": 40,
       "department_name": "R&D Team - 4 (Sunil Namballa)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -364,8 +2630,53 @@
       "department_id": 41,
       "department_name": "R&D Team - 6 (Vijay Rakholiya)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -373,8 +2684,53 @@
       "department_id": 42,
       "department_name": "R&D Team - 7 (Dr. Bipin Devani)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -382,8 +2738,53 @@
       "department_id": 43,
       "department_name": "R&D Team - 5 (Sandeep Patel)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -391,8 +2792,32 @@
       "department_id": 44,
       "department_name": "Founder",
       "domain_name": "Executive Leadership",
-      "keywords": ["founder", "promoter", "chairman", "director"],
-      "default_roles": ["Founder", "Chairman"],
+      "keywords": [
+        {
+          "term": "founder",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "promoter",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chairman",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "director",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Founder",
+        "Chairman"
+      ],
       "priority": 10,
       "is_active": true
     },
@@ -400,8 +2825,52 @@
       "department_id": 45,
       "department_name": "C & I - 1 (Ramesh Maurya)",
       "domain_name": "Instrumentation & Control",
-      "keywords": ["instrumentation", "control", "plc", "scada", "dcs", "automation", "calibration", "sensors"],
-      "default_roles": ["Instrumentation Engineer", "C&I Technician"],
+      "keywords": [
+        {
+          "term": "instrumentation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "control",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "scada",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "dcs",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "automation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "calibration",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "sensors",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Instrumentation Engineer",
+        "C&I Technician"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -409,8 +2878,52 @@
       "department_id": 46,
       "department_name": "C & I - 2 (Chetan Panchal)",
       "domain_name": "Instrumentation & Control",
-      "keywords": ["instrumentation", "control", "plc", "scada", "dcs", "automation", "calibration", "sensors"],
-      "default_roles": ["Instrumentation Engineer", "C&I Technician"],
+      "keywords": [
+        {
+          "term": "instrumentation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "control",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plc",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "scada",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "dcs",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "automation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "calibration",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "sensors",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Instrumentation Engineer",
+        "C&I Technician"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -418,8 +2931,48 @@
       "department_id": 47,
       "department_name": "Dispatch Team",
       "domain_name": "Logistics & Warehousing",
-      "keywords": ["dispatch", "shipping", "packing", "loading", "transportation", "delivery", "consignment"],
-      "default_roles": ["Dispatch Coordinator", "Dispatch Supervisor", "Logistics Executive"],
+      "keywords": [
+        {
+          "term": "dispatch",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "shipping",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "packing",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "loading",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "transportation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "delivery",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "consignment",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Dispatch Coordinator",
+        "Dispatch Supervisor",
+        "Logistics Executive"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -427,8 +2980,53 @@
       "department_id": 48,
       "department_name": "R&D Team - 8 (Dr. Sharad Bobe)",
       "domain_name": "Chemical R&D",
-      "keywords": ["research", "development", "r&d", "synthesis", "formulation", "api", "chemistry", "laboratory"],
-      "default_roles": ["Research Chemist", "R&D Scientist", "Laboratory Analyst"],
+      "keywords": [
+        {
+          "term": "research",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "development",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "synthesis",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "formulation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "api",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "chemistry",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "laboratory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Research Chemist",
+        "R&D Scientist",
+        "Laboratory Analyst"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -436,8 +3034,53 @@
       "department_id": 49,
       "department_name": "Corporate Affairs Team",
       "domain_name": "Corporate Affairs",
-      "keywords": ["corporate", "legal", "compliance", "regulatory", "government", "liaison", "secretarial", "company secretary"],
-      "default_roles": ["Corporate Affairs Executive", "Legal Officer", "Company Secretary"],
+      "keywords": [
+        {
+          "term": "corporate",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "legal",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "compliance",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "regulatory",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "government",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "liaison",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "secretarial",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "company secretary",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Corporate Affairs Executive",
+        "Legal Officer",
+        "Company Secretary"
+      ],
       "priority": 1,
       "is_active": true
     },
@@ -445,8 +3088,48 @@
       "department_id": 50,
       "department_name": "Electrical Team - 3 (Chetan Panchal)",
       "domain_name": "Electrical Engineering",
-      "keywords": ["electrical", "power", "transformer", "motor", "panel", "wiring", "switchgear"],
-      "default_roles": ["Electrical Engineer", "Electrician", "Electrical Supervisor"],
+      "keywords": [
+        {
+          "term": "electrical",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "power",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "transformer",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "motor",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "panel",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "wiring",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "switchgear",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Electrical Engineer",
+        "Electrician",
+        "Electrical Supervisor"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -454,8 +3137,38 @@
       "department_id": 51,
       "department_name": "Chemical Engineer, R&D Leader",
       "domain_name": "Chemical R&D",
-      "keywords": ["chemical engineering", "r&d leader", "process development", "scale-up", "reaction engineering"],
-      "default_roles": ["Chemical Engineer", "R&D Leader", "Senior Scientist"],
+      "keywords": [
+        {
+          "term": "chemical engineering",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "r&d leader",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "process development",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        },
+        {
+          "term": "scale-up",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "reaction engineering",
+          "match_type": "CASE_INSENSITIVE_PHRASE",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Chemical Engineer",
+        "R&D Leader",
+        "Senior Scientist"
+      ],
       "priority": 2,
       "is_active": true
     },
@@ -463,8 +3176,42 @@
       "department_id": 52,
       "department_name": "Horticulture & Landscaping Team",
       "domain_name": "Horticulture & Facility",
-      "keywords": ["horticulture", "landscaping", "garden", "greenery", "plantation", "nursery"],
-      "default_roles": ["Horticulture Supervisor", "Landscape Officer"],
+      "keywords": [
+        {
+          "term": "horticulture",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "landscaping",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "garden",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "greenery",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "plantation",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        },
+        {
+          "term": "nursery",
+          "match_type": "CASE_INSENSITIVE_TOKEN",
+          "weight": 1.0
+        }
+      ],
+      "default_roles": [
+        "Horticulture Supervisor",
+        "Landscape Officer"
+      ],
       "priority": 3,
       "is_active": true
     }

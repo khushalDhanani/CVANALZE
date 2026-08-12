@@ -41,6 +41,8 @@ class CandidateAnalysisContext:
     domain_candidate_text: str = ""
     is_software_cand: bool = False
     cand_hierarchy: Any | None = None
+    llm_core_skills: list[str] = field(default_factory=list)
+    llm_inferred_skills: list[str] = field(default_factory=list)
 
     @classmethod
     def create(
@@ -79,8 +81,6 @@ class CandidateAnalysisContext:
         if optimized_profile:
             profile_parts.extend(
                 [
-                    *optimized_profile.core_skills,
-                    *optimized_profile.inferred_skills,
                     *optimized_profile.professional_domains,
                     optimized_profile.current_role or "",
                     *optimized_profile.education_domains,
@@ -89,16 +89,10 @@ class CandidateAnalysisContext:
             )
             current_role = optimized_profile.current_role
 
-            if exp_years is None and optimized_profile.relevant_experience_years is not None:
-                try:
-                    exp_years = float(optimized_profile.relevant_experience_years)
-                except (ValueError, TypeError):
-                    pass
 
         elif dynamic_profile:
             profile_parts.extend(
                 [
-                    *dynamic_profile.core_skills,
                     *dynamic_profile.professional_domains,
                     dynamic_profile.current_domain or "",
                     dynamic_profile.current_role or "",
@@ -108,11 +102,6 @@ class CandidateAnalysisContext:
             )
             current_role = dynamic_profile.current_role
 
-            if exp_years is None and dynamic_profile.relevant_experience_years is not None:
-                try:
-                    exp_years = float(dynamic_profile.relevant_experience_years)
-                except (ValueError, TypeError):
-                    pass
 
         if not current_role and normalized_resume and normalized_resume.employment:
             current_role = normalized_resume.employment[0].job_title.normalized_value
@@ -145,28 +134,16 @@ class CandidateAnalysisContext:
         cand_tax_domain, cand_families_list = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
         cand_families = list(cand_families_list)
 
-        # Override with LLM classification only if domain is validated against DB canonicals
+        # Taxonomy overrides using LLM domain are no longer permitted.
+        # Gemma may provide grounded evidence (skills/roles) which inform the deterministic
+        # classification during profile extraction, but cannot directly set the candidate domain.
         if optimized_profile and optimized_profile.professional_domains:
             llm_domain = optimized_profile.professional_domains[0]
             canonical_domains = set(RuleConfigManager.get_taxonomy_rules().canonical_domains)
-            if llm_domain in canonical_domains:
-                cand_tax_domain = llm_domain
-                # Map canonical domain back to compatible families using taxonomy rules
-                llm_families = []
-                taxonomy = RuleConfigManager.get_taxonomy_rules()
-                for r in taxonomy.candidate_rules:
-                    if r.domain == cand_tax_domain:
-                        llm_families.extend(r.families)
-                seen = set()
-                mapped_families = [f for f in llm_families if not (f in seen or seen.add(f))]
-                if mapped_families:
-                    cand_families = mapped_families
-                else:
-                    cand_families = [cand_tax_domain]
-            else:
+            if llm_domain not in canonical_domains:
                 import logging as _log
                 _log.getLogger("cv_analyzer").warning(
-                    f"[CANDIDATE_CONTEXT] LLM domain '{llm_domain}' not in DB canonicals — keeping deterministic classification '{cand_tax_domain}'."
+                    f"[CANDIDATE_CONTEXT] LLM domain '{llm_domain}' not in DB canonicals."
                 )
 
         cand_primary_family = cand_families[0] if cand_families else None
@@ -223,6 +200,9 @@ class CandidateAnalysisContext:
             education_evidence=resume_evidence.education,
             domain_candidate_text=domain_candidate_text,
             is_software_cand=is_software_cand,
+            cand_hierarchy=None,
+            llm_core_skills=optimized_profile.core_skills if optimized_profile else (dynamic_profile.core_skills if dynamic_profile else []),
+            llm_inferred_skills=optimized_profile.inferred_skills if optimized_profile else [],
         )
 
     def apply_optimized_profile(
@@ -245,7 +225,7 @@ class CandidateAnalysisContext:
         deterministic_families = list(self.cand_families)
         deterministic_primary_family = self.cand_primary_family
         self.optimized_profile = optimized_profile
-        self.professional_skills = list(dict.fromkeys([*self.professional_skills, *optimized_profile.core_skills, *optimized_profile.inferred_skills]))
+        self.professional_skills = list(dict.fromkeys([*self.professional_skills, *optimized_profile.core_skills]))
         if optimized_profile.current_role:
             self.experience_titles = list(dict.fromkeys([optimized_profile.current_role, *self.experience_titles]))
         self.education_evidence = list(dict.fromkeys([*self.education_evidence, *optimized_profile.education_domains]))
@@ -269,21 +249,14 @@ class CandidateAnalysisContext:
         self.norm_text = re.sub(r"[^a-zA-Z0-9\s#+./-]", " ", " ".join(filter(None, profile_parts))).lower()
         self.norm_text = re.sub(r"\s+", " ", self.norm_text).strip()
 
+        # Taxonomy overrides using LLM domain are no longer permitted.
         if optimized_profile.professional_domains and self.cand_tax_domain in ("", "Unknown"):
             llm_domain = optimized_profile.professional_domains[0]
             canonical_domains = set(RuleConfigManager.get_taxonomy_rules().canonical_domains)
-            if llm_domain in canonical_domains:
-                self.cand_tax_domain = llm_domain
-                mapped_families: list[str] = []
-                for rule in RuleConfigManager.get_taxonomy_rules().candidate_rules:
-                    if rule.domain == self.cand_tax_domain:
-                        mapped_families.extend(rule.families)
-                self.cand_families = list(dict.fromkeys(mapped_families)) or [self.cand_tax_domain]
-                self.cand_primary_family = self.cand_families[0]
-            else:
+            if llm_domain not in canonical_domains:
                 import logging as _log
                 _log.getLogger("cv_analyzer").warning(
-                    f"[CANDIDATE_CONTEXT] apply_optimized_profile: LLM domain '{llm_domain}' not in DB canonicals — keeping deterministic '{self.cand_tax_domain}'."
+                    f"[CANDIDATE_CONTEXT] apply_optimized_profile: LLM domain '{llm_domain}' not in DB canonicals."
                 )
 
         self.cand_domain_profile = CandidateDomainService.extract_candidate_domain_profile(

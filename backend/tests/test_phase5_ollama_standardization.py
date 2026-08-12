@@ -147,12 +147,12 @@ def test_transport_retries_connection_error_then_succeeds(monkeypatch):
     client = _install_client(
         monkeypatch,
         httpx.ConnectError("offline", request=request),
-        _response({"models": [{"name": "gemma3:4b"}]}),
+        _response({"models": [{"name": "gemma3:1b"}]}),
     )
 
     result = OllamaTransport.get_tags()
 
-    assert [model.name for model in result.value.models] == ["gemma3:4b"]
+    assert [model.name for model in result.value.models] == ["gemma3:1b"]
     assert result.attempts == 2
     assert client.stream.call_count == 2
     assert OllamaTransport.get_metrics()["retries"] == 1
@@ -168,7 +168,7 @@ def test_transport_uses_exponential_backoff(monkeypatch):
         monkeypatch,
         httpx.ConnectError("offline", request=request),
         httpx.ConnectError("offline", request=request),
-        _response({"models": [{"name": "gemma3:4b"}]}),
+        _response({"models": [{"name": "gemma3:1b"}]}),
     )
 
     result = OllamaTransport.get_tags()
@@ -340,7 +340,7 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
             time.sleep(0.02)
             yield httpx.Response(
                 200,
-                json={"models": [{"name": "gemma3:4b"}]},
+                json={"models": [{"name": "gemma3:1b"}]},
                 request=httpx.Request("GET", "http://ollama.test/api/tags"),
             )
         finally:
@@ -354,7 +354,7 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
         results = list(executor.map(lambda _: OllamaTransport.get_tags(), range(2)))
 
     assert maximum_active == 1
-    assert all(result.value.models[0].name == "gemma3:4b" for result in results)
+    assert all(result.value.models[0].name == "gemma3:1b" for result in results)
 
 
 def test_embedding_rejects_non_finite_values_and_still_unloads(monkeypatch):

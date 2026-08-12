@@ -98,6 +98,13 @@ class ScoringParameters(BaseModel):
     low_coverage_threshold: float = Field(..., ge=0.0, le=1.0)
     false_positive_score_cap: float = Field(..., ge=0.0, le=100.0)
     
+    experience_relevance_threshold: float = Field(default=7.0, ge=0.0)
+    experience_partial_threshold: float = Field(default=5.5, ge=0.0)
+    
+    block_weight_taxonomy: float = Field(default=5.0, ge=0.0)
+    block_weight_title: float = Field(default=3.0, ge=0.0)
+    block_weight_skills: float = Field(default=2.0, ge=0.0)
+    
     # Migrated from legacy ConfigRepository
     match_high_threshold: float = Field(..., ge=0.0, le=100.0)
     match_medium_threshold: float = Field(..., ge=0.0, le=100.0)
@@ -256,6 +263,13 @@ class ScoringRules(BaseModel):
     resume_quality: ResumeQualityRules
     domain_embedding: DomainEmbeddingRules
 
+class HiringRiskPolicy(BaseModel):
+    severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
+    manual_review: bool
+
+class HiringRiskConfig(BaseModel):
+    policies: dict[str, HiringRiskPolicy] = Field(default_factory=dict)
+
 
 class UnifiedRuleConfig(BaseModel):
     version: str
@@ -265,6 +279,7 @@ class UnifiedRuleConfig(BaseModel):
     fields: dict[str, FieldRuleConfig]
     scoring: ScoringRules
     workflow: WorkflowRules = Field(default_factory=WorkflowRules)
+    hiring_risks: HiringRiskConfig = Field(default_factory=HiringRiskConfig)
 
     @model_validator(mode="after")
     def validate_safety_invariants(self) -> "UnifiedRuleConfig":
@@ -289,17 +304,21 @@ class UnifiedRuleConfig(BaseModel):
             if not {"dear", "sir", "madam", "salutation"}.intersection(blacklist):
                 raise ValueError("[SAFETY_GATE_VIOLATION] Location field blacklist missing salutations")
 
-        title = self.fields.get("job_title")
-        if title:
-            starters = title.get_keyword_set("narrative_starters")
-            if not {"graduated", "worked"}.intersection(starters):
-                raise ValueError("[SAFETY_GATE_VIOLATION] Job title narrative_starters missing expected verbs")
-
         comp = self.fields.get("company_name")
         if comp:
             generic = comp.get_keyword_set("generic_section_headers")
             if not {"experience", "education"}.intersection(generic):
                 raise ValueError("[SAFETY_GATE_VIOLATION] Company name generic_section_headers missing expected headers")
+            if not comp.get_keyword_set("suffixes"):
+                raise ValueError("[SAFETY_GATE_VIOLATION] Company name suffixes missing. Cannot parse organizations without config.")
+                
+        title = self.fields.get("job_title")
+        if title:
+            starters = title.get_keyword_set("narrative_starters")
+            if not {"graduated", "worked"}.intersection(starters):
+                raise ValueError("[SAFETY_GATE_VIOLATION] Job title narrative_starters missing expected verbs")
+            if not title.get_upper_keyword_set("keywords"):
+                raise ValueError("[SAFETY_GATE_VIOLATION] Job title keywords missing. Cannot parse roles without config.")
 
         match_rules = self.scoring.match
         guard = match_rules.cross_domain_guard

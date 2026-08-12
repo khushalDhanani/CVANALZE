@@ -96,10 +96,23 @@ class CandidateResumeDTO(BaseModel):
     skills: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
     normalized_full_text: str = ""
+    
+    # Original-casing strings kept local for case-sensitive acronym matching
+    raw_summary: str = ""
+    raw_experience_titles: list[str] = Field(default_factory=list)
+    raw_responsibilities: list[str] = Field(default_factory=list)
+    raw_skills: list[str] = Field(default_factory=list)
+    raw_education: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_resume(cls, cv_text: str, resume_json: dict[str, Any] | None = None) -> "CandidateResumeDTO":
         text_lower = cv_text.lower()
+        raw_summary = ""
+        raw_exp_titles: list[str] = []
+        raw_skills_str: list[str] = []
+        raw_edu_str: list[str] = []
+        raw_responsibilities: list[str] = []
+        
         summary = ""
         exp_titles: list[str] = []
         skills_str: list[str] = []
@@ -107,33 +120,41 @@ class CandidateResumeDTO(BaseModel):
         responsibilities: list[str] = []
 
         if resume_json and isinstance(resume_json, dict):
-            summary = str(resume_json.get("summary") or "").lower()
+            raw_summary = str(resume_json.get("summary") or "")
+            summary = raw_summary.lower()
+            
             exp_list = resume_json.get("work_experience", []) or resume_json.get("experience", [])
             if isinstance(exp_list, list):
-                exp_titles = [str(e.get("job_title") or e.get("title") or "").lower() for e in exp_list if isinstance(e, dict)]
+                raw_exp_titles = [str(e.get("job_title") or e.get("title") or "") for e in exp_list if isinstance(e, dict)]
+                exp_titles = [t.lower() for t in raw_exp_titles]
                 for experience in exp_list:
                     if not isinstance(experience, dict):
                         continue
-                    responsibilities.extend(
-                        str(item).lower()
-                        for item in experience.get("responsibilities") or []
-                        if isinstance(item, str) and item.strip()
-                    )
+                    for item in experience.get("responsibilities") or []:
+                        if isinstance(item, str) and item.strip():
+                            raw_responsibilities.append(str(item))
+                            responsibilities.append(str(item).lower())
             
             skills_data = resume_json.get("skills")
             if isinstance(skills_data, dict):
                 if "all_skills" in skills_data:
-                    skills_str = [str(s).lower() for s in skills_data["all_skills"]]
+                    raw_skills_str = [str(s) for s in skills_data["all_skills"]]
                 elif "categorized" in skills_data:
                     for cat, s_list in skills_data["categorized"].items():
                         if isinstance(s_list, list):
-                            skills_str.extend([str(s).lower() for s in s_list])
+                            raw_skills_str.extend([str(s) for s in s_list])
             elif isinstance(skills_data, list):
-                skills_str = [str(s).lower() for s in skills_data]
+                raw_skills_str = [str(s) for s in skills_data]
+            skills_str = [s.lower() for s in raw_skills_str]
             
             edu_list = resume_json.get("education", [])
             if isinstance(edu_list, list):
-                edu_str = [str(e.get("degree", "")) + " " + str(e.get("field", "")) + " " + str(e.get("institution", "")) if isinstance(e, dict) else str(e).lower() for e in edu_list]
+                raw_edu_str = [str(e.get("degree", "")) + " " + str(e.get("field", "")) + " " + str(e.get("institution", "")) if isinstance(e, dict) else str(e) for e in edu_list]
+                edu_str = [e.lower() for e in raw_edu_str]
+
+        if not summary and not exp_titles and not skills_str:
+            raw_summary = cv_text
+            summary = text_lower
 
         combined = f"{text_lower} {summary} {' '.join(exp_titles)} {' '.join(responsibilities)} {' '.join(skills_str)} {' '.join(edu_str)}"
         norm_full_text = re.sub(r"\s+", " ", combined).strip()
@@ -146,6 +167,11 @@ class CandidateResumeDTO(BaseModel):
             skills=skills_str,
             education=edu_str,
             normalized_full_text=norm_full_text,
+            raw_summary=raw_summary,
+            raw_experience_titles=raw_exp_titles,
+            raw_responsibilities=raw_responsibilities,
+            raw_skills=raw_skills_str,
+            raw_education=raw_edu_str,
         )
 
 
@@ -331,11 +357,11 @@ class TaxonomyClassifier:
         w_summary = tax_rules.evidence_weight_summary
         w_edu = tax_rules.evidence_weight_education
         
-        exp_text = " ".join(dto.experience_titles).lower()
-        skills_text = " ".join(dto.skills).lower()
-        summary_text = dto.summary.lower() if dto.summary else ""
-        edu_text = " ".join(dto.education).lower()
-        responsibilities_text = " ".join(dto.responsibilities).lower()
+        exp_text = " ".join(dto.raw_experience_titles)
+        skills_text = " ".join(dto.raw_skills)
+        summary_text = dto.raw_summary if dto.raw_summary else ""
+        edu_text = " ".join(dto.raw_education)
+        responsibilities_text = " ".join(dto.raw_responsibilities)
         
         dept_scores = []
         for matcher in department_domain_repository.get_domain_matchers():
@@ -411,12 +437,48 @@ class TaxonomyClassifier:
         from app.core.rule_config_manager import RuleConfigManager
 
         compatibility_threshold = RuleConfigManager.get_taxonomy_rules().family_compatibility_min_score
+        
+        # 1. Exact string match
         for cand_fam in candidate_families:
-            if cand_fam == job_family:
+            if cand_fam.strip().lower() == job_family.strip().lower():
                 return True
+
+        # 2. Canonical DB ID / Hierarchy Check
+        from app.core.database import PostgresAppSession
+        if PostgresAppSession is not None:
+            try:
+                with PostgresAppSession() as session:
+                    from app.models.taxonomy import JobFamilyMaster, DomainMaster
+                    job_domain_ids = set()
+                    
+                    # Resolve Job Family
+                    jf = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name.ilike(job_family)).first()
+                    if jf:
+                        job_domain_ids.add(jf.domain_id)
+                    else:
+                        jd = session.query(DomainMaster).filter(DomainMaster.domain_name.ilike(job_family)).first()
+                        if jd:
+                            job_domain_ids.add(jd.domain_id)
+                            
+                    # Resolve Candidate Families
+                    for cand_fam in candidate_families:
+                        cf = session.query(JobFamilyMaster).filter(JobFamilyMaster.family_name.ilike(cand_fam)).first()
+                        if cf and cf.domain_id in job_domain_ids:
+                            return True
+                        if not cf:
+                            cd = session.query(DomainMaster).filter(DomainMaster.domain_name.ilike(cand_fam)).first()
+                            if cd and cd.domain_id in job_domain_ids:
+                                return True
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Taxonomy ID Canonicalization failed: {e}")
+
+        # 3. Explicit cross-family compatibility mapping fallback
+        for cand_fam in candidate_families:
             is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(cand_fam, job_family)
             if is_compat and score is not None and score > compatibility_threshold:
                 return True
+                
         return False
 
     @classmethod

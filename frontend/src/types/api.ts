@@ -160,6 +160,18 @@ export interface MandatoryFailureDetails {
   description: string;
   reason: string;
   score_impact: number;
+  failure_code?: string;
+}
+
+export interface HiringRisk {
+  risk_code: string;
+  category: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN' | string;
+  title: string;
+  explanation: string;
+  evidence: string[];
+  source: string;
+  requires_manual_review: boolean;
 }
 
 export interface RequirementEvaluation {
@@ -248,6 +260,7 @@ export interface JobMatchScore {
   missing_criteria: string[];
   evidence: Record<string, DualEvidence>;
   confidence: number;
+  hiring_risks?: HiringRisk[];
   hr_review_required: boolean;
   reason: string;
   ranking_reason: string;

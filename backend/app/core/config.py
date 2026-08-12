@@ -110,7 +110,9 @@ class Settings(BaseSettings):
     EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
     EXPERIENCE_CALCULATOR_VERSION: str = "2.0.0"
     TAXONOMY_VERSION: str = "1.5.0"
-    MATCHING_VERSION: str = "3.0.6"
+    MATCHING_VERSION: str = "3.0.7"
+    PARSING_VERSION: str = "1.5.0"
+    CV_SCHEMA_VERSION: str = "2.1"
     AUTO_OCR_MIN_TEXT_CHARS: int = 100
 
     DOCUMENT_PARSER_WORKERS: int = 1
@@ -120,7 +122,7 @@ class Settings(BaseSettings):
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = ""
-    OLLAMA_MODEL: str = "gemma3:4b"  # or qwen2.5:3b etc based on what's available
+    OLLAMA_MODEL: str = "gemma3:1b"  # or qwen2.5:3b etc based on what's available
     OLLAMA_REQUEST_TIMEOUT: float = 300.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0

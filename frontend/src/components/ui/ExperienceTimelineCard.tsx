@@ -43,6 +43,8 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
 
   if (!analysis && !experienceAssessment && !candidateData) return null;
 
+  const hasUnresolvedHeaders = candidateData?.resume_json?.work_experience?.some((w: any) => w?.metadata?.unresolved_header) || candidateData?.resume_json?.experience?.some((w: any) => w?.metadata?.unresolved_header);
+
   const summary = analysis?.summary;
   const events = analysis?.timeline_events || [];
   const undated = analysis?.undated_nodes || [];
@@ -334,7 +336,22 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
 
   return (
     <Card className="p-3 border-border shadow-none gap-3">
-      {/* Header */}
+      {/* Unresolved Header Banner */}
+      {hasUnresolvedHeaders && (
+          <View className="bg-warning/10 border border-warning/30 rounded-md p-3 gap-1 mb-2">
+            <View className="flex-row items-center gap-1.5">
+              <AlertTriangle size={14} color={COLORS.warning} />
+              <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
+                Incomplete Chronology detected
+              </Text>
+            </View>
+            <Text className="text-xs font-sans text-warning leading-4">
+              Some sections of this CV used non-standard formatting and could not be confidently mapped to employment blocks. This may impact relevant experience calculations.
+            </Text>
+          </View>
+        )}
+
+        {/* Global Summary & Insights Header */}
       <View className="flex-row justify-between items-center pb-2 border-b border-border">
         <View className="flex-row items-center gap-1.5">
           <Clock size={14} color={COLORS.info} />

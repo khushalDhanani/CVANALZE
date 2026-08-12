@@ -28,3 +28,4 @@ export * from "./ExperienceTimelineCard";
 export * from "./OrganizationHierarchySelector";
 export * from "./ComponentScoreBar";
 export * from "./VacancyMatchStatusBadge";
+export * from "./HiringRisksCard";

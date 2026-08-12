@@ -69,7 +69,7 @@ def _generation_payload(client: MagicMock) -> dict:
 
 
 def test_ollama_default_model_is_qwen3_4b():
-    assert settings.OLLAMA_MODEL == "gemma3:4b"
+    assert settings.OLLAMA_MODEL == "gemma3:1b"
 
 
 def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
@@ -104,7 +104,7 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, DynamicCandidateProfile)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
+    assert payload["model"] == "gemma3:1b"
     assert payload["prompt"].startswith("/no_think")
     assert payload["think"] is False
     assert payload["format"] == DynamicCandidateProfile.model_json_schema()
@@ -137,7 +137,7 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, QwenCVAnalysis)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
+    assert payload["model"] == "gemma3:1b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
     assert payload["format"] == QwenCVAnalysis.model_json_schema()
@@ -172,7 +172,7 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, DynamicMappingResponse)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
+    assert payload["model"] == "gemma3:1b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
     assert payload["format"] == DynamicMappingResponse.model_json_schema()
@@ -213,7 +213,7 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, OptimizedLLMMatchResponse)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
+    assert payload["model"] == "gemma3:1b"
     assert payload["prompt"].startswith("/think")
     assert payload["think"] is True
     assert payload["format"] == OptimizedLLMMatchResponse.model_json_schema()
@@ -223,11 +223,11 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
 def test_ollama_unload_model_sends_keep_alive_zero(monkeypatch):
     client = _mock_transport_client(monkeypatch, {})
 
-    success = OllamaLLMService.unload_model("gemma3:4b")
+    success = OllamaLLMService.unload_model("gemma3:1b")
 
     assert success is True
     payload = client.stream.call_args.kwargs["json"]
-    assert payload["model"] == "gemma3:4b"
+    assert payload["model"] == "gemma3:1b"
     assert payload["keep_alive"] == 0
 
 

@@ -262,6 +262,36 @@ class OllamaLLMService:
         return result
 
     @classmethod
+    def generate_structured_json(
+        cls,
+        *,
+        operation: str,
+        prompt: str,
+        prompt_version: str,
+        cache_key: str,
+        response_model: type[TModel],
+        think: bool = False,
+        options: dict[str, Any] | None = None,
+        profiler: PipelineProfiler | None = None,
+    ) -> TModel | None:
+        """
+        Public contract for calling Ollama with a structured JSON response schema.
+        Handles caching, retries, parsing, and telemetry.
+        """
+        if options is None:
+            options = {"temperature": 0.0}
+        return cls._execute_structured_generation(
+            operation=operation,
+            prompt=prompt,
+            prompt_version=prompt_version,
+            cache_key=cache_key,
+            response_model=response_model,
+            think=think,
+            options=options,
+            profiler=profiler,
+        )
+
+    @classmethod
     def _execute_structured_generation(
         cls,
         *,

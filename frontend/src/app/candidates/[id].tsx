@@ -22,6 +22,7 @@ import {
   ExperienceTimelineCard,
   ComponentScoreBar,
   ErrorBanner,
+  HiringRisksCard,
 } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import {
@@ -549,6 +550,10 @@ export default function CandidateDetailScreen() {
                   </View>
                 ) : null}
 
+                {!!match.hiring_risks && match.hiring_risks.length > 0 && (
+                  <HiringRisksCard risks={match.hiring_risks} />
+                )}
+
                 <View className="flex-row justify-end mt-2">
                   <Button
                     label="HR Review"
@@ -596,6 +601,11 @@ export default function CandidateDetailScreen() {
                 <Text className="text-xs leading-4 text-text-primary">💡 {bestMatch.recommendation}</Text>
               </View>
             ) : null}
+
+            {!!bestMatch.hiring_risks && bestMatch.hiring_risks.length > 0 && (
+              <HiringRisksCard risks={bestMatch.hiring_risks} />
+            )}
+
             <View className="flex-row justify-end mt-2">
               <Button
                 label="HR Review"

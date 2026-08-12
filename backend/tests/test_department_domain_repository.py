@@ -40,7 +40,7 @@ def _seed_repo(*, db_factory=None, seed_path=None, seed_loader=None):
                     "department_id": 7,
                     "department_name": "Engineering Team",
                     "domain_name": "Engineering",
-                    "keywords": ["civil", "mechanical"],
+                    "keywords": ["civil", "mechanical", "plant", "maintenance", "scada"],
                     "default_roles": ["Engineer"],
                     "priority": 3,
                     "is_active": True
@@ -116,7 +116,7 @@ def test_seed_matches_legacy_map_values():
     assert it.department_name == "CIS Team"
     assert it.priority == 1
     for kw in ["developer", "flutter", "dotnet", "full stack", "ui/ux"]:
-        assert kw in it.keywords
+        assert kw in [k.term for k in it.keywords]
     assert it.default_roles[0] == "Software Developer"
 
     fin = by_domain["Finance & Accounting"]
@@ -124,7 +124,7 @@ def test_seed_matches_legacy_map_values():
     assert fin.department_name == "Finance Team"
     assert fin.priority == 2
     for kw in ["finance", "tally", "ledger", "valuation"]:
-        assert kw in fin.keywords
+        assert kw in [k.term for k in fin.keywords]
 
 
 def test_get_domain_by_department():
@@ -194,41 +194,50 @@ def test_domain_matchers_are_precompiled():
 
 
 def test_extract_candidate_domain_profile_maps_to_real_departments(monkeypatch):
+    from unittest.mock import patch
+    from app.schemas.classification_types import NormalizedClassification, MatchStatus
     repo = _seed_repo()
     monkeypatch.setattr(ScoringEngine, "domain_repository", repo)
 
-    software_cv = """
-    Senior Flutter & Mobile App Developer
-    Skills: Flutter, Dart, React Native, REST APIs, Git, Firebase
-    Education: B.Tech in Computer Science
-    """
-    profile = ScoringEngine.extract_candidate_domain_profile(software_cv)
-    assert any(term in profile["recommended_department"] for term in ["IT & Software Services", "Software", "CIS"])
-    assert any(term in profile["professional_domain"] for term in ["IT & Software Services", "Information Technology", "Software"])
-    assert any("Developer" in role or "Engineer" in role for role in profile["suitable_job_roles"])
+    with patch("app.services.dynamic_taxonomy_service.DynamicTaxonomyService.resolve_candidate_role_and_domain") as mock_dyn:
+        mock_dyn.return_value = NormalizedClassification(match_status=MatchStatus.NO_SUITABLE_MATCH, confidence=0.0)
+        
+        software_cv = """
+        Senior Flutter & Mobile App Developer
+        Skills: Flutter, Dart, React Native, REST APIs, Git, Firebase
+        Education: B.Tech in Computer Science
+        """
+        profile = ScoringEngine.extract_candidate_domain_profile(software_cv)
+        assert any(term in profile["recommended_department"] for term in ["IT & Software Services", "Software", "CIS"])
+        assert any(term in profile["professional_domain"] for term in ["IT & Software Services", "Information Technology", "Software"])
+        assert any("Developer" in role or "Engineer" in role for role in profile["suitable_job_roles"])
 
-    finance_cv = """
-    Financial Analyst | CA Inter
-    Skills: Financial Modeling, Valuation, Ledger, Tally ERP, Tax Audit, Forecasting
-    """
-    profile = ScoringEngine.extract_candidate_domain_profile(finance_cv)
-    assert any(term in profile["recommended_department"] for term in ["Finance", "Accounts"])
-    assert "Finance" in profile["professional_domain"] or "Accounting" in profile["professional_domain"]
+        finance_cv = """
+        Financial Analyst | CA Inter
+        Skills: Financial Modeling, Valuation, Ledger, Tally ERP, Tax Audit, Forecasting
+        """
+        profile = ScoringEngine.extract_candidate_domain_profile(finance_cv)
+        assert any(term in profile["recommended_department"] for term in ["Finance", "Accounts"])
+        assert "Finance" in profile["professional_domain"] or "Accounting" in profile["professional_domain"]
 
-    plant_cv = """
-    Mechanical Engineer - Plant Maintenance
-    Skills: Boiler, PLC, SCADA, Equipment, Preventive Maintenance
-    """
-    profile = ScoringEngine.extract_candidate_domain_profile(plant_cv)
-    assert any(term in profile["recommended_department"] for term in ["Maintenance", "Plant", "Operations", "Engineering"])
-    assert any(term in profile["professional_domain"] for term in ["Plant", "Maintenance", "Engineering"])
+        plant_cv = """
+        Mechanical Engineer - Plant Maintenance
+        Skills: Boiler, PLC, SCADA, Equipment, Preventive Maintenance
+        """
+        profile = ScoringEngine.extract_candidate_domain_profile(plant_cv)
+        assert any(term in profile["recommended_department"] for term in ["Maintenance", "Plant", "Operations", "Engineering"])
+        assert any(term in profile["professional_domain"] for term in ["Plant", "Maintenance", "Engineering"])
 
 
 def test_extract_candidate_domain_profile_generic_fallback(monkeypatch):
+    from unittest.mock import patch
+    from app.schemas.classification_types import NormalizedClassification, MatchStatus
     repo = _seed_repo()
     monkeypatch.setattr(ScoringEngine, "domain_repository", repo)
 
-    profile = ScoringEngine.extract_candidate_domain_profile("completely unrelated text about hobbies")
+    with patch("app.services.dynamic_taxonomy_service.DynamicTaxonomyService.resolve_candidate_role_and_domain") as mock_dyn:
+        mock_dyn.return_value = NormalizedClassification(match_status=MatchStatus.NO_SUITABLE_MATCH, confidence=0.0)
+        profile = ScoringEngine.extract_candidate_domain_profile("completely unrelated text about hobbies")
     assert profile["recommended_department"] == ""
     assert profile["professional_domain"] == ""
     assert profile["suitable_job_roles"] == []
@@ -279,7 +288,11 @@ def test_new_department_works_without_code_change(monkeypatch):
     Senior Data Scientist
     Skills: Machine Learning, TensorFlow, Pandas, Deep Learning, NLP, Big Data, Statistics
     """
-    profile = ScoringEngine.extract_candidate_domain_profile(cv_text)
+    from unittest.mock import patch
+    from app.schemas.classification_types import NormalizedClassification, MatchStatus
+    with patch("app.services.dynamic_taxonomy_service.DynamicTaxonomyService.resolve_candidate_role_and_domain") as mock_dyn:
+        mock_dyn.return_value = NormalizedClassification(match_status=MatchStatus.NO_SUITABLE_MATCH, confidence=0.0)
+        profile = ScoringEngine.extract_candidate_domain_profile(cv_text)
     assert profile["recommended_department"] == "Data & Analytics"
     assert profile["professional_domain"] == "Data Science & Analytics"
     assert profile["suitable_job_roles"][0] == "Data Scientist"

@@ -1,0 +1,40 @@
+CV: cv_Shruti_Dhameliya_React_js_Developer_3_Years_of_Exp
+Result: ISSUE: ['Minimum Experience: 3.0 years']
+Relevant Employment: 3 blocks detected
+Parsed Dates:
+  - Front-end Developer: 2025-06-01 to 2026-02-28 (Current: False)
+  - React.js Developer: 2024-04-01 to 2025-05-31 (Current: False)
+  - React.js Developer: 2022-11-01 to 2024-04-30 (Current: False)
+Relevant Years: 2.6 (Raw valid dates combined: 3.3)
+Required Years: 3.0
+--------------------------------------------------
+CV: cv_gptsuifgr321345678o9p
+Result: ISSUE: ['Minimum Experience: 3.0 years']
+Relevant Employment: 3 blocks detected
+Parsed Dates:
+  - None: 2018-01-01 to 2022-12-31 (Current: False)
+  - Sr Developer: 2022-01-01 to None (Current: True)
+  - None: 2026-08-12 to None (Current: True)
+Relevant Years: 0.0 (Raw valid dates combined: 8.6)
+Required Years: 3.0
+--------------------------------------------------
+CV: cv_Utkarsh_Patil_07012026sdfgdfvdfsf
+Result: ISSUE: ['Minimum Experience: 4.0 years']
+Relevant Employment: 1 blocks detected
+Parsed Dates:
+  - ASP .NET Developer: 2021-07-01 to None (Current: True)
+Relevant Years: 0.0 (Raw valid dates combined: 5.1)
+Required Years: 4.0
+--------------------------------------------------
+CV: cv_san1761727581
+Result: PASS
+Relevant Employment: 5 blocks detected
+Parsed Dates:
+  - Sr. Flutter Developer: 2024-04-01 to None (Current: True)
+  - Sr. Flutter Developer: 2021-10-01 to 2024-03-31 (Current: False)
+  - Android and Flutter Developer: None to None (Current: False)
+  - None: 2019-12-01 to 2021-09-30 (Current: False)
+  - Android Developer: 2019-04-01 to 2021-11-30 (Current: False)
+Relevant Years: 7.4 (Raw valid dates combined: 7.4)
+Required Years: 5.0
+--------------------------------------------------

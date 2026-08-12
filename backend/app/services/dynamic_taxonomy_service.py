@@ -367,7 +367,7 @@ class DynamicTaxonomyService:
                 is_named_department = configured_name == dept_name_clean
                 is_domain_match = bool(configured_domain and normalized_department and configured_domain == normalized_department)
                 if is_named_department or is_domain_match or matcher.keyword_match_count(dept_name_clean) > 0:
-                    semantic_keywords.extend(domain.keywords)
+                    semantic_keywords.extend([kw.term for kw in domain.keywords])
                     semantic_keywords.extend(domain.default_roles)
                     semantic_keywords.extend([domain.department_name, domain.domain_name])
             semantic_keywords = list(dict.fromkeys(keyword.strip().lower() for keyword in semantic_keywords if keyword and keyword.strip()))
@@ -586,7 +586,7 @@ class DynamicTaxonomyService:
                     reasoning="Main department was not matched; designation search skipped.",
                     match_status="NO_STRONG_DESIGNATION_MATCH",
                 ),
-                is_hierarchy_valid=True,
+                is_hierarchy_valid=None,
                 validation_errors=[],
                 overall_confidence=main_dept_res.confidence,
             )
@@ -659,7 +659,7 @@ class DynamicTaxonomyService:
                 main_department=main_dept_node,
                 department=dept_node,
                 designation=desig_node,
-                is_hierarchy_valid=True,
+                is_hierarchy_valid=None,
                 validation_errors=[],
                 overall_confidence=main_dept_res.confidence,
             )
@@ -768,7 +768,7 @@ class DynamicTaxonomyService:
                 main_department=main_dept_node,
                 department=dept_node,
                 designation=desig_node,
-                is_hierarchy_valid=True,
+                is_hierarchy_valid=None,
                 validation_errors=[],
                 overall_confidence=round((main_dept_node.confidence + dept_node.confidence) / 2, 2),
             )
@@ -846,7 +846,7 @@ class DynamicTaxonomyService:
                 main_department=main_dept_node,
                 department=dept_node,
                 designation=desig_node,
-                is_hierarchy_valid=True,
+                is_hierarchy_valid=None,
                 validation_errors=[],
                 overall_confidence=round((main_dept_node.confidence + dept_node.confidence) / 2, 2),
             )
@@ -931,7 +931,7 @@ class DynamicTaxonomyService:
                 main_department=main_dept_node,
                 department=dept_node,
                 designation=desig_node,
-                is_hierarchy_valid=True,
+                is_hierarchy_valid=None,
                 validation_errors=[],
                 overall_confidence=round((main_dept_node.confidence + dept_node.confidence) / 2, 2),
             )
@@ -948,7 +948,7 @@ class DynamicTaxonomyService:
         )
 
         # Step 4: Parent-Child Hierarchy Validation via OrganizationSourceRepository
-        is_valid_hierarchy = True
+        is_valid_hierarchy: bool | None = None
         validation_errors: list[str] = []
         if db_session is not None:
             from app.repositories.mssql.organization_source import OrganizationSourceRepository
@@ -969,6 +969,8 @@ class DynamicTaxonomyService:
                     match_status="NO_STRONG_DESIGNATION_MATCH",
                     top_k_candidates=top_k_desigs,
                 )
+            else:
+                is_valid_hierarchy = True
 
         overall_conf = round(
             (main_dept_node.confidence + dept_node.confidence + (desig_node.confidence if desig_node.id else 0.0)) /

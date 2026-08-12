@@ -23,6 +23,8 @@ from app.core.rule_config_manager import (
     TierThresholds,
     UnifiedRuleConfig,
     VacancyTaxonomyRule,
+    HiringRiskConfig,
+    HiringRiskPolicy,
     WorkflowRules,
 )
 
@@ -46,6 +48,17 @@ class SystemRuleConfigFactory:
             fields=cls._fields(),
             scoring=cls._scoring(),
             workflow=WorkflowRules(),
+            hiring_risks=HiringRiskConfig(
+                policies={
+                    "MIN_EXPERIENCE_FAILED": HiringRiskPolicy(severity="CRITICAL", manual_review=False),
+                    "EXPERIENCE_UNKNOWN": HiringRiskPolicy(severity="UNKNOWN", manual_review=True),
+                    "MISSING_MANDATORY_SKILL": HiringRiskPolicy(severity="CRITICAL", manual_review=False),
+                    "MISSING_PREFERRED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=False),
+                    "UNVERIFIED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=True),
+                    "DOMAIN_MISMATCH": HiringRiskPolicy(severity="HIGH", manual_review=False),
+                    "OVERQUALIFIED": HiringRiskPolicy(severity="LOW", manual_review=False),
+                }
+            ),
         )
         return config
 
@@ -75,7 +88,16 @@ class SystemRuleConfigFactory:
                 confidence_scoring={"explicit_title": 0.90, "inferred_title": 0.50},
                 tier_thresholds=common_tiers.model_copy(deep=True),
                 downstream_gates=DownstreamGates(min_acceptance_confidence=0.50, max_word_count=10, max_char_length=100),
-                keywords={"narrative_starters": ["graduated", "worked"], "narrative_phrases": []},
+                keywords={
+                    "narrative_starters": ["graduated", "worked"], 
+                    "narrative_phrases": [], 
+                    "keywords": [
+                        "ENGINEER", "DEVELOPER", "MANAGER", "EXECUTIVE", "ANALYST", "OFFICER", "CONSULTANT", "DIRECTOR", 
+                        "LEAD", "SPECIALIST", "INSPECTOR", "ADMINISTRATOR", "TECHNICIAN", "INCHARGE", "IN CHARGE", 
+                        "OPERATOR", "ASSISTANT", "CHEMIST", "SCIENTIST", "PROGRAMMER", "ARCHITECT", "DESIGNER", 
+                        "COORDINATOR", "SUPERVISOR", "HEAD", "SR.", "JR."
+                    ]
+                },
             ),
             "company_name": FieldRuleConfig(
                 field_name="company_name",
@@ -83,7 +105,14 @@ class SystemRuleConfigFactory:
                 confidence_scoring={"explicit_company": 0.90, "inferred_company": 0.50},
                 tier_thresholds=common_tiers.model_copy(deep=True),
                 downstream_gates=DownstreamGates(min_acceptance_confidence=0.50, max_char_length=120),
-                keywords={"generic_section_headers": ["experience", "education", "skills", "projects"]},
+                keywords={
+                    "generic_section_headers": ["experience", "education", "skills", "projects"],
+                    "suffixes": [
+                        "ltd", "limited", "pvt", "private", "inc", "incorporated", "llc", "llp", "corp", 
+                        "corporation", "industries", "solutions", "enterprises", "infosys", "infotech", 
+                        "technologies", "technology", "pharma", "chemicals", "remedies", "generics", "organics", "techno lab", "techno labs"
+                    ]
+                },
             ),
         }
 

@@ -100,15 +100,9 @@ def test_missing_mandatory_skill_and_cross_domain_match_cannot_be_strong(monkeyp
 
 def test_semantic_similarity_cannot_manufacture_skill_evidence(monkeypatch):
     from app.services.job_taxonomy import TaxonomyClassifier
-    from app.services.match_evaluators import RequirementEvaluator
 
     monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("IT", ("Software Engineering",)))
     monkeypatch.setattr(TaxonomyClassifier, "classify_vacancy", lambda job: ("IT", "Software Engineering"))
-    monkeypatch.setattr(
-        RequirementEvaluator,
-        "_match_semantic_skill_gaps",
-        classmethod(lambda cls, context, missing_skills: list(missing_skills)),
-    )
     result = ScoringEngine.evaluate_job_match(
         "Front-end Developer. Skills: React, JavaScript, TypeScript.",
         {
@@ -155,6 +149,7 @@ def test_quality_gate_fails_closed_when_prompt_or_taxonomy_is_missing(monkeypatc
 
 def test_quality_gate_fails_closed_when_required_rule_assets_are_empty(monkeypatch):
     from app.services.prompt_service import PromptReadiness, PromptService
+    from app.core.rule_config_manager import RuleConfigManager
 
     monkeypatch.setattr(PromptService, "check_required_optimized_match_prompt", classmethod(lambda cls: PromptReadiness(True, "READY")))
     monkeypatch.setattr(RuleConfigManager, "get_config", classmethod(lambda cls: object()))
