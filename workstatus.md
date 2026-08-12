@@ -1,6 +1,39 @@
 # Work Status
 
 ## Last Completed Task
+**Remove false one-minute reprocessing timeout**
+
+### Architecture Impact Analysis
+- Kept the backend RQ queue, 900-second worker deadline, retries, extraction deadlines, and status response contracts unchanged.
+- Made candidate-detail reprocessing follow the existing canonical frontend queue-state resolver and the backend's durable terminal state.
+
+### Files Changed
+- Reprocessing polling: `frontend/src/app/candidates/[id].tsx`.
+- Queue-state regressions: `frontend/src/__tests__/cvQueueState.test.ts`.
+- Task record: `workstatus.md`.
+
+### Implementation Plan
+- Compare the candidate-page polling deadline with backend queue and extraction deadlines.
+- Remove the client-only timeout that can expire while a valid backend job is active.
+- Reuse canonical queue-state resolution for completion, retry, failure, and cancellation.
+- Preserve genuine backend timeout/error codes and messages.
+
+### Code Changes
+- Removed the 40-poll/60-second client cutoff and fabricated `TIMED_OUT` message.
+- Reprocessing now continues while the backend reports a non-terminal queue state.
+- Added canonical handling for `job_state`, case-insensitive statuses, degraded completion, cancellation, and backend error details.
+
+### Verification Checklist
+- [x] Confirmed the removed frontend cutoff was approximately 60 seconds while the backend permits a processing attempt up to 900 seconds.
+- [x] Serena diagnostics report no errors or warnings in the candidate page or queue-state regression file.
+- [x] No `pollCount` or fabricated reprocessing `TIMED_OUT` text remains in the candidate page.
+- [x] `git diff --check` passes.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Reused `resolveCvQueueUiState` and `getCvQueueStateMeta` instead of maintaining a divergent candidate-page status implementation.
+
+## Previous Task
 **Hiring Intelligence and AI Domain Analysis semantic entity validation**
 
 ### Architecture Impact Analysis

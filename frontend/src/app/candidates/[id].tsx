@@ -36,6 +36,7 @@ import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { COLORS } from '@/constants/colors';
 import { formatDateTime } from '@/utils/date';
+import { getCvQueueStateMeta, resolveCvQueueUiState } from '@/utils/cvQueueState';
 import {
   buildCandidateDetailViewModel,
   cleanCandidateText,
@@ -197,39 +198,27 @@ export default function CandidateDetailScreen() {
       await candidateService.reprocessCandidate(candidateCvId);
 
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-      let pollCount = 0;
       let errorCount = 0;
       pollTimerRef.current = setInterval(async () => {
-        pollCount++;
-
-        if (pollCount >= 40) {
-          stopTimers();
-          setIsReprocessing(false);
-          setReprocessError('Reprocessing timed out (TIMED_OUT). Pipeline is taking longer than expected. Please try again.');
-          return;
-        }
-
         try {
           const statusRes: any = await cvService.getCvStatus(candidateCvId);
-          const statusStr = statusRes.status;
-          const msg = statusRes.message || statusRes.error || '';
+          const queueState = resolveCvQueueUiState(statusRes);
+          const queueStateMeta = getCvQueueStateMeta(queueState);
+          const msg = statusRes.error_message || statusRes.message || statusRes.error || '';
           const pct = statusRes.progress || 0;
 
-          if (msg) setReprocessStatusMsg(msg);
+          setReprocessStatusMsg(msg || queueStateMeta.label);
 
-          if (statusStr === 'FAILED') {
+          if (queueState === 'FAILED') {
             stopTimers();
             setIsReprocessing(false);
-            setReprocessError(msg || 'Reprocessing failed (FAILED).');
+            setReprocessError(
+              statusRes.error_code ? `${statusRes.error_code}: ${msg || 'Reprocessing failed.'}` : msg || 'Reprocessing failed.'
+            );
             return;
           }
 
-          const isTerminated =
-            statusStr === 'COMPLETED' || statusStr === 'NEW_CV' || statusStr === 'REPROCESSED' ||
-            pct >= 100 || statusRes.is_complete ||
-            (statusStr !== 'processing' && (statusRes.match_analysis || statusRes.text || statusRes.markdown));
-
-          if (isTerminated) {
+          if (queueState === 'COMPLETED') {
             stopTimers();
             setCurrentStepIndex(7);
             setStepStates(Array(8).fill('completed'));
