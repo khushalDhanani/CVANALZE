@@ -278,22 +278,35 @@ class JobRepository:
         try:
             from sqlalchemy import or_, select
             from app.models.mssql.vacancy import RecruitVacancyRequest
+            from app.models.mssql.taxonomy import TransactionStatusMst
 
-            stmt = select(RecruitVacancyRequest.VacancyRequestID).where(
-                RecruitVacancyRequest.VacancyRequestIsActive == True,
-                or_(
-                    RecruitVacancyRequest.VacancyRequestIsDeleted == False,
-                    RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None),
-                ),
-                or_(
-                    RecruitVacancyRequest.VacancyRequestClose == False,
-                    RecruitVacancyRequest.VacancyRequestClose.is_(None),
-                ),
-                or_(
-                    RecruitVacancyRequest.VacancyRequestIsForceClosed == False,
-                    RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None),
-                ),
-            ).order_by(RecruitVacancyRequest.VacancyRequestID)
+            stmt = (
+                select(RecruitVacancyRequest.VacancyRequestID)
+                .join(
+                    TransactionStatusMst,
+                    RecruitVacancyRequest.RequestStatusID == TransactionStatusMst.StatusID,
+                )
+                .where(
+                    RecruitVacancyRequest.VacancyRequestIsActive == True,
+                    or_(
+                        RecruitVacancyRequest.VacancyRequestIsDeleted == False,
+                        RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None),
+                    ),
+                    TransactionStatusMst.StatusIsDeleted == False,
+                    TransactionStatusMst.ModuleName == 'Vacancy Request Track',
+                    TransactionStatusMst.StatusDesc == 'Approved',
+                    or_(
+                        RecruitVacancyRequest.VacancyRequestClose == False,
+                        RecruitVacancyRequest.VacancyRequestClose.is_(None),
+                    ),
+                    RecruitVacancyRequest.VacancyRequestCloseDate.is_(None),
+                    or_(
+                        RecruitVacancyRequest.VacancyRequestIsForceClosed == False,
+                        RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None),
+                    ),
+                )
+                .order_by(RecruitVacancyRequest.VacancyRequestID)
+            )
             
             rows = db.execute(stmt).scalars().all()
             db_pairs = sorted(str(row) for row in rows)
@@ -317,19 +330,28 @@ class JobRepository:
                 from sqlalchemy import func, or_
 
                 from app.models.mssql.vacancy import RecruitVacancyRequest
+                from app.models.mssql.taxonomy import TransactionStatusMst
 
                 count = (
                     db.query(func.count(RecruitVacancyRequest.VacancyRequestID))
+                    .join(
+                        TransactionStatusMst,
+                        RecruitVacancyRequest.RequestStatusID == TransactionStatusMst.StatusID,
+                    )
                     .filter(
                         RecruitVacancyRequest.VacancyRequestIsActive == True,
                         or_(
                             RecruitVacancyRequest.VacancyRequestIsDeleted == False,
                             RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None),
                         ),
+                        TransactionStatusMst.StatusIsDeleted == False,
+                        TransactionStatusMst.ModuleName == 'Vacancy Request Track',
+                        TransactionStatusMst.StatusDesc == 'Approved',
                         or_(
                             RecruitVacancyRequest.VacancyRequestClose == False,
                             RecruitVacancyRequest.VacancyRequestClose.is_(None),
                         ),
+                        RecruitVacancyRequest.VacancyRequestCloseDate.is_(None),
                         or_(
                             RecruitVacancyRequest.VacancyRequestIsForceClosed == False,
                             RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None),

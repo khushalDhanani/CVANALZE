@@ -15,7 +15,7 @@ from app.models.mssql.organization import (
     OrgMainDepartmentMst,
     OrgJobProfileQualificationDet,
 )
-from app.models.mssql.taxonomy import QualificationMst
+from app.models.mssql.taxonomy import QualificationMst, TransactionStatusMst
 from app.models.mssql.vacancy import RecruitVacancyRequest, RecruitVacancyRequriedQualificationDet
 from app.schemas.job import JobOpening
 from app.services.department_normalizer import DepartmentNormalizer
@@ -33,6 +33,10 @@ class VacancyService:
 
         stmt = (
             select(RecruitVacancyRequest)
+            .join(
+                TransactionStatusMst,
+                RecruitVacancyRequest.RequestStatusID == TransactionStatusMst.StatusID,
+            )
             .join(
                 OrgJobProfileMst,
                 RecruitVacancyRequest.JobProfileID == OrgJobProfileMst.JobProfileID,
@@ -71,15 +75,20 @@ class VacancyService:
                     RecruitVacancyRequest.VacancyRequestIsDeleted == False,
                     RecruitVacancyRequest.VacancyRequestIsDeleted.is_(None),
                 ),
+                TransactionStatusMst.StatusIsDeleted == False,
+                TransactionStatusMst.ModuleName == 'Vacancy Request Track',
+                TransactionStatusMst.StatusDesc == 'Approved',
                 or_(
                     RecruitVacancyRequest.VacancyRequestClose == False,
                     RecruitVacancyRequest.VacancyRequestClose.is_(None),
                 ),
+                RecruitVacancyRequest.VacancyRequestCloseDate.is_(None),
                 or_(
                     RecruitVacancyRequest.VacancyRequestIsForceClosed == False,
                     RecruitVacancyRequest.VacancyRequestIsForceClosed.is_(None),
                 ),
             )
+            .order_by(RecruitVacancyRequest.RequestDate.desc())
         )
 
         results = self.db.execute(stmt).unique().scalars().all()
