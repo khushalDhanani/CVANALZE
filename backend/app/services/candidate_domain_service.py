@@ -21,6 +21,8 @@ class CandidateDomainService:
     and department term resolution.
     """
 
+    _ENTITY_CONFIDENCE_THRESHOLD = 0.70
+
     @classmethod
     def extract_candidate_domain_profile(
         cls,
@@ -39,37 +41,38 @@ class CandidateDomainService:
 
             resume_json = ResumeFieldExtractor.extract(cv_text)
         combined_parts = [cv_text]
-        skills_set: set[str] = set()
+        skill_candidates: list[tuple[str, float]] = []
         education_list: list[str] = []
         projects_list: list[str] = []
         responsibilities_list: list[str] = []
-        roles_list: list[str] = []
+        role_candidates: list[tuple[str, float]] = []
 
         if optimized_profile:
-            skills_set.update(optimized_profile.core_skills)
-            skills_set.update(optimized_profile.inferred_skills)
+            skill_candidates.extend((skill, 0.45) for skill in optimized_profile.core_skills)
+            skill_candidates.extend((skill, 0.35) for skill in optimized_profile.inferred_skills)
             education_list.extend(optimized_profile.education_domains)
             if optimized_profile.current_role:
-                roles_list.append(optimized_profile.current_role)
+                role_candidates.append((optimized_profile.current_role, 0.55))
             combined_parts.extend(optimized_profile.professional_domains)
 
         if dynamic_profile:
-            skills_set.update(dynamic_profile.core_skills)
+            dynamic_confidence = {"HIGH": 0.50, "MEDIUM": 0.40}.get(dynamic_profile.confidence.upper(), 0.25)
+            skill_candidates.extend((skill, dynamic_confidence) for skill in dynamic_profile.core_skills)
             education_list.extend(dynamic_profile.education_domains)
             if dynamic_profile.current_role:
-                roles_list.append(dynamic_profile.current_role)
-            roles_list.extend(dynamic_profile.previous_roles)
+                role_candidates.append((dynamic_profile.current_role, dynamic_confidence + 0.10))
+            role_candidates.extend((role, dynamic_confidence) for role in dynamic_profile.previous_roles)
 
         if resume_json:
             if isinstance(resume_json.get("skills"), list):
-                skills_set.update(resume_json["skills"])
+                skill_candidates.extend((skill, 0.45) for skill in resume_json["skills"] if isinstance(skill, str))
             elif isinstance(resume_json.get("skills"), dict):
                 raw_skills = resume_json["skills"]
                 if isinstance(raw_skills.get("all_skills"), list):
-                    skills_set.update(s for s in raw_skills["all_skills"] if isinstance(s, str) and s.strip())
+                    skill_candidates.extend((skill, 0.45) for skill in raw_skills["all_skills"] if isinstance(skill, str) and skill.strip())
                 for sub in raw_skills.values():
                     if isinstance(sub, list):
-                        skills_set.update(s for s in sub if isinstance(s, str) and s.strip())
+                        skill_candidates.extend((skill, 0.45) for skill in sub if isinstance(skill, str) and skill.strip())
             if isinstance(resume_json.get("education"), list):
                 for edu in resume_json["education"]:
                     if isinstance(edu, dict):
@@ -89,15 +92,19 @@ class CandidateDomainService:
                         continue
                     role = experience.get("job_title") or experience.get("title") or experience.get("position")
                     if role:
-                        roles_list.append(str(role))
+                        role_candidates.append((str(role), 0.60))
                     for responsibility in experience.get("responsibilities") or []:
                         if isinstance(responsibility, str) and responsibility.strip():
                             responsibilities_list.append(responsibility.strip())
 
-        if not skills_set:
-            skills_set.update(cls._extract_cv_skill_lines(cv_text))
-        if not roles_list:
-            roles_list.extend(cls._extract_cv_role_headers(cv_text))
+        if not skill_candidates:
+            skill_candidates.extend((skill, 0.40) for skill in cls._extract_cv_skill_lines(cv_text))
+        if not role_candidates:
+            role_candidates.extend((role, 0.50) for role in cls._extract_cv_role_headers(cv_text))
+
+        repo = domain_repository or department_domain_repository
+        skills_set = set(cls._validate_skills(skill_candidates, cv_text, resume_json, repo))
+        roles_list = cls.validate_job_roles([role for role, _ in role_candidates], cv_text, resume_json, repo, role_candidates)
 
         # Enforce that education does not override established professional experience
         active_education = []
@@ -111,8 +118,6 @@ class CandidateDomainService:
             )
         ).lower()
 
-        repo = domain_repository or department_domain_repository
-
         # 1. Dynamic Vector & MSSQL taxonomy resolution
         role_evidence = [*roles_list, *responsibilities_list, *projects_list]
         role_input = " ".join(role_evidence) if role_evidence else combined_text
@@ -125,7 +130,8 @@ class CandidateDomainService:
             industry_dept = dyn_res.industry_department or dyn_res.industry_domain or dyn_res.db_department_name
             prof_domain = dyn_res.industry_domain or dyn_res.db_department_name or ""
             recommended_dept = industry_dept or prof_domain
-            suitable_roles = [dyn_res.db_department_name] if dyn_res.db_department_name else []
+            resolved_role = dyn_res.industry_designation or dyn_res.db_designation_name
+            suitable_roles = [resolved_role] if resolved_role else []
         else:
             tax_rules = RuleConfigManager.get_taxonomy_rules()
             w_exp = tax_rules.evidence_weight_experience
@@ -171,9 +177,9 @@ class CandidateDomainService:
                 suitable_roles = []
 
         # Build custom roles from structured profile roles first
-        custom_roles = []
+        custom_roles: list[str] = []
         if roles_list:
-            custom_roles.extend([r.title() for r in roles_list if len(r) > 2])
+            custom_roles.extend(roles_list)
 
         # When no structured roles available, dynamically infer from actual resume content
         if not custom_roles:
@@ -181,7 +187,7 @@ class CandidateDomainService:
             if inferred:
                 custom_roles = inferred
             else:
-                custom_roles = suitable_roles
+                custom_roles = cls.validate_job_roles(suitable_roles, cv_text, resume_json, repo, taxonomy_inferred=True)
 
         # Build strengths from structured data first, then fall back to resume content
         strengths: list[str] = []
@@ -214,17 +220,12 @@ class CandidateDomainService:
         work experience responsibilities, education degrees, and CV text against
         the data-driven Job Taxonomy rules and Department Domain configurations.
         """
-        # Build a comprehensive search text from all available resume content
         search_parts: list[str] = []
-        if cv_text:
-            search_parts.append(cv_text)
 
         if resume_json:
             for exp in resume_json.get("work_experience") or resume_json.get("experience") or []:
                 if not isinstance(exp, dict):
                     continue
-                if exp.get("company"):
-                    search_parts.append(str(exp["company"]))
                 if exp.get("job_title") or exp.get("title") or exp.get("position"):
                     search_parts.append(str(exp.get("job_title") or exp.get("title") or exp.get("position")))
                 if exp.get("description"):
@@ -240,6 +241,15 @@ class CandidateDomainService:
                     if edu.get("field_of_study"):
                         search_parts.append(str(edu["field_of_study"]))
 
+        if not search_parts and cv_text:
+            from app.services.resume_field_extractor import ResumeFieldExtractor
+
+            sections = ResumeFieldExtractor._split_sections(cv_text.splitlines())
+            search_parts.extend(sections.get("experience", []))
+            search_parts.extend(sections.get("education", []))
+            search_parts.extend(sections.get("skills", []))
+            search_parts.extend(sections.get("projects", []))
+
         search_text = " ".join(search_parts).lower()
         if not search_text.strip():
             return []
@@ -247,21 +257,10 @@ class CandidateDomainService:
         scored_roles: list[tuple[int, str]] = []
         seen_roles: set[str] = set()
 
-        # 1. Match against dynamic department domains directly to prevent circular recursion
         repository = repo or department_domain_repository
         for matcher in repository.get_domain_matchers():
             kw_matches = matcher.keyword_match_count(search_text)
-            if kw_matches > 0:
-                dept_name = matcher.domain.department_name
-                if dept_name and dept_name not in seen_roles and dept_name != "Unknown":
-                    scored_roles.append((kw_matches * 2, dept_name))
-                    seen_roles.add(dept_name)
-
-        # 2. Match against dynamic department domains
-        repository = repo or department_domain_repository
-        for matcher in repository.get_domain_matchers():
-            kw_matches = matcher.keyword_match_count(search_text)
-            if kw_matches > 0:
+            if kw_matches >= 2:
                 for role in matcher.domain.default_roles:
                     if role not in seen_roles:
                         scored_roles.append((kw_matches, role))
@@ -269,7 +268,209 @@ class CandidateDomainService:
 
         # Sort by match count descending and return top 4
         scored_roles.sort(key=lambda x: x[0], reverse=True)
-        return [role for _, role in scored_roles[:4]]
+        inferred = [role for _, role in scored_roles[:4]]
+        return cls.validate_job_roles(inferred, cv_text, resume_json, repository, taxonomy_inferred=True)
+
+    @classmethod
+    def validate_skills(
+        cls,
+        skills: list[str],
+        cv_text: str,
+        resume_json: dict[str, Any] | None = None,
+        repo: DepartmentDomainRepository | None = None,
+        source_confidence: float = 0.45,
+    ) -> list[str]:
+        candidates = [(skill, source_confidence) for skill in skills]
+        return cls._validate_skills(candidates, cv_text, resume_json, repo or department_domain_repository)
+
+    @classmethod
+    def validate_optimized_profile(
+        cls,
+        profile: OptimizedCandidateProfile,
+        cv_text: str,
+        resume_json: dict[str, Any] | None = None,
+        repo: DepartmentDomainRepository | None = None,
+    ) -> OptimizedCandidateProfile:
+        repository = repo or department_domain_repository
+        current_roles = cls.validate_job_roles(
+            [profile.current_role] if profile.current_role else [], cv_text, resume_json, repository
+        )
+        canonical_domains = set(RuleConfigManager.get_taxonomy_rules().canonical_domains)
+        professional_domains = [
+            domain for domain in profile.professional_domains
+            if domain in canonical_domains and cls._contains_entity(cv_text, domain)
+        ]
+        professional_domain = profile.professional_domain
+        if professional_domain not in canonical_domains or not cls._contains_entity(cv_text, professional_domain or ""):
+            professional_domain = None
+        return profile.model_copy(
+            update={
+                "core_skills": cls.validate_skills(profile.core_skills, cv_text, resume_json, repository),
+                "inferred_skills": cls.validate_skills(
+                    profile.inferred_skills, cv_text, resume_json, repository, source_confidence=0.35
+                ),
+                "current_role": current_roles[0] if current_roles else None,
+                "professional_domains": professional_domains,
+                "professional_domain": professional_domain,
+                "suitable_job_roles": cls.validate_job_roles(
+                    profile.suitable_job_roles, cv_text, resume_json, repository
+                ),
+            }
+        )
+
+    @classmethod
+    def _validate_skills(
+        cls,
+        candidates: list[tuple[str, float]],
+        cv_text: str,
+        resume_json: dict[str, Any] | None,
+        repo: DepartmentDomainRepository,
+    ) -> list[str]:
+        from app.services.resume_field_extractor import ResumeFieldExtractor
+
+        sections = ResumeFieldExtractor._split_sections(cv_text.splitlines()) if cv_text else {}
+        skills_text = " ".join(sections.get("skills", []))
+        professional_text = " ".join(
+            [*sections.get("experience", []), *sections.get("projects", []), *sections.get("education", [])]
+        )
+        vocabulary = cls._professional_vocabulary(repo, include_roles=False)
+        accepted: list[str] = []
+        seen: set[str] = set()
+        for raw_value, source_score in candidates:
+            value = cls._clean_entity(raw_value)
+            key = value.casefold()
+            if not value or key in seen or cls._is_contaminated_entity(value, resume_json):
+                continue
+            in_skill_section = cls._contains_entity(skills_text, value)
+            in_professional_context = cls._contains_entity(professional_text, value)
+            in_cv = cls._contains_entity(cv_text, value)
+            if not in_cv:
+                continue
+            score = source_score + (0.30 if in_skill_section else 0.20 if in_professional_context else 0.10)
+            score += 0.15 if cls._matches_vocabulary(value, vocabulary) else 0.0
+            score += 0.05 if re.search(r"[A-Za-z]", value) and len(value.split()) <= 8 else 0.0
+            if score >= cls._ENTITY_CONFIDENCE_THRESHOLD:
+                seen.add(key)
+                accepted.append(value)
+        return accepted
+
+    @classmethod
+    def validate_job_roles(
+        cls,
+        roles: list[str],
+        cv_text: str,
+        resume_json: dict[str, Any] | None = None,
+        repo: DepartmentDomainRepository | None = None,
+        scored_roles: list[tuple[str, float]] | None = None,
+        taxonomy_inferred: bool = False,
+    ) -> list[str]:
+        from app.services.resume_field_extractor import ResumeFieldExtractor
+
+        repository = repo or department_domain_repository
+        sections = ResumeFieldExtractor._split_sections(cv_text.splitlines()) if cv_text else {}
+        experience_text = " ".join(sections.get("experience", []))
+        occupation_vocabulary = cls._professional_vocabulary(repository, include_roles=True)
+        source_scores = {cls._clean_entity(role).casefold(): score for role, score in scored_roles or []}
+        accepted: list[str] = []
+        seen: set[str] = set()
+        for raw_role in roles:
+            role = cls._clean_role(raw_role, occupation_vocabulary)
+            key = role.casefold()
+            if not role or key in seen or cls._is_contaminated_entity(role, resume_json):
+                continue
+            if ResumeFieldExtractor._DATE_RANGE.search(role) or re.search(r"\b(?:19|20)\d{2}\b", role):
+                continue
+            if ResumeFieldExtractor._looks_like_company(role):
+                continue
+            has_occupation_type = cls._matches_vocabulary(role, occupation_vocabulary, require_role=True)
+            if not has_occupation_type or not ResumeFieldExtractor.is_valid_job_title(role):
+                continue
+            if taxonomy_inferred:
+                score = 0.85
+            else:
+                in_experience = cls._contains_entity(experience_text, role)
+                in_cv = cls._contains_entity(cv_text, role)
+                if not in_cv:
+                    continue
+                score = source_scores.get(key, 0.50) + 0.25 + (0.20 if in_experience else 0.05)
+            if score >= cls._ENTITY_CONFIDENCE_THRESHOLD:
+                seen.add(key)
+                accepted.append(role)
+        return accepted
+
+    @classmethod
+    def _professional_vocabulary(cls, repo: DepartmentDomainRepository, *, include_roles: bool) -> set[str]:
+        vocabulary: set[str] = set()
+        for matcher in repo.get_domain_matchers():
+            if include_roles:
+                vocabulary.update(cls._clean_entity(role).casefold() for role in matcher.domain.default_roles if role)
+            else:
+                vocabulary.update(cls._clean_entity(term).casefold() for term in matcher.domain.keywords if term)
+        if include_roles:
+            from app.services.resume_field_extractor import ResumeFieldExtractor
+
+            vocabulary.update(term.casefold() for term in ResumeFieldExtractor.JOB_TITLE_KEYWORDS)
+        else:
+            assets = RuleConfigManager.get_term_matching_assets()
+            for canonical, aliases in assets.get("aliases", {}).items():
+                vocabulary.add(cls._clean_entity(str(canonical)).casefold())
+                vocabulary.update(cls._clean_entity(str(alias)).casefold() for alias in aliases)
+        return {term for term in vocabulary if term}
+
+    @staticmethod
+    def _clean_entity(value: Any) -> str:
+        return re.sub(r"\s+", " ", str(value or "").strip().strip("#*•|-:;,")).strip()
+
+    @classmethod
+    def _clean_role(cls, value: Any, occupation_vocabulary: set[str]) -> str:
+        role = cls._clean_entity(value)
+        segments = [cls._clean_entity(segment) for segment in re.split(r"\||\s+at\s+", role, flags=re.IGNORECASE)]
+        occupational_segments = [segment for segment in segments if cls._matches_vocabulary(segment, occupation_vocabulary, require_role=True)]
+        return occupational_segments[0] if occupational_segments else role
+
+    @classmethod
+    def _is_contaminated_entity(cls, value: str, resume_json: dict[str, Any] | None) -> bool:
+        from app.services.resume_field_extractor import ResumeFieldExtractor
+
+        normalized = value.casefold()
+        compact = re.sub(r"\s+", "", normalized)
+        if not normalized or value.startswith("#") or normalized in ResumeFieldExtractor.GENERIC_SECTION_HEADERS:
+            return True
+        if re.fullmatch(r"(?:19|20)\d{2}", value) or re.fullmatch(r"\d+(?:[./-]\d+)+", value):
+            return True
+        if re.fullmatch(r"[\d\s()+./-]+", value) or re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", value):
+            return True
+        if re.search(r"(?:https?://|www\.|linkedin\.com|github\.com)", value, re.IGNORECASE):
+            return True
+        match_rules = RuleConfigManager.get_match_rules()
+        headings = {heading.casefold().strip() for heading in match_rules.cv_section_heading_denylist if heading}
+        compact_headings = {heading.casefold().replace(" ", "").strip() for heading in match_rules.cv_section_heading_compact_denylist if heading}
+        if normalized in headings or compact in compact_headings:
+            return True
+        contact = (resume_json or {}).get("contact_info") or {}
+        personal_values = [contact.get(key) for key in ("name", "full_name", "candidate_name", "email", "phone", "location")]
+        if any(normalized == cls._clean_entity(personal).casefold() for personal in personal_values if personal):
+            return True
+        for experience in (resume_json or {}).get("work_experience") or (resume_json or {}).get("experience") or []:
+            if isinstance(experience, dict) and experience.get("company") and normalized == cls._clean_entity(experience["company"]).casefold():
+                return True
+        return False
+
+    @staticmethod
+    def _contains_entity(source: str, value: str) -> bool:
+        normalized_source = re.sub(r"\s+", " ", source or "").casefold()
+        normalized_value = re.sub(r"\s+", " ", value).casefold()
+        return bool(normalized_value and normalized_value in normalized_source)
+
+    @staticmethod
+    def _matches_vocabulary(value: str, vocabulary: set[str], *, require_role: bool = False) -> bool:
+        normalized = value.casefold()
+        tokens = {token for token in re.split(r"[^\w+#.]+", normalized) if token}
+        for term in vocabulary:
+            term_tokens = {token for token in re.split(r"[^\w+#.]+", term) if token}
+            if normalized == term or (require_role and term_tokens and term_tokens & tokens) or (not require_role and term in normalized):
+                return True
+        return False
 
     @classmethod
     def _extract_strengths_from_resume(
@@ -322,28 +523,11 @@ class CandidateDomainService:
 
     @classmethod
     def _extract_cv_skill_lines(cls, cv_text: str) -> list[str]:
-        skill_lines: list[str] = []
-        in_skills_section = False
+        from app.services.resume_field_extractor import ResumeFieldExtractor
 
-        for raw_line in cv_text.splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-
-            normalized_heading = re.sub(r"\s+", " ", line.lstrip("#- ").strip()).lower()
-            compact_heading = normalized_heading.replace(" ", "")
-
-            if compact_heading == "skills":
-                in_skills_section = True
-                continue
-
-            if in_skills_section and line.startswith("##"):
-                break
-
-            if in_skills_section or re.match(r"^[\w /&+\-.#]+:\s*\S+", line):
-                skill_lines.append(line)
-
-        return skill_lines
+        sections = ResumeFieldExtractor._split_sections(cv_text.splitlines())
+        extracted = ResumeFieldExtractor._extract_skills(sections.get("skills", []))
+        return extracted.get("all_skills", [])
 
     @classmethod
     def _extract_cv_role_headers(cls, cv_text: str) -> list[str]:
@@ -363,9 +547,9 @@ class CandidateDomainService:
             compact_header = re.sub(r"\s+", "", normalized_header)
             if not header or normalized_header in section_denylist or compact_header in compact_denylist or any(term in normalized_header for term in substring_denylist):
                 continue
-            is_explicit_header = line.startswith("##") or labeled_role is not None
+            is_explicit_header = labeled_role is not None
             is_header_role = line_index < 12 and ResumeFieldExtractor.is_valid_job_title(header)
-            if is_explicit_header or is_header_role:
+            if (is_explicit_header or is_header_role) and ResumeFieldExtractor.is_valid_job_title(header):
                 headers.append(header)
 
         return headers

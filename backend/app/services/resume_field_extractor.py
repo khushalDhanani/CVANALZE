@@ -421,7 +421,7 @@ class ResumeFieldExtractor:
             "summary": "\n".join(sections.get("summary", [])).strip(),
             "work_experience": extracted_exp,
             "education": extracted_education,
-            "skills": cls._extract_skills(sections.get("skills", []) or text_lines),
+            "skills": cls._extract_skills(sections.get("skills", [])),
             "projects": cls._extract_projects(sections.get("projects", [])),
             "certifications": [line.lstrip("-• ").strip() for line in sections.get("certifications", []) if line.strip()],
             "quality_metrics": metrics or {},
@@ -471,7 +471,8 @@ class ResumeFieldExtractor:
         sections: dict[str, list[str]] = {"general": []}
         current = "general"
         for line in lines:
-            match = cls._SECTION_HEADING.match(line.strip())
+            stripped_line = line.strip()
+            match = cls._SECTION_HEADING.match(stripped_line)
             if not match:
                 sections.setdefault(current, []).append(line)
                 continue
@@ -491,6 +492,9 @@ class ResumeFieldExtractor:
             else:
                 current = heading.lower()
             sections.setdefault(current, [])
+            inline_content = stripped_line[match.end():].strip().lstrip(":-–—").strip()
+            if inline_content:
+                sections[current].append(inline_content)
         return sections
 
     @staticmethod

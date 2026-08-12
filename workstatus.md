@@ -1,6 +1,48 @@
 # Work Status
 
 ## Last Completed Task
+**Hiring Intelligence and AI Domain Analysis semantic entity validation**
+
+### Architecture Impact Analysis
+- Kept `OllamaLLMService` and its shared transport, retry, timeout, cache, model, and JSON-generation contracts unchanged.
+- Centralized skill, occupation, and optimized-profile validation in `CandidateDomainService`, the shared boundary used by Hiring Intelligence, AI Domain Analysis, candidate context, and no-vacancy fallback output.
+- Tightened `LLMGroundingService` so literal CV presence is no longer sufficient evidence for an entity's semantic type.
+- Preserved all API response models and frontend rendering contracts.
+
+### Files Changed
+- Section-aware extraction: `backend/app/services/resume_field_extractor.py`.
+- Semantic entity validation and confidence gating: `backend/app/services/candidate_domain_service.py`.
+- Ollama response grounding: `backend/app/services/llm_grounding_service.py`.
+- Downstream validation enforcement: `backend/app/schemas/candidate_context.py` and `backend/app/services/match_service.py`.
+- Focused regressions: `backend/tests/test_candidate_domain_entity_validation.py`.
+- Task record: `workstatus.md`.
+
+### Implementation Plan
+- Preserve inline section content and stop the empty Skills section from falling back to whole-document extraction.
+- Score candidate skills and roles from source reliability, semantic vocabulary, CV support, and section context.
+- Reject personal data, dates, numeric values, contact data, headings, companies, URLs, and uncorroborated text before type-specific acceptance.
+- Infer roles only from configured taxonomy occupations supported by professional evidence, excluding department labels.
+- Apply the same validator to grounded Ollama output and remove downstream bypasses.
+
+### Code Changes
+- Added a fail-closed 0.70 entity-confidence threshold with generic, candidate-independent contamination detection.
+- Added section-context and repository/configuration-backed semantic vocabulary checks for skills and occupations.
+- Preserved content following inline headings such as `Skills: Python, SQL` and removed whole-CV skill parsing.
+- Replaced dynamic department-as-role output with resolved designations or configured default occupations.
+- Removed company names from role inference evidence and required at least two configured domain keyword matches for inferred roles.
+- Validated optimized LLM profiles even when optional grounding is disabled, and removed candidate-context code that reintroduced unvalidated LLM domains.
+
+### Verification Checklist
+- [x] Serena diagnostics report no errors or warnings in the new validator, extractor, grounding, candidate-context, or regression-test changes.
+- [x] `match_service.py` has only its pre-existing local Pyright environment error for unresolved `fastapi.concurrency`.
+- [x] `git diff --check` passes.
+- [x] Regression coverage includes inline-section parsing, contaminated structured/LLM fields, semantic-type grounding, and uncertain-entity exclusion.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+
+### Refactoring Performed
+- Consolidated duplicated hardcoded role rejection and downstream LLM trust into the dynamic `CandidateDomainService` semantic validation boundary.
+
+## Previous Task
 **Dedicated MSSQL SELECT-only credential cutover**
 
 ### Architecture Impact Analysis

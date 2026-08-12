@@ -7,6 +7,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.schemas.analysis import OptimizedLLMMatchResponse, OptimizedVacancyMatch
+from app.services.candidate_domain_service import CandidateDomainService
 from app.services.quality_metrics import QualityMetrics
 
 _NORMALIZE = re.compile(r"[^a-z0-9+#./-]+")
@@ -51,7 +52,19 @@ class LLMGroundingService:
         vacancies: list[dict[str, Any]],
     ) -> tuple[OptimizedLLMMatchResponse, GroundingReport]:
         if not settings.LLM_GROUNDING_ENABLED:
-            return response, GroundingReport()
+            profile = CandidateDomainService.validate_optimized_profile(response.candidate_profile, cv_text)
+            matches = [
+                match.model_copy(
+                    update={
+                        "matched_skills": CandidateDomainService.validate_skills(match.matched_skills, cv_text),
+                        "inferred_skills": CandidateDomainService.validate_skills(
+                            match.inferred_skills, cv_text, source_confidence=0.35
+                        ),
+                    }
+                )
+                for match in response.matched_vacancies
+            ]
+            return response.model_copy(update={"candidate_profile": profile, "matched_vacancies": matches}), GroundingReport()
 
         vacancy_sources = {
             str(vacancy.get("vacancy_id") or vacancy.get("id")): json.dumps(vacancy, sort_keys=True, default=str)
@@ -73,8 +86,8 @@ class LLMGroundingService:
                 continue
             grounded += 1
 
-            matched_skills, matched_grounded, matched_total = cls._filter_claims(match.matched_skills, cv_text)
-            inferred_skills, inferred_grounded, inferred_total = cls._filter_claims(match.inferred_skills, cv_text)
+            matched_skills, matched_grounded, matched_total = cls._filter_skills(match.matched_skills, cv_text)
+            inferred_skills, inferred_grounded, inferred_total = cls._filter_skills(match.inferred_skills, cv_text)
             assertions += matched_total + inferred_total
             grounded += matched_grounded + inferred_grounded
             unsupported.extend(skill for skill in match.matched_skills + match.inferred_skills if skill not in matched_skills + inferred_skills)
@@ -109,17 +122,18 @@ class LLMGroundingService:
             )
 
         profile = response.candidate_profile
-        core_skills, core_grounded, core_total = cls._filter_claims(profile.core_skills, cv_text)
-        inferred_profile, profile_grounded, profile_total = cls._filter_claims(profile.inferred_skills, cv_text)
+        core_skills, core_grounded, core_total = cls._filter_skills(profile.core_skills, cv_text)
+        inferred_profile, profile_grounded, profile_total = cls._filter_skills(profile.inferred_skills, cv_text)
         education, education_grounded, education_total = cls._filter_claims(profile.education_domains, cv_text)
         certifications, certifications_grounded, certifications_total = cls._filter_claims(profile.certifications, cv_text)
         professional_domains, domains_grounded, domains_total = cls._filter_claims(profile.professional_domains, cv_text)
         strengths, strengths_grounded, strengths_total = cls._filter_claims(profile.strengths, cv_text)
-        suitable_roles, roles_grounded, roles_total = cls._filter_claims(profile.suitable_job_roles, cv_text)
+        suitable_roles, roles_grounded, roles_total = cls._filter_roles(profile.suitable_job_roles, cv_text)
         assertions += core_total + profile_total + education_total + certifications_total + domains_total + strengths_total + roles_total
         grounded += core_grounded + profile_grounded + education_grounded + certifications_grounded + domains_grounded + strengths_grounded + roles_grounded
         unsupported.extend(skill for skill in profile.core_skills + profile.inferred_skills if skill not in core_skills + inferred_profile)
-        current_role = profile.current_role if profile.current_role and _supported(profile.current_role, cv_text) else None
+        validated_current_roles = cls._filter_roles([profile.current_role], cv_text)[0] if profile.current_role else []
+        current_role = validated_current_roles[0] if validated_current_roles else None
         if profile.current_role:
             assertions += 1
             grounded += int(current_role is not None)
@@ -157,6 +171,7 @@ class LLMGroundingService:
                 "suitable_job_roles": suitable_roles,
             }
         )
+        validated_profile = CandidateDomainService.validate_optimized_profile(validated_profile, cv_text)
         summary = response.ai_career_summary if report.ratio >= 0.8 else ""
         validated = response.model_copy(
             update={"candidate_profile": validated_profile, "matched_vacancies": validated_matches, "ai_career_summary": summary}
@@ -174,3 +189,15 @@ class LLMGroundingService:
     def _filter_claims(claims: list[str], source: str) -> tuple[list[str], int, int]:
         supported = [claim for claim in claims if _supported(claim, source)]
         return supported, len(supported), len(claims)
+
+    @staticmethod
+    def _filter_skills(claims: list[str], source: str) -> tuple[list[str], int, int]:
+        supported = [claim for claim in claims if _supported(claim, source)]
+        validated = CandidateDomainService.validate_skills(supported, source)
+        return validated, len(validated), len(claims)
+
+    @staticmethod
+    def _filter_roles(claims: list[str], source: str) -> tuple[list[str], int, int]:
+        supported = [claim for claim in claims if _supported(claim, source)]
+        validated = CandidateDomainService.validate_job_roles(supported, source)
+        return validated, len(validated), len(claims)

@@ -72,6 +72,11 @@ class CandidateAnalysisContext:
                     pass
 
         if optimized_profile:
+            optimized_profile = CandidateDomainService.validate_optimized_profile(
+                optimized_profile, cv_text, resume_json, domain_repository
+            )
+
+        if optimized_profile:
             profile_parts.extend(
                 [
                     *optimized_profile.core_skills,
@@ -112,31 +117,11 @@ class CandidateAnalysisContext:
         if not current_role and normalized_resume and normalized_resume.employment:
             current_role = normalized_resume.employment[0].job_title.normalized_value
 
-        cand_name_clean = ""
-        if isinstance(resume_json, dict):
-            raw_cand_name = resume_json.get("name") or resume_json.get("candidate_name") or ""
-            if isinstance(raw_cand_name, str):
-                cand_name_clean = raw_cand_name.strip().lower()
-
-        denied_roles = {
-            "personal details", "personal details:", "objective", "summary", "profile",
-            "education", "skills", "technical skills", "experience", "work experience",
-            "key achievements", "achievements", "certifications", "contact information",
-            "projects", "declarations", "declaration", "hobbies", "languages"
-        }
-
-        def is_valid_role(r: str) -> bool:
-            if not r or len(r.strip()) < 2:
-                return False
-            clean = r.strip().lower()
-            if clean in denied_roles or clean.endswith(":") or clean in cand_name_clean:
-                return False
-            if cand_name_clean and len(cand_name_clean) > 3 and cand_name_clean in clean:
-                return False
-            return True
-
-        if current_role and not is_valid_role(current_role):
-            current_role = None
+        if current_role:
+            validated_roles = CandidateDomainService.validate_job_roles(
+                [current_role], cv_text, resume_json, domain_repository
+            )
+            current_role = validated_roles[0] if validated_roles else None
 
         if not current_role:
             m = re.search(
@@ -144,8 +129,11 @@ class CandidateAnalysisContext:
                 cv_text,
                 re.IGNORECASE,
             )
-            if m and is_valid_role(m.group(1)):
-                current_role = m.group(1).strip()
+            if m:
+                validated_roles = CandidateDomainService.validate_job_roles(
+                    [m.group(1)], cv_text, resume_json, domain_repository
+                )
+                current_role = validated_roles[0] if validated_roles else None
 
         # Text normalization inline (mirrors ScoringEngine._normalize_text)
         raw_combined = " ".join(filter(None, profile_parts))
@@ -191,9 +179,6 @@ class CandidateAnalysisContext:
             resume_json=resume_json,
             domain_repository=domain_repository,
         )
-        if optimized_profile and optimized_profile.professional_domains:
-            cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
-
         profile_domain = str(cand_domain_profile.get("professional_domain") or "").strip()
         profile_department = str(cand_domain_profile.get("recommended_department") or "").strip()
         if profile_domain:
@@ -250,6 +235,10 @@ class CandidateAnalysisContext:
         if optimized_profile is None:
             return
 
+        optimized_profile = CandidateDomainService.validate_optimized_profile(
+            optimized_profile, self.cv_text, self.resume_json, domain_repository
+        )
+
         deterministic_role = self.current_role
         deterministic_domain = self.cand_tax_domain
         deterministic_profile_domain = self.cand_domain
@@ -303,8 +292,6 @@ class CandidateAnalysisContext:
             resume_json=self.resume_json,
             domain_repository=domain_repository,
         )
-        if optimized_profile.professional_domains and not deterministic_profile_domain:
-            self.cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
         self.cand_domain = deterministic_profile_domain or self.cand_domain_profile.get("professional_domain", self.cand_domain)
         profile_department = str(self.cand_domain_profile.get("recommended_department") or "").strip()
         if self.cand_domain and deterministic_domain in ("", "Unknown"):

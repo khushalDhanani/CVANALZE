@@ -20,9 +20,10 @@ from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.classification_types import AISuggestion, ClassificationEvidence, MatchStatus, NormalizedClassification
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.normalized_resume import NormalizedResume
+from app.services.candidate_domain_service import CandidateDomainService
+from app.services.confidence_calibration import ConfidenceCalibrationService
 from app.services.document_parser import ResumeJsonExtractor
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
-from app.services.confidence_calibration import ConfidenceCalibrationService
 from app.services.llm_grounding_service import GroundingReport, LLMGroundingService
 from app.services.llm_service import OllamaLLMService
 from app.services.matching_quality_gate import MatchingQualityGate, MatchingReadiness
@@ -852,7 +853,7 @@ class MatchService:
         roles = cand_profile.get("suitable_job_roles", [])
         if not roles and normalized_resume and normalized_resume.employment:
             current_title = normalized_resume.employment[0].job_title.normalized_value
-            roles = [current_title] if current_title else []
+            roles = CandidateDomainService.validate_job_roles([current_title], cv_text) if current_title else []
         best_match = None
         ai_career_suggestions = [
             AISuggestion(
