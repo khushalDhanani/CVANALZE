@@ -7,43 +7,38 @@ export function useBatchProgress() {
   const [progress, setProgress] = useState<BatchProgressMessage | null>(null);
   const [result, setResult] = useState<BatchMatchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const cancelledRef = useRef<boolean>(false);
 
   const startBatch = useCallback(async (limit: number = 10) => {
     setRunning(true);
     setError(null);
     setProgress(null);
     setResult(null);
-
-    // Connect progress websocket
-    wsRef.current = batchService.connectProgressWebSocket(
-      (data) => {
-        setProgress(data);
-      },
-      (err) => {
-        console.warn('WebSocket progress warning:', err);
-      }
-    );
+    cancelledRef.current = false;
 
     try {
-      const res = await batchService.matchCandidates(limit);
-      setResult(res);
+      let current = await batchService.matchCandidates(limit);
+      setProgress(current);
+      while (!['COMPLETED', 'COMPLETED_DEGRADED', 'FAILED'].includes(current.status.toUpperCase())) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (cancelledRef.current) return;
+        current = await batchService.getBatchJob(current.batch_job_id);
+        setProgress(current);
+      }
+      if (current.status === 'FAILED') {
+        throw new Error(current.error || current.message || 'Batch matching failed');
+      }
+      setResult(current);
     } catch (err: any) {
       setError(err.message || 'Batch matching failed');
     } finally {
-      setRunning(false);
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
+      if (!cancelledRef.current) setRunning(false);
     }
   }, []);
 
   useEffect(() => {
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      cancelledRef.current = true;
     };
   }, []);
 

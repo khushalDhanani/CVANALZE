@@ -1,0 +1,110 @@
+from __future__ import annotations
+from pydantic import BaseModel, Field
+from typing import Any, List, Optional
+from enum import Enum
+
+class MatchStatus(str, Enum):
+    DB_MATCH = "DB_MATCH"
+    PARTIAL_MATCH = "PARTIAL_MATCH"
+    NO_SUITABLE_MATCH = "NO_SUITABLE_MATCH"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    SOURCE_DATA_UNAVAILABLE = "SOURCE_DATA_UNAVAILABLE"
+    ANALYSIS_UNAVAILABLE = "ANALYSIS_UNAVAILABLE"
+    NO_ACTIVE_VACANCIES = "NO_ACTIVE_VACANCIES"
+
+
+class ClassificationEvidence(BaseModel):
+    """Evidence for a single match component.
+
+    Attributes:
+        source: Origin of the evidence, e.g., "mssql_vacancy", "cv_skill",
+                "cv_title", "cv_education".
+        matched_term: The exact term from the CV or source that matched.
+        matched_against: The entity it was matched against (DB designation, skill, etc.).
+        confidence: Confidence score for this evidence in the range 0.0-1.0.
+    """
+    source: str = Field(..., description="Source of the evidence")
+    matched_term: Optional[str] = Field(None, description="What matched")
+    matched_against: Optional[str] = Field(None, description="What it matched against")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence for the evidence")
+
+class AISuggestion(BaseModel):
+    """AI‑generated career suggestion used when no DB match is found."""
+    suggested_role: str = Field(..., description="Suggested role name")
+    suggested_domain: str = Field(..., description="Suggested domain name")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence for the suggestion")
+    evidence: List[ClassificationEvidence] = Field(default_factory=list, description="Evidence supporting the suggestion")
+    missing_requirements: List[str] = Field(default_factory=list, description="What is needed to increase confidence")
+
+
+class MainDepartmentClassificationResult(BaseModel):
+    """Result of mapping a candidate profile to OrgMainDepartmentMst."""
+    main_department_id: Optional[int] = Field(None, description="Source of truth MSSQL MainDeptID")
+    main_department_name: str = Field(..., description="Official MainDeptName or 'NO_STRONG_MAIN_DEPARTMENT_MATCH'")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence score")
+    reasoning: str = Field(..., description="Short explanation of semantic mapping decision")
+    match_status: str = Field(..., description="MATCHED or NO_STRONG_MAIN_DEPARTMENT_MATCH")
+
+
+class HierarchyMatchNode(BaseModel):
+    """Details for a single level in the hierarchy resolution."""
+    id: Optional[int] = Field(None, description="Source of truth MSSQL ID")
+    name: str = Field(..., description="Entity name or NO_STRONG_*_MATCH")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
+    reasoning: str = Field(..., description="Short explanation of decision")
+    match_status: str = Field(..., description="MATCHED or NO_STRONG_*_MATCH")
+    top_k_candidates: List[dict[str, Any]] = Field(default_factory=list, description="Top-K candidate options evaluated")
+
+
+class HierarchyClassificationResult(BaseModel):
+    """Complete 3-level hierarchy classification result (MainDept -> Dept -> Desig)."""
+    main_department: HierarchyMatchNode
+    department: HierarchyMatchNode
+    designation: HierarchyMatchNode
+    is_hierarchy_valid: bool = Field(True, description="Whether parent-child hierarchy validation passed in MSSQL")
+    validation_errors: List[str] = Field(default_factory=list, description="Validation errors if hierarchy is invalid")
+    overall_confidence: float = Field(..., ge=0.0, le=1.0, description="Combined hierarchy confidence score")
+
+
+class NormalizedClassification(BaseModel):
+    """Unified classification result that carries both raw DB identifiers and normalized industry labels.
+
+    The model also includes confidence, match status and supporting evidence.
+    """
+    # Raw DB identifiers (MUST be real MSSQL IDs; never PostgreSQL aliases)
+    db_business_group_id: Optional[int] = None
+    db_business_group_name: Optional[str] = None
+    db_company_id: Optional[int] = None
+    db_company_name: Optional[str] = None
+    db_location_id: Optional[int] = None
+    db_location_name: Optional[str] = None
+    db_main_department_id: Optional[int] = None
+    db_main_department_name: Optional[str] = None
+    db_department_id: Optional[int] = None
+    db_department_name: Optional[str] = None
+    db_designation_id: Optional[int] = None
+    db_designation_name: Optional[str] = None
+
+    # Normalized industry labels (derived from alias/normalizer)
+    industry_department: Optional[str] = None
+    industry_designation: Optional[str] = None
+    industry_domain: Optional[str] = None
+
+    # Classification quality
+    match_status: MatchStatus = Field(..., description="One of: DB_MATCH, NO_SUITABLE_MATCH, INSUFFICIENT_EVIDENCE")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Overall confidence of the classification")
+    evidence: List[ClassificationEvidence] = Field(default_factory=list, description="Supporting evidence items")
+    match_source: Optional[str] = None
+
+    # When no DB match, provide optional AI suggestion
+    ai_career_suggestion: Optional[AISuggestion] = None
+
+    # Main Department classification result from OrgMainDepartmentMst
+    main_department_classification: Optional[MainDepartmentClassificationResult] = None
+
+    # Full 3-level hierarchy classification result (MainDept -> Dept -> Desig)
+    hierarchy_classification: Optional[HierarchyClassificationResult] = None
+
+
+NormalizedClassification.model_rebuild()
+

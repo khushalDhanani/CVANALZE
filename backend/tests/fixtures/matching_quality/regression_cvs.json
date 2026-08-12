@@ -1,0 +1,45 @@
+[
+  {
+    "fixture_id": "cv_Shruti_Dhameliya_React_js_Developer_3_Years_of_Exp",
+    "document_hash": "f13a7563d127d3a38a427b7b72125f041df1851c9992f6de07a9eca4bc1fbe57",
+    "resume_text": "SHRUTI DHAMELIYA\nFront-end Developer\nspdhameliya5@gmail.com\nSKILLS\nReact.js, Next.js, JavaScript, TypeScript, HTML5, CSS3, Redux, Tailwind CSS, Jest\nWORK EXPERIENCE\nFront-end Developer, Dignizant Technologies\nDeveloped responsive admin dashboard interfaces and scalable component libraries.\nReact.js Developer, Braincuber Technology\nBuilt accessible React.js web interfaces and dynamic content rendering.\nEDUCATION\nMaster of Computer Applications (MCA), Jain University, Expected 2026\nBachelor of Computer Applications (BCA), 2020 - 2023\nExperience: 3 years 4 months",
+    "expected_name": "SHRUTI DHAMELIYA",
+    "expected_role_terms": ["front-end", "react"],
+    "required_skills": ["React.js", "JavaScript", "TypeScript"],
+    "expected_family": "software",
+    "minimum_experience_years": 3.0
+  },
+  {
+    "fixture_id": "cv_gptsuifgr321345678o9p",
+    "document_hash": "c369770edae6dbd27123d2ea68cc20cf6329535022a48c74850c0e20df910fd6",
+    "resume_text": "Tarun Gupta\nFULL STACK DEVELOPER\ngtworks05@gmail.com\nResults-driven Flutter Developer with 3+ years of experience building cross-platform applications.\nWORK EXPERIENCE\nEqual SoftTech\nSr Developer\nDeveloped iOS and Android apps using Flutter. Applied Provider, Riverpod and BLoC.\nMobile/Web App Freelancer\n2023-Present\nBuilt client apps and integrated backend APIs.\nSKILLS\nDart, Flutter, Firebase, REST APIs, Git, Riverpod, BLoC, GetX\nEDUCATION\nBTech Mechanical, 2018-2022",
+    "expected_name": "Tarun Gupta",
+    "forbidden_names": ["WORK EXPERIENCE"],
+    "expected_role_terms": ["flutter", "developer"],
+    "required_skills": ["Flutter", "Dart", "Firebase"],
+    "expected_family": "software",
+    "minimum_experience_years": 3.0
+  },
+  {
+    "fixture_id": "cv_Utkarsh_Patil_07012026sdfgdfvdfsf",
+    "document_hash": "85050828c10dd305fcbc5fdff56761569ee6c8fea26922e870979722c10a1790",
+    "resume_text": "Utkarsh Patil\nASP .NET Developer\ncodewithprogrammer@gmail.com\nSkilled ASP.NET developer with 4+ years creating software and integrating third-party tools.\nWORK EXPERIENCE\nASP .NET Developer, Pulse Software Solutions LLC\n07/2021 - Present\nMigrated applications to ASP.NET Core and created secure APIs. Managed SQL Server and MongoDB.\nSKILLS\nASP.NET Core, ASP.NET MVC, Web API, Entity Framework Core, ADO.NET, LINQ, SQL Server, MongoDB, Angular\nEDUCATION\nBachelor of Science (Computer Science), 2017 - 2020\nMaster of Science (Information & Communication Technology), 2021 - 2023",
+    "expected_name": "Utkarsh Patil",
+    "forbidden_names": ["ASP .NET Developer"],
+    "expected_role_terms": ["asp", ".net", "developer"],
+    "required_skills": ["ASP.NET Core", "ADO.NET", "LINQ", "SQL Server"],
+    "expected_family": "software",
+    "minimum_experience_years": 4.0
+  },
+  {
+    "fixture_id": "cv_san1761727581",
+    "document_hash": "4f4334f97c11e4900772f7ab3a8e4dfe6b9d16c5a10edf1b288c441d57c4de65",
+    "resume_text": "Santosh Koli\nSr. Flutter Developer\nkolisantosh222@gmail.com\nFlutter Developer with 6 years of mobile app development experience.\nProfessional Experience\nSr. Flutter Developer, Resonent TechnoLabs Pvt Ltd\n2024-04 To Current\nDeveloped Android and iOS apps using Flutter and Dart; integrated MQTT and Firebase.\nSr. Flutter Developer, The Complete Softech\n2021-10 To 2024-03\nLed Flutter development using Provider, GetX and BLoC.\nAndroid and Flutter Developer\n2019-12 To 2021-09\nSKILLS\nFlutter, Dart, Android, iOS, Firebase, REST APIs, Git, Provider, GetX, BLoC, MQTT",
+    "expected_name": "Santosh Koli",
+    "forbidden_names": ["Professional Experience"],
+    "expected_role_terms": ["flutter", "developer"],
+    "required_skills": ["Flutter", "Dart", "Firebase", "BLoC"],
+    "expected_family": "software",
+    "minimum_experience_years": 5.0
+  }
+]

@@ -1,10 +1,13 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
-import httpx
-from fastapi import APIRouter, File, HTTPException, UploadFile, BackgroundTasks
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.core.config import settings
-from app.repositories.job import JobRepository
+from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
+from app.core.logging import logger
+from app.repositories.job import JobRepository, VacancySourceUnavailableError
+from app.repositories.processing_job import ProcessingJobPersistenceError, ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.repositories.training import TrainingRepository
 from app.schemas.analysis import (
@@ -13,8 +16,12 @@ from app.schemas.analysis import (
     TrainingExample,
 )
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse
-from app.services.cv_service import process_cv_file, get_stable_cv_key
 from app.services.match_service import MatchService
+from app.services.processing_queue import (
+    ProcessingQueueService,
+    ProcessingQueueUnavailableError,
+)
+from app.services.upload_service import UploadService, UploadValidationError
 
 router = APIRouter(prefix="/match", tags=["Matching"])
 
@@ -25,24 +32,21 @@ async def check_llm_health():
     if not settings.LLM_ENABLED:
         return {"status": "disabled", "message": "LLM matching is disabled in config."}
 
-    url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags"
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            model_names = [m.get("name") for m in models]
+    from app.services.llm_service import OllamaLLMService
 
+    try:
+        is_healthy, model_names = OllamaLLMService.get_status()
+        if is_healthy:
             return {
                 "status": "online",
                 "model_configured": settings.OLLAMA_MODEL,
-                "model_available": any(
-                    settings.OLLAMA_MODEL in name for name in model_names
-                ),
+                "model_available": any(settings.OLLAMA_MODEL in name for name in model_names),
                 "available_models": model_names,
             }
-    except Exception as exc:  # noqa: BLE001
-        return {"status": "offline", "error": str(exc)}
+        return {"status": "offline", "error": "Ollama server unreachable"}
+    except Exception as exc:
+        logger.warning(f"Ollama health check failed: {type(exc).__name__}")
+        return {"status": "offline", "error": "Ollama server unreachable"}
 
 
 @router.post("/analyze", response_model=EnrichedCandidateAnalysis)
@@ -53,85 +57,179 @@ async def analyze_cv_text(payload: CVMatchRequest):
 
     try:
         return await MatchService.analyze_single_cv(payload.cv_text)
+    except VacancySourceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to analyze CV text: {exc}"
-        ) from exc
+        logger.exception(f"Failed to analyze CV text: {exc}")
+        raise HTTPException(status_code=500, detail="An internal error occurred during CV analysis.") from exc
 
 
-async def background_upload_and_analyze(filename: str, content: bytes, content_type: str | None):
-    try:
-        await process_cv_file(
-            filename=filename,
-            content=content,
-            content_type=content_type,
-        )
-    except Exception as exc:
-        from app.core.logging import logger
-        logger.exception(f"Background match processing failed: {exc}")
-
-
-@router.post("/upload", response_model=CVProcessingResponse)
+@router.post("/upload", response_model=EnrichedCandidateAnalysis | CVProcessingResponse)
 async def upload_and_analyze(
-    background_tasks: BackgroundTasks, 
-    file: UploadFile = File(...)  # noqa: B008
+    file: UploadFile = File(...),
 ):
     """Upload CV, parse with Docling, and perform LLM-enriched semantic matching in background."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Filename is required.")
-
     try:
-        content = await file.read()
-        cv_key = get_stable_cv_key(file.filename)
-        
-        background_tasks.add_task(
-            background_upload_and_analyze,
-            filename=file.filename,
-            content=content,
-            content_type=file.content_type,
-        )
+        normalized = UploadService.normalize_filename(file.filename)
+        identity = resolve_cv_identity(normalized.safe_filename)
+        cv_key = identity.canonical_key
+        accepted = await UploadService.accept_and_persist(file, storage_key=cv_key)
+        try:
+            ResultRepository.assert_identity_available(identity, accepted.content_hash)
+            submission = ProcessingQueueService.submit_upload(
+                cv_key=cv_key,
+                content_hash=accepted.content_hash,
+                filename=accepted.safe_filename,
+                content_type=accepted.detected_content_type,
+                storage_filename=accepted.storage_filename,
+            )
 
+            if submission.reused_existing_job and submission.record.state in ("COMPLETED", "COMPLETED_DEGRADED"):
+                return await get_match_status(submission.record.cv_key)
+
+        except Exception:
+            if not accepted.was_already_stored:
+                UploadService.remove_stored_upload(accepted.storage_filename)
+            raise
+
+        record_state = submission.record.state.value if hasattr(submission.record.state, "value") else str(submission.record.state)
+        record_exec_mode = submission.record.execution_mode.value if hasattr(submission.record.execution_mode, "value") else str(submission.record.execution_mode)
         return CVProcessingResponse(
-            message="10% - Upload and match processing started in the background...",
-            cv_key=cv_key,
+            message=submission.record.message,
+            cv_key=submission.record.cv_key,
             status="processing",
-            progress=10
+            progress=submission.record.progress,
+            stage=submission.record.stage,
+            job_id=submission.record.job_id,
+            job_state=record_state,
+            execution_mode=record_exec_mode,
+            retry_count=submission.record.attempt,
         )
 
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except CVIdentityCollisionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except ProcessingQueueUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ProcessingJobPersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception(f"Failed to process CV upload: {exc}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to process CV: {exc}"
+            status_code=500,
+            detail="An internal error occurred while processing the CV.",
         ) from exc
 
 
 @router.get("/status/{cv_key}")
 async def get_match_status(cv_key: str):
     """Get the status or result of an enriched background match job."""
-    result = ResultRepository.read_result_by_filename(f"{cv_key}.json")
+    result = ResultRepository.resolve_result(cv_key)
+    job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    if job:
+        job = ProcessingQueueService.reconcile_job(job)
+        
+    job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
+    exec_mode_val = (job.execution_mode.value if hasattr(job.execution_mode, "value") else str(job.execution_mode)) if job else None
     if result:
+        persistence_degraded = (
+            job_state_val == "COMPLETED_DEGRADED"
+            or result.get("status") == "COMPLETED_DEGRADED"
+            or result.get("persistence_status") == ResultRepository.PERSISTENCE_DEGRADED
+        )
+        if result.get("status") == "FAILED":
+            if job and job_state_val in ("QUEUED", "PROCESSING", "RETRYING"):
+                return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
+            return CVProcessingResponse(
+                message=result.get("message") or result.get("error") or "CV processing failed.",
+                cv_key=cv_key,
+                status="FAILED",
+                progress=100,
+                stage=result.get("stage"),
+                failed_step=result.get("failed_step"),
+                error_details=None,
+                error_code=job.error.code.value if job and job.error else "PROCESSING_FAILED",
+                error_message=job.error.message if job and job.error else result.get("message") or result.get("error") or "CV processing failed.",
+                error_retryable=job.error.retryable if job and job.error else False,
+                correlation_id=job.error.correlation_id if job and job.error else None,
+                job_id=job.job_id if job else None,
+                job_state=job_state_val or "FAILED",
+                execution_mode=exec_mode_val,
+                retry_count=job.attempt if job else None,
+            )
+
+        is_completed = (
+            result.get("status") in ("COMPLETED", "COMPLETED_DEGRADED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+            or result.get("progress") == 100
+            or result.get("is_complete") is True
+        ) and result.get("status") != "processing"
+
         match_analysis = result.get("match_analysis")
-        if match_analysis:
+        if match_analysis and is_completed:
             match_analysis["scan_id"] = result.get("scan_id", result.get("id"))
             match_analysis["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
-            return match_analysis
-        
+            match_analysis["status"] = "COMPLETED_DEGRADED" if persistence_degraded else result.get("status", "COMPLETED")
+            match_analysis["persistence_status"] = (
+                ResultRepository.PERSISTENCE_DEGRADED if persistence_degraded else ResultRepository.PERSISTENCE_DURABLE
+            )
+            match_analysis["persistence_error"] = ResultRepository.PERSISTENCE_ERROR_MESSAGE if persistence_degraded else None
+            match_analysis["progress"] = result.get("progress", 100)
+            match_analysis["stage"] = "complete_degraded" if persistence_degraded else result.get("stage", "complete")
+            match_analysis["is_complete"] = result.get("is_complete", True)
+            if job:
+                match_analysis.update(
+                    job_id=job.job_id,
+                    job_state=job_state_val,
+                    execution_mode=exec_mode_val,
+                    retry_count=job.attempt,
+                )
+            try:
+                return EnrichedCandidateAnalysis.model_validate(match_analysis)
+            except Exception:
+                return match_analysis
+
+        if is_completed:
+            return CVProcessingResponse(
+                message=result.get("message") or "100% - CV parsing & job matching complete!",
+                cv_key=result.get("scan_id") or result.get("id") or cv_key,
+                status="COMPLETED_DEGRADED" if persistence_degraded else "COMPLETED",
+                progress=100,
+                stage="complete_degraded" if persistence_degraded else "complete",
+                job_id=job.job_id if job else None,
+                job_state=job_state_val or ("COMPLETED_DEGRADED" if persistence_degraded else "COMPLETED"),
+                execution_mode=exec_mode_val,
+                retry_count=job.attempt if job else None,
+                persistence_status=(
+                    ResultRepository.PERSISTENCE_DEGRADED if persistence_degraded else ResultRepository.PERSISTENCE_DURABLE
+                ),
+                persistence_error=ResultRepository.PERSISTENCE_ERROR_MESSAGE if persistence_degraded else None,
+            )
+
         return CVProcessingResponse(
-            message="50% - Parsing complete, matching in progress...",
+            message=result.get("message") or f"{result.get('progress', 50)}% - Processing in progress...",
             cv_key=cv_key,
             status="processing",
-            progress=50
+            progress=result.get("progress", 50),
+            stage=result.get("stage", "processing"),
+            job_id=job.job_id if job else None,
+            job_state=job_state_val or "PROCESSING",
+            execution_mode=exec_mode_val,
+            retry_count=job.attempt if job else None,
         )
-        
-    return CVProcessingResponse(
-        message="Uploading and parsing CV...",
-        cv_key=cv_key,
-        status="processing",
-        progress=25
-    )
+
+    if job:
+        return CVProcessingResponse(**ProcessingQueueService.legacy_status_payload(job))
+    if ProcessingQueueService.unknown_job_compatibility_active():
+        return CVProcessingResponse(
+            message="Uploading and parsing CV...",
+            cv_key=cv_key,
+            status="processing",
+            progress=25,
+            stage="parsing",
+            job_state="UNKNOWN",
+        )
+    raise HTTPException(status_code=404, detail=f"CV processing job '{cv_key}' was not found.")
 
 
 @router.post("/reanalyze/{scan_id}")
@@ -140,23 +238,18 @@ async def reanalyze_scan(scan_id: str):
     matching_files = ResultRepository.find_results_by_scan_id(scan_id)
 
     # Filter out already enriched files
-    original_files = [
-        f for f in matching_files if not f.name.endswith("_enriched.json")
-    ]
+    original_files = [f for f in matching_files if not str(f).endswith("_enriched.json")]
 
     if not original_files:
-        raise HTTPException(
-            status_code=404, detail=f"No original result found for scan_id: {scan_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"No original result found for scan_id: {scan_id}")
 
     file_path = original_files[0]
 
     try:
         return await MatchService.analyze_from_result_file(file_path)
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to reanalyze CV: {exc}"
-        ) from exc
+        logger.exception(f"Failed to reanalyze CV: {exc}")
+        raise HTTPException(status_code=500, detail="An internal error occurred during reanalysis.") from exc
 
 
 @router.post("/hr-review")
@@ -165,12 +258,10 @@ async def submit_hr_review(payload: HRReviewRequest):
     matching_files = ResultRepository.find_results_by_scan_id(payload.scan_id)
 
     if not matching_files:
-        raise HTTPException(
-            status_code=404, detail=f"No result found for scan_id: {payload.scan_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"No result found for scan_id: {payload.scan_id}")
 
     # Prefer enriched result if available
-    enriched_files = [f for f in matching_files if f.name.endswith("_enriched.json")]
+    enriched_files = [f for f in matching_files if str(f).endswith("_enriched.json")]
     file_path = enriched_files[0] if enriched_files else matching_files[0]
 
     try:
@@ -179,18 +270,12 @@ async def submit_hr_review(payload: HRReviewRequest):
         cv_text = data.get("markdown", "")
 
         # Get original analysis
-        match_analysis = data.get("enriched_match_analysis") or data.get(
-            "match_analysis"
-        )
+        match_analysis = data.get("enriched_match_analysis") or data.get("match_analysis")
         if not match_analysis:
-            raise HTTPException(
-                status_code=400, detail="Result file lacks match_analysis."
-            )
+            raise HTTPException(status_code=400, detail="Result file lacks match_analysis.")
 
         suitable_openings = match_analysis.get("suitable_openings", [])
-        job_eval = next(
-            (j for j in suitable_openings if j.get("job_id") == payload.job_id), None
-        )
+        job_eval = next((j for j in suitable_openings if j.get("job_id") == payload.job_id), None)
 
         if not job_eval:
             raise HTTPException(
@@ -199,6 +284,7 @@ async def submit_hr_review(payload: HRReviewRequest):
             )
 
         from fastapi.concurrency import run_in_threadpool
+
         # Get Job Requirements
         job_req = await run_in_threadpool(JobRepository.get_job_by_id, payload.job_id) or {}
 
@@ -219,15 +305,19 @@ async def submit_hr_review(payload: HRReviewRequest):
             hr_corrected_score=payload.corrected_score,
             hr_corrected_classification=payload.corrected_classification,
             hr_feedback=payload.feedback_notes,
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
         TrainingRepository.append_training_example(example)
         return {"status": "success", "message": "Training example saved."}
 
+    except HTTPException:
+        raise
     except Exception as exc:
+        logger.exception(f"Failed to save HR review: {exc}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to save HR review: {exc}"
+            status_code=500,
+            detail="An internal error occurred while saving the HR review.",
         ) from exc
 
 

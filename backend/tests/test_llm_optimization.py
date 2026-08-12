@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,7 +13,6 @@ from app.schemas.analysis import (
 )
 from app.services.llm_service import OllamaLLMService
 from app.services.match_service import MatchService
-from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
 
 
@@ -53,9 +51,7 @@ def test_vacancy_prefilter():
         },
     ]
 
-    filtered = VacancyPreFilter.filter_vacancies(
-        cv_text=cv_text, openings=vacancies, top_k=2
-    )
+    filtered = VacancyPreFilter.filter_vacancies(cv_text=cv_text, openings=vacancies, top_k=2)
 
     assert len(filtered) == 2
     top_titles = [j["title"] for j in filtered]
@@ -80,16 +76,34 @@ def test_pipeline_profiler():
 def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
 
-    cv_text = "Python Engineer with 5 years experience."
-    vacancies = [{"id": 101, "title": "Python Dev", "required_skills": ["Python"]}]
-
     key1 = LLMCacheRepository.compute_composite_hash(
-        cv_text, vacancies, "3.0", "qwen3:4b"
+        document_hash="abc123",
+        candidate_id="42",
+        vacancy_ids=["101"],
+        prompt_version="3.0",
+        model_version="gemma3:4b",
+        matching_version="3.0",
     )
     key2 = LLMCacheRepository.compute_composite_hash(
-        cv_text, vacancies, "3.0", "qwen3:4b"
+        document_hash="abc123",
+        candidate_id="42",
+        vacancy_ids=["101"],
+        prompt_version="3.0",
+        model_version="gemma3:4b",
+        matching_version="3.0",
     )
     assert key1 == key2
+
+    # Changing any component produces a different key
+    key3 = LLMCacheRepository.compute_composite_hash(
+        document_hash="abc123",
+        candidate_id="42",
+        vacancy_ids=["101"],
+        prompt_version="3.0",
+        model_version="gemma3:4b",
+        matching_version="3.1",
+    )
+    assert key1 != key3
 
     sample_response = OptimizedLLMMatchResponse(
         candidate_profile=OptimizedCandidateProfile(
@@ -126,10 +140,16 @@ def test_build_optimized_match_prompt():
             "title": "Backend Engineer",
             "department": "Engineering",
             "required_skills": ["Python", "FastAPI"],
+            "education": "Configured Degree",
         }
     ]
 
-    prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
+    from unittest.mock import patch
+    with patch("app.services.prompt_service.PromptService.get_prompt") as mock_get_prompt:
+        mock_get_prompt.return_value = "John Doe Backend Engineer"
+        prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
+    prompt_input = mock_get_prompt.call_args.args[1]["input_json"]
+    assert '"education_req":["Configured Degree"]' in prompt_input
     assert "John Doe" in prompt
     assert "Backend Engineer" in prompt
     assert token_est > 0
@@ -138,6 +158,11 @@ def test_build_optimized_match_prompt():
 
 @pytest.mark.asyncio
 async def test_end_to_end_optimized_match_service(monkeypatch):
+    from app.core.cache import match_result_cache_manager
+
+    match_result_cache_manager.clear()
+    monkeypatch.setattr(settings, "LLM_SKIP_COVERAGE_THRESHOLD", 1.1)
+
     cv_text = """
     ## HITESH GHOGHARI
     Senior Frontend Developer
@@ -162,7 +187,9 @@ async def test_end_to_end_optimized_match_service(monkeypatch):
     )
 
     monkeypatch.setattr(
-        OllamaLLMService, "run_optimized_match", MagicMock(return_value=mock_llm_response)
+        OllamaLLMService,
+        "run_optimized_match",
+        MagicMock(return_value=mock_llm_response),
     )
 
     openings = [

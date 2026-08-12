@@ -1,32 +1,42 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { ComponentBreakdown } from '@/types/api';
+import { getMatchBand } from '@/utils/scoreBand';
 
-interface ComponentScoreBarProps {
-  scores: ComponentBreakdown;
+export interface ComponentScoreBarProps {
+  scores?: ComponentBreakdown | null;
+  className?: string;
 }
 
-const componentLabels: Record<keyof ComponentBreakdown, string> = {
-  role: 'Role & Title Match',
-  skills: 'Skills Coverage',
-  experience: 'Experience Level',
-  education: 'Education',
-  domain: 'Industry Domain',
-  technology: 'Tech Stack',
-  certification: 'Certifications',
-  responsibilities: 'Responsibilities',
-};
+const ORDERED_COMPONENTS: Array<{ key: keyof ComponentBreakdown; label: string }> = [
+  { key: 'role', label: 'Role & Title Match' },
+  { key: 'skills', label: 'Skills Coverage' },
+  { key: 'experience', label: 'Experience Level' },
+  { key: 'responsibilities', label: 'Responsibilities' },
+  { key: 'domain', label: 'Industry Domain' },
+  { key: 'technology', label: 'Tech Stack' },
+  { key: 'education', label: 'Education' },
+  { key: 'certification', label: 'Certifications' },
+];
 
-export function ComponentScoreBar({ scores }: ComponentScoreBarProps) {
+export function ComponentScoreBar({ scores, className = '' }: ComponentScoreBarProps) {
+  if (!scores) return null;
+
   return (
-    <View className="gap-1.5 my-2">
-      {Object.entries(scores || {}).map(([key, val]) => {
-        const valNum = Math.min(100, Math.max(0, val || 0));
-        const label = componentLabels[key as keyof ComponentBreakdown] || key;
+    <View className={`gap-2 my-2 ${className}`}>
+      {ORDERED_COMPONENTS.map(({ key, label }) => {
+        const val = scores[key];
+        if (val === undefined || val === null) return null;
 
-        let barColor = 'bg-danger';
-        if (valNum >= 70) barColor = 'bg-success';
-        else if (valNum >= 40) barColor = 'bg-warning';
+        const valNum = Math.min(100, Math.max(0, val));
+        const band = getMatchBand(valNum);
+
+        const barColorClass =
+          band.tone === 'success'
+            ? 'bg-success'
+            : band.tone === 'warning'
+            ? 'bg-warning'
+            : 'bg-danger';
 
         return (
           <View key={key} className="gap-1">
@@ -34,13 +44,13 @@ export function ComponentScoreBar({ scores }: ComponentScoreBarProps) {
               <Text className="text-xs font-sans-medium text-text-primary">
                 {label}
               </Text>
-              <Text className="text-xs font-sans-bold text-text-muted">
+              <Text className="text-[11px] font-sans-bold text-text-muted">
                 {Math.round(valNum)}%
               </Text>
             </View>
             <View className="h-1.5 w-full bg-border rounded-full overflow-hidden">
               <View
-                className={`h-full rounded-full ${barColor}`}
+                className={`h-full rounded-full ${barColorClass}`}
                 style={{ width: `${valNum}%` }}
               />
             </View>

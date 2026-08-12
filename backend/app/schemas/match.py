@@ -1,6 +1,8 @@
+from __future__ import annotations
 from enum import Enum
 from typing import Any
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class RequirementTier(str, Enum):
@@ -28,7 +30,10 @@ class RequirementEvaluation(BaseModel):
     tier: RequirementTier = Field(..., description="Requirement classification tier")
     status: RequirementStatus = Field(..., description="Evaluation status of requirement")
     evidence: DualEvidence = Field(..., description="Supporting evidence from CV and Vacancy")
-    failure_reason: str | None = Field(None, description="Detailed explanation if requirement failed or partially satisfied")
+    failure_reason: str | None = Field(
+        None,
+        description="Detailed explanation if requirement failed or partially satisfied",
+    )
 
 
 class MandatoryFailureDetails(BaseModel):
@@ -36,6 +41,20 @@ class MandatoryFailureDetails(BaseModel):
     description: str = Field(..., description="Requirement description")
     reason: str = Field(..., description="Explicit reason why mandatory requirement was not satisfied")
     score_impact: float = Field(default=0.0, description="Deduction or penalty applied to final score")
+
+
+class VacancyFitScoreBreakdown(BaseModel):
+    """Detailed score breakdown for structured hierarchy + semantic vacancy fit evaluation."""
+    hierarchy_score: float = Field(default=0.0, description="Hierarchy ID match score (MainDeptID, DeptID, DesigID) (0-100)")
+    designation_role_score: float = Field(default=0.0, description="Designation and role alignment score (0-100)")
+    skills_score: float = Field(default=0.0, description="Mandatory & preferred skills match score (0-100)")
+    experience_score: float = Field(default=0.0, description="Experience & seniority match score (0-100)")
+    education_score: float = Field(default=0.0, description="Required education alignment score (0-100)")
+    semantic_similarity_score: float = Field(default=0.0, description="Dense vector nomic-embed-text similarity score (0-100)")
+    overall_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0-100)")
+    hierarchy_mismatch_penalty: float = Field(default=0.0, description="Penalty deduction applied for hierarchy mismatch")
+    is_hierarchy_valid: bool = Field(default=True, description="Whether MSSQL parent-child hierarchy validation passed")
+    match_status: str = Field(default="MATCHED", description="MATCHED, POTENTIAL_MATCH, or NO_STRONG_VACANCY_MATCH")
 
 
 class JobMatchResult(BaseModel):
@@ -51,12 +70,11 @@ class JobMatchResult(BaseModel):
     department_name: str | None = Field(None, description="Live MSSQL DeptName")
     location_id: int | None = Field(None, description="Live MSSQL LocID")
 
-    score: float = Field(
-        ..., description="Calculated suitability match score (0.0 - 100.0)"
-    )
-    overall_score: float = Field(
-        default=0.0, description="Deterministic two-stage overall score (0.0 - 100.0)"
-    )
+    score: float = Field(..., description="Calculated suitability match score (0.0 - 100.0)")
+    overall_score: float = Field(default=0.0, description="Deterministic two-stage overall score (0.0 - 100.0)")
+    vacancy_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0.0 - 100.0)")
+    score_breakdown: VacancyFitScoreBreakdown | None = Field(default=None, description="Structured score breakdown across hierarchy, skills, experience, role, and semantic fit")
+    vacancy_match_status: str = Field(default="MATCHED", description="MATCHED or NO_STRONG_VACANCY_MATCH")
     role_score: float = Field(default=0.0, description="Score based on job title and domain match")
     skills_score: float = Field(default=0.0, description="Score based on mandatory/preferred skills")
     experience_score: float = Field(default=0.0, description="Score based on experience match")
@@ -65,77 +83,102 @@ class JobMatchResult(BaseModel):
     technology_score: float = Field(default=0.0, description="Score based on technology matches")
     certification_score: float = Field(default=0.0, description="Score based on required certifications")
     responsibilities_score: float = Field(default=0.0, description="Score based on matched responsibilities/keywords")
-    coverage: float = Field(default=1.0, description="Percentage of evaluation dimensions actually defined in the vacancy config")
+    coverage: float = Field(
+        default=1.0,
+        description="Percentage of evaluation dimensions actually defined in the vacancy config",
+    )
     ranking_reason: str = Field(default="", description="Reason this vacancy was ranked at its position")
-    classification: str = Field(
-        ..., description="Classification category: HIGH, MEDIUM, or LOW"
-    )
-    recommendation: str = Field(
-        ..., description="Actionable recommendation status for HR/Recruiters"
-    )
+    classification: str = Field(..., description="Classification category: HIGH, MEDIUM, or LOW")
+    recommendation: str = Field(..., description="Actionable recommendation status for HR/Recruiters")
     matched_skills: list[str] = Field(
         default_factory=list,
         description="Skills present in CV that match job requirements",
     )
-    missing_skills: list[str] = Field(
-        default_factory=list, description="Required job skills missing from CV"
-    )
-    matched_keywords: list[str] = Field(
-        default_factory=list, description="Preferred keywords found in CV"
-    )
-    missing_keywords: list[str] = Field(
-        default_factory=list, description="Preferred keywords missing from CV"
-    )
+    missing_skills: list[str] = Field(default_factory=list, description="Required job skills missing from CV")
+    matched_keywords: list[str] = Field(default_factory=list, description="Preferred keywords found in CV")
+    missing_keywords: list[str] = Field(default_factory=list, description="Preferred keywords missing from CV")
 
     # Structured Two-Stage Evaluation Fields
-    mandatory_requirements: list[RequirementEvaluation] = Field(
-        default_factory=list, description="Evaluated mandatory requirements"
-    )
-    preferred_requirements: list[RequirementEvaluation] = Field(
-        default_factory=list, description="Evaluated preferred requirements"
-    )
-    optional_requirements: list[RequirementEvaluation] = Field(
-        default_factory=list, description="Evaluated optional requirements"
-    )
+    mandatory_requirements: list[RequirementEvaluation] = Field(default_factory=list, description="Evaluated mandatory requirements")
+    preferred_requirements: list[RequirementEvaluation] = Field(default_factory=list, description="Evaluated preferred requirements")
+    optional_requirements: list[RequirementEvaluation] = Field(default_factory=list, description="Evaluated optional requirements")
     matched_criteria: list[str] = Field(
-        default_factory=list, description="All matched requirement criteria descriptions"
+        default_factory=list,
+        description="All matched requirement criteria descriptions",
     )
     missing_criteria: list[str] = Field(
-        default_factory=list, description="All missing or failed requirement criteria descriptions"
+        default_factory=list,
+        description="All missing or failed requirement criteria descriptions",
     )
     evidence: dict[str, DualEvidence] = Field(
-        default_factory=dict, description="Map of requirement_id to dual CV & Vacancy evidence"
+        default_factory=dict,
+        description="Map of requirement_id to dual CV & Vacancy evidence",
     )
     mandatory_failures: list[MandatoryFailureDetails] = Field(
-        default_factory=list, description="Explicit mandatory requirements that failed or partially failed"
+        default_factory=list,
+        description="Explicit mandatory requirements that failed or partially failed",
+    )
+    mandatory_fails: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Explicit mandatory requirement failure summary list",
     )
     confidence: float = Field(
-        default=1.0, ge=0.0, le=1.0, description="Overall confidence level in extraction and evidence completeness"
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Overall confidence level in extraction and evidence completeness",
     )
     hr_review_required: bool = Field(
-        default=False, description="Flag indicating mandatory HR review required due to mandatory failure or low score"
+        default=False,
+        description="Flag indicating mandatory HR review required due to mandatory failure or low score",
     )
     reason: str = Field(
-        default="", description="Detailed summary explaining match score, failures, and HR review rationale"
+        default="",
+        description="Detailed summary explaining match score, failures, and HR review rationale",
     )
-    career_transition_detected: bool = Field(
-        default=False, description="Whether a dynamic career transition was detected"
+    career_transition_detected: bool = Field(default=False, description="Whether a dynamic career transition was detected")
+    career_transition_note: str | None = Field(default=None, description="Notes on detected career transition")
+    domain_mismatch_capped: bool = Field(
+        default=False,
+        description="Flag indicating cross-domain guard fired and capped the suitability match score",
     )
-    career_transition_note: str | None = Field(
-        default=None, description="Notes on detected career transition"
+    domain_mismatch_reason: str | None = Field(
+        default=None,
+        description="Explicit explainability reason explaining why cross-domain guard capped the match score",
     )
+    retrieval_source: str | None = Field(
+        default="keyword",
+        description="Retrieval path that selected this vacancy: 'both', 'vector', or 'keyword'",
+    )
+    candidate_job_family: str | None = Field(default=None, description="Classified job family of the candidate")
+    vacancy_job_family: str | None = Field(default=None, description="Classified job family of the target vacancy")
+
+    @model_validator(mode="after")
+    def synchronize_canonical_score_and_status(self) -> "JobMatchResult":
+        """Keep one final score/status across persistence, APIs, and frontend consumers."""
+        canonical_score = self.vacancy_fit_score
+        if canonical_score == 0.0 and self.score_breakdown is None:
+            canonical_score = self.overall_score if self.overall_score != 0.0 else self.score
+        canonical_score = round(max(0.0, min(100.0, float(canonical_score))), 1)
+        self.vacancy_fit_score = canonical_score
+        self.overall_score = canonical_score
+        self.score = canonical_score
+        if self.mandatory_failures and self.vacancy_match_status == "MATCHED":
+            self.vacancy_match_status = "NO_STRONG_VACANCY_MATCH"
+        return self
 
 
 class CandidateMatchAnalysis(BaseModel):
-    primary_department: str = Field(
-        ..., description="Top recommended department for candidate"
-    )
-    best_match: JobMatchResult = Field(..., description="Top matching job opening")
-    suitable_openings: list[JobMatchResult] = Field(
-        ..., description="All evaluated job openings ranked by match score"
+    full_name: str | None = Field(default=None, description="Extracted candidate full name")
+    candidate_name: str | None = Field(default=None, description="Extracted candidate name")
+    primary_department: str = Field(..., description="Top recommended department for candidate")
+    best_match: JobMatchResult | None = Field(default=None, description="Top matching job opening")
+    suitable_openings: list[JobMatchResult] = Field(..., description="Verified HIGH job matches with no hard disqualifiers, ranked by match score")
+    unsuitable_openings: list[JobMatchResult] = Field(
+        default_factory=list,
+        description="Potential or unsuitable openings retained for HR manual review but not selected as suitable matches",
     )
     rejection_policy_note: str = Field(
         default="Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
         description="Policy enforcement note regarding LOW score candidate retention",
     )
-

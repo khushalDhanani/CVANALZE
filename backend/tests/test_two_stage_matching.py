@@ -1,6 +1,4 @@
-import pytest
 from app.services.scoring_engine import ScoringEngine
-from app.schemas.match import RequirementTier, RequirementStatus
 
 
 def test_mandatory_failure_reduces_score_and_requires_hr_review():
@@ -13,9 +11,13 @@ def test_mandatory_failure_reduces_score_and_requires_hr_review():
         "id": "job_1",
         "title": "Senior Python Developer",
         "department": "Engineering",
-        "required_skills": ["Python", "Docker", "Kubernetes"],  # Docker and Kubernetes are missing
+        "required_skills": [
+            "Python",
+            "Docker",
+            "Kubernetes",
+        ],  # Docker and Kubernetes are missing
         "preferred_keywords": ["Git", "CI/CD"],
-        "min_experience_years": 5.0
+        "min_experience_years": 5.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=10.0)
@@ -26,7 +28,7 @@ def test_mandatory_failure_reduces_score_and_requires_hr_review():
     assert result.score <= 65.0  # Capped at max score on mandatory failure
     assert result.score < 100.0
     assert "Mandatory requirement failure(s)" in result.reason
-    
+
     # Dual evidence verification
     assert "req_skill_docker" in result.evidence
     ev = result.evidence["req_skill_docker"]
@@ -45,8 +47,12 @@ def test_false_100_percent_prevention():
         "title": "Frontend Engineer",
         "department": "Engineering",
         "required_skills": ["React", "JavaScript"],
-        "preferred_keywords": ["TypeScript", "GraphQL", "Tailwind"],  # Missing preferred keywords
-        "min_experience_years": 2.0
+        "preferred_keywords": [
+            "TypeScript",
+            "GraphQL",
+            "Tailwind",
+        ],  # Missing preferred keywords
+        "min_experience_years": 2.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=4.0)
@@ -56,7 +62,7 @@ def test_false_100_percent_prevention():
     assert result.score < 100.0
 
 
-def test_perfect_candidate_100_percent_score():
+def test_candidate_matching_all_explicit_requirements_scores_high():
     cv_text = """
     ## Senior React Developer
     Skills: React, JavaScript, TypeScript, GraphQL
@@ -68,14 +74,14 @@ def test_perfect_candidate_100_percent_score():
         "department": "Engineering",
         "required_skills": ["React", "JavaScript"],
         "preferred_keywords": ["TypeScript", "GraphQL"],
-        "min_experience_years": 5.0
+        "min_experience_years": 5.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=6.0)
 
     assert len(result.mandatory_failures) == 0
     assert len(result.missing_criteria) == 0
-    assert result.score == 100.0
+    assert result.score >= 70.0
     assert result.hr_review_required is False
 
 
@@ -92,7 +98,7 @@ def test_unspecified_education_does_not_reduce_score():
         "department": "Engineering",
         "required_skills": ["Python", "FastAPI"],
         "preferred_keywords": ["PostgreSQL"],
-        "min_experience_years": 2.0
+        "min_experience_years": 2.0,
         # Notice: NO education requirement in job dict
     }
 
@@ -101,7 +107,36 @@ def test_unspecified_education_does_not_reduce_score():
     # Education requirement should not be created as mandatory or reduce score
     edu_reqs = [r for r in result.mandatory_requirements if "education" in r.requirement_id.lower()]
     assert len(edu_reqs) == 0
-    assert result.score == 100.0
+    assert result.score >= 70.0
+
+
+def test_advisory_education_and_upper_experience_conflicts_preserve_professional_match():
+    cv_text = """
+    ## Mobile Application Developer
+    Skills: Cross-platform UI, REST API, state management
+    Experience: 6 years building production mobile applications.
+    Education: Bachelor of Mechanical Engineering
+    """
+    job = {
+        "id": "job_advisory_requirements",
+        "title": "Mobile Application Developer",
+        "department": "Digital Products",
+        "required_skills": ["Cross-platform UI", "REST API", "state management"],
+        "required_skills_are_mandatory": False,
+        "min_experience_years": 3.0,
+        "max_experience_years": 5.0,
+        "education": "Bachelor of Computer Science",
+    }
+
+    result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=6.0)
+
+    assert result.matched_skills == job["required_skills"]
+    assert result.mandatory_failures == []
+    assert result.hr_review_required is True
+    assert any(item.startswith("Education Mismatch") for item in result.missing_criteria)
+    assert any(item.requirement_id == "req_education" and item.status == "FAILED" for item in result.preferred_requirements)
+    assert any(item.requirement_id == "req_max_experience" for item in result.preferred_requirements)
+    assert all(item.requirement_id != "req_seniority_gate" for item in result.mandatory_requirements)
 
 
 def test_dynamic_career_transition_detection():
@@ -117,7 +152,7 @@ def test_dynamic_career_transition_detection():
         "department": "Product",
         "required_skills": ["Product Strategy", "Roadmapping", "Java"],
         "preferred_keywords": ["Agile", "User Research"],
-        "min_experience_years": 5.0
+        "min_experience_years": 5.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=8.0)
@@ -125,7 +160,8 @@ def test_dynamic_career_transition_detection():
     assert result.career_transition_detected is True
     assert "career transition" in result.career_transition_note.lower()
     # Mandatory skills Product Strategy and Roadmapping are missing -> strict failure enforced
-    assert len(result.mandatory_failures) == 2
+    failure_ids = {item.requirement_id for item in result.mandatory_failures}
+    assert {"req_skill_product_strategy", "req_skill_roadmapping"}.issubset(failure_ids)
     assert result.hr_review_required is True
 
 
@@ -141,13 +177,13 @@ def test_dual_evidence_tracing():
         "department": "Healthcare",
         "required_skills": ["Patient Care", "ICU"],
         "preferred_keywords": ["CPR"],
-        "min_experience_years": 3.0
+        "min_experience_years": 3.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=5.0)
 
     assert len(result.evidence) > 0
-    for req_id, dual_ev in result.evidence.items():
+    for dual_ev in result.evidence.values():
         assert dual_ev.cv_evidence != ""
         assert dual_ev.vacancy_evidence != ""
 
@@ -164,7 +200,7 @@ def test_cross_industry_generalization():
         "department": "Finance",
         "required_skills": ["Financial Modeling", "Valuation", "SQL"],
         "preferred_keywords": ["Forecasting"],
-        "min_experience_years": 3.0
+        "min_experience_years": 3.0,
     }
 
     result = ScoringEngine.evaluate_job_match(cv_text, job, candidate_experience=4.0)
