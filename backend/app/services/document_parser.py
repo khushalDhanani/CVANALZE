@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Compatibility façade for CV document conversion and structured extraction.
 
 Existing imports remain stable while focused implementations live in dedicated modules.

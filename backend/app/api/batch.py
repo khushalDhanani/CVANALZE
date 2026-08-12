@@ -1,93 +1,43 @@
+from __future__ import annotations
 import asyncio
-from pathlib import Path
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 
 from app.core.config import settings
-from app.core.database import get_db
 from app.core.logging import logger
-from app.models.recruit import RecruitCandidateMst
-from app.services.match_service import MatchService
-from app.services.vacancy_service import VacancyService
+from app.services.batch_processing_service import BatchProcessingService
+from app.services.processing_queue import ProcessingQueueUnavailableError
 
 router = APIRouter(prefix="/batch", tags=["Batch Processing"])
 
 
-@router.post("/match-candidates")
-async def match_candidates_against_vacancies(limit: int = 10, db: Session = Depends(get_db)):
-    """
-    Fetch active vacancies and un-evaluated candidates, parse CVs, and match them.
-    Cap maximum candidate processing count via MAX_BATCH_LIMIT to prevent API timeouts.
-    """
+@router.post("/match-candidates", status_code=status.HTTP_202_ACCEPTED)
+async def match_candidates_against_vacancies(limit: int = 10):
+    """Create an asynchronous RQ batch coordinator without parsing CVs in the request."""
     if limit <= 0 or limit > settings.MAX_BATCH_LIMIT:
         raise HTTPException(
             status_code=400,
             detail=f"Limit must be between 1 and {settings.MAX_BATCH_LIMIT}.",
         )
+    try:
+        return BatchProcessingService.submit(limit).to_response()
+    except ProcessingQueueUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    vacancy_service = VacancyService(db)
 
-    # 1. Fetch active vacancies
-    job_openings = vacancy_service.get_active_vacancies()
-    if not job_openings:
-        return {"message": "No active vacancies found.", "matches": []}
-
-    # Convert JobOpenings to dicts for the match engine
-    job_dicts = [job.model_dump() for job in job_openings]
-
-    # 2. Fetch candidates (for demo, just fetch top N active candidates)
-    stmt = select(RecruitCandidateMst).where(RecruitCandidateMst.CandidateIsActive == True).where(RecruitCandidateMst.CandidateCVFileName.isnot(None)).limit(limit)
-    candidates = db.execute(stmt).scalars().all()
-
-    if not candidates:
-        return {"message": "No candidates with CVs found.", "matches": []}
-
-    results = []
-
-    # 3. Process candidates
-    for candidate in candidates:
-        cv_path = Path("uploads") / candidate.CandidateCVFileName
-        cv_text = ""
-
-        # Read CV text
-        if cv_path.exists() and cv_path.is_file():
-            try:
-                cv_text = cv_path.read_text(errors="ignore")
-            except Exception:
-                cv_text = f"Candidate {candidate.CandidateFirstName} {candidate.CandidateLastName} CV Placeholder Text."
-        else:
-            cv_text = f"Mock CV text for {candidate.CandidateFirstName} {candidate.CandidateLastName} with {candidate.CandidateTotExperience} years of experience."
-
-        # Pass metadata to MatchService
-        analysis = await MatchService.analyze_single_cv(
-            cv_text=cv_text,
-            job_openings=job_dicts,
-            candidate_id=str(candidate.CandidateID) if candidate.CandidateID is not None else "",
-            candidate_experience=float(candidate.CandidateTotExperience) if candidate.CandidateTotExperience else None,
-            candidate_ctc=float(candidate.CandidateExpectedCtc) if candidate.CandidateExpectedCtc else None,
-        )
-
-        results.append(
-            {
-                "candidate_id": candidate.CandidateID,
-                "candidate_name": f"{candidate.CandidateFirstName} {candidate.CandidateLastName}",
-                "analysis": analysis.model_dump(),
-            }
-        )
-
-    return {
-        "message": f"Processed {len(results)} candidates against {len(job_openings)} vacancies.",
-        "matches": results,
-    }
+@router.get("/jobs/{batch_job_id}")
+async def get_batch_job(batch_job_id: str):
+    record = BatchProcessingService.get_status(batch_job_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Batch job '{batch_job_id}' was not found.")
+    return record.to_response()
 
 
 @router.websocket("/ws/progress")
 async def websocket_progress_endpoint(websocket: WebSocket):
     await websocket.accept()
-    redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
+    redis_url = settings.REDIS_URL
 
     redis_client = aioredis.from_url(redis_url, decode_responses=True)
     pubsub = redis_client.pubsub()

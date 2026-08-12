@@ -65,9 +65,9 @@ def test_normalized_resume_retains_raw_values_confidence_and_evidence():
     assert normalized.education[0].domain.normalized_value == "Computer Science & IT"
     assert normalized.education[0].institution.normalized_value == "University of Technology"
     assert normalized.employment[0].interval.start_date == "2020-01-01"
-    assert normalized.employment[0].interval.end_date == "2021-12-01"
+    assert normalized.employment[0].interval.end_date == "2021-12-31"
     assert normalized.employment[0].interval.duration_months == 23
-    assert normalized.experience.deterministic_years == 1.9
+    assert normalized.experience.deterministic_years == 2.0
     assert normalized.experience.stated_years == 9.0
     assert normalized.experience.authoritative_source == "employment_dates"
     assert normalized.experience.validation_status == "stated_value_conflicts"
@@ -84,7 +84,7 @@ def test_candidate_context_keeps_dates_authoritative_and_uses_llm_only_as_fallba
         normalized_resume=normalized,
         optimized_profile=llm_profile,
     )
-    assert dated_context.candidate_experience == 1.9
+    assert dated_context.candidate_experience == 2.0
 
     undated_resume = {
         "contact_info": {},
@@ -138,7 +138,7 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
                 kwargs["context"].candidate_experience,
             )
         )
-        return MatchService._empty_job_match().model_copy(update={"job_id": kwargs["job"].job_id, "vacancy_id": kwargs["job"].job_id})
+        return MatchService._empty_job_match().model_copy(update={"job_id": kwargs["job"].job_id})
 
     monkeypatch.setattr(
         "app.services.match_service.ScoringEngine.evaluate_job_match",
@@ -173,7 +173,7 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
     assert {context_id for context_id, _, _ in scoring_calls} == {id(candidate_context)}
     assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[0])) == 2
     assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[1])) == 2
-    assert {experience for _, _, experience in scoring_calls} == {1.9}
+    assert {experience for _, _, experience in scoring_calls} == {2.0}
 
 
 @pytest.mark.asyncio

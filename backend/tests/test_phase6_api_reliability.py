@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,6 +12,9 @@ from app.core.error_handlers import register_exception_handlers
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.request_context import RequestContextMiddleware
 from app.core.security import AccessControlMiddleware
+from app.core.security import AuthenticatedPrincipal, authenticate_session_token, create_session_token
+from app.api.auth import router as auth_router
+import app.main as main_module
 from app.main import app as main_app
 from app.schemas.analysis import HRReviewRequest
 from app.schemas.contracts import AccessTier
@@ -30,14 +34,144 @@ def _app_with_operational_middleware(path: str = "/test") -> FastAPI:
     return test_app
 
 
+def _app_with_session_auth() -> FastAPI:
+    test_app = FastAPI()
+    register_exception_handlers(test_app)
+    test_app.include_router(auth_router, prefix="/api")
+
+    @test_app.get("/api/candidates")
+    async def candidates():
+        return {"status": "ok"}
+
+    @test_app.get("/api/config/active")
+    async def active_config():
+        return {"status": "ok"}
+
+    test_app.add_middleware(AccessControlMiddleware)
+    test_app.add_middleware(RequestContextMiddleware)
+    return test_app
+
+
+@pytest.mark.asyncio
+async def test_health_reports_configured_dependencies_online(monkeypatch):
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    assert payload["database"] == "online"
+    assert payload["pg_database"] == "online"
+    assert payload["redis"] == "online"
+    assert payload["ollama_llm"] == "disabled"
+    assert payload["rule_configuration"] == "online"
+    assert payload["prompt_configuration"] == "online"
+
+
+@pytest.mark.asyncio
+async def test_health_returns_service_unavailable_for_offline_dependency(monkeypatch):
+    def database_health(_engine, label):
+        return "offline" if label == "PostgreSQL" else "online"
+
+    monkeypatch.setattr(main_module, "_database_health", database_health)
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert payload["status"] == "unhealthy"
+    assert payload["database"] == "online"
+    assert payload["pg_database"] == "offline"
+    assert payload["redis"] == "online"
+
+
+@pytest.mark.asyncio
+async def test_health_requires_ollama_when_llm_capability_is_enabled(monkeypatch):
+    from app.services.llm_service import OllamaLLMService
+
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", True)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+    monkeypatch.setattr(OllamaLLMService, "check_health", classmethod(lambda _cls: False))
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert payload["status"] == "unhealthy"
+    assert payload["ollama_llm"] == "offline"
+
+
+@pytest.mark.asyncio
+async def test_health_is_unavailable_without_active_rule_configuration(monkeypatch):
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_rule_config_health", lambda: "unavailable")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert payload["status"] == "unhealthy"
+    assert payload["rule_configuration"] == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_health_reports_prompt_not_ready(monkeypatch):
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "PROMPT_NOT_READY")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    response = await main_module.health()
+    payload = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert payload["prompt_configuration"] == "PROMPT_NOT_READY"
+
+
+def test_redis_health_distinguishes_disabled_and_unavailable(monkeypatch):
+    from app.core import cache
+
+    monkeypatch.setattr(settings, "REDIS_URL", None)
+    assert main_module._redis_health() == "disabled"
+
+    monkeypatch.setattr(settings, "REDIS_URL", "redis://redis:6379/0")
+    monkeypatch.setattr(cache, "_REDIS_CLIENT", None)
+    assert main_module._redis_health() == "offline"
+
+
 def test_concrete_paths_resolve_characterized_access_tiers():
     assert resolve_access_tier("GET", "/") == AccessTier.PUBLIC
     assert resolve_access_tier("GET", "/api/candidates/candidate-123") == AccessTier.RECRUITER
     assert resolve_access_tier("POST", "/api/candidates/candidate-123/reprocess") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("POST", "/api/match/hr-review") == AccessTier.RECRUITER
-    assert resolve_access_tier("PUT", "/api/config/match") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("POST", "/api/master-data/warm") == AccessTier.ADMINISTRATOR
     assert resolve_access_tier("POST", "/api/vector-db/sync") == AccessTier.ADMINISTRATOR
+    assert resolve_access_tier("GET", "/api/batch/jobs/batch-123") == AccessTier.RECRUITER
+    assert resolve_access_tier("GET", "/api/config/schema") == AccessTier.ADMINISTRATOR
+    assert resolve_access_tier("GET", "/api/config/system-default") == AccessTier.ADMINISTRATOR
+    assert resolve_access_tier("GET", "/api/config/rules") == AccessTier.ADMINISTRATOR
+    assert resolve_access_tier("POST", "/api/config/initialize") == AccessTier.ADMINISTRATOR
 
 
 def test_trusted_cors_configuration_never_contains_wildcard():
@@ -49,11 +183,12 @@ def test_authentication_and_role_authorization(monkeypatch):
     monkeypatch.setattr(settings, "AUTH_ENABLED", True)
     monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
     monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", ["administrator-secret"])
-    client = TestClient(_app_with_operational_middleware("/api/config/match"))
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
+    client = TestClient(_app_with_operational_middleware("/api/config/active"))
 
-    unauthorized = client.get("/api/config/match", headers={"X-Request-ID": "request-auth"})
-    forbidden = client.get("/api/config/match", headers={"Authorization": "Bearer recruiter-secret"})
-    allowed = client.get("/api/config/match", headers={"X-API-Key": "administrator-secret"})
+    unauthorized = client.get("/api/config/active", headers={"X-Request-ID": "request-auth"})
+    forbidden = client.get("/api/config/active", headers={"Authorization": "Bearer recruiter-secret"})
+    allowed = client.get("/api/config/active", headers={"X-API-Key": "administrator-secret"})
 
     assert unauthorized.status_code == 401
     assert unauthorized.json()["error"]["code"] == "UNAUTHORIZED"
@@ -64,17 +199,75 @@ def test_authentication_and_role_authorization(monkeypatch):
     assert allowed.status_code == 200
 
 
-def test_production_authentication_fails_closed(monkeypatch):
+def test_authentication_disabled_bypasses_protected_endpoint(monkeypatch):
     monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
     monkeypatch.setattr(settings, "AUTH_ENABLED", False)
     monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
     monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", [])
-    client = TestClient(_app_with_operational_middleware("/api/candidates"))
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
+    client = TestClient(_app_with_operational_middleware("/api/jobs"))
 
-    response = client.get("/api/candidates")
+    response = client.get("/api/jobs")
 
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "UNAUTHORIZED"
+    assert settings.AUTH_REQUIRED is False
+    assert response.status_code == 200
+
+
+def test_authentication_enabled_protects_endpoint_and_accepts_valid_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "development")
+    monkeypatch.setattr(settings, "AUTH_ENABLED", True)
+    monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
+    monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", [])
+    client = TestClient(_app_with_operational_middleware("/api/jobs"))
+
+    unauthorized = client.get("/api/jobs")
+    authenticated = client.get("/api/jobs", headers={"Authorization": "Bearer recruiter-secret"})
+
+    assert settings.AUTH_REQUIRED is True
+    assert unauthorized.status_code == 401
+    assert unauthorized.json()["error"]["code"] == "UNAUTHORIZED"
+    assert authenticated.status_code == 200
+
+
+def test_frontend_exchanges_api_key_for_secure_session_cookie(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "AUTH_ENABLED", True)
+    monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
+    monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", ["administrator-secret"])
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
+    client = TestClient(_app_with_session_auth(), base_url="https://api.example.test")
+
+    login = client.post("/api/auth/session", headers={"X-API-Key": "recruiter-secret"})
+
+    assert login.status_code == 200
+    assert login.json()["role"] == "recruiter"
+    cookie = login.headers["set-cookie"]
+    assert "cv_analyzer_session=" in cookie
+    assert "HttpOnly" in cookie
+    assert "Secure" in cookie
+    assert "SameSite=strict" in cookie
+    assert "recruiter-secret" not in cookie
+    assert client.get("/api/candidates").status_code == 200
+    assert client.get("/api/config/active").status_code == 403
+
+    logout = client.delete("/api/auth/session")
+
+    assert logout.status_code == 200
+    assert client.get("/api/candidates").status_code == 401
+
+
+def test_signed_session_rejects_expiry_and_tampering(monkeypatch):
+    monkeypatch.setattr(settings, "RECRUITER_API_KEYS", ["recruiter-secret"])
+    monkeypatch.setattr(settings, "ADMINISTRATOR_API_KEYS", [])
+    monkeypatch.setattr(settings, "AUTH_SESSION_SIGNING_KEY", "test-session-signing-secret-value-32")
+    monkeypatch.setattr(settings, "AUTH_SESSION_TTL_SECONDS", 60)
+    principal = AuthenticatedPrincipal(AccessTier.RECRUITER, "fingerprint")
+    token = create_session_token(principal, issued_at=100)
+
+    assert authenticate_session_token(token, now=159) == principal
+    assert authenticate_session_token(token, now=160) is None
+    tampered_token = ("A" if token[0] != "A" else "B") + token[1:]
+    assert authenticate_session_token(tampered_token, now=159) is None
 
 
 def test_unhandled_exception_returns_stable_envelope_without_trace(monkeypatch):

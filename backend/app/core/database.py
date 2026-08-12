@@ -1,57 +1,77 @@
-from sqlalchemy import create_engine, text
+from __future__ import annotations
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.core.config import settings
 
-# Create the SQLAlchemy engine if DB_URL is configured
-if settings.DB_URL:
-    # mssql+pyodbc connection string might require some additional arguments depending on the driver
-    engine = create_engine(
-        settings.DB_URL,
+# Create the SQLAlchemy engine for MSSQL Read-Only
+if settings.MSSQL_READ_ONLY_URL:
+    mssql_read_engine = create_engine(
+        settings.MSSQL_READ_ONLY_URL,
         pool_pre_ping=True,  # Enable connection health checks
         pool_size=10,
         max_overflow=20,
         fast_executemany=True,  # Optimization for pyodbc
     )
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    MssqlReadSession = sessionmaker(autocommit=False, autoflush=False, bind=mssql_read_engine)
 else:
-    engine = None
-    SessionLocal = None
+    mssql_read_engine = None
+    MssqlReadSession = None
 
-# Create the PG engine
-if settings.PG_DB_URL:
-    pg_engine = create_engine(settings.PG_DB_URL, pool_pre_ping=True, pool_size=10, max_overflow=20)
-    pg_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=pg_engine)
+# Create the PG engine for App Data
+if settings.POSTGRES_APP_URL:
+    postgres_app_engine = create_engine(settings.POSTGRES_APP_URL, pool_pre_ping=True, pool_size=10, max_overflow=20)
+    PostgresAppSession = sessionmaker(autocommit=False, autoflush=False, bind=postgres_app_engine)
 else:
-    pg_engine = None
-    pg_SessionLocal = None
+    postgres_app_engine = None
+    PostgresAppSession = None
 
-Base = declarative_base()
-pg_Base = declarative_base()
+MssqlReadBase = declarative_base()
+PostgresAppBase = declarative_base()
+
+@event.listens_for(MssqlReadBase.metadata, "before_create")
+def block_mssql_create(target, connection, **kw):
+    raise RuntimeError("MSSQL database is read-only. DDL operations are permanently disabled.")
+
+@event.listens_for(MssqlReadBase.metadata, "before_drop")
+def block_mssql_drop(target, connection, **kw):
+    raise RuntimeError("MSSQL database is read-only. DDL operations are permanently disabled.")
+
+if MssqlReadSession:
+    @event.listens_for(MssqlReadSession, "before_flush")
+    def block_mssql_flush(session, flush_context, instances):
+        if session.new or session.dirty or session.deleted:
+            raise RuntimeError("MSSQL database is read-only. Writes are permanently disabled.")
+
+    @event.listens_for(mssql_read_engine, "before_cursor_execute")
+    def block_mssql_raw_writes(conn, cursor, statement, parameters, context, executemany):
+        stmt = statement.strip().upper()
+        if stmt.startswith(("INSERT", "UPDATE", "DELETE", "ALTER", "CREATE", "DROP")):
+            raise RuntimeError("MSSQL database is read-only. Raw DML/DDL statements are permanently disabled.")
 
 
-def get_db():
+def get_mssql_read_db():
     """
-    Dependency to yield a database session for FastAPI endpoints. (MSSQL)
+    Dependency to yield a read-only database session for enterprise source data.
     """
-    if SessionLocal is None:
-        raise RuntimeError("Database connection is not configured. Please check your .env settings.")
+    if MssqlReadSession is None:
+        raise RuntimeError("MSSQL Read-Only connection is not configured. Please check your .env settings.")
 
-    db = SessionLocal()
+    db = MssqlReadSession()
     try:
         yield db
     finally:
         db.close()
 
 
-def get_pg_db():
+def get_postgres_app_db():
     """
-    Dependency to yield a database session for Postgres.
+    Dependency to yield a read/write database session for CV Analyzer-owned data.
     """
-    if pg_SessionLocal is None:
-        raise RuntimeError("PG Database connection is not configured.")
+    if PostgresAppSession is None:
+        raise RuntimeError("Postgres App Data connection is not configured.")
 
-    db = pg_SessionLocal()
+    db = PostgresAppSession()
     try:
         yield db
     finally:
@@ -59,28 +79,20 @@ def get_pg_db():
 
 
 def init_db():
-    if engine is not None:
+    if postgres_app_engine is not None:
         try:
-            from app.models.config import SystemConfig
-
-            SystemConfig.__table__.create(engine, checkfirst=True)
-        except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning(f"Could not initialize DB tables: {exc}")
-
-    if pg_engine is not None:
-        try:
-            # We need to run CREATE EXTENSION IF NOT EXISTS vector
-            with pg_engine.connect() as conn:
+            with postgres_app_engine.connect() as conn:
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                conn.execute(text("CREATE SEQUENCE IF NOT EXISTS cv_results_generation_seq START WITH 1 INCREMENT BY 1"))
                 conn.commit()
 
-            pg_Base.metadata.create_all(bind=pg_engine)
+            PostgresAppBase.metadata.create_all(bind=postgres_app_engine)
         except Exception as exc:
             import logging
 
             logging.getLogger(__name__).warning(f"Could not initialize PG tables: {exc}")
+
+
 
 
 def run_auto_migrations():
@@ -97,21 +109,8 @@ def run_auto_migrations():
         logger.warning("[AUTO_MIGRATE] Ignored in production; use scripts/run_migrations.py explicitly.")
         return
 
-    try:
-        from scripts.run_migrations import run_migrations
+    from scripts.run_migrations import run_migrations
 
-        if settings.DB_NAME and settings.DB_URL:
-            try:
-                logger.info("[AUTO_MIGRATE] Checking pending MSSQL schema migrations...")
-                run_migrations("mssql", settings.DB_URL, dry_run=False)
-            except Exception as exc:
-                logger.warning(f"[AUTO_MIGRATE] MSSQL auto-migration warning: {exc}")
-
-        if settings.PG_DB_URL:
-            try:
-                logger.info("[AUTO_MIGRATE] Checking pending PostgreSQL schema migrations...")
-                run_migrations("postgres", settings.PG_DB_URL, dry_run=False)
-            except Exception as exc:
-                logger.warning(f"[AUTO_MIGRATE] PostgreSQL auto-migration warning: {exc}")
-    except Exception as exc:
-        logger.warning(f"[AUTO_MIGRATE] Could not execute auto-migrations: {exc}")
+    if settings.POSTGRES_APP_URL:
+        logger.info("[AUTO_MIGRATE] Checking pending PostgreSQL schema migrations...")
+        run_migrations(db_url=settings.POSTGRES_APP_URL, dry_run=False, dialect="postgres")

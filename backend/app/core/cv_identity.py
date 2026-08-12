@@ -1,3 +1,4 @@
+from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
@@ -20,11 +21,17 @@ class CVIdentity:
     def uses_supplied_ids(self) -> bool:
         return self.candidate_id is not None or self.cv_id is not None
 
-    def to_metadata(self) -> dict[str, str | None]:
+    @property
+    def source_candidate_id(self) -> int | None:
+        """Return the AIRIS/MSSQL identity when the supplied candidate ID is valid."""
+        return normalize_source_candidate_id(self.candidate_id)
+
+    def to_metadata(self) -> dict[str, str | int | None]:
         return {
             "canonical_key": self.canonical_key,
             "legacy_key": self.legacy_key,
             "candidate_id": self.candidate_id,
+            "source_candidate_id": self.source_candidate_id,
             "cv_id": self.cv_id,
             "strategy": self.strategy,
         }
@@ -35,6 +42,17 @@ def _clean_supplied_id(value: str | int | None) -> str | None:
         return None
     cleaned = str(value).strip()
     return cleaned or None
+
+
+def normalize_source_candidate_id(value: str | int | None) -> int | None:
+    """Normalize an explicitly supplied AIRIS/MSSQL candidate ID."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        source_candidate_id = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return source_candidate_id if source_candidate_id > 0 else None
 
 
 def _safe_component(value: str) -> str:

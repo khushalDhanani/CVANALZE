@@ -1,12 +1,11 @@
-import json
+from __future__ import annotations
 import logging
-from typing import List, Optional
+from typing import Optional
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.domain import DepartmentDomainMaster
 
-from app.schemas.classification_types import NormalizedClassification
 
 logger = logging.getLogger("cv_analyzer")
 
@@ -37,17 +36,19 @@ class DepartmentNormalizer:
                 ...
             }
         """
-        if SessionLocal is None:
+        if PostgresAppSession is None:
             logger.warning("[DepartmentNormalizer] No DB session available; cannot load mappings.")
             return
         try:
-            with SessionLocal() as session:
+            with PostgresAppSession() as session:
                 rows = session.query(DepartmentDomainMaster).all()
                 for row in rows:
                     # Use the Keywords column (comma‑separated) to map possible internal names to the domain label
-                    keywords = []
                     if row.Keywords:
-                        keywords = [kw.strip().lower() for kw in row.Keywords.split(',') if kw.strip()]
+                        if isinstance(row.Keywords, list):
+                            keywords = [str(kw).strip().lower() for kw in row.Keywords if str(kw).strip()]
+                        elif isinstance(row.Keywords, str):
+                            keywords = [kw.strip().lower() for kw in row.Keywords.split(',') if kw.strip()]
                     # If no keywords, fall back to using the DomainName itself as a possible key
                     if not keywords:
                         keywords = [row.DomainName.strip().lower()]
@@ -108,9 +109,18 @@ class DepartmentNormalizer:
         # Heuristic: strip parenthetical suffixes, normalise abbreviations, title-case
         import re as _re
         clean = _re.sub(r"\s*\(.*?\)", "", internal_name).strip()
-        # Expand common abbreviations
-        clean = _re.sub(r"(?i)\bsr\b\.?", "Senior", clean)
-        clean = _re.sub(r"(?i)\bjr\b\.?", "Junior", clean)
-        clean = _re.sub(r"(?i)\bmgr\b\.?", "Manager", clean)
-        clean = _re.sub(r"\s+", " ", clean).strip().title()
+        
+        # Expand common abbreviations from DB
+        from app.services.taxonomy_service import TaxonomyService
+        abbr_map = TaxonomyService.get_abbreviations()
+        
+        # We need to replace whole words case-insensitively
+        # We can split the text and replace
+        parts = clean.split()
+        for i, part in enumerate(parts):
+            lower_part = part.lower()
+            if lower_part in abbr_map:
+                parts[i] = abbr_map[lower_part]
+                
+        clean = " ".join(parts).strip().title()
         return {"industry_designation": clean if clean else None}

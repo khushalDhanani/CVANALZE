@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 from typing import Any
 
@@ -38,7 +39,7 @@ class ResumeQualityMetrics:
         )
 
         words_per_page = len(words) / max(page_count, 1)
-        density_score = 0.05
+        density_score = resume_quality.default_density_score
         for tier in resume_quality.density_scores:
             if words_per_page >= tier.min_words_per_page:
                 density_score = tier.score

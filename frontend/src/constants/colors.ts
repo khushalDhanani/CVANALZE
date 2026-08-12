@@ -3,9 +3,12 @@ export const COLORS = {
   primaryLight: '#818CF8',
   primaryDark: '#3730A3',
   surface: '#FFFFFF',
+  surfaceElevated: '#FFFFFF',
+  surfaceHover: '#F3F4F6',
   background: '#F8F9FB',
   border: '#E5E7EB',
   textPrimary: '#111827',
+  textSecondary: '#4B5563',
   textMuted: '#6B7280',
   textFaint: '#9CA3AF',
   textInverse: '#FFFFFF',
@@ -13,4 +16,10 @@ export const COLORS = {
   warning: '#D97706',
   danger: '#DC2626',
   info: '#2563EB',
+  category: {
+    blue: '#3B82F6',
+    purple: '#8B5CF6',
+    teal: '#14B8A6',
+    indigo: '#6366F1',
+  },
 };

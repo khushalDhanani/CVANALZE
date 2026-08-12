@@ -1,11 +1,12 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class GeoLocation(Base):
+class GeoLocation(PostgresAppBase):
     __tablename__ = "geo_locations"
     __table_args__ = {"schema": "cvai"}
 
@@ -14,10 +15,10 @@ class GeoLocation(Base):
     state_name = Column(String(255), nullable=True)
     country_name = Column(String(255), default="Global")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
-class SectionHeading(Base):
+class SectionHeading(PostgresAppBase):
     __tablename__ = "section_headings"
     __table_args__ = {"schema": "cvai"}
 
@@ -26,10 +27,10 @@ class SectionHeading(Base):
     category = Column(String(100), default="general")
     language = Column(String(10), default="en")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
-class NameDenylist(Base):
+class NameDenylist(PostgresAppBase):
     __tablename__ = "name_denylists"
     __table_args__ = {"schema": "cvai"}
 
@@ -37,4 +38,4 @@ class NameDenylist(Base):
     word = Column(String(255), nullable=False, unique=True, index=True)
     category = Column(String(100), default="job_title")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

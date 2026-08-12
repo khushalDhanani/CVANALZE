@@ -48,3 +48,12 @@ def test_fuzzy_and_partial_date_ranges():
     interval_present = DateIntervalParser.parse_interval("2020 to Till Date")
     assert interval_present.start_date == "2020-01-01"
     assert interval_present.is_current is True
+
+
+def test_bare_code_token_not_parsed_as_date():
+    """A non-date token like 'RAID-5' must NOT fabricate a Jan-2000 interval."""
+    interval = DateIntervalParser.parse_interval("RAID-5")
+    assert interval.start_date is None
+    assert interval.end_date is None
+    assert interval.duration_months is None
+    assert interval.confidence == 0.0

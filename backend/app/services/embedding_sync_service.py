@@ -1,6 +1,20 @@
+from __future__ import annotations
 # backend/app/services/embedding_sync_service.py
 import hashlib
+import json
 from typing import Any
+from datetime import datetime
+
+def _parse_dt(val: Any) -> datetime | None:
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        return val
+    try:
+        from dateutil.parser import parse
+        return parse(str(val))
+    except Exception:
+        return None
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -32,11 +46,25 @@ class EmbeddingSyncService:
         from app.services.embedding_service import (
             build_vacancy_canonical_text,
             get_vacancy_embedding,
+            get_vacancy_embedding_metadata,
             save_vacancy_embedding,
         )
 
         model = settings.EMBEDDING_MODEL
         uncached: list[tuple[int, dict[str, Any], str, str]] = []  # (vac_id, job, canonical_text, content_hash)
+
+        from app.core.database import PostgresAppSession
+        from app.models.pg import VacancyEmbedding
+
+        existing_pg_embeddings: dict[int, VacancyEmbedding] = {}
+        if PostgresAppSession is not None:
+            try:
+                with PostgresAppSession() as pg_db:
+                    records = pg_db.query(VacancyEmbedding).all()
+                    for rec in records:
+                        existing_pg_embeddings[rec.vacancy_id] = rec
+            except Exception as exc:
+                logger.warning(f"[EMBEDDING_SYNC] Could not pre-fetch VacancyEmbedding rows: {exc}")
 
         for job in job_dicts:
             vac_id = job.get("vacancy_id") or job.get("id")
@@ -55,11 +83,17 @@ class EmbeddingSyncService:
 
             # Check if embedding already exists in cache or DB for this model and content hash
             cached_emb = _ecm.get(f"{model}:vac:{content_hash}")
-            if cached_emb is None and vac_id_int > 0:
-                pg_emb, stored_hash = get_vacancy_embedding(vac_id_int)
-                if pg_emb is not None and stored_hash == content_hash:
-                    cached_emb = pg_emb
-                    _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
+            if cached_emb is None and vac_id_int > 0 and vac_id_int in existing_pg_embeddings:
+                rec = existing_pg_embeddings[vac_id_int]
+                if rec.embedding is not None and rec.content_hash == content_hash:
+                    source_watermark = rec.source_watermark
+                    job_updated_at = job.get("updated_at") or job.get("VacancyRequestCreatedAt")
+                    
+                    dt_source = _parse_dt(source_watermark)
+                    dt_job = _parse_dt(job_updated_at)
+                    if not job_updated_at or (dt_source and dt_job and dt_source >= dt_job):
+                        cached_emb = [float(x) for x in list(rec.embedding)]
+                        _ecm.set(f"{model}:vac:{content_hash}", cached_emb)
 
             if cached_emb is None:
                 uncached.append((vac_id_int, job, canonical_text, content_hash))
@@ -73,7 +107,9 @@ class EmbeddingSyncService:
                     if emb:
                         _ecm.set(f"{model}:vac:{content_hash}", emb)
                         if vac_id_int > 0:
-                            save_vacancy_embedding(vac_id_int, emb, content_hash)
+                            source_snapshot = json.dumps(job, default=str)
+                            source_watermark = job.get("updated_at") or job.get("VacancyRequestCreatedAt")
+                            save_vacancy_embedding(vac_id_int, emb, content_hash, source_snapshot=source_snapshot, source_watermark=source_watermark)
                         metrics["synced"] += 1
                     else:
                         metrics["failed"] += 1

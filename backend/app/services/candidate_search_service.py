@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlalchemy import select
 
 from app.core.config import settings
@@ -10,6 +11,8 @@ from app.schemas.candidate_search import (
     CandidateSearchResultItem,
 )
 from app.services.embedding_service import EmbeddingService, get_candidate_embedding
+from app.services.match_evaluators import VacancyFitEvaluator, VacancyMatchStatus
+from app.services.resume_field_extractor import ResumeFieldExtractor
 
 
 class CandidateSearchService:
@@ -27,11 +30,11 @@ class CandidateSearchService:
         """
         scores: dict[str, float] = {}
         try:
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import CandidateEmbedding
 
-            if pg_SessionLocal is not None:
-                with pg_SessionLocal() as session:
+            if PostgresAppSession is not None:
+                with PostgresAppSession() as session:
                     stmt = (
                         select(
                             CandidateEmbedding.cv_key,
@@ -101,10 +104,15 @@ class CandidateSearchService:
                         fallback_scores[cv_key] = round(EmbeddingService.cosine_similarity(query_embedding, candidate_embedding), 4)
 
         items: list[CandidateSearchResultItem] = []
+        scoring_parameters = RuleConfigManager.get_scoring_parameters()
+        high_threshold = scoring_parameters.match_high_threshold
+        potential_threshold = scoring_parameters.match_medium_threshold
 
         for r in results:
             if not r or not isinstance(r, dict):
                 continue
+
+            ResumeFieldExtractor.revalidate_candidate_name(r)
 
             cv_key = str(r.get("id") or r.get("filename") or "")
             cv_key = cv_key.removesuffix(".json")
@@ -112,6 +120,21 @@ class CandidateSearchService:
             raw_match = r.get("match_analysis")
             match_analysis = raw_match if isinstance(raw_match, dict) else {}
             best_match = match_analysis.get("best_match") or {}
+            evaluated_openings = [
+                opening
+                for opening in [*(match_analysis.get("suitable_openings") or []), *(match_analysis.get("unsuitable_openings") or [])]
+                if isinstance(opening, dict)
+            ]
+            if not best_match or VacancyFitEvaluator.classify_opening_fit(best_match, high_threshold, potential_threshold) == VacancyMatchStatus.NO_STRONG_MATCH.value:
+                best_match = next(
+                    (
+                        opening
+                        for opening in evaluated_openings
+                        if VacancyFitEvaluator.classify_opening_fit(opening, high_threshold, potential_threshold) in {VacancyMatchStatus.MATCHED.value, VacancyMatchStatus.POTENTIAL_MATCH.value}
+                    ),
+                    {},
+                )
+            best_match_score = VacancyFitEvaluator.resolve_opening_score(best_match) if best_match else None
 
             resume_json = r.get("resume_json") or {}
             contact_info = resume_json.get("contact_info") or {}
@@ -155,10 +178,17 @@ class CandidateSearchService:
                     continue
 
             # Experience Range Filter
-            quality_metrics = r.get("quality_metrics") or {}
-            cand_exp = quality_metrics.get("experience_years")
+            cand_exp = r.get("experience_years")
+            if cand_exp is None:
+                cand_exp = r.get("total_experience_years")
+            if cand_exp is None:
+                cand_exp = (r.get("experience_summary") or {}).get("experience_years")
+            if cand_exp is None:
+                quality_metrics = r.get("quality_metrics") or {}
+                cand_exp = quality_metrics.get("experience_years")
             if cand_exp is None:
                 cand_exp = r.get("candidate_experience")
+
 
             if request.min_experience is not None:
                 if cand_exp is not None and cand_exp < request.min_experience:
@@ -194,14 +224,23 @@ class CandidateSearchService:
                 if edu_req not in edu_text and edu_req not in text_lower:
                     continue
 
-            # Status Filter
+            # Status Filter & Completion Guard
+            cand_status = str(r.get("status") or "").upper()
+            is_complete_record = (
+                cand_status in ("COMPLETED", "NEW_CV", "REPROCESSED", "CACHE_HIT")
+                or r.get("progress") == 100
+                or r.get("is_complete") is True
+            ) and cand_status != "PROCESSING"
+
             if request.status:
-                req_st = request.status.strip().lower()
-                cand_status = str(r.get("status") or "completed").lower()
-                if req_st in ("complete", "completed") and cand_status in ("complete", "completed"):
+                req_st = request.status.strip().upper()
+                if req_st in ("COMPLETE", "COMPLETED") and is_complete_record:
                     pass
-                elif req_st != cand_status:
+                elif req_st != cand_status and req_st != "ALL":
                     continue
+            elif not is_complete_record:
+                continue
+
 
             location_val = r.get("location") or contact_info.get("location")
             job_title_val = r.get("job_title") or contact_info.get("job_title") or best_match.get("job_title")
@@ -244,7 +283,9 @@ class CandidateSearchService:
             items.append(
                 CandidateSearchResultItem(
                     id=r.get("id") or cv_key,
+                    result_generation_id=r.get("result_generation_id"),
                     filename=r.get("filename") or f"{cv_key}.pdf",
+
                     full_name=extracted_name if (extracted_name and extracted_name.lower() != "unknown candidate") else None,
                     email=email if email else None,
                     phone=phone if phone else None,
@@ -262,14 +303,22 @@ class CandidateSearchService:
                     is_scanned=r.get("is_scanned", False),
                     ocr_applied=r.get("ocr_applied", False),
                     primary_department=match_analysis.get("primary_department"),
+                    experience_years=cand_exp,
+                    gross_display=r.get("gross_display") or (r.get("experience_summary") or {}).get("gross_display"),
+                    experience_state=r.get("experience_state") or (r.get("experience_summary") or {}).get("experience_state"),
                     similarity_score=sim_score,
                     search_mode=search_mode,
                     best_match={
                         "job_title": best_match.get("job_title"),
                         "department": best_match.get("department") or best_match.get("department_name"),
-                        "score": best_match.get("score") or best_match.get("overall_score"),
+                        "score": best_match_score,
+                        "vacancy_fit_score": best_match.get("vacancy_fit_score"),
+                        "vacancy_match_status": best_match.get("vacancy_match_status"),
+                        "match_status": best_match.get("match_status"),
+                        "score_breakdown": best_match.get("score_breakdown"),
                         "classification": best_match.get("classification"),
                         "recommendation": best_match.get("recommendation"),
+                        "reason": best_match.get("reason"),
                         "domain_mismatch_capped": best_match.get("domain_mismatch_capped")
                         or any(
                             (f.get("requirement_id") == "req_domain_mismatch" if isinstance(f, dict) else False)

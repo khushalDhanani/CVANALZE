@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import timezone, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -8,13 +9,14 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from app.core.database import PostgresAppBase
 
 
-class DomainMaster(Base):
+class DomainMaster(PostgresAppBase):
     __tablename__ = "domains"
     __table_args__ = {"schema": "cvai"}
 
@@ -23,13 +25,13 @@ class DomainMaster(Base):
     domain_name = Column(String(255), nullable=False)
     description = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     families = relationship("JobFamilyMaster", back_populates="domain", cascade="all, delete-orphan")
 
 
-class JobFamilyMaster(Base):
+class JobFamilyMaster(PostgresAppBase):
     __tablename__ = "job_families"
     __table_args__ = {"schema": "cvai"}
 
@@ -41,16 +43,19 @@ class JobFamilyMaster(Base):
     )
     family_code = Column(String(50), nullable=False, unique=True)
     family_name = Column(String(255), nullable=False)
+    mssql_department_id = Column(Integer, nullable=True)
     description = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     domain = relationship("DomainMaster", back_populates="families")
     designations = relationship("DesignationMaster", back_populates="family", cascade="all, delete-orphan")
+    compatibilities_a = relationship("FamilyCompatibility", foreign_keys="FamilyCompatibility.family_a_id", back_populates="family_a")
+    compatibilities_b = relationship("FamilyCompatibility", foreign_keys="FamilyCompatibility.family_b_id", back_populates="family_b")
 
 
-class DesignationMaster(Base):
+class DesignationMaster(PostgresAppBase):
     __tablename__ = "designations"
     __table_args__ = {"schema": "cvai"}
 
@@ -62,18 +67,19 @@ class DesignationMaster(Base):
     )
     designation_code = Column(String(100), nullable=False, unique=True)
     designation_name = Column(String(255), nullable=False)
+    mssql_designation_id = Column(Integer, nullable=True)
     seniority_level = Column(String(50), nullable=True)
     content_hash = Column(String(64), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     family = relationship("JobFamilyMaster", back_populates="designations")
     synonyms = relationship("DesignationSynonym", back_populates="designation", cascade="all, delete-orphan")
     skills = relationship("DesignationSkill", back_populates="designation", cascade="all, delete-orphan")
 
 
-class DesignationSynonym(Base):
+class DesignationSynonym(PostgresAppBase):
     __tablename__ = "designation_synonyms"
     __table_args__ = {"schema": "cvai"}
 
@@ -85,12 +91,22 @@ class DesignationSynonym(Base):
     )
     synonym_text = Column(String(255), nullable=False, index=True)
     is_canonical = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     designation = relationship("DesignationMaster", back_populates="synonyms")
 
 
-class SkillMaster(Base):
+class DesignationAbbreviation(PostgresAppBase):
+    __tablename__ = "designation_abbreviations"
+    __table_args__ = {"schema": "cvai"}
+
+    abbreviation_id = Column(Integer, primary_key=True, autoincrement=True)
+    abbreviation = Column(String(50), nullable=False, unique=True, index=True)
+    expansion = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True)
+
+
+class SkillMaster(PostgresAppBase):
     __tablename__ = "skills"
     __table_args__ = {"schema": "cvai"}
 
@@ -99,10 +115,11 @@ class SkillMaster(Base):
     skill_name = Column(String(255), nullable=False, unique=True)
     category = Column(String(100), default="general")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    designations = relationship("DesignationSkill", back_populates="skill", cascade="all, delete-orphan")
 
-class DesignationSkill(Base):
+class DesignationSkill(PostgresAppBase):
     __tablename__ = "designation_skills"
     __table_args__ = {"schema": "cvai"}
 
@@ -120,14 +137,31 @@ class DesignationSkill(Base):
     importance_weight = Column(Float, default=1.0)
 
     designation = relationship("DesignationMaster", back_populates="skills")
-    skill = relationship("SkillMaster")
+    skill = relationship("SkillMaster", back_populates="designations")
 
 
-class FamilyCompatibility(Base):
+class FamilyCompatibility(PostgresAppBase):
     __tablename__ = "family_compatibilities"
-    __table_args__ = {"schema": "cvai"}
+    __table_args__ = (
+        UniqueConstraint("family_a_id", "family_b_id", name="uq_family_pair"),
+        {"schema": "cvai"}
+    )
 
-    source_family_id = Column(Integer, ForeignKey("cvai.job_families.family_id"), primary_key=True)
-    target_family_id = Column(Integer, ForeignKey("cvai.job_families.family_id"), primary_key=True)
+    compatibility_id = Column(Integer, primary_key=True, autoincrement=True)
+    family_a_id = Column(
+        Integer,
+        ForeignKey("cvai.job_families.family_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    family_b_id = Column(
+        Integer,
+        ForeignKey("cvai.job_families.family_id", ondelete="CASCADE"),
+        nullable=False,
+    )
     compatibility_score = Column(Float, nullable=False, default=1.0)
-    is_allowed = Column(Boolean, default=True)
+    is_allowed = Column(Boolean, nullable=False, default=True)
+    status = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    family_a = relationship("JobFamilyMaster", foreign_keys=[family_a_id], back_populates="compatibilities_a")
+    family_b = relationship("JobFamilyMaster", foreign_keys=[family_b_id], back_populates="compatibilities_b")

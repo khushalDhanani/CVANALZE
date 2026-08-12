@@ -1,18 +1,23 @@
+from __future__ import annotations
+import multiprocessing
 import time
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from io import BytesIO
-from threading import Lock
+from threading import BoundedSemaphore, Lock
 from typing import Any
 
 from docling.datamodel.base_models import DocumentStream
-from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling_pp_ocrv6 import PPOCRv6Options
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
 from app.core.config import settings
+from app.core.error_handlers import DocumentExtractionTimeoutError
 from app.core.logging import logger
 from app.services.resume_text_normalizer import ResumeTextNormalizer
-from app.services.upload_service import UploadService
+from app.services.upload_service import UploadService, UploadTooLargeError, UploadValidationError
+
+_OCR_ENGINE = "PP-OCRv6-Medium"
+_PROCESS_SHUTDOWN_GRACE_SECONDS = 5.0
 
 
 class MarkdownResult:
@@ -65,7 +70,9 @@ class MarkdownResult:
 def _init_fast_converter() -> DocumentConverter:
     options = PdfPipelineOptions()
     options.do_ocr = False
+    options.allow_external_plugins = True
     options.do_table_structure = settings.DOCUMENT_TABLE_STRUCTURE_ENABLED
+    logger.info(f"[OCR_INIT] Fast converter: engine=docling_fast, do_ocr=False, allow_external_plugins=True")
     return DocumentConverter(format_options={"pdf": PdfFormatOption(pipeline_options=options)})
 
 
@@ -73,14 +80,17 @@ def _init_ocr_converter() -> DocumentConverter:
     options = PdfPipelineOptions()
     options.do_ocr = True
     options.do_table_structure = settings.DOCUMENT_TABLE_STRUCTURE_ENABLED
-    options.ocr_options = RapidOcrOptions(force_full_page_ocr=True)
+    options.allow_external_plugins = True
+    options.ocr_options = PPOCRv6Options(force_full_page_ocr=True)
+    logger.info(f"[OCR_INIT] OCR converter: engine={_OCR_ENGINE}, ocr=enabled, allow_external_plugins=True, force_full_page=True")
     return DocumentConverter(format_options={"pdf": PdfFormatOption(pipeline_options=options)})
 
 
 _fast_converter_instance: DocumentConverter | None = None
 _ocr_converter_instance: DocumentConverter | None = None
 _converter_lock = Lock()
-_parser_thread_pool = ThreadPoolExecutor(max_workers=max(1, settings.DOCUMENT_PARSER_WORKERS), thread_name_prefix="docling_parser")
+_parser_slots = BoundedSemaphore(value=max(1, settings.DOCUMENT_PARSER_WORKERS))
+_parser_process_context = multiprocessing.get_context("spawn")
 
 
 def _get_fast_converter() -> DocumentConverter:
@@ -228,12 +238,54 @@ class DocumentConversionService:
             "fast_docling_chars": fast_length,
             "fast_docling_ms": fast_duration_ms,
             "ocr_decision": ocr_decision,
+            "ocr_engine": _OCR_ENGINE if ocr_applied else "none",
             "ocr_chars": len(ocr_text),
             "ocr_ms": ocr_duration_ms,
             "final_char_count": len(clean_text),
             "parser_used": parser_used,
         }
-        logger.info(f"[STAGE 5: FINAL TEXT] '{filename}': type={pdf_type}, parser={parser_used}, chars={len(clean_text)}")
+        # Multi-dimensional Content-Loss Validation:
+        # Detect if final extraction lost character mass, section headings, dates, or contact info.
+        content_loss_detected = False
+        content_loss_reasons: list[str] = []
+
+        if native_char_count > 200 and len(clean_text) < native_char_count * 0.5:
+            content_loss_detected = True
+            content_loss_reasons.append(f"Length ratio low: final={len(clean_text)} vs native={native_char_count}")
+
+        # Check for year/date loss if native text contained multiple years
+        import re
+        native_years = set(re.findall(r"\b(19\d{2}|20\d{2})\b", native_text))
+        clean_years = set(re.findall(r"\b(19\d{2}|20\d{2})\b", clean_text))
+        if len(native_years) >= 2 and len(clean_years) < len(native_years) * 0.5:
+            content_loss_detected = True
+            content_loss_reasons.append(f"Date loss: native_years={len(native_years)} vs clean_years={len(clean_years)}")
+
+        # Check for email loss
+        native_emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", native_text)
+        clean_emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", clean_text)
+        if native_emails and not clean_emails:
+            content_loss_detected = True
+            content_loss_reasons.append("Contact email lost in extraction")
+
+        if content_loss_detected:
+            logger.warning(
+                f"[CONTENT_LOSS_WARNING] '{filename}': reasons={content_loss_reasons}. "
+                f"parser={parser_used}, pdf_type={pdf_type}, ocr_applied={ocr_applied}."
+            )
+            # If native text is richer and clean_text suffered severe loss, fallback/merge native_text
+            if native_char_count > len(clean_text) * 1.5 and native_text.strip():
+                logger.info(f"[CONTENT_LOSS_RECOVERY] Appending native_text fallback for '{filename}'.")
+                clean_text = f"{clean_text}\n\n## Extracted Source Text\n{native_text}".strip()
+
+        logger.info(
+            f"[EXTRACTION_TELEMETRY] '{filename}': "
+            f"native_chars={native_char_count} docling_chars={fast_length} "
+            f"ocr_chars={len(ocr_text)} final_chars={len(clean_text)} "
+            f"content_loss_detected={content_loss_detected} "
+            f"parser={parser_used} pdf_type={pdf_type}"
+        )
+        logger.info(f"[STAGE 5: FINAL TEXT] '{filename}': type={pdf_type}, parser={parser_used}, ocr_engine={_OCR_ENGINE if ocr_applied else 'none'}, chars={len(clean_text)}")
         return MarkdownResult(
             markdown=clean_text,
             page_count=page_count,
@@ -242,7 +294,11 @@ class DocumentConversionService:
             pdf_type=pdf_type,
             parser_used=parser_used,
             ocr_decision=ocr_decision,
-            stage_metrics=metrics,
+            stage_metrics={
+                **metrics,
+                "content_loss_detected": content_loss_detected,
+                "llm_chars": None,  # Set later by LLM prompt builder — not extraction concern
+            },
         )
 
     @classmethod
@@ -252,13 +308,98 @@ class DocumentConversionService:
         content: bytes,
         timeout_seconds: float | None = None,
     ) -> MarkdownResult:
-        timeout = timeout_seconds if timeout_seconds is not None else settings.EXTRACTION_TIMEOUT_SECONDS
-        future = _parser_thread_pool.submit(cls.generate, filename, content)
+        timeout = timeout_seconds if timeout_seconds is not None else cls._default_timeout(filename, content)
+        if timeout <= 0:
+            raise ValueError("Document extraction timeout must be greater than zero.")
+        deadline = time.monotonic() + timeout
+        if not _parser_slots.acquire(timeout=timeout):
+            cls._raise_timeout(filename, timeout)
+
+        receiver = None
+        sender = None
+        process = None
         try:
-            return future.result(timeout=timeout)
-        except FuturesTimeoutError as exc:
-            logger.error(f"Extraction timed out after {timeout} seconds for '{filename}'.")
-            raise TimeoutError(f"Extraction timed out after {timeout} seconds for '{filename}'.") from exc
+            receiver, sender = _parser_process_context.Pipe(duplex=False)
+            process = _parser_process_context.Process(target=_isolated_conversion_worker, args=(sender, filename, content), name="docling-extraction")
+            process.start()
+            sender.close()
+            sender = None
+
+            payload = cls._wait_for_isolated_result(receiver, process, deadline)
+            if payload is None:
+                cls._stop_process(process)
+                cls._raise_timeout(filename, timeout)
+            process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+            if process.is_alive():
+                cls._stop_process(process)
+            return cls._decode_isolated_result(payload)
+        finally:
+            if receiver is not None:
+                receiver.close()
+            if sender is not None:
+                sender.close()
+            if process is not None and not process.is_alive():
+                process.close()
+            _parser_slots.release()
+
+    @staticmethod
+    def _default_timeout(filename: str, content: bytes) -> float:
+        normalized = UploadService.normalize_filename(filename)
+        if normalized.extension == "pdf":
+            pdf_type, _native_text, _native_char_count, _has_images = _classify_pdf(content)
+            if pdf_type in ("SCANNED_PDF", "UNKNOWN_PDF"):
+                return settings.SCANNED_EXTRACTION_TIMEOUT_SECONDS
+        return settings.EXTRACTION_TIMEOUT_SECONDS
+
+    @staticmethod
+    def _wait_for_isolated_result(receiver: Any, process: Any, deadline: float) -> dict[str, Any] | None:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            if receiver.poll(min(0.1, remaining)):
+                return receiver.recv()
+            if not process.is_alive():
+                process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+                if receiver.poll():
+                    return receiver.recv()
+                raise RuntimeError(f"Document extraction process exited unexpectedly with code {process.exitcode}.")
+
+    @staticmethod
+    def _stop_process(process: Any) -> None:
+        if not process.is_alive():
+            process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+            return
+        process.terminate()
+        process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+        if process.is_alive() and hasattr(process, "kill"):
+            process.kill()
+            process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+
+    @staticmethod
+    def _raise_timeout(filename: str, timeout: float) -> None:
+        logger.error(f"Extraction timed out after {timeout} seconds for '{filename}'; isolated extraction deadline enforced.")
+        raise DocumentExtractionTimeoutError(f"Extraction timed out after {timeout} seconds for '{filename}'.")
+
+    @staticmethod
+    def _decode_isolated_result(payload: dict[str, Any]) -> MarkdownResult:
+        if payload.get("status") == "ok":
+            return MarkdownResult.from_dict(payload["result"])
+        message = str(payload.get("message") or "Document extraction failed.")
+        error_type = payload.get("error_type")
+        if error_type == "UploadTooLargeError":
+            raise UploadTooLargeError()
+        if error_type == "UploadValidationError":
+            raise UploadValidationError(
+                message,
+                code=str(payload.get("code") or "invalid_upload"),
+                status_code=int(payload.get("status_code") or 400),
+            )
+        if error_type == "ValueError":
+            raise ValueError(message)
+        if error_type == "TimeoutError":
+            raise TimeoutError(message)
+        raise RuntimeError(message)
 
     @staticmethod
     def _convert_fast(filename: str, content: bytes) -> tuple[str, float, Any]:
@@ -279,24 +420,32 @@ class DocumentConversionService:
     def _convert_ocr(filename: str, content: bytes) -> tuple[str, float, Any]:
         started = time.perf_counter()
         try:
+            logger.info(f"[STAGE 3: OCR START] '{filename}': engine={_OCR_ENGINE}, status=RUNNING")
             result = _get_ocr_converter().convert(DocumentStream(name=filename, stream=BytesIO(content)))
             document = result.document if result else None
             text = document.export_to_markdown().strip() if document else ""
-            return text, round((time.perf_counter() - started) * 1000.0, 2), document
+            page_count = len(document.pages) if document and getattr(document, "pages", None) else 0
+            duration = round((time.perf_counter() - started) * 1000.0, 2)
+            logger.info(f"[STAGE 4: OCR DONE] '{filename}': engine={_OCR_ENGINE}, chars={len(text)}, pages={page_count}, duration={duration}ms")
+            return text, duration, document
         except Exception as exc:
             duration = round((time.perf_counter() - started) * 1000.0, 2)
-            logger.warning(f"[STAGE 4: OCR EXECUTION] Warning for '{filename}': {exc}. Fallback to native.")
+            logger.warning(f"[STAGE 4: OCR EXECUTION] '{filename}': engine={_OCR_ENGINE}, status=FAILED, error={exc}, fallback=native, duration={duration}ms")
             return "", duration, None
 
     @staticmethod
     def _ocr_decision(extension: str, pdf_type: str, fast_length: int, native_length: int) -> str:
         if extension != "pdf":
-            return "SKIPPED_NON_PDF"
-        if pdf_type in ("TEXT_PDF", "HYBRID_PDF") and (fast_length >= 50 or native_length >= 50):
-            return "SKIPPED_TEXT_PRESENT"
-        if fast_length >= settings.AUTO_OCR_MIN_TEXT_CHARS or native_length >= settings.AUTO_OCR_MIN_TEXT_CHARS:
-            return "SKIPPED_SUFFICIENT_TEXT"
-        return "INVOKED_SPARSE_TEXT"
+            decision = "SKIPPED_NON_PDF"
+        elif pdf_type in ("TEXT_PDF", "HYBRID_PDF") and (fast_length >= 50 or native_length >= 50):
+            decision = "SKIPPED_TEXT_PRESENT"
+        elif fast_length >= settings.AUTO_OCR_MIN_TEXT_CHARS or native_length >= settings.AUTO_OCR_MIN_TEXT_CHARS:
+            decision = "SKIPPED_SUFFICIENT_TEXT"
+        else:
+            decision = "INVOKED_SPARSE_TEXT"
+        ocr_enabled = decision == "INVOKED_SPARSE_TEXT"
+        logger.info(f"[OCR_DECISION] type={pdf_type}, fast_chars={fast_length}, native_chars={native_length}, decision={decision}, ocr_enabled={ocr_enabled}, engine={_OCR_ENGINE if ocr_enabled else 'none'}")
+        return decision
 
     @staticmethod
     def _recover_structured_headings(raw_text: str, document: Any) -> str:
@@ -318,6 +467,28 @@ class DocumentConversionService:
                 else:
                     recovered.append(text)
         return "\n\n".join(recovered + [raw_text]) if recovered else raw_text
+
+
+def _isolated_conversion_worker(sender: Any, filename: str, content: bytes) -> None:
+    try:
+        result = DocumentConversionService.generate(filename, content)
+        sender.send({"status": "ok", "result": result.to_dict()})
+    except UploadTooLargeError as exc:
+        sender.send({"status": "error", "error_type": "UploadTooLargeError", "message": str(exc)})
+    except UploadValidationError as exc:
+        sender.send(
+            {
+                "status": "error",
+                "error_type": "UploadValidationError",
+                "message": str(exc),
+                "code": exc.code,
+                "status_code": exc.status_code,
+            }
+        )
+    except Exception as exc:
+        sender.send({"status": "error", "error_type": type(exc).__name__, "message": str(exc)})
+    finally:
+        sender.close()
 
 
 MarkdownGenerator = DocumentConversionService

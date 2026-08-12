@@ -1,9 +1,11 @@
+from __future__ import annotations
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.core.rule_config_manager import RuleConfigManager
 
 
 class AccessTier(str, Enum):
@@ -12,12 +14,14 @@ class AccessTier(str, Enum):
     ADMINISTRATOR = "administrator"
 
 
-class JobState(str, Enum):
+class JobState:
     QUEUED = "QUEUED"
     PROCESSING = "PROCESSING"
     RETRYING = "RETRYING"
     COMPLETED = "COMPLETED"
+    COMPLETED_DEGRADED = "COMPLETED_DEGRADED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
     UNKNOWN = "UNKNOWN"
 
 
@@ -42,12 +46,16 @@ class ErrorCode(str, Enum):
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     UNSUPPORTED_FILE = "UNSUPPORTED_FILE"
     DEPENDENCY_UNAVAILABLE = "DEPENDENCY_UNAVAILABLE"
+    CONFIGURATION_UNAVAILABLE = "CONFIGURATION_UNAVAILABLE"
+    PROMPT_UNAVAILABLE = "PROMPT_UNAVAILABLE"
     PROCESSING_FAILED = "PROCESSING_FAILED"
+    WORKER_LOST = "WORKER_LOST"
+    JOB_STUCK = "JOB_STUCK"
     RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
-LEGACY_JOB_STATE_ALIASES: dict[str, JobState] = {
+LEGACY_JOB_STATE_ALIASES: dict[str, str] = {
     "QUEUED": JobState.QUEUED,
     "PROCESSING": JobState.PROCESSING,
     "IN_PROGRESS": JobState.PROCESSING,
@@ -55,11 +63,14 @@ LEGACY_JOB_STATE_ALIASES: dict[str, JobState] = {
     "SCHEMA_CHANGED": JobState.PROCESSING,
     "RETRYING": JobState.RETRYING,
     "COMPLETED": JobState.COMPLETED,
+    "COMPLETED_DEGRADED": JobState.COMPLETED_DEGRADED,
     "NEW_CV": JobState.COMPLETED,
     "REPROCESSED": JobState.COMPLETED,
     "CACHE_HIT": JobState.COMPLETED,
     "FAILED": JobState.FAILED,
     "ERROR": JobState.FAILED,
+    "CANCELLED": JobState.CANCELLED,
+    "CANCELED": JobState.CANCELLED,
 }
 
 
@@ -68,10 +79,14 @@ def normalize_job_state(
     *,
     progress: int | None = None,
     is_complete: bool | None = None,
-) -> JobState:
+) -> str:
     normalized = str(status or "").strip().upper()
     if normalized in ("FAILED", "ERROR"):
         return JobState.FAILED
+    if normalized in ("CANCELLED", "CANCELED"):
+        return JobState.CANCELLED
+    if normalized == JobState.COMPLETED_DEGRADED:
+        return JobState.COMPLETED_DEGRADED
     if is_complete is True:
         return JobState.COMPLETED
     if progress == 100:
@@ -98,7 +113,15 @@ class ErrorResponse(BaseModel):
 
 class JobStateResponse(BaseModel):
     job_id: str
-    state: JobState
+    state: str
+    
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, v: str) -> str:
+        allowed = RuleConfigManager.get_config().workflow.allowed_job_states
+        if v not in allowed:
+            raise ValueError(f"Invalid job state '{v}'. Must be one of {allowed}")
+        return v
     progress: int = Field(default=0, ge=0, le=100)
     stage: str | None = None
     message: str = ""
@@ -146,7 +169,9 @@ class JobStateResponse(BaseModel):
             JobState.PROCESSING: "processing",
             JobState.RETRYING: "processing",
             JobState.COMPLETED: "COMPLETED",
+            JobState.COMPLETED_DEGRADED: "COMPLETED_DEGRADED",
             JobState.FAILED: "FAILED",
+            JobState.CANCELLED: "CANCELLED",
             JobState.UNKNOWN: "processing",
         }[self.state]
         payload: dict[str, Any] = {
@@ -170,10 +195,11 @@ class ProcessingJobRecord(BaseModel):
     storage_filename: str
     content_type: str | None = None
     candidate_id: str | None = None
+    source_candidate_id: int | None = None
     cv_id: str | None = None
     parser_version: str
     schema_version: str
-    state: JobState = JobState.QUEUED
+    state: str = JobState.QUEUED
     progress: int = Field(default=10, ge=0, le=100)
     stage: str = "queued"
     message: str = "CV processing is queued."
@@ -185,7 +211,18 @@ class ProcessingJobRecord(BaseModel):
     force_reprocess: bool = False
     outcome: ProcessingOutcome | None = None
     error: CanonicalError | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    enqueue_sequence: int | None = None
+    version: int = 1
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: datetime | None = None
+    heartbeat_at: datetime | None = None
     completed_at: datetime | None = None
+
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, v: str) -> str:
+        allowed = RuleConfigManager.get_config().workflow.allowed_job_states
+        if v not in allowed:
+            raise ValueError(f"Invalid job state '{v}'. Must be one of {allowed}")
+        return v

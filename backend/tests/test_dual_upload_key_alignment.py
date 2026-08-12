@@ -25,10 +25,24 @@ def test_dual_upload_key_alignment_and_single_raw_file(monkeypatch, tmp_path):
     cv_content = output.getvalue()
     content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-    with (
-        patch("app.api.cv.background_process_cv"),
-        patch("app.api.analysis.background_upload_and_analyze"),
-    ):
+    from app.services.processing_queue import QueueSubmission
+    from app.schemas.contracts import JobState, ProcessingExecutionMode, ProcessingJobRecord
+    dummy_submission = QueueSubmission(
+        record=ProcessingJobRecord(
+            job_id="dummy_job_id",
+            job_state=JobState.QUEUED,
+            execution_mode=ProcessingExecutionMode.RQ.value,
+            target_cv_key="cv_dual_upload_test_resume",
+            cv_filename="dual_upload_test_resume.docx",
+            cv_key="cv_dual_upload_test_resume",
+            content_hash="dummy_hash",
+            filename="dual_upload_test_resume.docx",
+            storage_filename="dual_upload_test_resume.docx",
+            parser_version="1.0",
+            schema_version="1.0"
+        )
+    )
+    with patch("app.services.processing_queue.ProcessingQueueService.submit_upload", return_value=dummy_submission):
         resp1 = client.post("/api/cv/upload", files={"file": (cv_filename, cv_content, content_type)})
         assert resp1.status_code == 200, f"/api/cv/upload failed: {resp1.text}"
         key1 = resp1.json()["cv_key"]

@@ -1,7 +1,8 @@
+from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RequirementTier(str, Enum):
@@ -42,6 +43,20 @@ class MandatoryFailureDetails(BaseModel):
     score_impact: float = Field(default=0.0, description="Deduction or penalty applied to final score")
 
 
+class VacancyFitScoreBreakdown(BaseModel):
+    """Detailed score breakdown for structured hierarchy + semantic vacancy fit evaluation."""
+    hierarchy_score: float = Field(default=0.0, description="Hierarchy ID match score (MainDeptID, DeptID, DesigID) (0-100)")
+    designation_role_score: float = Field(default=0.0, description="Designation and role alignment score (0-100)")
+    skills_score: float = Field(default=0.0, description="Mandatory & preferred skills match score (0-100)")
+    experience_score: float = Field(default=0.0, description="Experience & seniority match score (0-100)")
+    education_score: float = Field(default=0.0, description="Required education alignment score (0-100)")
+    semantic_similarity_score: float = Field(default=0.0, description="Dense vector nomic-embed-text similarity score (0-100)")
+    overall_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0-100)")
+    hierarchy_mismatch_penalty: float = Field(default=0.0, description="Penalty deduction applied for hierarchy mismatch")
+    is_hierarchy_valid: bool = Field(default=True, description="Whether MSSQL parent-child hierarchy validation passed")
+    match_status: str = Field(default="MATCHED", description="MATCHED, POTENTIAL_MATCH, or NO_STRONG_VACANCY_MATCH")
+
+
 class JobMatchResult(BaseModel):
     job_id: str = Field(..., description="Unique job opening ID")
     job_title: str = Field(..., description="Job position title")
@@ -57,6 +72,9 @@ class JobMatchResult(BaseModel):
 
     score: float = Field(..., description="Calculated suitability match score (0.0 - 100.0)")
     overall_score: float = Field(default=0.0, description="Deterministic two-stage overall score (0.0 - 100.0)")
+    vacancy_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0.0 - 100.0)")
+    score_breakdown: VacancyFitScoreBreakdown | None = Field(default=None, description="Structured score breakdown across hierarchy, skills, experience, role, and semantic fit")
+    vacancy_match_status: str = Field(default="MATCHED", description="MATCHED or NO_STRONG_VACANCY_MATCH")
     role_score: float = Field(default=0.0, description="Score based on job title and domain match")
     skills_score: float = Field(default=0.0, description="Score based on mandatory/preferred skills")
     experience_score: float = Field(default=0.0, description="Score based on experience match")
@@ -135,16 +153,30 @@ class JobMatchResult(BaseModel):
     candidate_job_family: str | None = Field(default=None, description="Classified job family of the candidate")
     vacancy_job_family: str | None = Field(default=None, description="Classified job family of the target vacancy")
 
+    @model_validator(mode="after")
+    def synchronize_canonical_score_and_status(self) -> "JobMatchResult":
+        """Keep one final score/status across persistence, APIs, and frontend consumers."""
+        canonical_score = self.vacancy_fit_score
+        if canonical_score == 0.0 and self.score_breakdown is None:
+            canonical_score = self.overall_score if self.overall_score != 0.0 else self.score
+        canonical_score = round(max(0.0, min(100.0, float(canonical_score))), 1)
+        self.vacancy_fit_score = canonical_score
+        self.overall_score = canonical_score
+        self.score = canonical_score
+        if self.mandatory_failures and self.vacancy_match_status == "MATCHED":
+            self.vacancy_match_status = "NO_STRONG_VACANCY_MATCH"
+        return self
+
 
 class CandidateMatchAnalysis(BaseModel):
     full_name: str | None = Field(default=None, description="Extracted candidate full name")
     candidate_name: str | None = Field(default=None, description="Extracted candidate name")
     primary_department: str = Field(..., description="Top recommended department for candidate")
-    best_match: JobMatchResult = Field(..., description="Top matching job opening")
-    suitable_openings: list[JobMatchResult] = Field(..., description="Job openings classified as HIGH or MEDIUM, ranked by match score")
+    best_match: JobMatchResult | None = Field(default=None, description="Top matching job opening")
+    suitable_openings: list[JobMatchResult] = Field(..., description="Verified HIGH job matches with no hard disqualifiers, ranked by match score")
     unsuitable_openings: list[JobMatchResult] = Field(
         default_factory=list,
-        description="Job openings classified as LOW, retained for HR manual review but not suitable matches",
+        description="Potential or unsuitable openings retained for HR manual review but not selected as suitable matches",
     )
     rejection_policy_note: str = Field(
         default="Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",

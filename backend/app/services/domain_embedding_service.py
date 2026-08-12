@@ -1,3 +1,4 @@
+from __future__ import annotations
 import hashlib
 from typing import Any
 
@@ -36,7 +37,13 @@ class DomainEmbeddingService:
         return dict(RuleConfigManager.get_domain_embedding_rules().canonical_equivalents)
 
     @classmethod
-    def get_or_generate_domain_embedding(cls, term: str, category: str, allow_live_generation: bool = True) -> list[float] | None:
+    def get_or_generate_domain_embedding(
+        cls,
+        term: str,
+        category: str,
+        allow_live_generation: bool = True,
+        persist_generated: bool = True,
+    ) -> list[float] | None:
         if not term or not term.strip():
             return None
 
@@ -45,6 +52,7 @@ class DomainEmbeddingService:
             [clean_term],
             category,
             allow_live_generation=allow_live_generation,
+            persist_generated=persist_generated,
         ).get(clean_term)
 
     @classmethod
@@ -53,6 +61,7 @@ class DomainEmbeddingService:
         terms: list[str],
         category: str,
         allow_live_generation: bool = True,
+        persist_generated: bool = True,
     ) -> dict[str, list[float]]:
         """Resolve related domain terms through one cached, serialized Ollama batch."""
         cat = category.strip().lower()
@@ -84,17 +93,18 @@ class DomainEmbeddingService:
                 embedding = generated.get(str(index))
                 if embedding:
                     resolved[clean_term] = embedding
-                    cls._save_domain_embedding(clean_term, cat, embedding, model_version)
+                    if persist_generated:
+                        cls._save_domain_embedding(clean_term, cat, embedding, model_version)
         return resolved
 
     @staticmethod
     def _load_domain_embedding(clean_term: str, category: str) -> list[float] | None:
         try:
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import DomainEmbedding
 
-            if pg_SessionLocal is not None:
-                with pg_SessionLocal() as session:
+            if PostgresAppSession is not None:
+                with PostgresAppSession() as session:
                     stmt = select(DomainEmbedding.embedding).where(
                         DomainEmbedding.category == category,
                         DomainEmbedding.term == clean_term,
@@ -109,13 +119,13 @@ class DomainEmbeddingService:
     @staticmethod
     def _save_domain_embedding(clean_term: str, category: str, embedding: list[float], model_version: str) -> None:
         try:
-            from app.core.database import pg_SessionLocal
+            from app.core.database import PostgresAppSession
             from app.models.pg import DomainEmbedding
 
-            if pg_SessionLocal is None:
+            if PostgresAppSession is None:
                 return
             content_hash = hashlib.sha256(clean_term.encode("utf-8")).hexdigest()
-            with pg_SessionLocal() as session:
+            with PostgresAppSession() as session:
                 rec = DomainEmbedding(
                     category=category,
                     term=clean_term,
@@ -173,11 +183,11 @@ class DomainEmbeddingService:
         target_emb = cls.get_or_generate_domain_embedding(clean_term, cat, allow_live_generation=allow_live_generation)
         if target_emb:
             try:
-                from app.core.database import pg_SessionLocal
+                from app.core.database import PostgresAppSession
                 from app.models.pg import DomainEmbedding
 
-                if pg_SessionLocal is not None:
-                    with pg_SessionLocal() as session:
+                if PostgresAppSession is not None:
+                    with PostgresAppSession() as session:
                         stmt = (
                             select(
                                 DomainEmbedding.term,

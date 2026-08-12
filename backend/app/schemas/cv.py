@@ -1,3 +1,5 @@
+from __future__ import annotations
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -19,13 +21,41 @@ class CVProcessingResponse(BaseModel):
         default=None,
         description="Reserved compatibility field; technical traces are never returned",
     )
+    error_code: str | None = Field(default=None, description="Stable safe processing error code")
+    error_message: str | None = Field(default=None, description="Safe processing failure reason")
+    error_retryable: bool | None = Field(default=None, description="Whether the failure can be retried")
+    correlation_id: str | None = Field(default=None, description="Support correlation identifier")
     job_id: str | None = Field(default=None, description="Content-addressed background processing job ID")
     job_state: str | None = Field(
         default=None,
-        description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, or FAILED state",
+        description="Canonical QUEUED, PROCESSING, RETRYING, COMPLETED, FAILED, or CANCELLED state",
     )
-    execution_mode: str | None = Field(default=None, description="RQ or explicit development fallback execution mode")
+    execution_mode: str | None = Field(default=None, description="Background processing execution mode; production CV jobs use RQ")
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
+    persistence_status: str | None = Field(default=None, description="PostgreSQL result durability status")
+    persistence_error: str | None = Field(default=None, description="Safe persistence failure summary")
+
+
+class CVProcessingJobSummary(BaseModel):
+    job_id: str
+    cv_key: str
+    filename: str
+    job_state: str
+    progress: int
+    stage: str
+    message: str
+    execution_mode: str
+    retry_count: int
+    max_attempts: int
+    enqueue_sequence: int | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    error_retryable: bool | None = None
+    correlation_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
 
 class CVUploadResponse(BaseModel):
@@ -55,8 +85,10 @@ class CVUploadResponse(BaseModel):
     updated_at: str | None = Field(None, description="ISO timestamp of last update")
     status: str | None = Field(
         None,
-        description="Processing status: CACHE_HIT, NEW_CV, CV_CHANGED, SCHEMA_CHANGED, REPROCESSED",
+        description="Processing status, including COMPLETED or COMPLETED_DEGRADED terminal states",
     )
+    persistence_status: str | None = Field(default=None, description="PostgreSQL result durability status")
+    persistence_error: str | None = Field(default=None, description="Safe persistence failure summary")
     dynamic_profile: DynamicCandidateProfile | None = Field(None, description="Dynamically extracted candidate profile from LLM analysis.")
     quality_metrics: dict[str, Any] | None = Field(
         None,

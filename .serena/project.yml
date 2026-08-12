@@ -1,0 +1,189 @@
+# the name by which the project can be referenced within Serena/when chatting with the LLM.
+project_name: "CVANALZE"
+
+# list of language servers to start when using the LSP backend.
+#
+# CVANALZE uses:
+# - Python for the FastAPI backend
+# - TypeScript for the Expo / React Native frontend
+#
+# Do not enable Vue/Svelte because this repository does not use them.
+language_servers:
+  - python
+  - typescript
+
+# the encoding used by text files in the project
+encoding: "utf-8"
+
+# optional shell command to run before the language backend
+# (LSP or JetBrains) is initialised.
+#
+# Keep disabled for CVANALZE.
+#
+# We do NOT want Serena automatically:
+# - activating backend virtualenv
+# - installing dependencies
+# - running npm
+# - starting Docker
+# - running migrations
+# - running builds/tests
+activation_command:
+
+# maximum time in seconds to wait for activation_command to complete
+activation_command_timeout: 180
+
+# line ending convention.
+#
+# Leave unset so Serena/global configuration handles it.
+line_ending:
+
+# Explicitly use Serena's LSP backend.
+language_backend: LSP
+
+# Use the repository's .gitignore rules.
+#
+# This prevents Serena from indexing many generated/runtime files
+# already excluded by the project.
+ignore_all_files_in_gitignore: true
+
+# language-server-specific configuration.
+#
+# No special settings required currently.
+ls_specific_settings: {}
+
+# Workspace folders used to build Serena's symbol index.
+#
+# Do NOT use ["."] for this repository.
+#
+# Restrict semantic indexing to the two application trees:
+#
+# backend/
+# frontend/
+#
+# Root-level Markdown, Docker Compose files, etc. can still be accessed
+# through normal file/search tools when required, but do not need to
+# become primary LSP indexing targets.
+ls_workspace_folders:
+  - "./backend"
+  - "./frontend"
+
+# Additional LSP workspaces that should participate in reference resolution
+# without being included in Serena's primary symbol index.
+#
+# CVANALZE currently does not need any.
+ls_additional_workspace_folders: []
+
+# Additional paths Serena must ignore.
+#
+# These rules are additive to .gitignore.
+#
+# The main goal is to prevent generated files, dependencies, caches,
+# runtime data, uploaded CVs, logs, etc. from consuming indexing resources.
+ignored_paths:
+  # Python virtual environments
+  - "backend/.venv/**"
+  - "**/.venv/**"
+  - "**/venv/**"
+
+  # Python generated/cache files
+  - "**/__pycache__/**"
+  - "**/.pytest_cache/**"
+  - "**/.mypy_cache/**"
+  - "**/.ruff_cache/**"
+  - "**/*.pyc"
+  - "**/*.pyo"
+
+  # Frontend dependencies and generated files
+  - "frontend/node_modules/**"
+  - "**/node_modules/**"
+  - "frontend/.expo/**"
+  - "**/.next/**"
+
+  # Build/output directories
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/coverage/**"
+
+  # Runtime/user-generated content
+  #
+  # Uploaded CVs/resumes should not become AI coding context.
+  - "backend/uploads/**"
+  - "**/uploads/**"
+
+  # Logs
+  - "**/*.log"
+  - "**/logs/**"
+
+  # OS/editor noise
+  - "**/.DS_Store"
+  - "**/.idea/**"
+
+# Whether the project is read-only.
+#
+# false allows Serena's symbolic editing tools.
+#
+# Keep false if Serena is being used by your AI coding platform
+# to modify CVANALZE source code.
+read_only: false
+
+# Tools to explicitly exclude.
+#
+# Keep empty initially.
+# We can optimize the Serena toolset later after observing actual usage.
+excluded_tools: []
+
+# Optional Serena tools that should be enabled even if normally disabled.
+#
+# Keep empty initially to minimize unnecessary tools/context.
+included_optional_tools: []
+
+# Fixed tool set.
+#
+# Leave empty so Serena uses its standard recommended tool set.
+#
+# Do not combine fixed_tools with excluded_tools/included_optional_tools
+# unless intentionally customizing the full tool configuration.
+fixed_tools: []
+
+# Project-specific default modes.
+#
+# Leave unset to inherit Serena's global default modes.
+default_modes:
+
+# Additional Serena modes for this project.
+#
+# None required currently.
+added_modes:
+
+# This prompt is automatically given to the LLM whenever CVANALZE
+# is activated.
+#
+# Keep this intentionally SHORT because it consumes context on every
+# project activation.
+#
+# Detailed development policies remain in AGENTS.md instead of being
+# duplicated here.
+initial_prompt: |
+  Prefer Serena symbol-level retrieval over full-file reads.
+  Search and inspect relevant symbols before retrieving large code sections.
+  Inspect symbol references before making cross-file changes.
+  Avoid reading unchanged or unrelated files.
+  Keep edits minimal and focused.
+  Follow repository AGENTS.md instructions before making project changes.
+
+# Maximum time budget for retrieving extra symbol information
+# such as docstrings and parameter information.
+#
+# Leave unset to inherit Serena's global configuration.
+symbol_info_budget:
+
+# Memory entries matching these regex patterns become read-only.
+#
+# No project-specific restrictions required currently.
+read_only_memory_patterns: []
+
+# Memory entries matching these regex patterns are hidden from
+# Serena memory tools.
+#
+# No project-specific exclusions required currently.
+ignored_memory_patterns: []

@@ -1,13 +1,24 @@
+from __future__ import annotations
 # backend/app/services/dynamic_scoring_prefilter_service.py
 import json
 import logging
 from typing import Any
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
 from app.models.scoring_profile import ScoringProfileMaster, StopWord
 
 logger = logging.getLogger("cv_analyzer")
+
+
+def _safe_json_load(value: Any) -> Any:
+    """Safely deserialize a value that may already be a dict/list (SQLAlchemy ORM JSON columns)
+    or a JSON string. Avoids TypeError: the JSON object must be str, bytes or bytearray, not dict."""
+    if isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, (str, bytes, bytearray)) and value:
+        return json.loads(value)
+    return {}
 
 
 class DynamicScoringAndPrefilterService:
@@ -40,9 +51,9 @@ class DynamicScoringAndPrefilterService:
         stop_words: set[str] = set()
 
         # 1. Load from MSSQL if available
-        if SessionLocal is not None:
+        if PostgresAppSession is not None:
             try:
-                with SessionLocal() as session:
+                with PostgresAppSession() as session:
                     db_words = session.query(StopWord.word).filter(StopWord.is_active == True).all()
                     stop_words.update(w[0].strip().lower() for w in db_words if w[0])
 
@@ -56,9 +67,9 @@ class DynamicScoringAndPrefilterService:
                     )
                     if prof:
                         cls._default_profile_cache = {
-                            "lexical_weights": json.loads(prof.lexical_weights_json) if prof.lexical_weights_json else {},
-                            "penalties": json.loads(prof.penalties_json) if prof.penalties_json else {},
-                            "thresholds": json.loads(prof.thresholds_json) if prof.thresholds_json else {},
+                            "lexical_weights": _safe_json_load(prof.lexical_weights_json) if prof.lexical_weights_json is not None else {},
+                            "penalties": _safe_json_load(prof.penalties_json) if prof.penalties_json is not None else {},
+                            "thresholds": _safe_json_load(prof.thresholds_json) if prof.thresholds_json is not None else {},
                         }
             except Exception as exc:
                 logger.warning(f"[DYNAMIC_SCORING_PREFILTER] MSSQL query failed: {exc}")
@@ -83,9 +94,9 @@ class DynamicScoringAndPrefilterService:
         if profile_code == "DEFAULT" and cls._default_profile_cache:
             return cls._default_profile_cache
 
-        if SessionLocal is not None:
+        if PostgresAppSession is not None:
             try:
-                with SessionLocal() as session:
+                with PostgresAppSession() as session:
                     prof = (
                         session.query(ScoringProfileMaster)
                         .filter(
@@ -98,9 +109,9 @@ class DynamicScoringAndPrefilterService:
                         return {
                             "profile_code": prof.profile_code,
                             "profile_name": prof.profile_name,
-                            "lexical_weights": json.loads(prof.lexical_weights_json) if prof.lexical_weights_json else {},
-                            "penalties": json.loads(prof.penalties_json) if prof.penalties_json else {},
-                            "thresholds": json.loads(prof.thresholds_json) if prof.thresholds_json else {},
+                            "lexical_weights": _safe_json_load(prof.lexical_weights_json) if prof.lexical_weights_json is not None else {},
+                            "penalties": _safe_json_load(prof.penalties_json) if prof.penalties_json is not None else {},
+                            "thresholds": _safe_json_load(prof.thresholds_json) if prof.thresholds_json is not None else {},
                         }
             except Exception as exc:
                 logger.warning(f"[DYNAMIC_SCORING_PREFILTER] Query failed for profile '{profile_code}': {exc}")

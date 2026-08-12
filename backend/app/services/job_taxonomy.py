@@ -1,5 +1,5 @@
+from __future__ import annotations
 # backend/app/services/job_taxonomy.py
-import functools
 import logging
 import re
 import threading
@@ -8,8 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.core.rule_config_manager import RuleConfigManager
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
+from app.schemas.classification_types import MatchStatus
 
 logger = logging.getLogger("cv_analyzer")
 
@@ -92,6 +92,7 @@ class CandidateResumeDTO(BaseModel):
     cv_text: str = ""
     summary: str = ""
     experience_titles: list[str] = Field(default_factory=list)
+    responsibilities: list[str] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
     normalized_full_text: str = ""
@@ -103,26 +104,45 @@ class CandidateResumeDTO(BaseModel):
         exp_titles: list[str] = []
         skills_str: list[str] = []
         edu_str: list[str] = []
+        responsibilities: list[str] = []
 
         if resume_json and isinstance(resume_json, dict):
             summary = str(resume_json.get("summary") or "").lower()
-            exp_list = resume_json.get("experience", [])
+            exp_list = resume_json.get("work_experience", []) or resume_json.get("experience", [])
             if isinstance(exp_list, list):
-                exp_titles = [str(e.get("title") or "").lower() for e in exp_list if isinstance(e, dict)]
+                exp_titles = [str(e.get("job_title") or e.get("title") or "").lower() for e in exp_list if isinstance(e, dict)]
+                for experience in exp_list:
+                    if not isinstance(experience, dict):
+                        continue
+                    responsibilities.extend(
+                        str(item).lower()
+                        for item in experience.get("responsibilities") or []
+                        if isinstance(item, str) and item.strip()
+                    )
+            
             skills_data = resume_json.get("skills")
-            if isinstance(skills_data, (list, dict)):
+            if isinstance(skills_data, dict):
+                if "all_skills" in skills_data:
+                    skills_str = [str(s).lower() for s in skills_data["all_skills"]]
+                elif "categorized" in skills_data:
+                    for cat, s_list in skills_data["categorized"].items():
+                        if isinstance(s_list, list):
+                            skills_str.extend([str(s).lower() for s in s_list])
+            elif isinstance(skills_data, list):
                 skills_str = [str(s).lower() for s in skills_data]
+            
             edu_list = resume_json.get("education", [])
             if isinstance(edu_list, list):
-                edu_str = [str(e).lower() for e in edu_list]
+                edu_str = [str(e.get("degree", "")) + " " + str(e.get("field", "")) + " " + str(e.get("institution", "")) if isinstance(e, dict) else str(e).lower() for e in edu_list]
 
-        combined = f"{text_lower} {summary} {' '.join(exp_titles)} {' '.join(skills_str)} {' '.join(edu_str)}"
+        combined = f"{text_lower} {summary} {' '.join(exp_titles)} {' '.join(responsibilities)} {' '.join(skills_str)} {' '.join(edu_str)}"
         norm_full_text = re.sub(r"\s+", " ", combined).strip()
 
         return cls(
             cv_text=cv_text,
             summary=summary,
             experience_titles=exp_titles,
+            responsibilities=responsibilities,
             skills=skills_str,
             education=edu_str,
             normalized_full_text=norm_full_text,
@@ -151,82 +171,17 @@ class classproperty:
 class JobTaxonomy:
     """
     4-Tier Enterprise Job Taxonomy: Department -> Domain -> Job Family -> Vacancy.
-    Canonical domain/family identifiers below stay consistent with rule_config.json.
+    Canonical domain/family identifiers below stay consistent with the unified rule configuration.
     """
 
-    # Canonical Domains
-    DOMAIN_IT_SOFTWARE = "IT & Software Services"
-    DOMAIN_PLANT_OPERATIONS = "Plant Operations & Maintenance"
-    DOMAIN_QUALITY_LAB = "Quality Assurance & QC Laboratory"
-    DOMAIN_EHS_ENVIRONMENT = "Environmental Health & Safety (EHS)"
-    DOMAIN_PROCESS_PROJECT = "Process & Project Engineering"
-    DOMAIN_FINANCE_ADMIN = "Finance & Administration"
-    DOMAIN_OTHER = "General Operations"
 
-    # Canonical Job Families
-    FAMILY_SOFTWARE_DEV = "Software Engineering & Development"
-    FAMILY_IT_NETWORKING_AV = "IT Infrastructure, Networking & AV Systems"
-    FAMILY_PLANT_ELECTRICAL = "Plant Electrical & Utility Maintenance"
-    FAMILY_CONTROL_INSTRUMENTATION = "Control & Instrumentation (C&I)"
-    FAMILY_QC_LAB = "Quality Control (QC) & Laboratory"
-    FAMILY_QA_ASSURANCE = "Quality Assurance (QA)"
-    FAMILY_FIRE_SAFETY = "Fire, Safety & EHS"
-    FAMILY_PROCESS_PROJECT = "Process & Project Engineering"
-    FAMILY_ENVIRONMENT_ETP = "Environment & ETP Operations"
-    FAMILY_FINANCE_ADMIN = "Finance & Administration"
-    FAMILY_OTHER = "General Professional"
-
-    @classproperty
-    def COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
-        return {family: set(compatible) for family, compatible in RuleConfigManager.get_taxonomy_rules().compatibility_map.items()}
-
-    @classproperty
-    def REVERSE_COMPATIBILITY_MAP(cls) -> dict[str, set[str]]:
-        """Precomputed reverse compatibility map: job_family -> set of compatible candidate_families."""
-        reverse_map: dict[str, set[str]] = {}
-        for cand_fam, job_fams in cls.COMPATIBILITY_MAP.items():
-            for job_fam in job_fams:
-                reverse_map.setdefault(job_fam, set()).add(cand_fam)
-        return reverse_map
 
     @classmethod
     def validate_taxonomy_config(cls) -> None:
         """
-        Validates taxonomy configuration during startup.
-        Ensures:
-          1. Every family in compatibility_map exists in canonical_families.
-          2. Every rule domain exists in canonical_domains.
-          3. Every rule family exists in canonical_families.
-          4. Zero orphan or unknown domains/families.
+        Deprecated. Taxonomy is now fully dynamic via PostgreSQL and MSSQL schemas.
         """
-        rules = RuleConfigManager.get_taxonomy_rules()
-        canonical_domains = set(rules.canonical_domains)
-        canonical_families = set(rules.canonical_families)
-
-        if not canonical_domains:
-            raise ValueError("[TAXONOMY_VALIDATION_FAILURE] canonical_domains must not be empty")
-        if not canonical_families:
-            raise ValueError("[TAXONOMY_VALIDATION_FAILURE] canonical_families must not be empty")
-
-        for cand_fam, compatible in rules.compatibility_map.items():
-            if cand_fam not in canonical_families:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Unknown candidate family in compatibility_map: '{cand_fam}'")
-            for job_fam in compatible:
-                if job_fam not in canonical_families:
-                    raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Unknown job family in compatibility_map for '{cand_fam}': '{job_fam}'")
-
-        for r in rules.vacancy_rules:
-            if r.domain not in canonical_domains:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Vacancy rule '{r.name}' has unknown domain: '{r.domain}'")
-            if r.family not in canonical_families:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Vacancy rule '{r.name}' has unknown family: '{r.family}'")
-
-        for r in rules.candidate_rules:
-            if r.domain not in canonical_domains:
-                raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Candidate rule '{r.name}' has unknown domain: '{r.domain}'")
-            for f in r.families:
-                if f not in canonical_families:
-                    raise ValueError(f"[TAXONOMY_VALIDATION_FAILURE] Candidate rule '{r.name}' has unknown family: '{f}'")
+        pass
 
 
 class TaxonomyMetrics:
@@ -268,109 +223,8 @@ class TaxonomyClassifier:
     intersection keyword matching, dual LRU caching, and strong typing via DTOs.
     """
 
-    @staticmethod
-    def _condition_matches(condition: Any, scopes: dict[str, str], scope_tokens: dict[str, set[str]]) -> tuple[bool, tuple[str, ...]]:
-        text = scopes.get(condition.scope, "")
-        tokens = scope_tokens.get(condition.scope, set())
-
-        if not condition.keywords:
-            return (False, ())
-
-        matched_kws: list[str] = []
-
-        if condition.mode == "any":
-            # Fast single-word token intersection check
-            for k in condition.keywords:
-                k_norm = k.lower().strip()
-                if " " in k_norm or "-" in k_norm:
-                    if k_norm in text:
-                        matched_kws.append(k_norm)
-                elif k_norm in tokens or k_norm in text:
-                    matched_kws.append(k_norm)
-            is_match = len(matched_kws) > 0
-        else:  # mode == "all"
-            is_match = True
-            for k in condition.keywords:
-                k_norm = k.lower().strip()
-                if " " in k_norm or "-" in k_norm:
-                    if k_norm not in text:
-                        is_match = False
-                        break
-                elif k_norm not in tokens and k_norm not in text:
-                    is_match = False
-                    break
-                else:
-                    matched_kws.append(k_norm)
-
-        final_match = not is_match if condition.negate else is_match
-        return (final_match, tuple(matched_kws) if is_match else ())
-
-    @staticmethod
-    def _branch_matches(branch: Any, scopes: dict[str, str], scope_tokens: dict[str, set[str]]) -> tuple[bool, tuple[str, ...]]:
-        branch_kws: list[str] = []
-        for c in branch.conditions:
-            matches, kws = TaxonomyClassifier._condition_matches(c, scopes, scope_tokens)
-            if not matches:
-                return (False, ())
-            branch_kws.extend(kws)
-        return (True, tuple(branch_kws))
-
-    @staticmethod
-    def _rule_matches(rule: Any, scopes: dict[str, str], scope_tokens: dict[str, set[str]]) -> tuple[bool, int | None, tuple[str, ...]]:
-        for branch_idx, b in enumerate(rule.branches):
-            matches, kws = TaxonomyClassifier._branch_matches(b, scopes, scope_tokens)
-            if matches:
-                return (True, branch_idx, kws)
-        return (False, None, ())
-
-    @staticmethod
-    @functools.lru_cache(maxsize=1024)
-    def _classify_vacancy_cached(normalized_job_text: str, title_lower: str, dept_lower: str) -> tuple[str, str, str | None, int | None, tuple[str, ...]]:
-        """
-        Classifies vacancy into (domain, family, rule_name, branch_idx, matched_keywords).
-        Thread-safe under CPython GIL atomic LRU cache operations.
-        """
-        scopes = {
-            "title": title_lower,
-            "dept": dept_lower,
-            "full_text": normalized_job_text,
-        }
-        scope_tokens = {
-            "title": set(re.findall(r"\w+", title_lower)),
-            "dept": set(re.findall(r"\w+", dept_lower)),
-            "full_text": set(re.findall(r"\w+", normalized_job_text)),
-        }
-        taxonomy = RuleConfigManager.get_taxonomy_rules()
-
-        for rule in taxonomy.vacancy_rules:
-            matches, branch_idx, kws = TaxonomyClassifier._rule_matches(rule, scopes, scope_tokens)
-            if matches:
-                return (rule.domain, rule.family, rule.name, branch_idx, kws)
-
-        return (taxonomy.default_domain, taxonomy.default_family, None, None, ())
-
-    @staticmethod
-    @functools.lru_cache(maxsize=512)
-    def classify_candidate_by_full_text(
-        candidate_full_text: str,
-    ) -> tuple[str, tuple[str, ...]]:
-        """
-        Classifies candidate full text into (domain, families_tuple).
-        Cached via functools.lru_cache(maxsize=512). Thread-safe under CPython GIL.
-        """
-        scopes = {"full_text": candidate_full_text}
-        scope_tokens = {"full_text": set(re.findall(r"\w+", candidate_full_text))}
-        taxonomy = RuleConfigManager.get_taxonomy_rules()
-
-        for rule in taxonomy.candidate_rules:
-            matches, _, _ = TaxonomyClassifier._rule_matches(rule, scopes, scope_tokens)
-            if matches:
-                return (rule.domain, tuple(rule.families))
-
-        return (taxonomy.default_domain, (taxonomy.default_family,))
-
     @classmethod
-    def classify_vacancy_dto(cls, dto: VacancyDTO) -> TaxonomyClassification:
+    def classify_vacancy_dto(cls, dto: VacancyDTO, skip_vector: bool = False) -> TaxonomyClassification:
         """Strongly-typed classification of VacancyDTO returning TaxonomyClassification via DynamicTaxonomyService."""
         t0 = time.perf_counter()
 
@@ -380,53 +234,67 @@ class TaxonomyClassifier:
             department=dto.department,
             description=dto.description,
             required_skills=dto.required_skills,
+            skip_vector=skip_vector,
         )
 
-        if dyn_res.match_source != "legacy_fallback":
+        if dyn_res.match_status in (MatchStatus.DB_MATCH, MatchStatus.PARTIAL_MATCH):
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             matched_kw = dyn_res.evidence[0].matched_term if dyn_res.evidence else ""
-            domain = dyn_res.industry_domain or RuleConfigManager.get_taxonomy_rules().default_domain
-            family = dyn_res.db_department_name or RuleConfigManager.get_taxonomy_rules().default_family
+            domain = dyn_res.industry_domain or "Unknown"
+            family = dyn_res.industry_department or dyn_res.db_department_name or "Unknown"
             return TaxonomyClassification(
                 domain=domain,
                 job_family=family,
-                compatible_families=tuple(JobTaxonomy.REVERSE_COMPATIBILITY_MAP.get(family, {family})),
+                compatible_families=(family,),
                 matched_rule=f"dynamic:{dyn_res.match_source}",
                 matched_branch=0,
                 matched_keywords=(matched_kw,) if matched_kw else (),
             )
 
-        # 2. Fallback to static rule classification
-        cache_info_before = cls._classify_vacancy_cached.cache_info()
-        domain, family, rule_name, branch_idx, kws = cls._classify_vacancy_cached(dto.normalized_job_text, dto.title_lower, dto.department_lower)
-        cache_info_after = cls._classify_vacancy_cached.cache_info()
-        cache_hit = cache_info_after.hits > cache_info_before.hits
+        from app.repositories.department_domain import department_domain_repository
+        
+        combined_text = f"{dto.title_lower} {dto.department_lower} {dto.normalized_description} {dto.normalized_required_skills}".lower()
+        dept_scores = []
+        for matcher in department_domain_repository.get_domain_matchers():
+            score = matcher.keyword_match_count(combined_text)
+            if score > 0:
+                dept_scores.append((score, matcher.domain))
+
+        if dept_scores:
+            best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
+            return TaxonomyClassification(
+                domain=best_domain.domain_name,
+                job_family=best_domain.department_name or dto.department or "Unknown",
+                compatible_families=(best_domain.department_name or dto.department or "Unknown",),
+                matched_rule="domain_repository_keyword_fallback",
+                matched_branch=0,
+                matched_keywords=(),
+            )
+
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-        TaxonomyMetrics.record_hit(cache_hit, elapsed_ms)
-
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[TAXONOMY_VACANCY] Title='{dto.title}' -> Domain='{domain}', Family='{family}' | Rule='{rule_name}', Branch={branch_idx}, Keywords={kws}, CacheHit={cache_hit}")
-
+        TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
         return TaxonomyClassification(
-            domain=domain,
-            job_family=family,
-            compatible_families=tuple(JobTaxonomy.REVERSE_COMPATIBILITY_MAP.get(family, {family})),
-            matched_rule=rule_name,
-            matched_branch=branch_idx,
-            matched_keywords=kws,
+            domain="Unknown",
+            job_family="Unknown",
+            compatible_families=("Unknown",),
+            matched_rule=dyn_res.match_status.value if hasattr(dyn_res.match_status, "value") else str(dyn_res.match_status),
+            matched_branch=0,
+            matched_keywords=(),
         )
 
     @classmethod
-    def classify_vacancy(cls, job: dict[str, Any] | VacancyDTO | Any) -> tuple[str, str]:
+    def classify_vacancy(cls, job: dict[str, Any] | VacancyDTO | Any, skip_vector: bool = False) -> tuple[str, str]:
         """
         Classifies a job opening into (domain, job_family).
         Accepts VacancyDTO, JobEvaluationContext, or raw dicts.
         Preserves 100% backward compatibility.
+        Pass `skip_vector=True` during bulk preprocessing to avoid blocking Ollama calls.
         """
         dto = VacancyDTO.from_job(job)
-        classification = cls.classify_vacancy_dto(dto)
+        classification = cls.classify_vacancy_dto(dto, skip_vector=skip_vector)
         return (classification.domain, classification.job_family)
 
     @classmethod
@@ -441,35 +309,86 @@ class TaxonomyClassifier:
             skills=dto.skills,
         )
 
-        if dyn_res.match_source != "legacy_fallback":
+        if dyn_res.match_status in (MatchStatus.DB_MATCH, MatchStatus.PARTIAL_MATCH):
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
-            matched_kw = dyn_res.evidence[0].matched_term if dyn_res.evidence else ""
-            domain = dyn_res.industry_domain or RuleConfigManager.get_taxonomy_rules().default_domain
-            family = dyn_res.db_department_name or RuleConfigManager.get_taxonomy_rules().default_family
+            domain = dyn_res.industry_domain or "Unknown"
+            family = dyn_res.industry_department or dyn_res.db_department_name or "Unknown"
+            if domain != "Unknown":
+                return TaxonomyClassification(
+                    domain=domain,
+                    job_family=family,
+                    compatible_families=(family,),
+                    matched_rule=f"dynamic:{dyn_res.match_source}",
+                )
+
+        from app.repositories.department_domain import department_domain_repository
+        from app.core.rule_config_manager import RuleConfigManager
+        
+        tax_rules = RuleConfigManager.get_taxonomy_rules()
+        w_exp = tax_rules.evidence_weight_experience
+        w_skills = tax_rules.evidence_weight_skills
+        w_summary = tax_rules.evidence_weight_summary
+        w_edu = tax_rules.evidence_weight_education
+        
+        exp_text = " ".join(dto.experience_titles).lower()
+        skills_text = " ".join(dto.skills).lower()
+        summary_text = dto.summary.lower() if dto.summary else ""
+        edu_text = " ".join(dto.education).lower()
+        responsibilities_text = " ".join(dto.responsibilities).lower()
+        
+        dept_scores = []
+        for matcher in department_domain_repository.get_domain_matchers():
+            score = 0.0
+            evidence_sources = 0
+            total_matches = 0
+            if exp_text:
+                matches = matcher.keyword_match_count(exp_text)
+                score += matches * w_exp
+                evidence_sources += int(matches > 0)
+                total_matches += matches
+            if skills_text:
+                matches = matcher.keyword_match_count(skills_text)
+                score += matches * w_skills
+                evidence_sources += int(matches > 0)
+                total_matches += matches
+            if responsibilities_text:
+                matches = matcher.keyword_match_count(responsibilities_text)
+                score += matches * tax_rules.evidence_weight_responsibilities
+                evidence_sources += int(matches > 0)
+                total_matches += matches
+            if summary_text:
+                matches = matcher.keyword_match_count(summary_text)
+                score += matches * w_summary
+                evidence_sources += int(matches > 0)
+                total_matches += matches
+            if edu_text and not (exp_text or skills_text or responsibilities_text):
+                matches = matcher.keyword_match_count(edu_text)
+                score += matches * w_edu
+                evidence_sources += int(matches > 0)
+                total_matches += matches
+                
+            if score > 0 and (evidence_sources >= 2 or total_matches >= 2):
+                dept_scores.append((score, matcher.domain))
+
+        if dept_scores:
+            best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             return TaxonomyClassification(
-                domain=domain,
-                job_family=family,
-                compatible_families=(family,),
-                matched_rule=f"dynamic:{dyn_res.match_source}",
+                domain=best_domain.domain_name,
+                job_family=best_domain.department_name,
+                compatible_families=(best_domain.department_name,),
+                matched_rule="domain_repository_keyword_fallback",
             )
 
-        # 2. Fallback to static rule classification
-        cache_info_before = cls.classify_candidate_by_full_text.cache_info()
-        domain, families_tuple = cls.classify_candidate_by_full_text(dto.normalized_full_text)
-        cache_info_after = cls.classify_candidate_by_full_text.cache_info()
-        cache_hit = cache_info_after.hits > cache_info_before.hits
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-        TaxonomyMetrics.record_hit(cache_hit, elapsed_ms)
-
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[TAXONOMY_CANDIDATE] Domain='{domain}', Families={families_tuple} | CacheHit={cache_hit}")
-
+        TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
         return TaxonomyClassification(
-            domain=domain,
-            job_family=families_tuple[0] if families_tuple else JobTaxonomy.FAMILY_OTHER,
-            compatible_families=families_tuple,
+            domain="Unknown",
+            job_family="Unknown",
+            compatible_families=("Unknown",),
+            matched_rule=dyn_res.match_status.value if hasattr(dyn_res.match_status, "value") else str(dyn_res.match_status),
         )
 
     @classmethod
@@ -489,11 +408,14 @@ class TaxonomyClassifier:
         Returns True if candidate_families contains or is compatible with job_family via DynamicTaxonomyService or legacy config map.
         Preserves 100% backward compatibility.
         """
+        from app.core.rule_config_manager import RuleConfigManager
+
+        compatibility_threshold = RuleConfigManager.get_taxonomy_rules().family_compatibility_min_score
         for cand_fam in candidate_families:
             if cand_fam == job_family:
                 return True
-            is_compat, score = DynamicTaxonomyService.check_family_compatibility(cand_fam, job_family)
-            if is_compat and score > 0.4:
+            is_compat, status, score = DynamicTaxonomyService.check_family_compatibility(cand_fam, job_family)
+            if is_compat and score is not None and score > compatibility_threshold:
                 return True
         return False
 

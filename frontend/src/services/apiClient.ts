@@ -1,6 +1,28 @@
 import { Platform } from 'react-native';
 import { API_CONFIG } from '@/constants/config';
 
+export interface AuthSession {
+  authenticated: boolean;
+  auth_required: boolean;
+  role: 'recruiter' | 'administrator' | null;
+  expires_in_seconds: number | null;
+}
+
+export type ApiQueryValue = string | number | boolean | null | undefined;
+
+export interface ApiGetOptions {
+  params?: Record<string, ApiQueryValue | ApiQueryValue[]>;
+  headers?: Record<string, string>;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  headers: Headers;
+}
+
+let unauthorizedHandler: (() => void) | null = null;
+let sessionCredentialsEnabled = false;
+
 export class ApiError extends Error {
   status: number;
   data: any;
@@ -13,9 +35,32 @@ export class ApiError extends Error {
   }
 }
 
+function appendQueryParams(
+  endpoint: string,
+  params?: ApiGetOptions['params'],
+): string {
+  if (!params) {
+    return endpoint;
+  }
+  const pairs: string[] = [];
+  Object.entries(params).forEach(([key, rawValue]) => {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    values.forEach((value) => {
+      if (value !== undefined && value !== null) {
+        pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+      }
+    });
+  });
+  if (pairs.length === 0) {
+    return endpoint;
+  }
+  return `${endpoint}${endpoint.includes('?') ? '&' : '?'}${pairs.join('&')}`;
+}
+
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  onResponse?: (response: Response) => void,
 ): Promise<T> {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
   
@@ -33,6 +78,7 @@ async function request<T>(
   try {
     const response = await fetch(url, {
       ...options,
+      credentials: options.credentials ?? (sessionCredentialsEnabled ? 'include' : 'omit'),
       headers: {
         ...defaultHeaders,
         ...options.headers,
@@ -51,6 +97,9 @@ async function request<T>(
     }
 
     if (!response.ok) {
+      if (response.status === 401 && endpoint !== '/api/auth/session') {
+        unauthorizedHandler?.();
+      }
       const errorMessage =
         (typeof data === 'object' && data?.detail) ||
         (typeof data === 'string' && data) ||
@@ -58,6 +107,7 @@ async function request<T>(
       throw new ApiError(errorMessage, response.status, data);
     }
 
+    onResponse?.(response);
     return data as T;
   } catch (error: any) {
     clearTimeout(timeoutId);
@@ -72,8 +122,55 @@ async function request<T>(
 }
 
 export const apiClient = {
-  get: <T>(endpoint: string, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: 'GET', headers }),
+  setUnauthorizedHandler: (handler: (() => void) | null) => {
+    unauthorizedHandler = handler;
+  },
+
+  getSession: async () => {
+    const publicStatus = await request<AuthSession>('/api/auth/session', {
+      method: 'GET',
+      credentials: 'omit',
+    });
+    sessionCredentialsEnabled = publicStatus.auth_required;
+    if (!publicStatus.auth_required) {
+      return publicStatus;
+    }
+    return request<AuthSession>('/api/auth/session', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  createSession: (apiKey: string) => {
+    sessionCredentialsEnabled = true;
+    return request<AuthSession>('/api/auth/session', {
+      method: 'POST',
+      headers: { 'X-API-Key': apiKey },
+      credentials: 'include',
+    });
+  },
+
+  deleteSession: () => request<AuthSession>('/api/auth/session', {
+    method: 'DELETE',
+    credentials: 'include',
+  }),
+
+  get: <T>(endpoint: string, options: ApiGetOptions = {}) =>
+    request<T>(appendQueryParams(endpoint, options.params), {
+      method: 'GET',
+      headers: options.headers,
+    }),
+
+  getWithMetadata: async <T>(endpoint: string, options: ApiGetOptions = {}): Promise<ApiResponse<T>> => {
+    let responseHeaders = new Headers();
+    const data = await request<T>(appendQueryParams(endpoint, options.params), {
+      method: 'GET',
+      headers: options.headers,
+    }, (response) => {
+      responseHeaders = response.headers;
+    });
+    return { data, headers: responseHeaders };
+  },
 
   post: <T>(endpoint: string, body?: any, headers?: Record<string, string>) =>
     request<T>(endpoint, {

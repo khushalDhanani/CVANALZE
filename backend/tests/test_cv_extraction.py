@@ -12,6 +12,7 @@ from app.services.document_parser import (
     ResumeJsonExtractor,
     TextSanitizer,
 )
+from app.services.resume_field_extractor import ResumeFieldExtractor
 
 
 @pytest.fixture
@@ -154,7 +155,24 @@ def test_api_upload_cv_endpoint(sample_docx_bytes: bytes, monkeypatch, tmp_path)
 
     monkeypatch.setattr(settings, "UPLOADS_DIR", tmp_path)
     client = TestClient(app)
-    with patch("app.api.cv.background_process_cv"):
+    from app.services.processing_queue import QueueSubmission
+    from app.schemas.contracts import JobState, ProcessingExecutionMode, ProcessingJobRecord
+    dummy_submission = QueueSubmission(
+        record=ProcessingJobRecord(
+            job_id="dummy_job_id",
+            job_state=JobState.QUEUED,
+            execution_mode=ProcessingExecutionMode.RQ.value,
+            target_cv_key="cv_dummy",
+            cv_filename="alex_johnson_cv.docx",
+            cv_key="cv_dummy",
+            content_hash="dummy_hash",
+            filename="alex_johnson_cv.docx",
+            storage_filename="alex_johnson_cv.docx",
+            parser_version="1.0",
+            schema_version="1.0"
+        )
+    )
+    with patch("app.services.processing_queue.ProcessingQueueService.submit_upload", return_value=dummy_submission):
         response = client.post(
             "/api/cv/upload",
             files={
@@ -221,6 +239,90 @@ Software engineer with 5 years experience.
     assert contact["name"] == "Alex Johnson"
     assert contact["name_confidence"] == 0.30
     assert contact["extraction_source"] == "email_username_fallback"
+
+
+@pytest.mark.parametrize(
+    ("merged_header", "email", "expected_name"),
+    [
+        ("BRAND J O R D A N LEEPRODUCT MANAGER PROFILE SUMMARY", "applications@sample.org", "Jordan Lee"),
+        ("MARK M A R I A SANTOSSENIOR OFFICER", "contact@sample.org", "Maria Santos"),
+    ],
+)
+def test_deterministic_name_extraction_recovers_structurally_merged_headers(merged_header, email, expected_name):
+    sample_text = f"""
+## CONTACT
++1 202 555 0187
+## {merged_header}
+{email}
+Austin, Texas
+
+## EXPERIENCE
+Five years of relevant experience.
+    """
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+    contact = resume_json["contact_info"]
+
+    assert contact["name"] == expected_name
+    assert contact["name_confidence"] >= 0.85
+    assert contact["extraction_source"] == "header_contact_section"
+
+
+def test_deterministic_name_extraction_recovers_inline_personal_details_name():
+    sample_text = """
+CURRICULUM VITAE
+PERSONAL DETAILS NAME : Mr. VIRAL D. HIRANI PERMANENT ADDRESS : 505 Example Road DATE OF BIRTH : 21/07/1985 CONTACT NO : 9913042301 EMAIL : viralhirani1985@gmail.com
+
+EDUCATION QUALIFICATION: -
+Bachelor of Arts
+    """
+
+    resume_json = ResumeJsonExtractor.extract(sample_text)
+    contact = resume_json["contact_info"]
+
+    assert contact["name"] == "VIRAL D. HIRANI"
+    assert contact["name_confidence"] >= 0.85
+    assert contact["extraction_source"] == "header_email_validated"
+
+
+@pytest.mark.parametrize(
+    ("stale_name", "stale_source"),
+    [
+        ("applications", "email_username_fallback"),
+        ("State:- Texas.", "header_contact_section"),
+        ("EDUCATION QUALIFICATION: -", "header_contact_section"),
+    ],
+)
+def test_candidate_detail_revalidates_fallback_and_structurally_invalid_names(stale_name, stale_source):
+    result = {
+        "id": "cv_generic",
+        "filename": "generic.pdf",
+        "markdown": "## CONTACT\nJordan Lee\napplications@sample.org\n+1 202 555 0187\nAustin, Texas",
+        "full_name": stale_name,
+        "candidate_name": stale_name,
+        "name_confidence": 0.85 if stale_source == "header_contact_section" else 0.3,
+        "name_extraction_source": stale_source,
+        "field_confidence": {"name": 0.3},
+        "field_confidence_tiers": {"name": "LOW"},
+        "resume_json": {
+            "contact_info": {
+                "name": stale_name,
+                "full_name": stale_name,
+                "candidate_name": stale_name,
+                "email": "applications@sample.org",
+                "phone": "+1 202 555 0187",
+                "location": "Austin, Texas",
+                "name_confidence": 0.85 if stale_source == "header_contact_section" else 0.3,
+                "extraction_source": stale_source,
+                "field_confidence": {"name": 0.3},
+            }
+        },
+    }
+
+    ResumeFieldExtractor.revalidate_candidate_name(result)
+
+    assert result["full_name"] == "Jordan Lee"
+    assert result["resume_json"]["contact_info"]["name"] == "Jordan Lee"
+    assert result["name_confidence"] >= 0.85
 
 
 def test_deterministic_name_extraction_filename_fallback():

@@ -1,8 +1,10 @@
 x-backend-environment: &backend-environment
   APP_ENVIRONMENT: production
-  AUTH_ENABLED: "true"
+  AUTH_ENABLED: '${AUTH_ENABLED:-true}'
   RECRUITER_API_KEYS: '${RECRUITER_API_KEYS:-[]}'
   ADMINISTRATOR_API_KEYS: '${ADMINISTRATOR_API_KEYS:-[]}'
+  AUTH_SESSION_SIGNING_KEY: '${AUTH_SESSION_SIGNING_KEY:-}'
+  AUTH_SESSION_TTL_SECONDS: '${AUTH_SESSION_TTL_SECONDS:-28800}'
   RATE_LIMIT_ENABLED: "true"
   RATE_LIMIT_REQUESTS: '${RATE_LIMIT_REQUESTS:-120}'
   RATE_LIMIT_WINDOW_SECONDS: '${RATE_LIMIT_WINDOW_SECONDS:-60}'
@@ -11,31 +13,45 @@ x-backend-environment: &backend-environment
   MAX_CV_TEXT_LENGTH_CHARS: '${MAX_CV_TEXT_LENGTH_CHARS:-500000}'
   MAX_HR_FEEDBACK_LENGTH_CHARS: '${MAX_HR_FEEDBACK_LENGTH_CHARS:-10000}'
   ALLOWED_ORIGINS: '${ALLOWED_ORIGINS:-["http://localhost:8081"]}'
-  CORS_ALLOW_CREDENTIALS: '${CORS_ALLOW_CREDENTIALS:-false}'
-  DB_SERVER: '${DB_SERVER}'
-  DB_PORT: '${DB_PORT:-1433}'
-  DB_NAME: '${DB_NAME}'
-  DB_USER: '${DB_USER}'
-  DB_PASSWORD: '${DB_PASSWORD}'
-  DB_ENCRYPT: '${DB_ENCRYPT:-true}'
-  DB_TRUST_CERT: '${DB_TRUST_CERT:-false}'
+  CORS_ALLOW_CREDENTIALS: '${CORS_ALLOW_CREDENTIALS:-true}'
+  MSSQL_READ_ONLY_URL: '${MSSQL_READ_ONLY_URL}'
+  MSSQL_READONLY_ENFORCEMENT: "true"
   INITIALIZE_DATABASE_ON_STARTUP: "false"
   STARTUP_CACHE_WARMUP_ENABLED: '${STARTUP_CACHE_WARMUP_ENABLED:-true}'
+  EXTRACTION_TIMEOUT_SECONDS: '${EXTRACTION_TIMEOUT_SECONDS:-300}'
+  SCANNED_EXTRACTION_TIMEOUT_SECONDS: '${SCANNED_EXTRACTION_TIMEOUT_SECONDS:-600}'
   AUTO_MIGRATE: "false"
-  PG_DB_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
+  POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
   REDIS_URL: 'redis://redis:6379/0'
   RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
+  RQ_AUXILIARY_QUEUE_NAME: '${RQ_AUXILIARY_QUEUE_NAME:-default}'
+  RQ_SHADOW_QUEUE_NAME: '${RQ_SHADOW_QUEUE_NAME:-shadow_validation}'
+  CV_PROCESSING_CONCURRENCY: '1'
+  CV_QUEUE_MAX_SIZE: '${CV_QUEUE_MAX_SIZE:-1000}'
+  RQ_WORKER_MAX_JOBS: '${RQ_WORKER_MAX_JOBS:-0}'
   RQ_JOB_TIMEOUT_SECONDS: '${RQ_JOB_TIMEOUT_SECONDS:-900}'
   RQ_RESULT_TTL_SECONDS: '${RQ_RESULT_TTL_SECONDS:-604800}'
   RQ_MAX_RETRIES: '${RQ_MAX_RETRIES:-2}'
   RQ_RETRY_INTERVAL_SECONDS: '${RQ_RETRY_INTERVAL_SECONDS:-30}'
+  RULE_CONFIG_RETRY_INTERVAL_SECONDS: '${RULE_CONFIG_RETRY_INTERVAL_SECONDS:-5}'
+  RQ_MAINTENANCE_INTERVAL_SECONDS: '${RQ_MAINTENANCE_INTERVAL_SECONDS:-60}'
+  CV_JOB_RECONCILIATION_INTERVAL_SECONDS: '${CV_JOB_RECONCILIATION_INTERVAL_SECONDS:-60}'
+  CV_JOB_STALE_AFTER_SECONDS: '${CV_JOB_STALE_AFTER_SECONDS:-1200}'
+  CV_JOB_HISTORY_HOURS: '${CV_JOB_HISTORY_HOURS:-24}'
+  CV_JOB_LIST_LIMIT: '${CV_JOB_LIST_LIMIT:-100}'
+  SHADOW_MODE_ENABLED: '${SHADOW_MODE_ENABLED:-false}'
+  BACKGROUND_SYNC_ENABLED: '${BACKGROUND_SYNC_ENABLED:-true}'
+  BACKGROUND_SYNC_INTERVAL_SECONDS: '${BACKGROUND_SYNC_INTERVAL_SECONDS:-900}'
+  BACKGROUND_SYNC_JOB_TIMEOUT_SECONDS: '${BACKGROUND_SYNC_JOB_TIMEOUT_SECONDS:-1800}'
+  BACKGROUND_SYNC_LOCK_TIMEOUT_SECONDS: '${BACKGROUND_SYNC_LOCK_TIMEOUT_SECONDS:-3600}'
+  VALIDATION_METRICS_SNAPSHOT_ENABLED: '${VALIDATION_METRICS_SNAPSHOT_ENABLED:-true}'
+  VALIDATION_METRICS_SNAPSHOT_INTERVAL_SECONDS: '${VALIDATION_METRICS_SNAPSHOT_INTERVAL_SECONDS:-86400}'
   PROCESSING_JOB_TTL_SECONDS: '${PROCESSING_JOB_TTL_SECONDS:-604800}'
   PROCESSING_JOB_LOCK_TIMEOUT_SECONDS: '${PROCESSING_JOB_LOCK_TIMEOUT_SECONDS:-1200}'
-  RQ_DEVELOPMENT_FALLBACK_ENABLED: "false"
   LLM_ENABLED: '${LLM_ENABLED:-true}'
   EMBEDDING_ENABLED: '${EMBEDDING_ENABLED:-true}'
   OLLAMA_BASE_URL: '${OLLAMA_BASE_URL:-http://host.docker.internal:11434}'
-  OLLAMA_MODEL: '${OLLAMA_MODEL:-qwen3:4b}'
+  OLLAMA_MODEL: '${OLLAMA_MODEL:-gemma3:4b}'
   EMBEDDING_MODEL: '${EMBEDDING_MODEL:-nomic-embed-text}'
   OLLAMA_REQUEST_TIMEOUT: '${OLLAMA_REQUEST_TIMEOUT:-60}'
   OLLAMA_CONNECT_TIMEOUT_SECONDS: '${OLLAMA_CONNECT_TIMEOUT_SECONDS:-3}'
@@ -45,13 +61,17 @@ x-backend-environment: &backend-environment
   OLLAMA_UNLOAD_TIMEOUT_SECONDS: '${OLLAMA_UNLOAD_TIMEOUT_SECONDS:-10}'
   OLLAMA_MAX_RETRIES: '${OLLAMA_MAX_RETRIES:-0}'
   OLLAMA_RETRY_BACKOFF_SECONDS: '${OLLAMA_RETRY_BACKOFF_SECONDS:-0.5}'
+  OLLAMA_RETRY_JITTER_SECONDS: '${OLLAMA_RETRY_JITTER_SECONDS:-0.1}'
   OLLAMA_KEEP_ALIVE: '${OLLAMA_KEEP_ALIVE:-1m}'
+  OLLAMA_RESIDENCY_ENABLED: '${OLLAMA_RESIDENCY_ENABLED:-true}'
   OLLAMA_UNLOAD_ON_SHUTDOWN: '${OLLAMA_UNLOAD_ON_SHUTDOWN:-true}'
   OLLAMA_MAX_CONNECTIONS: '${OLLAMA_MAX_CONNECTIONS:-1}'
   OLLAMA_MAX_KEEPALIVE_CONNECTIONS: '${OLLAMA_MAX_KEEPALIVE_CONNECTIONS:-1}'
   OLLAMA_MAX_RESPONSE_BYTES: '${OLLAMA_MAX_RESPONSE_BYTES:-4194304}'
   OLLAMA_LOCK_FILE: '${OLLAMA_LOCK_FILE:-/app/uploads/.locks/ollama.lock}'
   OLLAMA_LOCK_TIMEOUT_SECONDS: '${OLLAMA_LOCK_TIMEOUT_SECONDS:-65}'
+  OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: '${OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD:-3}'
+  OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS: '${OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS:-60}'
   OLLAMA_EMBED_BATCH_SIZE: '${OLLAMA_EMBED_BATCH_SIZE:-10}'
   OLLAMA_EMBED_MIN_SPLIT_SIZE: '${OLLAMA_EMBED_MIN_SPLIT_SIZE:-2}'
   OLLAMA_EMBEDDING_EXPECTED_DIMENSION: '${OLLAMA_EMBEDDING_EXPECTED_DIMENSION:-768}'
@@ -72,6 +92,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./backend/uploads:/app/uploads
+      - huggingface_cache:/root/.cache/huggingface
     restart: unless-stopped
     depends_on:
       pgvector:
@@ -79,7 +100,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/"]
+      test: ["CMD", "python", "scripts/container_healthcheck.py"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -88,12 +109,14 @@ services:
   worker:
     build: ./backend
     container_name: cv_analyzer_worker
-    command: ["rq", "worker", "--url", "redis://redis:6379/0", "${RQ_QUEUE_NAME:-cv-processing}"]
+    command: ["python", "start_worker.py"]
     environment: *backend-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./backend/uploads:/app/uploads
+      - docling_cache:/root/.cache/docling
+      - huggingface_cache:/root/.cache/huggingface
     restart: unless-stopped
     depends_on:
       redis:
@@ -101,16 +124,47 @@ services:
       pgvector:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "rq info --url $$REDIS_URL >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "rq info $$RQ_QUEUE_NAME --url $$REDIS_URL >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
 
+  auxiliary-worker:
+    build: ./backend
+    container_name: cv_analyzer_auxiliary_worker
+    command: ["python", "start_aux_worker.py"]
+    environment: *backend-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - huggingface_cache:/root/.cache/huggingface
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      pgvector:
+        condition: service_healthy
+
+  scheduler:
+    build: ./backend
+    container_name: cv_analyzer_scheduler
+    command: ["python", "start_scheduler.py"]
+    environment: *backend-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      pgvector:
+        condition: service_healthy
+
   migrate-postgres:
     build: ./backend
     profiles: ["tools"]
-    command: ["python", "scripts/run_migrations.py", "--dialect", "postgres"]
+    command: ["python", "scripts/run_migrations.py"]
     environment: *backend-environment
     depends_on:
       pgvector:
@@ -139,8 +193,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: cv_analyzer_redis
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
     ports:
       - "6380:6379"
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -152,3 +209,6 @@ services:
 
 volumes:
   pg_data:
+  redis_data:
+  docling_cache:
+  huggingface_cache:

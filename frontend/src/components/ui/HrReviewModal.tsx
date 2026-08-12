@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
   Text,
-  Pressable
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { X, CheckCircle } from 'lucide-react-native';
 import { COLORS } from '@/constants/colors';
@@ -12,8 +14,9 @@ import { JobMatchScore } from '@/types/api';
 import { Button } from './Button';
 import { TextField } from './TextField';
 import { Card } from './Card';
+import { SegmentedControl } from './SegmentedControl';
 
-interface HrReviewModalProps {
+export interface HrReviewModalProps {
   visible: boolean;
   scanId: string;
   job: JobMatchScore | null;
@@ -28,23 +31,47 @@ export function HrReviewModal({
   onClose,
   onSubmitted,
 }: HrReviewModalProps) {
-  const [correctedScore, setCorrectedScore] = useState<string>(
-    job?.overall_score ? String(Math.round(job.overall_score)) : '80'
-  );
-  const [classification, setClassification] = useState<'HIGH' | 'MEDIUM' | 'LOW'>(
-    (job?.classification as any) || 'HIGH'
-  );
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 640;
+
+  const [correctedScore, setCorrectedScore] = useState<string>('');
+  const [classification, setClassification] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('LOW');
   const [feedbackNotes, setFeedbackNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+
+  // Sync state whenever visible modal opens or target job changes
+  useEffect(() => {
+    if (visible && job) {
+      setError(null);
+      setSuccess(false);
+      setFeedbackNotes('');
+
+      // Populate score only if real overall_score exists on backend record; otherwise require deliberate input
+      if (job.overall_score != null && !isNaN(job.overall_score) && job.overall_score > 0) {
+        setCorrectedScore(String(Math.round(job.overall_score)));
+      } else {
+        setCorrectedScore('');
+      }
+
+      const rawCls = String(job.classification || job.vacancy_match_status || '').toUpperCase();
+      if (rawCls.includes('HIGH') || rawCls.includes('STRONG') || rawCls.includes('MATCHED')) {
+        setClassification('HIGH');
+      } else if (rawCls.includes('MED') || rawCls.includes('POTENTIAL')) {
+        setClassification('MEDIUM');
+      } else {
+        setClassification('LOW');
+      }
+    }
+  }, [visible, job?.job_id, job?.overall_score]);
 
   if (!job) return null;
 
   const handleSubmit = async () => {
     const numScore = parseFloat(correctedScore);
     if (isNaN(numScore) || numScore < 0 || numScore > 100) {
-      setError('Score must be a number between 0 and 100');
+      setError('Please provide a valid score between 0 and 100');
       return;
     }
 
@@ -56,14 +83,14 @@ export function HrReviewModal({
         job_id: Number(job.job_id),
         corrected_score: numScore,
         corrected_classification: classification,
-        feedback_notes: feedbackNotes || "",
+        feedback_notes: feedbackNotes || '',
       });
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
         onClose();
         if (onSubmitted) onSubmitted();
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       setError(err.message || 'Failed to submit HR review');
     } finally {
@@ -78,94 +105,105 @@ export function HrReviewModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-black/60">
-        <View className="w-full bg-surface rounded-t-lg p-5 gap-4">
-          <View className="flex-row justify-between items-center pb-3 border-b border-border">
-            <Text className="text-lg font-sans-bold text-text-primary">
+      <View className={`flex-1 bg-black/60 ${isDesktop ? 'items-center justify-center p-4' : 'justify-end'}`}>
+        <View
+          className={`w-full bg-surface ${
+            isDesktop ? 'max-w-lg rounded-lg shadow-xl' : 'rounded-t-lg'
+          } p-5 gap-3.5`}
+        >
+          <View className="flex-row justify-between items-center pb-2.5 border-b border-border">
+            <Text className="text-base font-sans-bold text-text-primary">
               HR Review & Correction
             </Text>
-            <Pressable onPress={onClose} hitSlop={8}>
-              <X size={20} color={COLORS.textFaint} />
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              className="p-1 rounded active:bg-background"
+              accessibilityRole="button"
+              accessibilityLabel="Close modal"
+            >
+              <X size={18} color={COLORS.textMuted} />
             </Pressable>
           </View>
 
-          <Text className="text-sm font-sans-medium text-text-primary">
-            Job: <Text className="font-sans-bold text-primary">{job.job_title}</Text>
-          </Text>
-
-          {error && (
-            <Card className="bg-danger/10 border-danger/30 p-3">
-              <Text className="text-xs font-sans-semibold text-danger">
-                {error}
+          <ScrollView className="max-h-[80vh]" contentContainerStyle={{ gap: 14 }}>
+            <View className="bg-background p-2.5 rounded border border-border/70">
+              <Text className="text-xs font-sans-medium text-text-muted">
+                Target Role: <Text className="font-sans-bold text-primary">{job.job_title}</Text>
               </Text>
-            </Card>
-          )}
+              {job.department_name && (
+                <Text className="text-[11px] font-sans text-text-muted mt-0.5">
+                  Dept: {job.department_name}
+                </Text>
+              )}
+            </View>
 
-          {success && (
-            <Card className="bg-success/10 border-success/30 p-3 flex-row items-center gap-1.5">
-              <CheckCircle size={14} color={COLORS.success} />
-              <Text className="text-xs font-sans-semibold text-success">
-                HR Review saved successfully!
+            {error && (
+              <Card className="bg-danger/10 border-danger/30 p-2.5">
+                <Text className="text-xs font-sans-semibold text-danger">
+                  {error}
+                </Text>
+              </Card>
+            )}
+
+            {success && (
+              <Card className="bg-success/10 border-success/30 p-2.5 flex-row items-center gap-1.5">
+                <CheckCircle size={14} color={COLORS.success} />
+                <Text className="text-xs font-sans-semibold text-success">
+                  HR Review saved successfully!
+                </Text>
+              </Card>
+            )}
+
+            <TextField
+              label="Corrected Match Score (0 - 100)"
+              value={correctedScore}
+              onChangeText={setCorrectedScore}
+              keyboardType="numeric"
+              placeholder="e.g. 75"
+              accessibilityLabel="Corrected match score input"
+            />
+
+            <View className="gap-1.5">
+              <Text className="text-xs font-sans-medium text-text-primary">
+                Classification Category:
               </Text>
-            </Card>
-          )}
-
-          <TextField
-            label="Corrected Match Score (0 - 100)"
-            value={correctedScore}
-            onChangeText={setCorrectedScore}
-            keyboardType="numeric"
-            placeholder="e.g. 85"
-          />
-
-          <View className="gap-1.5">
-            <Text className="text-xs font-sans-medium text-text-primary">
-              Classification Category:
-            </Text>
-            <View className="flex-row gap-2">
-              {(['HIGH', 'MEDIUM', 'LOW'] as const).map((cat) => (
-                <Pressable
-                  key={cat}
-                  onPress={() => setClassification(cat)}
-                  hitSlop={8}
-                  className={`flex-1 py-2 rounded-md border items-center ${
-                    classification === cat
-                      ? 'bg-primary border-primary active:bg-primary-dark'
-                      : 'bg-surface border-border active:bg-background'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-sans-semibold ${
-                      classification === cat
-                        ? 'text-text-inverse'
-                        : 'text-text-primary'
-                    }`}
-                  >
-                    {cat}
-                  </Text>
-                </Pressable>
-              ))}
+              <SegmentedControl
+                options={[
+                  { value: 'HIGH', label: 'High Match' },
+                  { value: 'MEDIUM', label: 'Medium Match' },
+                  { value: 'LOW', label: 'Low Match' },
+                ]}
+                value={classification}
+                onChange={(val) => setClassification(val as 'HIGH' | 'MEDIUM' | 'LOW')}
+              />
             </View>
-          </View>
 
-          <TextField
-            label="Feedback & Correction Notes"
-            value={feedbackNotes}
-            onChangeText={setFeedbackNotes}
-            multiline
-            numberOfLines={3}
-            placeholder="Explain changes..."
-            style={{ textAlignVertical: 'top', height: 80 }}
-          />
+            <TextField
+              label="Feedback & Correction Notes"
+              value={feedbackNotes}
+              onChangeText={setFeedbackNotes}
+              multiline
+              numberOfLines={3}
+              placeholder="Provide reason for score adjustment or manual decision..."
+              style={{ textAlignVertical: 'top', height: 75 }}
+            />
 
-          <View className="flex-row gap-3 pt-2">
-            <View className="flex-1">
-              <Button label="Cancel" variant="secondary" size="md" onPress={onClose} />
+            <View className="flex-row gap-2.5 pt-2">
+              <View className="flex-1">
+                <Button label="Cancel" variant="secondary" size="md" onPress={onClose} />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label="Submit Review"
+                  size="md"
+                  loading={submitting}
+                  disabled={submitting}
+                  onPress={handleSubmit}
+                />
+              </View>
             </View>
-            <View className="flex-1">
-              <Button label="Submit" size="md" loading={submitting} disabled={submitting} onPress={handleSubmit} />
-            </View>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>

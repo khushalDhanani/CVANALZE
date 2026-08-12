@@ -1,5 +1,8 @@
 from unittest.mock import patch
 
+from app.services.processing_queue import QueueSubmission
+from app.schemas.contracts import JobState, ProcessingExecutionMode, ProcessingJobRecord
+
 import fitz
 from fastapi.testclient import TestClient
 
@@ -19,7 +22,24 @@ def test_frontend_polling_match_status_completion(tmp_path, monkeypatch):
     pdf_bytes = doc.tobytes()
     doc.close()
 
-    with patch("app.api.analysis.background_upload_and_analyze"):
+    with patch("app.services.processing_queue.ProcessingQueueService.submit_upload") as mock_submit:
+        mock_submit.return_value = QueueSubmission(
+            record=ProcessingJobRecord(
+                    job_id="cvjob_123",
+                    job_state=JobState.QUEUED,
+                    execution_mode=ProcessingExecutionMode.RQ.value,
+                    message="Queued",
+                    stage="extraction",
+                    created_at="2024-01-01T00:00:00Z",
+                    updated_at="2024-01-01T00:00:00Z",
+                    candidate_id="cand_1",
+                    cv_key="cv_123",
+                    content_hash="hash",
+                    filename="test.pdf",
+                    storage_filename="test.pdf",
+                    parser_version="1.0",
+                    schema_version="1.0",
+                )      )
         upload_res = client.post(
             "/api/match/upload",
             files={"file": ("test_polling_match.pdf", pdf_bytes, "application/pdf")},
@@ -57,7 +77,24 @@ def test_frontend_polling_cv_status_completion(tmp_path, monkeypatch):
     pdf_bytes = doc.tobytes()
     doc.close()
 
-    with patch("app.api.cv.background_process_cv"):
+    with patch("app.services.processing_queue.ProcessingQueueService.submit_upload") as mock_submit:
+        mock_submit.return_value = QueueSubmission(
+            record=ProcessingJobRecord(
+                    job_id="cvjob_456",
+                    job_state=JobState.QUEUED,
+                    execution_mode=ProcessingExecutionMode.RQ.value,
+                    message="Queued",
+                    stage="extraction",
+                    created_at="2024-01-01T00:00:00Z",
+                    updated_at="2024-01-01T00:00:00Z",
+                    candidate_id="cand_2",
+                    cv_key="cv_456",
+                    content_hash="hash2",
+                    filename="test2.pdf",
+                    storage_filename="test2.pdf",
+                    parser_version="1.0",
+                    schema_version="1.0",
+                )      )
         upload_res = client.post(
             "/api/cv/upload",
             files={"file": ("test_polling_cv.pdf", pdf_bytes, "application/pdf")},

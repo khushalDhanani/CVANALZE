@@ -7,34 +7,14 @@ from app.schemas.classification_types import NormalizedClassification
 class TestDynamicTaxonomyFallback:
     """Tests for the fallback path (no DB, no pgvector) — always exercisable in CI."""
 
-    def test_fallback_returns_no_suitable_match(self):
-        from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
-        # Empty input should use fallback
-        result = DynamicTaxonomyService._get_default_fallback(matched_term="unknown role")
-        assert isinstance(result, NormalizedClassification)
-        assert result.match_status == "NO_SUITABLE_MATCH"
-        assert result.confidence == 0.0
-        assert result.match_source == "legacy_fallback"
 
-    def test_fallback_has_evidence(self):
-        from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
-        result = DynamicTaxonomyService._get_default_fallback(matched_term="chef")
-        assert len(result.evidence) > 0
-        ev = result.evidence[0]
-        assert ev.source == "fallback"
-        assert ev.matched_term == "chef"
-        assert ev.confidence == 0.0
-
-    def test_fallback_evidence_matched_against_is_none(self):
-        from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
-        result = DynamicTaxonomyService._get_default_fallback()
-        assert result.evidence[0].matched_against is None
 
     def test_empty_input_uses_fallback(self):
         from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
+        from app.schemas.classification_types import MatchStatus
         result = DynamicTaxonomyService.resolve_candidate_role_and_domain(role_or_summary="")
         assert isinstance(result, NormalizedClassification)
-        assert result.match_status == "NO_SUITABLE_MATCH"
+        assert result.match_status == MatchStatus.INSUFFICIENT_EVIDENCE
 
     def test_result_has_correct_fields(self):
         from app.services.dynamic_taxonomy_service import DynamicTaxonomyService

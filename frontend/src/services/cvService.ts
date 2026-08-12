@@ -3,10 +3,15 @@ import {
   CandidateMatchAnalysis,
   CVMatchRequest,
   CVProcessingResponse,
+  CVProcessingJobSummary,
   CVUploadResponse,
 } from '@/types/api';
 
 export const cvService = {
+  listProcessingJobs: (): Promise<CVProcessingJobSummary[]> => {
+    return apiClient.get<CVProcessingJobSummary[]>('/api/cv/processing-jobs');
+  },
+
   /**
    * Upload CV file for basic processing.
    */
@@ -14,12 +19,12 @@ export const cvService = {
     file: { uri: string; name: string; type: string; rawFile?: any },
     candidateId?: string,
     cvId?: string
-  ): Promise<CVProcessingResponse> => {
+  ): Promise<CVUploadResponse | CVProcessingResponse> => {
     const additionalFields: Record<string, string> = {};
     if (candidateId) additionalFields.candidate_id = candidateId;
     if (cvId) additionalFields.cv_id = cvId;
 
-    return apiClient.uploadFile<CVProcessingResponse>(
+    return apiClient.uploadFile<CVUploadResponse | CVProcessingResponse>(
       '/api/cv/upload',
       file,
       additionalFields

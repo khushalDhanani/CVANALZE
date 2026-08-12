@@ -1,15 +1,18 @@
+from __future__ import annotations
 import asyncio
 import hashlib
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
+from app.core.error_handlers import SystemConfigurationError
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,
     CandidateSearchResponse,
 )
 from app.services.candidate_search_service import CandidateSearchService
+from app.services.resume_field_extractor import ResumeFieldExtractor
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
@@ -23,6 +26,8 @@ def search_candidates_post(request: CandidateSearchRequest) -> CandidateSearchRe
     """
     try:
         return CandidateSearchService.search_candidates(request)
+    except SystemConfigurationError:
+        raise
     except Exception as exc:
         from app.core.logging import logger
 
@@ -67,6 +72,8 @@ def list_candidates(
         )
         res = CandidateSearchService.search_candidates(req)
         return [item.model_dump() for item in res.candidates]
+    except SystemConfigurationError:
+        raise
     except Exception as exc:
         from app.core.logging import logger
 
@@ -88,23 +95,31 @@ def get_candidate_detail(candidate_id: str):
     if not result:
         raise HTTPException(status_code=404, detail=f"Candidate record '{cid}' not found.")
 
-    if "experience_years" not in result or result.get("experience_years") is None:
-        from app.services.experience_calculator import ExperienceCalculator
+    ResumeFieldExtractor.revalidate_candidate_name(result)
 
-        resume_json = result.get("resume_json") or {}
-        cv_text = result.get("markdown") or result.get("text") or ""
-        stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
-        canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, cv_text, candidate_id=stem)
-        result["experience_years"] = canonical_exp["experience_years"]
-        result["seniority"] = canonical_exp["seniority"]
-        result["experience_summary"] = canonical_exp
-        result["work_experience"] = canonical_exp["normalized_employment"]
+    from app.services.experience_calculator import ExperienceCalculator
+
+    resume_json = result.get("resume_json") or {}
+    cv_text = result.get("markdown") or result.get("text") or ""
+    stem = str(result.get("id") or result.get("scan_id") or cid.removesuffix(".json"))
+    canonical_exp = ExperienceCalculator.calculate_canonical_experience(resume_json, cv_text, candidate_id=stem)
+
+    result["experience_state"] = canonical_exp["experience_state"]
+    result["gross_display"] = canonical_exp["gross_display"]
+    result["experience_years"] = canonical_exp["experience_years"]
+    result["total_experience_years"] = canonical_exp["total_experience_years"]
+    result["total_experience_months"] = canonical_exp["total_experience_months"]
+    result["seniority"] = canonical_exp["seniority"]
+    result["experience_summary"] = canonical_exp
+    result["work_experience"] = canonical_exp["normalized_employment"]
+    result["experience_gap_analysis"] = canonical_exp.get("gap_analysis")
 
     return result
 
 
+
 @router.post("/{candidate_id}/reprocess", response_model=dict[str, Any])
-async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTasks):
+async def reprocess_candidate(candidate_id: str):
     """
     Invalidate and delete all existing cache entries related to candidate CV,
     preserve original CV file, and reprocess CV from scratch using latest pipeline.
@@ -115,7 +130,6 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     from app.services.processing_queue import (
         ProcessingQueueService,
         ProcessingQueueUnavailableError,
-        run_processing_job_fallback,
     )
     from app.services.upload_service import UploadService, UploadValidationError
 
@@ -164,11 +178,17 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
     content_type = retained_upload.detected_content_type
     raw_bytes = retained_upload.content
 
-    # Invalidate and delete all cache entries for this CV
+    # Invalidate and delete all cache entries and legacy aliases for this CV
     cv_result_cache_manager.delete(result_filename)
     cv_result_cache_manager.delete_by_pattern(f"*{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*cv_{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*CV_{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*cv_document_{cv_key}*")
+    cv_result_cache_manager.delete_by_pattern(f"*cv_candidate_{cv_key}*")
+    CacheInvalidator.invalidate_candidate(cv_key)
     if cv_hash:
         CacheInvalidator.invalidate_cv(cv_hash)
+
 
     # Unlink old result file on disk to ensure fresh reprocessing
     disk_path = settings.RESULTS_DIR / result_filename
@@ -185,6 +205,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         "filename": filename,
         "storage_filename": retained_upload.storage_filename,
         "candidate_id": existing_result.get("candidate_id"),
+        "source_candidate_id": existing_result.get("source_candidate_id"),
         "cv_id": existing_result.get("cv_id"),
         "cv_hash": cv_hash,
         "identity": existing_result.get("identity"),
@@ -205,13 +226,15 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
             content_type=content_type,
             force_reprocess=True,
             candidate_id=existing_result.get("candidate_id"),
+            source_candidate_id=existing_result.get("source_candidate_id"),
             cv_id=existing_result.get("cv_id"),
             storage_filename=retained_upload.storage_filename,
         )
     except ProcessingQueueUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    if submission.schedule_development_fallback:
-        background_tasks.add_task(run_processing_job_fallback, submission.record.job_id)
+
+    record_state = submission.record.state.value if hasattr(submission.record.state, "value") else str(submission.record.state)
+    record_exec_mode = submission.record.execution_mode.value if hasattr(submission.record.execution_mode, "value") else str(submission.record.execution_mode)
 
     return {
         "message": submission.record.message,
@@ -219,7 +242,7 @@ async def reprocess_candidate(candidate_id: str, background_tasks: BackgroundTas
         "status": "processing",
         "progress": submission.record.progress,
         "job_id": submission.record.job_id,
-        "job_state": submission.record.state.value,
-        "execution_mode": submission.record.execution_mode.value,
+        "job_state": record_state,
+        "execution_mode": record_exec_mode,
         "retry_count": submission.record.attempt,
     }

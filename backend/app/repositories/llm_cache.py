@@ -1,4 +1,6 @@
-from dataclasses import asdict, dataclass
+from __future__ import annotations
+import hashlib
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -11,7 +13,7 @@ T = TypeVar("T", bound=BaseModel)
 
 @dataclass
 class LLMCacheEntry:
-    """Full LLM inference cache entry with all metadata preserved."""
+    """In-memory inference data; persistence deliberately excludes raw prompts, responses, and reasoning."""
 
     prompt: str
     raw_response: str
@@ -24,17 +26,24 @@ class LLMCacheEntry:
     prompt_version: str
 
     def to_dict(self) -> dict[str, Any]:
-        d = asdict(self)
-        d["__entry__"] = True
-        return d
+        return {
+            "__entry__": True,
+            "prompt_hash": hashlib.sha256(self.prompt.encode("utf-8")).hexdigest() if self.prompt else "",
+            "structured_data": self.structured_data,
+            "processing_time_ms": self.processing_time_ms,
+            "token_count": self.token_count,
+            "inference_time_ms": self.inference_time_ms,
+            "model": self.model,
+            "prompt_version": self.prompt_version,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LLMCacheEntry":
         return cls(
-            prompt=data["prompt"],
-            raw_response=data.get("raw_response", ""),
+            prompt="",
+            raw_response="",
             structured_data=data.get("structured_data", {}),
-            reasoning=data.get("reasoning", ""),
+            reasoning="",
             processing_time_ms=data.get("processing_time_ms", 0.0),
             token_count=data.get("token_count", 0),
             inference_time_ms=data.get("inference_time_ms", 0),
@@ -63,6 +72,8 @@ class LLMCacheRepository:
         model_version: str = "",
         extraction_version: str = "",
         matching_version: str = "",
+        rule_version: str = "",
+        taxonomy_version: str = "",
     ) -> str:
         return CacheKey.for_llm_match(
             document_hash=document_hash,
@@ -73,6 +84,8 @@ class LLMCacheRepository:
             model_version=model_version,
             extraction_version=extraction_version,
             matching_version=matching_version,
+            rule_version=rule_version,
+            taxonomy_version=taxonomy_version,
         ).to_key()
 
     @classmethod

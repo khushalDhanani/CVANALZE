@@ -33,8 +33,8 @@ export const matchService = {
     name: string;
     type: string;
     rawFile?: any;
-  }): Promise<CVProcessingResponse> => {
-    return apiClient.uploadFile<CVProcessingResponse>(
+  }): Promise<EnrichedCandidateAnalysis | CVProcessingResponse> => {
+    return apiClient.uploadFile<EnrichedCandidateAnalysis | CVProcessingResponse>(
       '/api/match/upload',
       file
     );

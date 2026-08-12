@@ -1,6 +1,8 @@
+from __future__ import annotations
 import re
 import time
 import uuid
+from contextvars import ContextVar
 
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -11,6 +13,13 @@ from app.core.logging import logger
 from app.schemas.contracts import ErrorCode
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_request_id_context: ContextVar[str] = ContextVar("request_id", default="")
+_correlation_id_context: ContextVar[str] = ContextVar("correlation_id", default="")
+
+
+def get_request_context_ids() -> tuple[str, str]:
+    """Return privacy-safe request lineage for telemetry in the current async/thread context."""
+    return _request_id_context.get(), _correlation_id_context.get()
 
 
 class RequestContextMiddleware:
@@ -46,6 +55,8 @@ class RequestContextMiddleware:
 
         status_code = 0
         response_started = False
+        request_token = _request_id_context.set(request_id)
+        correlation_token = _correlation_id_context.set(correlation_id)
 
         async def send_with_context(message: Message) -> None:
             nonlocal response_started, status_code
@@ -72,11 +83,15 @@ class RequestContextMiddleware:
             )
             await response(scope, receive, send_with_context)
         finally:
-            if scope["type"] == "http":
-                duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
-                logger.info(
-                    f"[REQUEST] request_id={request_id} correlation_id={correlation_id} method={scope.get('method')} path={scope.get('path')} status={status_code or 500} duration_ms={duration_ms}"
-                )
+            try:
+                if scope["type"] == "http":
+                    duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
+                    logger.info(
+                        f"[REQUEST] request_id={request_id} correlation_id={correlation_id} method={scope.get('method')} path={scope.get('path')} status={status_code or 500} duration_ms={duration_ms}"
+                    )
+            finally:
+                _request_id_context.reset(request_token)
+                _correlation_id_context.reset(correlation_token)
 
 
 def _safe_identifier(value: str | None) -> str | None:

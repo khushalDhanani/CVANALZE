@@ -10,7 +10,7 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-from app.core.database import SessionLocal
+from app.core.database import PostgresAppSession
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("backfill_cvai_cache")
@@ -19,7 +19,7 @@ UPLOADS_RESULTS_DIR = os.path.join(backend_dir, "uploads", "results")
 
 
 def backfill():
-    if not SessionLocal:
+    if not PostgresAppSession:
         logger.error("Database connection not configured.")
         return
 
@@ -30,7 +30,7 @@ def backfill():
     json_files = [f for f in os.listdir(UPLOADS_RESULTS_DIR) if f.endswith(".json")]
     logger.info(f"Found {len(json_files)} JSON files to process.")
 
-    db = SessionLocal()
+    db = PostgresAppSession()
     try:
         # cv_documents
         upsert_cv_sql = text("""

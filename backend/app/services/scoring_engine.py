@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 import re
 from typing import Any
@@ -24,6 +25,8 @@ from app.services.match_evaluators import (
     CrossDomainGuardEvaluator,
     RecommendationEvaluator,
     RequirementEvaluator,
+    VacancyFitEvaluator,
+    is_ignorable_requirement,
 )
 
 
@@ -139,19 +142,30 @@ class ScoringEngine:
         missing = []
 
         assets = RuleConfigManager.get_term_matching_assets()
-        stop_phrases = assets["stop_phrases"]
-        noise_words = assets["noise_words"]
+        noise_words = set(assets.get("noise_words", []))
+        noise_words.update(["general", "knowledge", "basic", "advanced", "good", "excellent", "working", "understanding", "hands-on", "familiarity", "experience", "skills", "ability"])
+        noise_words = list(noise_words)
         aliases = assets["aliases"]
+
+        def normalize_token(token: str) -> str:
+            if len(token) > 4 and token.endswith("ies"):
+                return token[:-3] + "y"
+            for suffix in ("ing", "ed", "s"):
+                if len(token) > len(suffix) + 3 and token.endswith(suffix):
+                    return token[:-len(suffix)]
+            return token
+
+        normalized_cv_tokens = {
+            normalize_token(token)
+            for token in re.findall(r"[a-z0-9]+", normalized_text.lower())
+        }
 
         for term in terms:
             term_clean = term.strip()
-            if not term_clean:
+            if not term_clean or is_ignorable_requirement(term):
                 continue
 
             term_lower = term_clean.lower()
-            if term_lower in stop_phrases:
-                matched.append(term)
-                continue
 
             pattern = cls._get_compiled_term_pattern(term_lower)
             if pattern.search(normalized_text):
@@ -170,22 +184,29 @@ class ScoringEngine:
                 if alt_matched:
                     continue
 
-            # Key Sub-token matching (stripping noise/filler words)
+            # Sub-token matching (stripping noise/filler words) is only used for
+            # SHORT skills (<= 3 meaningful tokens) and requires EVERY token to
+            # appear in the CV text. A single shared token must not fabricate a
+            # match for a longer phrase (e.g. "HPLC knowledge" is NOT proven by
+            # the word "knowledge" alone; "Plant Commission" requires both
+            # "plant" AND "commission").
             sub_tokens = [w for w in re.split(r"[\s,;/()\-_]+", term_lower) if w and w not in noise_words and len(w) > 1]
-            token_found = False
-            if sub_tokens:
-                for tok in sub_tokens:
-                    tok_pattern = cls._get_compiled_term_pattern(tok)
-                    if tok_pattern.search(normalized_text):
-                        matched.append(term)
-                        token_found = True
-                        break
-            if token_found:
+            if 1 <= len(sub_tokens) <= 3 and all(
+                cls._get_compiled_term_pattern(tok).search(normalized_text) for tok in sub_tokens
+            ):
+                matched.append(term)
+                continue
+
+            normalized_sub_tokens = {normalize_token(token) for token in sub_tokens}
+            if 1 <= len(normalized_sub_tokens) <= 3 and normalized_sub_tokens.issubset(normalized_cv_tokens):
+                matched.append(term)
                 continue
 
             missing.append(term)
 
+
         return matched, missing
+
 
     @classmethod
     def evaluate_job_match(
@@ -199,6 +220,7 @@ class ScoringEngine:
         llm_match: OptimizedVacancyMatch | None = None,
         scoring_config: dict[str, float] | ScoringConfig | None = None,
         context: CandidateAnalysisContext | None = None,
+        cand_hierarchy: Any | None = None,
     ) -> JobMatchResult:
         if context is None:
             context = CandidateAnalysisContext.create(
@@ -254,20 +276,6 @@ class ScoringEngine:
         if guard_results.additional_mandatory_failures:
             req_results.mandatory_failures.extend(guard_results.additional_mandatory_failures)
 
-        # 5. Recommendation & Confidence
-        total_req_count = len(req_results.mandatory_reqs) + len(req_results.preferred_reqs) + len(req_results.optional_reqs)
-        evidence_count = len(req_results.evidence_map)
-
-        rec_results = RecommendationEvaluator.evaluate(
-            final_score=guard_results.final_score,
-            component_coverage=comp_results.component_coverage,
-            total_req_count=total_req_count,
-            evidence_count=evidence_count,
-            scoring_config=typed_scoring_config,
-            reason_str=guard_results.reason_str,
-            missing_criteria=req_results.missing_criteria,
-        )
-
         def safe_round(val: float | None) -> float:
             return round(val, 1) if val is not None else 0.0
 
@@ -286,6 +294,38 @@ class ScoringEngine:
             elif has_lexical:
                 retrieval_src = "keyword"
 
+        from app.services.match_evaluators import VacancyFitEvaluator
+        resolved_cand_hierarchy = cand_hierarchy if cand_hierarchy is not None else getattr(context, "cand_hierarchy", None)
+        fit_results = VacancyFitEvaluator.evaluate_fit(
+            context=context,
+            job=job_ctx,
+            cv_text=cv_text,
+            cand_hierarchy=resolved_cand_hierarchy,
+            comp_results=comp_results,
+            mandatory_failures=req_results.mandatory_failures,
+            scoring_config=typed_scoring_config,
+        )
+        if guard_results.is_domain_capped and guard_results.final_score < fit_results.vacancy_fit_score:
+            fit_results.vacancy_fit_score = guard_results.final_score
+            fit_results.score_breakdown.overall_fit_score = guard_results.final_score
+            fit_results.score_breakdown.match_status = "NO_STRONG_VACANCY_MATCH"
+            fit_results.match_status = "NO_STRONG_VACANCY_MATCH"
+            fit_results.reason = guard_results.domain_capped_reason or fit_results.reason
+
+        # 5. Recommendation & Confidence. Classification is derived from the
+        # same canonical score returned to API/UI consumers.
+        total_req_count = len(req_results.mandatory_reqs) + len(req_results.preferred_reqs) + len(req_results.optional_reqs)
+        evidence_count = len(req_results.evidence_map)
+        rec_results = RecommendationEvaluator.evaluate(
+            final_score=fit_results.vacancy_fit_score,
+            component_coverage=comp_results.component_coverage,
+            total_req_count=total_req_count,
+            evidence_count=evidence_count,
+            scoring_config=typed_scoring_config,
+            reason_str=fit_results.reason,
+            missing_criteria=req_results.missing_criteria,
+        )
+
         return JobMatchResult(
             job_id=job_ctx.job_id,
             job_title=job_ctx.title,
@@ -296,8 +336,11 @@ class ScoringEngine:
             department_id=raw_job.get("department_id"),
             department_name=raw_job.get("department_name") or raw_job.get("department"),
             location_id=raw_job.get("location_id"),
-            score=guard_results.final_score,
-            overall_score=guard_results.final_score,
+            score=fit_results.vacancy_fit_score,
+            overall_score=fit_results.vacancy_fit_score,
+            vacancy_fit_score=fit_results.vacancy_fit_score,
+            score_breakdown=fit_results.score_breakdown,
+            vacancy_match_status=fit_results.match_status,
             classification=rec_results.classification,
             recommendation=rec_results.recommendation,
             role_score=safe_round(comp_results.role_score),
@@ -328,15 +371,19 @@ class ScoringEngine:
                 }
                 for f in req_results.mandatory_failures
             ],
-            confidence_score=rec_results.confidence_val,
-            hr_review_required=comp_results.hr_review_required,
-            is_cross_domain=guard_results.is_domain_capped,
-            cross_domain_penalty_applied=guard_results.is_domain_capped,
-            cross_domain_penalty_reason=guard_results.domain_capped_reason,
+            confidence=rec_results.confidence_val,
+            hr_review_required=bool(req_results.mandatory_failures) or fit_results.match_status != "MATCHED" or any(
+                item.requirement_id == "req_education" and item.status.value == "FAILED"
+                for item in req_results.preferred_reqs
+            ),
+            domain_mismatch_capped=guard_results.is_domain_capped,
+            domain_mismatch_reason=guard_results.domain_capped_reason,
             reason=rec_results.reason_str,
             career_transition_detected=transition_detected,
             career_transition_note=transition_note,
             retrieval_source=retrieval_src,
+            candidate_job_family=context.cand_primary_family,
+            vacancy_job_family=job_ctx.vac_family,
         )
 
     @classmethod
@@ -388,31 +435,20 @@ class ScoringEngine:
                 for job_ctx in job_contexts
             ]
 
-        evaluated_matches.sort(key=lambda m: m.score, reverse=True)
+        evaluated_matches.sort(key=lambda m: m.vacancy_fit_score or m.score, reverse=True)
 
-        best_match = (
-            evaluated_matches[0]
-            if evaluated_matches
-            else JobMatchResult(
-                job_id="general",
-                job_title="General Role",
-                department="General",
-                score=0.0,
-                classification="LOW",
-                recommendation="HR review required.",
-                matched_skills=[],
-                missing_skills=[],
-                matched_keywords=[],
-                missing_keywords=[],
-            )
-        )
+        high_threshold = scoring_config.match_high_threshold
+        suitable_matches = [
+            m
+            for m in evaluated_matches
+            if VacancyFitEvaluator.is_eligible_match(m, high_threshold=high_threshold)
+        ]
+        unsuitable_matches = [m for m in evaluated_matches if m not in suitable_matches]
+        best_match = suitable_matches[0] if suitable_matches else None
 
-        # Split evaluated matches into suitable (HIGH/MEDIUM) vs unsuitable (LOW)
-        suitable_matches = [m for m in evaluated_matches if m.classification in ("HIGH", "MEDIUM")]
-        unsuitable_matches = [m for m in evaluated_matches if m.classification not in ("HIGH", "MEDIUM")]
 
         return CandidateMatchAnalysis(
-            primary_department=best_match.department,
+            primary_department=best_match.department if best_match else "",
             best_match=best_match,
             suitable_openings=suitable_matches,
             unsuitable_openings=unsuitable_matches,

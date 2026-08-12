@@ -18,6 +18,19 @@ export interface FilePickerAsset {
 
 const TOTAL_STEPS = 8;
 
+function getProcessingStateLabel(response: CVProcessingResponse): string {
+  switch (response.job_state) {
+    case 'QUEUED':
+      return 'Pending';
+    case 'RETRYING':
+      return 'Retrying';
+    case 'PROCESSING':
+      return 'Processing';
+    default:
+      return '';
+  }
+}
+
 export function useCvUpload() {
   const [uploading, setUploading] = useState<boolean>(false);
   const [isComplete, setIsComplete] = useState<boolean>(false);
@@ -106,6 +119,7 @@ export function useCvUpload() {
     async (cvKey: string, isEnriched: boolean = false) => {
       stopPollTimer();
       let attempts = 0;
+      let consecutiveErrors = 0;
       pollIntervalRef.current = setInterval(async () => {
         attempts++;
         if (attempts > API_CONFIG.MAX_POLL_RETRIES) {
@@ -124,7 +138,18 @@ export function useCvUpload() {
         try {
           if (isEnriched) {
             const res = await matchService.getMatchStatus(cvKey);
-            if ('status' in res && (res as CVProcessingResponse).status?.toUpperCase() === 'FAILED') {
+            const resStatus = (res as any).status?.toUpperCase() || '';
+            const isFinished =
+              (resStatus === 'COMPLETED' ||
+                resStatus === 'COMPLETED_DEGRADED' ||
+                resStatus === 'NEW_CV' ||
+                resStatus === 'REPROCESSED' ||
+                resStatus === 'CACHE_HIT' ||
+                (res as any).progress === 100 ||
+                (res as any).is_complete === true) &&
+              resStatus !== 'PROCESSING';
+
+            if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
               stopPollTimer();
               stopTimer();
               setUploading(false);
@@ -153,16 +178,7 @@ export function useCvUpload() {
                 next[fIndex] = 'failed';
                 return next;
               });
-            } else if (
-              'scan_id' in res ||
-              'match_analysis' in res ||
-              (res as any).status === 'COMPLETED' ||
-              (res as any).status === 'NEW_CV' ||
-              (res as any).status === 'REPROCESSED' ||
-              (res as any).status === 'CACHE_HIT' ||
-              (res as any).progress === 100 ||
-              (res as any).is_complete === true
-            ) {
+            } else if (isFinished) {
               stopPollTimer();
               stopTimer();
               if ('scan_id' in res || 'match_analysis' in res) {
@@ -172,9 +188,15 @@ export function useCvUpload() {
               setIsComplete(true);
               setCurrentStepIndex(7);
               
-              const statusStr = (res as any).status?.toUpperCase() || '';
-              const isCacheHit = statusStr === 'CACHE_HIT';
-              setStatusMessage(isCacheHit ? 'Loaded from cache instantly!' : 'Candidate analysis & job matching complete!');
+              const isCacheHit = resStatus === 'CACHE_HIT';
+              const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
+              setStatusMessage(
+                isDegraded
+                  ? 'Analysis completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
+                  : isCacheHit
+                    ? 'Loaded from cache instantly!'
+                    : 'Candidate analysis & job matching complete!'
+              );
               
               setStepStates([
                 'completed',
@@ -188,7 +210,8 @@ export function useCvUpload() {
               ]);
             } else {
               const procRes = res as CVProcessingResponse;
-              const msg = procRes.message || 'Processing LLM match...';
+              const stateLabel = getProcessingStateLabel(procRes);
+              const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Processing LLM match...';
               setStatusMessage(msg);
 
               const stageMap: Record<string, number> = {
@@ -219,10 +242,22 @@ export function useCvUpload() {
 
               setCurrentStepIndex(nextStep);
               updateStepState(nextStep, 'active', isEnriched);
+              consecutiveErrors = 0;
             }
           } else {
             const res = await cvService.getCvStatus(cvKey);
-            if ('status' in res && (res as CVProcessingResponse).status?.toUpperCase() === 'FAILED') {
+            const resStatus = (res as any).status?.toUpperCase() || '';
+            const isFinished =
+              (resStatus === 'COMPLETED' ||
+                resStatus === 'COMPLETED_DEGRADED' ||
+                resStatus === 'NEW_CV' ||
+                resStatus === 'REPROCESSED' ||
+                resStatus === 'CACHE_HIT' ||
+                (res as any).progress === 100 ||
+                (res as any).is_complete === true) &&
+              resStatus !== 'PROCESSING';
+
+            if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
               stopPollTimer();
               stopTimer();
               setUploading(false);
@@ -253,21 +288,19 @@ export function useCvUpload() {
                 next[fIndex] = 'failed';
                 return next;
               });
-            } else if (
-              'scan_id' in res ||
-              'match_analysis' in res ||
-              (res as any).status === 'COMPLETED' ||
-              (res as any).status === 'NEW_CV' ||
-              (res as any).status === 'REPROCESSED' ||
-              (res as any).progress === 100
-            ) {
+            } else if (isFinished) {
               stopPollTimer();
               stopTimer();
               setBasicResult(res as CVUploadResponse);
               setUploading(false);
               setIsComplete(true);
               setCurrentStepIndex(7);
-              setStatusMessage('CV parsing & job matching complete!');
+              const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
+              setStatusMessage(
+                isDegraded
+                  ? 'CV processing completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
+                  : 'CV parsing & job matching complete!'
+              );
               setStepStates([
                 'completed',
                 'completed',
@@ -280,7 +313,8 @@ export function useCvUpload() {
               ]);
             } else {
               const procRes = res as CVProcessingResponse;
-              const msg = procRes.message || 'Parsing CV...';
+              const stateLabel = getProcessingStateLabel(procRes);
+              const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Parsing CV...';
               setStatusMessage(msg);
 
               const stageMap: Record<string, number> = {
@@ -307,18 +341,23 @@ export function useCvUpload() {
 
               setCurrentStepIndex(nextStep);
               updateStepState(nextStep, 'active', false);
+              consecutiveErrors = 0;
             }
           }
         } catch (err: any) {
-          stopPollTimer();
-          stopTimer();
-          setUploading(false);
-          setError(err.message || 'Status check failed');
-          setStepStates((prev) => {
-            const next = [...prev];
-            next[currentStepIndexRef.current] = 'failed';
-            return next;
-          });
+          consecutiveErrors++;
+          console.warn(`[POLL_RETRY] Status check transient error (attempt ${consecutiveErrors}/5):`, err?.message);
+          if (consecutiveErrors >= 5) {
+            stopPollTimer();
+            stopTimer();
+            setUploading(false);
+            setError(err.message || 'Status check failed');
+            setStepStates((prev) => {
+              const next = [...prev];
+              next[currentStepIndexRef.current] = 'failed';
+              return next;
+            });
+          }
         }
       }, API_CONFIG.POLL_INTERVAL_MS);
     },
@@ -366,7 +405,7 @@ export function useCvUpload() {
             'pending',
             'pending',
           ]);
-          pollCvStatus(res.cv_key, true);
+          pollCvStatus((res as any).cv_key || (res as any).scan_id || (res as any).id, true);
         } else {
           const res = await cvService.uploadCv(file);
           setStatusMessage('Document uploaded. Validating format & parsing...');
@@ -381,7 +420,7 @@ export function useCvUpload() {
             'pending',
             'pending',
           ]);
-          pollCvStatus(res.cv_key, false);
+          pollCvStatus((res as any).cv_key || (res as any).scan_id || (res as any).id, false);
         }
       } catch (err: any) {
         stopTimer();

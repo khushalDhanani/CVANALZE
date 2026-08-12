@@ -81,7 +81,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="qwen3:4b",
+        model_version="gemma3:4b",
         matching_version="3.0",
     )
     key2 = LLMCacheRepository.compute_composite_hash(
@@ -89,7 +89,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="qwen3:4b",
+        model_version="gemma3:4b",
         matching_version="3.0",
     )
     assert key1 == key2
@@ -100,7 +100,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="qwen3:4b",
+        model_version="gemma3:4b",
         matching_version="3.1",
     )
     assert key1 != key3
@@ -140,10 +140,16 @@ def test_build_optimized_match_prompt():
             "title": "Backend Engineer",
             "department": "Engineering",
             "required_skills": ["Python", "FastAPI"],
+            "education": "Configured Degree",
         }
     ]
 
-    prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
+    from unittest.mock import patch
+    with patch("app.services.prompt_service.PromptService.get_prompt") as mock_get_prompt:
+        mock_get_prompt.return_value = "John Doe Backend Engineer"
+        prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
+    prompt_input = mock_get_prompt.call_args.args[1]["input_json"]
+    assert '"education_req":["Configured Degree"]' in prompt_input
     assert "John Doe" in prompt
     assert "Backend Engineer" in prompt
     assert token_est > 0

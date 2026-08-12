@@ -85,6 +85,17 @@ def test_success_response_field_snapshots_are_stable():
         "rejection_policy_note",
         "llm_skipped",
         "normalized_resume",
+        "classification",
+        "scoring_profile_code",
+        "scoring_profile_version",
+        "ai_career_suggestions",
+        "unsuitable_openings",
+        "config_version",
+        "prompt_version",
+        "match_status",
+        "freshness_status",
+        "source_watermark",
+        "source_snapshot",
     }
     assert set(CVUploadResponse.model_fields) == {
         "id",
@@ -145,6 +156,7 @@ def test_compatibility_aliases_reference_existing_routes():
 
 def test_legacy_job_states_normalize_to_canonical_states():
     assert normalize_job_state("processing") == JobState.PROCESSING
+    assert normalize_job_state("canceled") == JobState.CANCELLED
     assert normalize_job_state("NEW_CV") == JobState.COMPLETED
     assert normalize_job_state("REPROCESSED") == JobState.COMPLETED
     assert normalize_job_state("CACHE_HIT") == JobState.COMPLETED

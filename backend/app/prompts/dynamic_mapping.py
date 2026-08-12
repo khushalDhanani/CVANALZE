@@ -1,5 +1,8 @@
+from __future__ import annotations
 import json
 from typing import Any
+from app.services.context_packer import pack_cv_context
+from app.services.llm_input_security import harden_prompt, sanitize_string_list, sanitize_untrusted_text
 
 PROMPT_VERSION = "2.0"
 
@@ -11,7 +14,7 @@ def build_dynamic_mapping_prompt(cv_text: str, active_vacancies: list[dict[str, 
     """
 
     simplified_vacancies = []
-    for vac in active_vacancies:
+    for vac in sorted(active_vacancies, key=lambda item: str(item.get("vacancy_id") or "")):
         simplified_vacancies.append(
             {
                 "vacancy_id": vac.get("vacancy_id"),
@@ -19,10 +22,10 @@ def build_dynamic_mapping_prompt(cv_text: str, active_vacancies: list[dict[str, 
                 "company_id": vac.get("company_id"),
                 "department_id": vac.get("department_id"),
                 "location_id": vac.get("location_id"),
-                "job_title": vac.get("title"),
-                "department": vac.get("department"),
-                "requirements": vac.get("required_skills", []),
-                "skills": vac.get("preferred_keywords", []),
+                "job_title": sanitize_untrusted_text(str(vac.get("title") or "")).text,
+                "department": sanitize_untrusted_text(str(vac.get("department") or "")).text,
+                "requirements": sanitize_string_list(vac.get("required_skills", [])),
+                "skills": sanitize_string_list(vac.get("preferred_keywords", [])),
             }
         )
 
@@ -41,28 +44,14 @@ def build_dynamic_mapping_prompt(cv_text: str, active_vacancies: list[dict[str, 
             "Explain matches using evidence from the CV and vacancy data only."
         ),
         "active_vacancies": simplified_vacancies,
-        "candidate_cv_markdown": cv_text,
+        "candidate_cv_markdown": pack_cv_context(cv_text, max_tokens=1600, deidentify=True).text,
     }
 
     input_json = json.dumps(structured_input, indent=2, ensure_ascii=False)
 
-    prompt = f"""/think
-{input_json}
-
-Provide your analysis in the EXACT JSON format below.
-DO NOT include any markdown formatting like ```json or ```.
-DO NOT include any thinking tokens or explanations outside the JSON object.
-Return ONLY valid JSON.
-
-Expected JSON Schema:
-{{
-  "matched_vacancies": [
-    {{
-      "vacancy_id": 1334,
-      "semantic_reason": "Candidate's experience and skills directly correspond to the requirements of the vacancy record.",
-      "inferred_skills": ["relevant_skill_1", "relevant_skill_2"]
-    }}
-  ]
-}}
-"""
-    return prompt
+    from app.services.prompt_service import PromptService
+    prompt = PromptService.get_prompt(
+        prompt_name="dynamic_mapping",
+        placeholders={"input_json": input_json}
+    )
+    return harden_prompt(prompt)

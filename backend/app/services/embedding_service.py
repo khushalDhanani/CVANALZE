@@ -1,8 +1,11 @@
+from __future__ import annotations
 # backend/app/services/embedding_service.py
 import hashlib
 import math
 import threading
 import time
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 
 from app.core.cache import embedding_cache_manager
@@ -15,6 +18,45 @@ from app.services.ollama_transport import (
     OllamaTransport,
     OllamaUnavailableError,
 )
+
+
+class EmbeddingSchemaError(Exception):
+    """Raised when PostgreSQL embedding table schema is invalid or missing required columns."""
+    pass
+
+
+class EmbeddingDatabaseConnectionError(Exception):
+    """Raised when PostgreSQL database connection is unavailable or unreachable."""
+    pass
+
+
+class EmbeddingCacheStatus(str, Enum):
+    CACHE_HIT = "CACHE_HIT"
+    CACHE_MISS = "CACHE_MISS"
+    STALE_CACHE = "STALE_CACHE"
+
+
+
+def _normalize_watermark(val: Any) -> str | None:
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        if val.tzinfo is None:
+            val = val.replace(tzinfo=timezone.utc)
+        else:
+            val = val.astimezone(timezone.utc)
+        return val.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        from dateutil.parser import parse
+        dt = parse(str(val))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(val).strip()
+
 
 
 def get_embedding(text: str, model_name: str | None = None) -> list[float]:
@@ -127,7 +169,35 @@ class EmbeddingService:
 
         t0 = time.perf_counter()
         try:
-            embedding = cls._call_ollama_embed(model, text)
+            # For short texts (<= 3000 chars), single embed call.
+            # For long texts (> 3000 chars), split into ~2000-char overlapping chunks and compute mean-pooled vector.
+            if len(text) <= 3000:
+                embedding = cls._call_ollama_embed(model, text)
+            else:
+                chunks: list[str] = []
+                chunk_size, overlap = 2000, 200
+                start = 0
+                while start < len(text):
+                    end = min(start + chunk_size, len(text))
+                    chunk = text[start:end].strip()
+                    if chunk:
+                        chunks.append(chunk)
+                    if end == len(text):
+                        break
+                    start += chunk_size - overlap
+
+                chunk_embeddings = cls._call_ollama_batch_embed(model, chunks) if chunks else None
+                if chunk_embeddings and any(c for c in chunk_embeddings if c):
+                    valid_vecs = [c for c in chunk_embeddings if c]
+                    dim = len(valid_vecs[0])
+                    mean_vec = [sum(vec[i] for vec in valid_vecs) / len(valid_vecs) for i in range(dim)]
+                    norm = math.sqrt(sum(v * v for v in mean_vec))
+                    embedding = [v / norm for v in mean_vec] if norm > 0 else mean_vec
+                    logger.info(f"[EMBEDDING_AGGREGATED] Pooled {len(valid_vecs)} chunks for {len(text)} chars (hash='{content_hash[:12]}...')")
+                else:
+                    # Fallback to single call on first 3000 chars if batch embed returns None
+                    embedding = cls._call_ollama_embed(model, text[:3000])
+
             duration_ms = (time.perf_counter() - t0) * 1000.0
 
             with cls._metrics_lock:
@@ -256,16 +326,25 @@ class EmbeddingService:
         return dot / (norm_a * norm_b)
 
 
-def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: str | None = None) -> bool:
+def save_candidate_embedding(
+    cv_key: str,
+    embedding: list[float],
+    content_hash: str | None = None,
+    source_snapshot: str | None = None,
+    source_watermark: Any = None,
+    freshness_status: str = "FRESH",
+) -> bool:
     """
     Upsert candidate embedding into PostgreSQL candidate_embeddings table keyed by cv_key.
+    Guarantees PostgreSQL commit succeeds BEFORE updating L2/L3 cache.
+    On DB failure: invokes pg_db.rollback() and re-raises exception (never populates cache).
     """
-    from app.core.database import pg_SessionLocal
+    from app.core.database import PostgresAppSession
 
-    if pg_SessionLocal is None:
-        return False
+    if PostgresAppSession is None:
+        raise EmbeddingDatabaseConnectionError("PostgresAppSession is None.")
 
-    pg_db = pg_SessionLocal()
+    pg_db = PostgresAppSession()
     try:
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert
@@ -277,6 +356,9 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
             embedding=embedding,
             embedding_model_version=settings.EMBEDDING_MODEL,
             content_hash=content_hash,
+            source_snapshot=source_snapshot,
+            source_watermark=source_watermark,
+            freshness_status=freshness_status,
             updated_at=func.now(),
         )
         stmt = stmt.on_conflict_do_update(
@@ -285,12 +367,16 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
                 "embedding": stmt.excluded.embedding,
                 "embedding_model_version": stmt.excluded.embedding_model_version,
                 "content_hash": stmt.excluded.content_hash,
+                "source_snapshot": stmt.excluded.source_snapshot,
+                "source_watermark": stmt.excluded.source_watermark,
+                "freshness_status": stmt.excluded.freshness_status,
                 "updated_at": func.now(),
             },
         )
         pg_db.execute(stmt)
         pg_db.commit()
-        # Also cache in L2/L3 cache manager under cv_key and content_hash
+
+        # ONLY AFTER successful DB commit, update L2/L3 cache
         cache_key = f"{settings.EMBEDDING_MODEL}:{cv_key}"
         embedding_cache_manager.set(cache_key, embedding)
         if content_hash and content_hash != cv_key:
@@ -300,7 +386,83 @@ def save_candidate_embedding(cv_key: str, embedding: list[float], content_hash: 
     except Exception as exc:
         pg_db.rollback()
         logger.error(f"save_candidate_embedding failed for cv_key={cv_key}: {exc}")
-        return False
+        orig = getattr(exc, "orig", exc)
+        pgcode = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+        if pgcode in ("42703", "42P01") or "UndefinedColumn" in str(exc) or "UndefinedTable" in str(exc):
+            raise EmbeddingSchemaError(f"save_candidate_embedding schema error: {exc}") from exc
+        raise
+    finally:
+        pg_db.close()
+
+
+def get_candidate_embedding_with_status(
+    cv_key: str,
+    current_content_hash: str | None = None,
+    current_watermark: Any = None,
+) -> tuple[list[float] | None, EmbeddingCacheStatus]:
+    """
+    Retrieve candidate vector embedding and cache status by cv_key.
+    PostgreSQL is the single source of truth.
+    """
+    from app.core.database import PostgresAppSession
+    from app.models.pg import CandidateEmbedding
+
+    cache_key = f"{settings.EMBEDDING_MODEL}:{cv_key}"
+
+    if PostgresAppSession is None:
+        logger.error("[EMBEDDING_CACHE] PostgresAppSession is None (DB_CONNECTION_ERROR)")
+        raise EmbeddingDatabaseConnectionError("PostgreSQL database session is not configured.")
+
+    pg_db = PostgresAppSession()
+    try:
+        rec = pg_db.query(CandidateEmbedding).filter(CandidateEmbedding.cv_key == cv_key).first()
+
+        if rec is None:
+            # PG row missing -> evict any orphan L2/L3 cache entry -> CACHE_MISS
+            embedding_cache_manager.delete(cache_key)
+            return None, EmbeddingCacheStatus.CACHE_MISS
+
+        # PG row exists -> evaluate freshness & content matching
+        is_stale = rec.freshness_status == "STALE" or rec.embedding is None
+
+        # Primary check: content_hash
+        if current_content_hash and rec.content_hash and rec.content_hash != current_content_hash:
+            is_stale = True
+
+        # Secondary check: source_watermark (normalized)
+        if current_watermark and rec.source_watermark:
+            w_norm_current = _normalize_watermark(current_watermark)
+            w_norm_rec = _normalize_watermark(rec.source_watermark)
+            if w_norm_current and w_norm_rec and w_norm_current != w_norm_rec:
+                is_stale = True
+
+        if is_stale:
+            # Evict L2/L3 cache before returning STALE_CACHE
+            embedding_cache_manager.delete(cache_key)
+            logger.info(f"[EMBEDDING_CACHE] STALE_CACHE for cv_key='{cv_key}' (evicted cache).")
+            return None, EmbeddingCacheStatus.STALE_CACHE
+
+        # PG row is FRESH & matching
+        vec = [float(x) for x in list(rec.embedding)]
+        embedding_cache_manager.set(cache_key, vec)
+        return vec, EmbeddingCacheStatus.CACHE_HIT
+
+    except (EmbeddingSchemaError, EmbeddingDatabaseConnectionError):
+        raise
+    except Exception as exc:
+        orig = getattr(exc, "orig", exc)
+        pgcode = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+
+        if pgcode in ("42703", "42P01") or "UndefinedColumn" in str(exc) or "UndefinedTable" in str(exc):
+            logger.critical(f"[DB_SCHEMA_ERROR] CandidateEmbedding table schema error (SQLSTATE {pgcode}): {exc}")
+            raise EmbeddingSchemaError(f"PostgreSQL candidate_embeddings schema error (SQLSTATE {pgcode}): {exc}") from exc
+
+        if pgcode in ("08001", "08006", "08003") or "connection" in str(exc).lower():
+            logger.error(f"[DB_CONNECTION_ERROR] PostgreSQL connection failure (SQLSTATE {pgcode}): {exc}")
+            raise EmbeddingDatabaseConnectionError(f"PostgreSQL database connection failure: {exc}") from exc
+
+        logger.error(f"[EMBEDDING_CACHE] Unexpected database query failure for cv_key='{cv_key}': {exc}")
+        raise
     finally:
         pg_db.close()
 
@@ -309,26 +471,9 @@ def get_candidate_embedding(cv_key: str) -> list[float] | None:
     """
     Retrieve candidate vector embedding by cv_key from PostgreSQL or cache.
     """
-    from app.core.database import pg_SessionLocal
+    emb, _ = get_candidate_embedding_with_status(cv_key)
+    return emb
 
-    if pg_SessionLocal is not None:
-        pg_db = pg_SessionLocal()
-        try:
-            from app.models.pg import CandidateEmbedding
-
-            rec = pg_db.query(CandidateEmbedding).filter(CandidateEmbedding.cv_key == cv_key).first()
-            if rec and rec.embedding is not None:
-                return [float(x) for x in list(rec.embedding)]
-        except Exception as exc:
-            logger.warning(f"get_candidate_embedding PG query error for cv_key={cv_key}: {exc}")
-        finally:
-            pg_db.close()
-
-    cache_key = f"{settings.EMBEDDING_MODEL}:{cv_key}"
-    cached = embedding_cache_manager.get(cache_key)
-    if cached is not None:
-        return cached
-    return None
 
 
 def build_vacancy_canonical_text(job: dict[str, Any]) -> str:
@@ -387,23 +532,25 @@ def build_vacancy_canonical_text(job: dict[str, Any]) -> str:
     return "\n".join(parts).strip()
 
 
-def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash: str | None = None) -> bool:
+def save_vacancy_embedding(
+    vacancy_id: int,
+    embedding: list[float],
+    content_hash: str | None = None,
+    source_snapshot: str | None = None,
+    source_watermark: Any = None,
+    freshness_status: str = "FRESH",
+) -> bool:
     """
     Upsert vacancy embedding into PostgreSQL vacancy_embeddings table keyed by vacancy_id.
-    Also caches in embedding_cache_manager.
+    Guarantees PostgreSQL commit succeeds BEFORE updating L2/L3 cache.
+    On DB failure: invokes pg_db.rollback() and re-raises exception (never populates cache).
     """
-    from app.core.database import pg_SessionLocal
+    from app.core.database import PostgresAppSession
 
-    cache_key_id = f"{settings.EMBEDDING_MODEL}:vac_id:{vacancy_id}"
-    embedding_cache_manager.set(cache_key_id, embedding)
-    if content_hash:
-        cache_key_hash = f"{settings.EMBEDDING_MODEL}:vac:{content_hash}"
-        embedding_cache_manager.set(cache_key_hash, embedding)
+    if PostgresAppSession is None:
+        raise EmbeddingDatabaseConnectionError("PostgresAppSession is None.")
 
-    if pg_SessionLocal is None:
-        return False
-
-    pg_db = pg_SessionLocal()
+    pg_db = PostgresAppSession()
     try:
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert
@@ -415,6 +562,9 @@ def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash
             embedding=embedding,
             embedding_model_version=settings.EMBEDDING_MODEL,
             content_hash=content_hash,
+            source_snapshot=source_snapshot,
+            source_watermark=source_watermark,
+            freshness_status=freshness_status,
             updated_at=func.now(),
         )
         stmt = stmt.on_conflict_do_update(
@@ -423,16 +573,99 @@ def save_vacancy_embedding(vacancy_id: int, embedding: list[float], content_hash
                 "embedding": stmt.excluded.embedding,
                 "embedding_model_version": stmt.excluded.embedding_model_version,
                 "content_hash": stmt.excluded.content_hash,
+                "source_snapshot": stmt.excluded.source_snapshot,
+                "source_watermark": stmt.excluded.source_watermark,
+                "freshness_status": stmt.excluded.freshness_status,
                 "updated_at": func.now(),
             },
         )
         pg_db.execute(stmt)
         pg_db.commit()
+
+        # ONLY AFTER successful DB commit, update L2/L3 cache
+        cache_key_id = f"{settings.EMBEDDING_MODEL}:vac_id:{vacancy_id}"
+        embedding_cache_manager.set(cache_key_id, embedding)
+        if content_hash:
+            cache_key_hash = f"{settings.EMBEDDING_MODEL}:vac:{content_hash}"
+            embedding_cache_manager.set(cache_key_hash, embedding)
         return True
     except Exception as exc:
         pg_db.rollback()
         logger.error(f"save_vacancy_embedding failed for vacancy_id={vacancy_id}: {exc}")
-        return False
+        orig = getattr(exc, "orig", exc)
+        pgcode = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+        if pgcode in ("42703", "42P01") or "UndefinedColumn" in str(exc) or "UndefinedTable" in str(exc):
+            raise EmbeddingSchemaError(f"save_vacancy_embedding schema error: {exc}") from exc
+        raise
+    finally:
+        pg_db.close()
+
+
+def get_vacancy_embedding_with_status(
+    vacancy_id: int,
+    current_content_hash: str | None = None,
+    current_watermark: Any = None,
+) -> tuple[list[float] | None, str | None, EmbeddingCacheStatus]:
+    """
+    Retrieve vacancy vector embedding, content hash, and cache status by vacancy_id from PostgreSQL.
+    PostgreSQL is the single source of truth.
+    """
+    from app.core.database import PostgresAppSession
+    from app.models.pg import VacancyEmbedding
+
+    cache_key_id = f"{settings.EMBEDDING_MODEL}:vac_id:{vacancy_id}"
+
+    if PostgresAppSession is None:
+        logger.error("[EMBEDDING_CACHE] PostgresAppSession is None for get_vacancy_embedding")
+        raise EmbeddingDatabaseConnectionError("PostgreSQL database session is not configured.")
+
+    pg_db = PostgresAppSession()
+    try:
+        rec = pg_db.query(VacancyEmbedding).filter(VacancyEmbedding.vacancy_id == vacancy_id).first()
+
+        if rec is None:
+            # PG row missing -> evict any orphan L2/L3 cache entry -> CACHE_MISS
+            embedding_cache_manager.delete(cache_key_id)
+            return None, None, EmbeddingCacheStatus.CACHE_MISS
+
+        is_stale = rec.freshness_status == "STALE" or rec.embedding is None
+
+        # Primary check: content_hash
+        if current_content_hash and rec.content_hash and rec.content_hash != current_content_hash:
+            is_stale = True
+
+        # Secondary check: source_watermark (normalized)
+        if current_watermark and rec.source_watermark:
+            w_norm_current = _normalize_watermark(current_watermark)
+            w_norm_rec = _normalize_watermark(rec.source_watermark)
+            if w_norm_current and w_norm_rec and w_norm_current != w_norm_rec:
+                is_stale = True
+
+        if is_stale:
+            embedding_cache_manager.delete(cache_key_id)
+            logger.info(f"[EMBEDDING_CACHE] STALE_CACHE for vacancy_id={vacancy_id} (evicted cache).")
+            return None, rec.content_hash, EmbeddingCacheStatus.STALE_CACHE
+
+        vec = [float(x) for x in list(rec.embedding)]
+        embedding_cache_manager.set(cache_key_id, vec)
+        return vec, rec.content_hash, EmbeddingCacheStatus.CACHE_HIT
+
+    except (EmbeddingSchemaError, EmbeddingDatabaseConnectionError):
+        raise
+    except Exception as exc:
+        orig = getattr(exc, "orig", exc)
+        pgcode = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+
+        if pgcode in ("42703", "42P01") or "UndefinedColumn" in str(exc) or "UndefinedTable" in str(exc):
+            logger.critical(f"[DB_SCHEMA_ERROR] VacancyEmbedding table schema error (SQLSTATE {pgcode}): {exc}")
+            raise EmbeddingSchemaError(f"PostgreSQL vacancy_embeddings schema error (SQLSTATE {pgcode}): {exc}") from exc
+
+        if pgcode in ("08001", "08006", "08003") or "connection" in str(exc).lower():
+            logger.error(f"[DB_CONNECTION_ERROR] PostgreSQL connection failure (SQLSTATE {pgcode}): {exc}")
+            raise EmbeddingDatabaseConnectionError(f"PostgreSQL database connection failure: {exc}") from exc
+
+        logger.error(f"[EMBEDDING_CACHE] Unexpected database query failure for vacancy_id={vacancy_id}: {exc}")
+        raise
     finally:
         pg_db.close()
 
@@ -441,24 +674,58 @@ def get_vacancy_embedding(vacancy_id: int) -> tuple[list[float] | None, str | No
     """
     Retrieve vacancy vector embedding and content hash by vacancy_id from PostgreSQL or cache.
     """
-    from app.core.database import pg_SessionLocal
+    vec, content_hash, _ = get_vacancy_embedding_with_status(vacancy_id)
+    return vec, content_hash
 
-    if pg_SessionLocal is not None:
-        pg_db = pg_SessionLocal()
-        try:
-            from app.models.pg import VacancyEmbedding
+def get_candidate_embedding_metadata(cv_key: str) -> dict | None:
+    from app.core.database import PostgresAppSession
+    from app.models.pg import CandidateEmbedding
 
-            rec = pg_db.query(VacancyEmbedding).filter(VacancyEmbedding.vacancy_id == vacancy_id).first()
-            if rec and rec.embedding is not None:
-                vec = [float(x) for x in list(rec.embedding)]
-                return vec, rec.content_hash
-        except Exception as exc:
-            logger.warning(f"get_vacancy_embedding PG query error for vacancy_id={vacancy_id}: {exc}")
-        finally:
-            pg_db.close()
+    if PostgresAppSession is None:
+        return None
 
-    cache_key_id = f"{settings.EMBEDDING_MODEL}:vac_id:{vacancy_id}"
-    cached = embedding_cache_manager.get(cache_key_id)
-    if cached is not None:
-        return cached, None
-    return None, None
+    pg_db = PostgresAppSession()
+    try:
+        record = pg_db.query(CandidateEmbedding).filter(CandidateEmbedding.cv_key == cv_key).first()
+        if record:
+            return {
+                "source_watermark": record.source_watermark,
+                "freshness_status": record.freshness_status,
+                "content_hash": record.content_hash,
+            }
+        return None
+    except Exception as exc:
+        orig = getattr(exc, "orig", exc)
+        pgcode = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+        if pgcode in ("42703", "42P01") or "UndefinedColumn" in str(exc) or "UndefinedTable" in str(exc):
+            raise EmbeddingSchemaError(f"get_candidate_embedding_metadata schema error: {exc}") from exc
+        raise
+    finally:
+        pg_db.close()
+
+
+def get_vacancy_embedding_metadata(vacancy_id: int) -> dict | None:
+    from app.core.database import PostgresAppSession
+    from app.models.pg import VacancyEmbedding
+    
+    if PostgresAppSession is None:
+        return None
+        
+    pg_db = PostgresAppSession()
+    try:
+        record = pg_db.query(VacancyEmbedding).filter(VacancyEmbedding.vacancy_id == vacancy_id).first()
+        if record:
+            return {
+                "source_watermark": record.source_watermark,
+                "freshness_status": record.freshness_status,
+                "content_hash": record.content_hash
+            }
+        return None
+    except Exception as exc:
+        orig = getattr(exc, "orig", exc)
+        pgcode = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+        if pgcode in ("42703", "42P01") or "UndefinedColumn" in str(exc) or "UndefinedTable" in str(exc):
+            raise EmbeddingSchemaError(f"get_vacancy_embedding_metadata schema error: {exc}") from exc
+        raise
+    finally:
+        pg_db.close()

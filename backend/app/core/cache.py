@@ -1,3 +1,4 @@
+from __future__ import annotations
 import fnmatch
 import hashlib
 import json
@@ -6,7 +7,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from filelock import FileLock
 
@@ -41,19 +42,29 @@ class CacheKey:
             return ""
         sorted_items = sorted(self.components.items())
         raw = "|".join(f"{k}={v}" for k, v in sorted_items)
-        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        doc_hash = self.components.get("doc_hash")
+        cand_id = self.components.get("cand_id")
+        if doc_hash:
+            return f"doc_{doc_hash}_{digest}"
+        elif cand_id:
+            return f"cand_{cand_id}_{digest}"
+        return digest
+
 
     @classmethod
     def for_llm_match(
         cls,
         document_hash: str = "",
         candidate_id: str = "",
-        vacancy_ids: list[str] | None = None,
+        vacancy_ids: Optional[list[str]] = None,
         vacancy_version: str = "",
         prompt_version: str = "",
         model_version: str = "",
         extraction_version: str = "",
         matching_version: str = "",
+        rule_version: str = "",
+        taxonomy_version: str = "",
     ) -> "CacheKey":
         components: dict[str, str] = {}
         if document_hash:
@@ -72,6 +83,10 @@ class CacheKey:
             components["extract_ver"] = extraction_version
         if matching_version:
             components["match_ver"] = matching_version
+        if rule_version:
+            components["rule_ver"] = rule_version
+        if taxonomy_version:
+            components["taxonomy_ver"] = taxonomy_version
         return cls(components=components)
 
     @classmethod
@@ -80,11 +95,13 @@ class CacheKey:
         document_hash: str = "",
         candidate_id: str = "",
         vacancy_version: str = "",
-        vacancy_ids: list[str] | None = None,
+        vacancy_ids: Optional[list[str]] = None,
         prompt_version: str = "",
         model_version: str = "",
         extraction_version: str = "",
         matching_version: str = "",
+        rule_version: str = "",
+        taxonomy_version: str = "",
     ) -> "CacheKey":
         components: dict[str, str] = {}
         if document_hash:
@@ -103,6 +120,10 @@ class CacheKey:
             components["extract_ver"] = extraction_version
         if matching_version:
             components["match_ver"] = matching_version
+        if rule_version:
+            components["rule_ver"] = rule_version
+        if taxonomy_version:
+            components["taxonomy_ver"] = taxonomy_version
         return cls(components=components)
 
     @classmethod
@@ -713,8 +734,7 @@ class CacheInvalidator:
         for key in keys:
             match_result_cache_manager.delete(key)
         CacheIndex.remove("match_by_doc", doc_hash)
-        if not keys:
-            match_result_cache_manager.delete_by_pattern(f"*{doc_hash}*")
+        match_result_cache_manager.delete_by_pattern(f"*{doc_hash}*")
 
     @classmethod
     def _invalidate_match_results_by_candidate(cls, candidate_id: str) -> None:
@@ -722,29 +742,28 @@ class CacheInvalidator:
         for key in keys:
             match_result_cache_manager.delete(key)
         CacheIndex.remove("match_by_cand", candidate_id)
-        if not keys:
-            match_result_cache_manager.delete_by_pattern(f"*{candidate_id}*")
+        match_result_cache_manager.delete_by_pattern(f"*{candidate_id}*")
+
 
 
 _redis_cache = RedisCache(key_prefix="")
 _memory_cache = MemoryCache(max_size=5000)
 
 _llm_file_cache = FileCache(settings.UPLOADS_DIR / ".llm_cache")
-_cv_file_cache = FileCache(settings.RESULTS_DIR)
 _doc_cache_file_cache = FileCache(settings.UPLOADS_DIR / ".doc_cache")
 _embedding_file_cache = FileCache(settings.UPLOADS_DIR / ".embed_cache")
-_processing_job_file_cache = FileCache(settings.RESULTS_DIR / ".processing_jobs")
+_processing_job_file_cache = FileCache(settings.UPLOADS_DIR / ".processing_jobs")
 
 llm_cache_manager = CacheManager(
     namespace="llm_cache",
     providers=[_memory_cache, _redis_cache, _llm_file_cache],
-    default_ttl=2592000,
+    default_ttl=settings.CACHE_TTL_LLM_SECONDS,
 )
 
 cv_result_cache_manager = CacheManager(
     namespace="cv_result",
-    providers=[_memory_cache, _redis_cache, _cv_file_cache],
-    default_ttl=604800,
+    providers=[_memory_cache, _redis_cache],
+    default_ttl=settings.CACHE_TTL_MATCH_RESULT_SECONDS,
 )
 
 processing_job_cache_manager = CacheManager(
@@ -757,35 +776,35 @@ processing_job_cache_manager = CacheManager(
 doc_cache_manager = CacheManager(
     namespace="doc_cache",
     providers=[_memory_cache, _redis_cache, _doc_cache_file_cache],
-    default_ttl=2592000,
+    default_ttl=settings.CACHE_TTL_DOC_SECONDS,
 )
 
 config_cache_manager = CacheManager(
     namespace="config",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=3600,
+    default_ttl=settings.CACHE_TTL_CONFIG_SECONDS,
 )
 
 embedding_cache_manager = CacheManager(
     namespace="embed",
     providers=[_memory_cache, _redis_cache, _embedding_file_cache],
-    default_ttl=2592000,
+    default_ttl=settings.CACHE_TTL_EMBEDDING_SECONDS,
 )
 
 match_result_cache_manager = CacheManager(
     namespace="match_result",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=604800,
+    default_ttl=settings.CACHE_TTL_MATCH_RESULT_SECONDS,
 )
 
 vacancy_cache_manager = CacheManager(
     namespace="vacancy",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=3600,
+    default_ttl=settings.CACHE_TTL_VACANCY_SECONDS,
 )
 
 master_data_cache_manager = CacheManager(
     namespace="mst",
     providers=[_memory_cache, _redis_cache],
-    default_ttl=3600,
+    default_ttl=settings.CACHE_TTL_MASTER_DATA_SECONDS,
 )

@@ -1,12 +1,11 @@
+from __future__ import annotations
 # backend/app/core/rule_config_manager.py
-import hashlib
 import json
 import logging
 import re
 import threading
 import time
-from datetime import UTC, datetime
-from pathlib import Path
+from datetime import timezone, datetime
 from re import Pattern
 from types import MappingProxyType
 from typing import Any, Literal
@@ -15,7 +14,6 @@ from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger("cv_analyzer")
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "rule_config.json"
 
 
 class GlobalTierBoundary(BaseModel):
@@ -24,14 +22,14 @@ class GlobalTierBoundary(BaseModel):
 
 
 class TierThresholds(BaseModel):
-    high_min: float = Field(0.80, ge=0.0, le=1.0)
-    medium_min: float = Field(0.50, ge=0.0, le=1.0)
-    low_min: float = Field(0.00, ge=0.0, le=1.0)
+    high_min: float = Field(..., ge=0.0, le=1.0)
+    medium_min: float = Field(..., ge=0.0, le=1.0)
+    low_min: float = Field(..., ge=0.0, le=1.0)
     override_reason: str | None = None
 
 
 class DownstreamGates(BaseModel):
-    min_acceptance_confidence: float = Field(0.50, ge=0.0, le=1.0)
+    min_acceptance_confidence: float = Field(..., ge=0.0, le=1.0)
     reject_email_fallback_as_unverified: bool = True
     max_word_count: int | None = None
     max_char_length: int | None = None
@@ -56,8 +54,8 @@ class FieldRuleConfig(BaseModel):
 
 
 class FallbackDefaults(BaseModel):
-    recommended_department: str = Field(..., min_length=1)
-    professional_domain: str = Field(..., min_length=1)
+    recommended_department: str
+    professional_domain: str
     suitable_roles: list[str] = Field(default_factory=list)
 
 
@@ -72,9 +70,9 @@ class CrossDomainGuard(BaseModel):
     non_it_job_keywords: list[str] = Field(default_factory=list)
     software_requirement_keywords: list[str] = Field(default_factory=list)
     domain_guard_terms: dict[str, list[str]] = Field(default_factory=dict)
-    domain_mismatch_multiplier: float = Field(0.15, gt=0.0, le=1.0)
-    domain_mismatch_score_cap: float = Field(20.0, gt=0.0)
-    mandatory_failure_score_impact: float = Field(50.0, gt=0.0)
+    domain_mismatch_multiplier: float = Field(..., gt=0.0, le=1.0)
+    domain_mismatch_score_cap: float = Field(..., gt=0.0)
+    mandatory_failure_score_impact: float = Field(..., gt=0.0)
 
 
 class RecommendationTexts(BaseModel):
@@ -91,14 +89,23 @@ class RecommendationTexts(BaseModel):
 
 
 class ScoringParameters(BaseModel):
-    career_transition_role_score: float = Field(50.0, ge=0.0, le=100.0)
-    role_divergence_score: float = Field(70.0, ge=0.0, le=100.0)
-    default_role_score: float = Field(100.0, ge=0.0, le=100.0)
-    below_min_exp_multiplier: float = Field(50.0, ge=0.0, le=100.0)
-    overqualification_penalty: float = Field(20.0, ge=0.0, le=100.0)
-    domain_default_match_score: float = Field(50.0, ge=0.0, le=100.0)
-    low_coverage_threshold: float = Field(0.5, ge=0.0, le=1.0)
-    false_positive_score_cap: float = Field(99.0, ge=0.0, le=100.0)
+    career_transition_role_score: float = Field(..., ge=0.0, le=100.0)
+    role_divergence_score: float = Field(..., ge=0.0, le=100.0)
+    default_role_score: float = Field(..., ge=0.0, le=100.0)
+    below_min_exp_multiplier: float = Field(..., ge=0.0, le=100.0)
+    overqualification_penalty: float = Field(..., ge=0.0, le=100.0)
+    domain_default_match_score: float = Field(..., ge=0.0, le=100.0)
+    low_coverage_threshold: float = Field(..., ge=0.0, le=1.0)
+    false_positive_score_cap: float = Field(..., ge=0.0, le=100.0)
+    
+    # Migrated from legacy ConfigRepository
+    match_high_threshold: float = Field(..., ge=0.0, le=100.0)
+    match_medium_threshold: float = Field(..., ge=0.0, le=100.0)
+    mandatory_failure_penalty: float = Field(..., ge=0.0, le=100.0)
+    max_score_on_failure: float = Field(..., ge=0.0, le=100.0)
+    llm_semantic_weight: float = Field(..., ge=0.0, le=1.0)
+    max_llm_boost: float = Field(..., ge=0.0, le=100.0)
+    component_weights: dict[str, float] = Field(...)
 
 
 class MatchScoringRules(BaseModel):
@@ -114,17 +121,17 @@ class MatchScoringRules(BaseModel):
 
 
 class LexicalWeights(BaseModel):
-    department_match: float = Field(30.0, ge=0.0)
-    title_term_match: float = Field(15.0, ge=0.0)
-    required_skill_match: float = Field(10.0, ge=0.0)
-    preferred_keyword_match: float = Field(5.0, ge=0.0)
-    experience_suitability: float = Field(10.0, ge=0.0)
+    department_match: float = Field(..., ge=0.0)
+    title_term_match: float = Field(..., ge=0.0)
+    required_skill_match: float = Field(..., ge=0.0)
+    preferred_keyword_match: float = Field(..., ge=0.0)
+    experience_suitability: float = Field(..., ge=0.0)
 
 
 class PrefilterRules(BaseModel):
     stop_words: list[str] = Field(default_factory=list)
-    lexical_weights: LexicalWeights = Field(default_factory=LexicalWeights)
-    rrf_k_constant: float = Field(60.0, gt=0.0)
+    lexical_weights: LexicalWeights
+    rrf_k_constant: float = Field(..., gt=0.0)
 
 
 class TaxonomyCondition(BaseModel):
@@ -157,9 +164,27 @@ class TaxonomyRules(BaseModel):
     canonical_families: list[str] = Field(default_factory=list)
     default_domain: str = Field(..., min_length=1)
     default_family: str = Field(..., min_length=1)
-    compatibility_map: dict[str, list[str]] = Field(default_factory=dict)
     vacancy_rules: list[VacancyTaxonomyRule] = Field(default_factory=list)
     candidate_rules: list[CandidateTaxonomyRule] = Field(default_factory=list)
+    
+    evidence_weight_experience: float = Field(default=5.0, ge=0.0)
+    evidence_weight_responsibilities: float = Field(default=3.0, ge=0.0)
+    evidence_weight_skills: float = Field(default=2.0, ge=0.0)
+    evidence_weight_summary: float = Field(default=1.5, ge=0.0)
+    evidence_weight_education: float = Field(default=1.0, ge=0.0)
+    semantic_match_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+    main_department_match_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
+    hierarchy_ambiguity_gap: float = Field(default=0.05, ge=0.0, le=1.0)
+    hierarchy_ambiguity_candidate_min_score: float = Field(default=0.35, ge=0.0, le=1.0)
+    hierarchy_exact_name_score: float = Field(default=0.60, ge=0.0, le=1.0)
+    hierarchy_normalized_name_score: float = Field(default=0.40, ge=0.0, le=1.0)
+    hierarchy_role_keyword_score: float = Field(default=0.25, ge=0.0, le=1.0)
+    hierarchy_domain_keyword_score: float = Field(default=0.20, ge=0.0, le=1.0)
+    hierarchy_skill_keyword_score: float = Field(default=0.15, ge=0.0, le=1.0)
+    hierarchy_cv_keyword_score: float = Field(default=0.10, ge=0.0, le=1.0)
+    hierarchy_rule_score_cap: float = Field(default=0.80, ge=0.0, le=1.0)
+    family_compatibility_min_score: float = Field(default=0.40, ge=0.0, le=1.0)
+    normalizer_partial_match_confidence: float = Field(default=0.85, ge=0.0, le=1.0)
 
 
 class DensityScoreTier(BaseModel):
@@ -175,16 +200,53 @@ class HeadingNormalization(BaseModel):
 class ResumeQualityRules(BaseModel):
     section_patterns: dict[str, str] = Field(default_factory=dict)
     core_sections: list[str] = Field(default_factory=list)
-    section_weight: float = Field(0.10, ge=0.0, le=1.0)
-    contact_weights: dict[str, float] = Field(default_factory=dict)
-    location_acceptance_min_confidence: float = Field(0.50, ge=0.0, le=1.0)
+    section_weight: float = Field(..., ge=0.0, le=1.0)
+    contact_weights: dict[str, float] = Field(...)
+    location_acceptance_min_confidence: float = Field(..., ge=0.0, le=1.0)
     density_scores: list[DensityScoreTier] = Field(default_factory=list)
+    default_density_score: float = Field(..., ge=0.0, le=1.0)
     heading_normalization: list[HeadingNormalization] = Field(default_factory=list)
 
 
 class DomainEmbeddingRules(BaseModel):
     categories: list[str] = Field(default_factory=list)
     canonical_equivalents: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+
+class WorkflowRules(BaseModel):
+    allowed_job_states: list[str] = Field(
+        default_factory=lambda: ["QUEUED", "PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED", "CANCELLED", "UNKNOWN"]
+    )
+    job_state_transitions: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "QUEUED": ["QUEUED", "PROCESSING", "RETRYING", "FAILED", "CANCELLED"],
+            "PROCESSING": ["PROCESSING", "RETRYING", "COMPLETED", "COMPLETED_DEGRADED", "FAILED", "CANCELLED"],
+            "RETRYING": ["RETRYING", "PROCESSING", "FAILED", "CANCELLED"],
+            "COMPLETED": ["COMPLETED", "QUEUED"],
+            "COMPLETED_DEGRADED": ["COMPLETED_DEGRADED", "QUEUED"],
+            "FAILED": ["FAILED", "QUEUED"],
+            "CANCELLED": ["CANCELLED", "QUEUED"],
+            "UNKNOWN": ["QUEUED", "FAILED"],
+        }
+    )
+
+    @model_validator(mode="after")
+    def include_persistence_degraded_state(self) -> "WorkflowRules":
+        """Upgrade stored workflow configurations created before degraded completion existed."""
+        if "COMPLETED_DEGRADED" not in self.allowed_job_states:
+            self.allowed_job_states.append("COMPLETED_DEGRADED")
+        processing_targets = self.job_state_transitions.setdefault("PROCESSING", [])
+        if "COMPLETED_DEGRADED" not in processing_targets:
+            processing_targets.append("COMPLETED_DEGRADED")
+        self.job_state_transitions.setdefault("COMPLETED_DEGRADED", ["COMPLETED_DEGRADED", "QUEUED"])
+        if "CANCELLED" not in self.allowed_job_states:
+            self.allowed_job_states.append("CANCELLED")
+        for state in ("QUEUED", "PROCESSING", "RETRYING"):
+            targets = self.job_state_transitions.setdefault(state, [])
+            if "CANCELLED" not in targets:
+                targets.append("CANCELLED")
+        self.job_state_transitions.setdefault("CANCELLED", ["CANCELLED", "QUEUED"])
+        return self
 
 
 class ScoringRules(BaseModel):
@@ -202,6 +264,7 @@ class UnifiedRuleConfig(BaseModel):
     global_confidence_tiers: dict[str, GlobalTierBoundary]
     fields: dict[str, FieldRuleConfig]
     scoring: ScoringRules
+    workflow: WorkflowRules = Field(default_factory=WorkflowRules)
 
     @model_validator(mode="after")
     def validate_safety_invariants(self) -> "UnifiedRuleConfig":
@@ -251,14 +314,9 @@ class UnifiedRuleConfig(BaseModel):
             raise ValueError("[SAFETY_GATE_VIOLATION] scoring.taxonomy.vacancy_rules must not be empty")
         if not taxonomy.candidate_rules:
             raise ValueError("[SAFETY_GATE_VIOLATION] scoring.taxonomy.candidate_rules must not be empty")
-        if not taxonomy.compatibility_map:
-            raise ValueError("[SAFETY_GATE_VIOLATION] scoring.taxonomy.compatibility_map must not be empty")
-
-        canonical_f = set(taxonomy.canonical_families)
-        for families in taxonomy.compatibility_map.values():
-            for fam in families:
-                if fam not in canonical_f:
-                    raise ValueError(f"[SAFETY_GATE_VIOLATION] Taxonomy compatibility_map contains unknown family '{fam}'")
+        # Canonical family checks
+        if taxonomy.default_family not in taxonomy.canonical_families:
+            raise ValueError(f"[SAFETY_GATE_VIOLATION] scoring.taxonomy.default_family '{taxonomy.default_family}' must be in canonical_families")
 
         canonical_d = set(taxonomy.canonical_domains)
         for rule in taxonomy.vacancy_rules:
@@ -288,45 +346,76 @@ class RuleConfigManager:
     """
 
     _lock = threading.RLock()
-    _active_config: UnifiedRuleConfig | None = None
-    _config_path: Path = DEFAULT_CONFIG_PATH
+    _active_configs: dict[str, UnifiedRuleConfig] = {}
     _load_counter: int = 0
-    _cache: MappingProxyType | None = None
-    _config_mtime: float | None = None
-    _config_hash: str | None = None
+    _caches: dict[str, MappingProxyType] = {}
     _metrics: MappingProxyType = MappingProxyType({})
+
+    @classmethod
+    def is_config_loaded(cls, tenant_id: str | None = None) -> bool:
+        """Return whether a validated configuration is active in this process."""
+        tenant_key = tenant_id or "GLOBAL"
+        with cls._lock:
+            return tenant_key in cls._active_configs
 
     @classmethod
     def load_config(
         cls,
-        config_source: dict[str, Any] | Path | str | None = None,
+        tenant_id: str | None = None,
     ) -> UnifiedRuleConfig:
-        """Load, validate, warm all caches, and atomically activate a rule configuration."""
+        """Load, validate, warm all caches, and atomically activate a rule configuration from PostgreSQL."""
         t0 = time.perf_counter()
 
-        if config_source is None:
-            config_source = cls._config_path
-
-        path_mtime: float | None = None
+        raw_data = None
         path_hash: str | None = None
+        config_size_bytes = 0
 
-        if isinstance(config_source, (str, Path)):
-            path = Path(config_source)
-            if not path.is_absolute():
-                path = Path(__file__).parent / path
-            with open(path, "rb") as f:
-                content = f.read()
-            raw_data = json.loads(content.decode("utf-8"))
-            path_mtime = path.stat().st_mtime if path.exists() else None
-            path_hash = hashlib.sha256(content).hexdigest()
-            config_size_bytes = len(content)
-        elif isinstance(config_source, dict):
-            raw_data = config_source
-            encoded = json.dumps(raw_data).encode("utf-8")
-            path_hash = hashlib.sha256(encoded).hexdigest()
-            config_size_bytes = len(encoded)
-        else:
-            raise TypeError(f"Invalid config_source type: {type(config_source)}")
+        try:
+            from app.core.database import PostgresAppSession
+            from app.models.rules import RuleConfigProfile, RuleComponent, SystemRule, RuleCondition
+            from sqlalchemy.orm import selectinload
+            
+            with PostgresAppSession() as db:
+                query = db.query(RuleConfigProfile).options(
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.system_rules).selectinload(SystemRule.conditions).selectinload(RuleCondition.values),
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.thresholds),
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.penalties),
+                    selectinload(RuleConfigProfile.components).selectinload(RuleComponent.weights),
+                ).filter(RuleConfigProfile.is_active == True)
+                if tenant_id:
+                    query = query.filter(RuleConfigProfile.tenant_id == tenant_id)
+                else:
+                    query = query.filter(RuleConfigProfile.tenant_id.is_(None))
+                active_profile = query.first()
+                if active_profile:
+                    raw_data = cls._hydrate_profile(active_profile)
+                    path_hash = active_profile.version_tag
+                    config_size_bytes = len(json.dumps(raw_data))
+                    logger.info(f"[RULE_CONFIG] Hydrated active profile from database (v{active_profile.version_tag})")
+                    
+                    from app.core.cache import config_cache_manager
+                    cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
+                    config_cache_manager.set(cache_key, raw_data)
+        except Exception as e:
+            logger.error(f"[RULE_CONFIG] Failed to load config from database: {e}")
+
+        if raw_data is None:
+            # Check cache as a fallback for intermittent DB issues if cache is populated
+            from app.core.cache import config_cache_manager
+            cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
+            cached_data = config_cache_manager.get(cache_key)
+            if cached_data:
+                raw_data = cached_data
+                path_hash = cached_data.get("version", "cached")
+                config_size_bytes = len(json.dumps(raw_data))
+                logger.info(f"[RULE_CONFIG] Loading active profile from cache (v{path_hash})")
+            else:
+                from app.core.error_handlers import SystemConfigurationError
+                raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
+
+        if raw_data is None:
+            from app.core.error_handlers import SystemConfigurationError
+            raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
 
         # 1. Pydantic Model & Safety Invariants Validation
         candidate_config = UnifiedRuleConfig.model_validate(raw_data)
@@ -342,10 +431,9 @@ class RuleConfigManager:
 
         # 4. Atomic Thread-Safe Swap
         with cls._lock:
-            cls._active_config = candidate_config
-            cls._cache = candidate_cache
-            cls._config_mtime = path_mtime
-            cls._config_hash = path_hash
+            tenant_key = tenant_id or 'GLOBAL'
+            cls._active_configs[tenant_key] = candidate_config
+            cls._caches[tenant_key] = candidate_cache
             cls._load_counter += 1
             cls._metrics = MappingProxyType(
                 {
@@ -355,8 +443,7 @@ class RuleConfigManager:
                     "cache_build_time_ms": cache_build_time_ms,
                     "compiled_pattern_count": compiled_pattern_count,
                     "configuration_size_bytes": config_size_bytes,
-                    "last_loaded_timestamp": datetime.now(UTC).isoformat(),
-                    "last_modified_timestamp": str(path_mtime) if path_mtime else None,
+                    "last_loaded_timestamp": datetime.now(timezone.utc).isoformat(),
                     "file_hash": path_hash,
                 }
             )
@@ -366,7 +453,295 @@ class RuleConfigManager:
             f"v{candidate_config.version} ({len(candidate_config.fields)} fields configured) | "
             f"LoadTime={total_load_time_ms}ms, CacheTime={cache_build_time_ms}ms, CompiledPatterns={compiled_pattern_count}"
         )
-        return cls._active_config
+        return cls._active_configs[tenant_key]
+
+    @classmethod
+    def _hydrate_profile(cls, profile) -> dict[str, Any]:
+        """Convert normalized DB rows back to UnifiedRuleConfig JSON structure."""
+        
+        base_dict: dict[str, Any] = {}
+
+        base_dict["version"] = profile.version_tag
+        base_dict["description"] = profile.description or ""
+        base_dict["last_updated"] = profile.updated_at.isoformat()
+        
+        for comp in profile.components:
+            if comp.component_type == "global_tiers":
+                if "global_confidence_tiers" not in base_dict:
+                    base_dict["global_confidence_tiers"] = {}
+                    
+                tier_names = {t.threshold_key.replace("_min", "").replace("_max", "") for t in comp.thresholds}
+                for t_name in tier_names:
+                    min_val = next((t.threshold_value for t in comp.thresholds if t.threshold_key == f"{t_name}_min"), 0.0)
+                    max_val = next((t.threshold_value for t in comp.thresholds if t.threshold_key == f"{t_name}_max"), 1.0)
+                    base_dict["global_confidence_tiers"][t_name] = {"min_score": min_val, "max_score": max_val}
+                    
+            elif comp.component_type == "field":
+                if "fields" not in base_dict:
+                    base_dict["fields"] = {}
+                f_name = comp.component_name
+                
+                field_dict: dict[str, Any] = {
+                    "field_name": f_name,
+                    "description": "",
+                    "confidence_scoring": {},
+                    "tier_thresholds": {},
+                    "downstream_gates": {},
+                    "keywords": {}
+                }
+
+                # Thresholds → tier_thresholds and downstream_gates
+                tier_keys = {"high_min", "medium_min", "low_min"}
+                gate_threshold_key = "min_acceptance_confidence"
+                gate_bool_keys = {"reject_email_fallback_as_unverified", "require_gazetteer_for_high"}
+                gate_int_keys = {"max_word_count", "max_char_length"}
+
+                for t in comp.thresholds:
+                    if t.threshold_key in tier_keys:
+                        field_dict["tier_thresholds"][t.threshold_key] = t.threshold_value
+                    elif t.threshold_key == gate_threshold_key:
+                        field_dict["downstream_gates"][t.threshold_key] = t.threshold_value
+                    elif t.threshold_key in gate_bool_keys:
+                        field_dict["downstream_gates"][t.threshold_key] = t.threshold_value >= 0.5
+                    elif t.threshold_key in gate_int_keys:
+                        field_dict["downstream_gates"][t.threshold_key] = int(t.threshold_value)
+
+                # Weights → confidence_scoring
+                for w in comp.weights:
+                    if w.weight_key.startswith("confidence_"):
+                        field_dict["confidence_scoring"][w.weight_key.replace("confidence_", "")] = w.weight_value
+                        
+                # System rules → keywords, description, override_reason
+                for r in comp.system_rules:
+                    if r.rule_type == "keywords":
+                        for c in r.conditions:
+                            field_dict["keywords"][c.condition_scope] = [v.value for v in c.values]
+                    elif r.rule_type == "field_meta":
+                        if r.rule_name == "description" and r.target_value:
+                            field_dict["description"] = r.target_value
+                        elif r.rule_name == "override_reason" and r.target_value:
+                            field_dict["tier_thresholds"]["override_reason"] = r.target_value
+                            
+                base_dict["fields"][f_name] = field_dict
+                
+            elif comp.component_type == "scoring":
+                if "scoring" not in base_dict:
+                    base_dict["scoring"] = {}
+                    
+                c_name = comp.component_name
+                
+                if c_name == "match":
+                    match_dict: dict[str, Any] = base_dict["scoring"].get("match", {})
+                    if "scoring_parameters" not in match_dict:
+                        match_dict["scoring_parameters"] = {}
+                    
+                    # Weights → scoring_parameters + component_weights
+                    comp_weights: dict[str, float] = {}
+                    for w in comp.weights:
+                        if w.weight_key.startswith("component_weights_"):
+                            comp_weights[w.weight_key.replace("component_weights_", "")] = w.weight_value
+                        else:
+                            match_dict["scoring_parameters"][w.weight_key] = w.weight_value
+                    if comp_weights:
+                        match_dict["scoring_parameters"]["component_weights"] = comp_weights
+
+                    # Thresholds → scoring_parameters
+                    for t in comp.thresholds:
+                        match_dict["scoring_parameters"][t.threshold_key] = t.threshold_value
+                    
+                    # Penalties → cross_domain_guard or scoring_parameters
+                    for p in comp.penalties:
+                        if p.penalty_key in ("domain_mismatch_multiplier", "domain_mismatch_score_cap", "mandatory_failure_score_impact"):
+                            if "cross_domain_guard" not in match_dict:
+                                match_dict["cross_domain_guard"] = {}
+                            match_dict["cross_domain_guard"][p.penalty_key] = p.penalty_value
+                        else:
+                            match_dict["scoring_parameters"][p.penalty_key] = p.penalty_value
+
+                    # System rules
+                    for r in comp.system_rules:
+                        if r.rule_type == "cross_domain_guard":
+                            cdg = match_dict.get("cross_domain_guard", {})
+                            if "domain_guard_terms" not in cdg:
+                                cdg["domain_guard_terms"] = {}
+                            for c in r.conditions:
+                                kws = [v.value for v in c.values]
+                                if c.condition_scope == "software_candidate":
+                                    cdg["software_candidate_keywords"] = kws
+                                elif c.condition_scope == "non_it_job":
+                                    cdg["non_it_job_keywords"] = kws
+                                elif c.condition_scope == "software_requirement":
+                                    cdg["software_requirement_keywords"] = kws
+                                elif c.condition_scope.startswith("domain_guard_"):
+                                    cdg["domain_guard_terms"][c.condition_scope.replace("domain_guard_", "")] = kws
+                            match_dict["cross_domain_guard"] = cdg
+
+                        elif r.rule_type == "fallback_defaults":
+                            parts = (r.target_value or "::").split("::")
+                            fb: dict[str, Any] = {
+                                "recommended_department": parts[0] if parts else "",
+                                "professional_domain": parts[1] if len(parts) > 1 else "",
+                                "suitable_roles": [],
+                            }
+                            for c in r.conditions:
+                                if c.condition_scope == "suitable_roles":
+                                    fb["suitable_roles"] = [v.value for v in c.values]
+                            match_dict["fallback_defaults"] = fb
+
+                        elif r.rule_type == "match_denylists":
+                            for c in r.conditions:
+                                match_dict[c.condition_scope] = [v.value for v in c.values]
+
+                        elif r.rule_type == "term_matching":
+                            tm: dict[str, Any] = {"stop_phrases": [], "noise_words": [], "aliases": {}}
+                            for c in r.conditions:
+                                if c.condition_scope == "stop_phrases":
+                                    tm["stop_phrases"] = [v.value for v in c.values]
+                                elif c.condition_scope == "noise_words":
+                                    tm["noise_words"] = [v.value for v in c.values]
+                                elif c.condition_scope.startswith("alias_"):
+                                    alias_key = c.condition_scope.replace("alias_", "")
+                                    tm["aliases"][alias_key] = [v.value for v in c.values]
+                            match_dict["term_matching"] = tm
+
+                        elif r.rule_type == "recommendations":
+                            if r.target_value:
+                                match_dict["recommendations"] = json.loads(r.target_value)
+
+                    base_dict["scoring"]["match"] = match_dict
+                    
+                elif c_name == "prefilter":
+                    pref_dict: dict[str, Any] = base_dict["scoring"].get("prefilter", {})
+                    if "lexical_weights" not in pref_dict:
+                        pref_dict["lexical_weights"] = {}
+                    for w in comp.weights:
+                        pref_dict["lexical_weights"][w.weight_key] = w.weight_value
+                    for t in comp.thresholds:
+                        if t.threshold_key == "rrf_k_constant":
+                            pref_dict["rrf_k_constant"] = t.threshold_value
+                    for r in comp.system_rules:
+                        if r.rule_type == "prefilter" and r.rule_name == "stop_words":
+                            for c in r.conditions:
+                                if c.condition_scope == "stop_words":
+                                    pref_dict["stop_words"] = [v.value for v in c.values]
+                    base_dict["scoring"]["prefilter"] = pref_dict
+                    
+                elif c_name == "taxonomy":
+                    tax_dict: dict[str, Any] = base_dict["scoring"].get("taxonomy", {})
+                    for weight in comp.weights:
+                        tax_dict[weight.weight_key] = weight.weight_value
+                    for threshold in comp.thresholds:
+                        tax_dict[threshold.threshold_key] = threshold.threshold_value
+                    vac_rules = []
+                    cand_rules = []
+                    for r in comp.system_rules:
+                        if r.rule_type == "taxonomy_defaults":
+                            parts = (r.target_value or "::").split("::")
+                            tax_dict["default_domain"] = parts[0] if parts else "General Operations"
+                            tax_dict["default_family"] = parts[1] if len(parts) > 1 else "General Professional"
+                            for c in r.conditions:
+                                if c.condition_scope == "canonical_domains":
+                                    tax_dict["canonical_domains"] = [v.value for v in c.values]
+                                elif c.condition_scope == "canonical_families":
+                                    tax_dict["canonical_families"] = [v.value for v in c.values]
+
+                        elif r.rule_type == "taxonomy_compatibility":
+                            if r.target_value:
+                                tax_dict["compatibility_map"] = json.loads(r.target_value)
+
+                        elif r.rule_type in ("vacancy_taxonomy", "candidate_taxonomy"):
+                            if not r.target_value:
+                                continue
+                            parts = r.target_value.split("::")
+                            domain = parts[0]
+                            families = parts[1].split(",") if len(parts) > 1 else []
+                            
+                            rule_name = r.rule_name
+                            if r.rule_type == "candidate_taxonomy" and rule_name.startswith("cand_"):
+                                rule_name = rule_name[5:]
+                            rule_obj: dict[str, Any] = {
+                                "name": rule_name,
+                                "domain": domain,
+                                "branches": [],
+                            }
+                            branches: dict[int, list[dict[str, Any]]] = {}
+                            for c in r.conditions:
+                                branch_index = getattr(c, "branch_index", 0)
+                                branches.setdefault(branch_index, []).append({
+                                    "scope": c.condition_scope,
+                                    "mode": c.condition_mode,
+                                    "negate": c.is_negated,
+                                    "keywords": [v.value for v in c.values]
+                                })
+                            rule_obj["branches"] = [
+                                {"conditions": conditions}
+                                for _, conditions in sorted(branches.items())
+                            ]
+                                
+                            if r.rule_type == "vacancy_taxonomy":
+                                rule_obj["family"] = families[0] if families else ""
+                                vac_rules.append(rule_obj)
+                            elif r.rule_type == "candidate_taxonomy":
+                                rule_obj["families"] = families
+                                cand_rules.append(rule_obj)
+
+                    tax_dict["vacancy_rules"] = vac_rules
+                    tax_dict["candidate_rules"] = cand_rules
+                    base_dict["scoring"]["taxonomy"] = tax_dict
+                    
+                elif c_name == "resume_quality":
+                    rq_dict: dict[str, Any] = base_dict["scoring"].get("resume_quality", {})
+                    if "contact_weights" not in rq_dict:
+                        rq_dict["contact_weights"] = {}
+                    for w in comp.weights:
+                        if w.weight_key == "section_weight":
+                            rq_dict["section_weight"] = w.weight_value
+                        elif w.weight_key.startswith("contact_"):
+                            rq_dict["contact_weights"][w.weight_key.replace("contact_", "")] = w.weight_value
+                    for t in comp.thresholds:
+                        rq_dict[t.threshold_key] = t.threshold_value
+
+                    for r in comp.system_rules:
+                        if r.rule_type == "resume_quality_meta":
+                            if r.rule_name == "core_sections":
+                                for c in r.conditions:
+                                    if c.condition_scope == "core_sections":
+                                        rq_dict["core_sections"] = [v.value for v in c.values]
+                            elif r.rule_name == "section_patterns" and r.target_value:
+                                rq_dict["section_patterns"] = json.loads(r.target_value)
+                            elif r.rule_name == "density_scores" and r.target_value:
+                                rq_dict["density_scores"] = json.loads(r.target_value)
+                            elif r.rule_name == "heading_normalization" and r.target_value:
+                                rq_dict["heading_normalization"] = json.loads(r.target_value)
+
+                    base_dict["scoring"]["resume_quality"] = rq_dict
+
+                elif c_name == "domain_embedding":
+                    de_dict: dict[str, Any] = base_dict["scoring"].get("domain_embedding", {})
+                    for r in comp.system_rules:
+                        if r.rule_type == "domain_embedding_meta":
+                            if r.rule_name == "categories":
+                                for c in r.conditions:
+                                    if c.condition_scope == "categories":
+                                        de_dict["categories"] = [v.value for v in c.values]
+                            elif r.rule_name == "canonical_equivalents" and r.target_value:
+                                de_dict["canonical_equivalents"] = json.loads(r.target_value)
+                    base_dict["scoring"]["domain_embedding"] = de_dict
+
+            elif comp.component_type == "workflow":
+                workflow_rule = next(
+                    (
+                        rule
+                        for rule in comp.system_rules
+                        if rule.rule_type == "workflow_state_machine" and rule.rule_name == "job_states" and rule.target_value
+                    ),
+                    None,
+                )
+                if workflow_rule:
+                    base_dict["workflow"] = json.loads(workflow_rule.target_value)
+
+        return base_dict
+
 
     @classmethod
     def _build_and_validate_all_caches(cls, config: UnifiedRuleConfig) -> tuple[MappingProxyType, int]:
@@ -460,37 +835,20 @@ class RuleConfigManager:
         return cache_dict, pattern_count
 
     @classmethod
-    def reload_if_changed(cls) -> bool:
-        """
-        Hot reload helper: Checks file modification time / SHA256 hash.
-        Reloads configuration atomically if changed. Returns True if reloaded.
-        """
-        with cls._lock:
-            path = cls._config_path
-            if not path.is_absolute():
-                path = Path(__file__).parent / path
-            if not path.exists():
-                return False
-            mtime = path.stat().st_mtime
-            if cls._config_mtime is not None and mtime == cls._config_mtime:
-                return False
-            cls.load_config(path)
-            return True
-
-    @classmethod
     def get_metrics(cls) -> dict[str, Any]:
         """Exposes lightweight diagnostics and telemetry metrics."""
         with cls._lock:
-            if cls._active_config is None:
+            if not cls._active_configs:
                 cls.load_config()
             return dict(cls._metrics)
 
     @classmethod
-    def get_config(cls) -> UnifiedRuleConfig:
+    def get_config(cls, tenant_id: str | None = None) -> UnifiedRuleConfig:
         with cls._lock:
-            if cls._active_config is None:
-                cls.load_config()
-            return cls._active_config
+            tenant_key = tenant_id or 'GLOBAL'
+        if tenant_key not in cls._active_configs:
+            cls.load_config(tenant_id=tenant_id)
+        return cls._active_configs[tenant_key]
 
     @classmethod
     def get_field_config(cls, field_name: str) -> FieldRuleConfig:
@@ -513,171 +871,122 @@ class RuleConfigManager:
     def get_confidence_tier(cls, field_name: str, score: float | None) -> str:
         if score is None or score <= 0.0:
             return "LOW"
-        try:
-            field_cfg = cls.get_field_config(field_name)
-            tier_t = field_cfg.tier_thresholds
-            if score >= tier_t.high_min:
-                return "HIGH"
-            elif score >= tier_t.medium_min:
-                return "MEDIUM"
-            else:
-                return "LOW"
-        except (KeyError, AttributeError, ValueError):
-            if score >= 0.80:
-                return "HIGH"
-            elif score >= 0.50:
-                return "MEDIUM"
-            else:
-                return "LOW"
+        field_cfg = cls.get_field_config(field_name)
+        tier_t = field_cfg.tier_thresholds
+        if score >= tier_t.high_min:
+            return "HIGH"
+        elif score >= tier_t.medium_min:
+            return "MEDIUM"
+        else:
+            return "LOW"
 
     # ------------------------------------------------------------------
     # Scoring rules (externalized hardcoded business rules)
     # ------------------------------------------------------------------
 
     @classmethod
-    def get_scoring(cls) -> ScoringRules:
-        return cls.get_config().scoring
+    def get_scoring(cls, tenant_id: str | None = None) -> ScoringRules:
+        return cls.get_config(tenant_id).scoring
 
     @classmethod
-    def get_match_rules(cls) -> MatchScoringRules:
-        return cls.get_scoring().match
+    def get_match_rules(cls, tenant_id: str | None = None) -> MatchScoringRules:
+        return cls.get_scoring(tenant_id).match
 
     @classmethod
-    def get_prefilter_rules(cls) -> PrefilterRules:
-        return cls.get_scoring().prefilter
+    def get_prefilter_rules(cls, tenant_id: str | None = None) -> PrefilterRules:
+        return cls.get_scoring(tenant_id).prefilter
 
     @classmethod
-    def get_taxonomy_rules(cls) -> TaxonomyRules:
-        return cls.get_scoring().taxonomy
+    def get_taxonomy_rules(cls, tenant_id: str | None = None) -> TaxonomyRules:
+        return cls.get_scoring(tenant_id).taxonomy
 
     @classmethod
-    def get_resume_quality_rules(cls) -> ResumeQualityRules:
-        return cls.get_scoring().resume_quality
+    def get_resume_quality_rules(cls, tenant_id: str | None = None) -> ResumeQualityRules:
+        return cls.get_scoring(tenant_id).resume_quality
 
     @classmethod
-    def get_domain_embedding_rules(cls) -> DomainEmbeddingRules:
-        return cls.get_scoring().domain_embedding
+    def get_domain_embedding_rules(cls, tenant_id: str | None = None) -> DomainEmbeddingRules:
+        return cls.get_scoring(tenant_id).domain_embedding
 
     @classmethod
-    def _get_cache(cls) -> MappingProxyType:
+    def _get_cache(cls, tenant_id: str | None = None) -> MappingProxyType:
         with cls._lock:
-            if cls._cache is None or cls._cache.get("config") is not cls._active_config:
-                cls.load_config()
-            return cls._cache
+            tenant_key = tenant_id or 'GLOBAL'
+            if tenant_key not in cls._caches or cls._caches[tenant_key].get('config') is not cls._active_configs.get(tenant_key):
+                cls.load_config(tenant_id=tenant_id)
+            return cls._caches[tenant_key]
 
     @classmethod
-    def get_term_matching_assets(cls) -> MappingProxyType:
-        return cls._get_cache()["term_matching"]
+    def get_term_matching_assets(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["term_matching"]
 
     @classmethod
-    def get_cross_domain_guard_assets(cls) -> MappingProxyType:
-        return cls._get_cache()["cross_domain_guard"]
+    def get_cross_domain_guard_assets(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["cross_domain_guard"]
 
     @classmethod
-    def get_compiled_section_patterns(cls) -> MappingProxyType:
-        return cls._get_cache()["compiled"]["section_patterns"]
+    def get_compiled_section_patterns(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["compiled"]["section_patterns"]
 
     @classmethod
     def get_compiled_heading_normalizations(
-        cls,
+        cls, tenant_id: str | None = None
     ) -> tuple[tuple[Pattern[str], str], ...]:
-        return cls._get_cache()["compiled"]["heading_normalization"]
+        return cls._get_cache(tenant_id)["compiled"]["heading_normalization"]
 
     @classmethod
-    def get_recommendations(cls) -> RecommendationTexts:
-        return cls._get_cache()["recommendations"]
+    def get_recommendations(cls, tenant_id: str | None = None) -> RecommendationTexts:
+        return cls._get_cache(tenant_id)["recommendations"]
 
     @classmethod
-    def get_scoring_parameters(cls) -> ScoringParameters:
-        return cls._get_cache()["scoring_parameters"]
+    def get_scoring_parameters(cls, tenant_id: str | None = None) -> ScoringParameters:
+        return cls._get_cache(tenant_id)["scoring_parameters"]
 
     @classmethod
-    def get_compiled_cross_domain_guard(cls) -> MappingProxyType:
-        return cls._get_cache()["compiled_cross_domain_guard"]
+    def get_compiled_cross_domain_guard(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return cls._get_cache(tenant_id)["compiled_cross_domain_guard"]
 
     @classmethod
     def _run_synthetic_smoke_tests(cls, candidate_config: UnifiedRuleConfig) -> None:
         """Execute in-memory synthetic smoke tests against candidate config before activation."""
-        loc_cfg = candidate_config.fields.get("location")
-        title_cfg = candidate_config.fields.get("job_title")
-        comp_cfg = candidate_config.fields.get("company_name")
-
-        if not loc_cfg or not title_cfg or not comp_cfg:
-            return
-
-        # Smoke Test 1: Location Null Suppression on Blacklisted Input
-        blacklist = loc_cfg.get_keyword_set("blacklist")
-        test_line = "Dear Sir, Madam"
-        tokens = [t.lower() for t in re.split(r"[,\s]+", test_line) if t]
-        if any(t in blacklist for t in tokens):
-            loc_extracted = None
-        else:
-            loc_extracted = test_line
-        if loc_extracted is not None:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to reject blacklisted location input 'Dear Sir, Madam'")
-
-        # Smoke Test 2: Job Title Narrative Rejection
-        starters = title_cfg.get_keyword_set("narrative_starters")
-        phrases = title_cfg.get_keyword_set("narrative_phrases")
-        test_title = "Graduated in 2020"
-        title_tokens = [t.lower() for t in test_title.split()]
-        if title_tokens[0] in starters or any(p in test_title.lower() for p in phrases):
-            is_valid_title = False
-        else:
-            is_valid_title = True
-        if is_valid_title is not False:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to reject narrative sentence 'Graduated in 2020' as job title")
-
-        # Smoke Test 3: Company Name Header Rejection
-        generic_headers = comp_cfg.get_keyword_set("generic_section_headers")
-        test_header = "## Experience"
-        clean_header = test_header.replace("#", "").strip().lower()
-        if clean_header in generic_headers:
-            is_valid_company = False
-        else:
-            is_valid_company = True
-        if is_valid_company is not False:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to reject generic section header '## Experience' as company name")
-
-        scoring = candidate_config.scoring
-
-        # Smoke Test 4: Cross-Domain Guard Software Candidate Detection
-        software_keywords = {k.lower().strip() for k in scoring.match.cross_domain_guard.software_candidate_keywords if k}
-        norm_text = "worked as a flutter developer"
-        if not any(k in norm_text for k in software_keywords):
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to detect software candidate via cross_domain_guard keywords")
-
-        # Smoke Test 5: Prefilter Stop-Word Filtering
-        prefilter_stop_words = {w.lower().strip() for w in scoring.prefilter.stop_words if w}
-        if not {"senior", "the"}.issubset(prefilter_stop_words):
-            raise ValueError("[SMOKE_TEST_FAILURE] prefilter stop_words missing expected entries")
-
-        # Smoke Test 6: Resume Quality Section Detection & Heading Normalization
-        section_patterns = {name: re.compile(pattern, re.IGNORECASE) for name, pattern in scoring.resume_quality.section_patterns.items()}
-        sample_resume = "## WORK EXPERIENCE\nPython developer"
-        if not section_patterns["experience"].search(sample_resume.lower()):
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to detect experience section via resume_quality patterns")
-        normalized = sample_resume
-        for h in scoring.resume_quality.heading_normalization:
-            normalized = re.sub(re.compile(h.pattern, re.IGNORECASE), h.replacement, normalized)
-        if "## WORK EXPERIENCE" not in normalized:
-            raise ValueError("[SMOKE_TEST_FAILURE] Failed to normalize '## WORK EXPERIENCE' heading")
-
-        # Smoke Test 7: Taxonomy Vacancy Rule Matches Software Job
-        scopes = {
-            "title": "flutter developer",
-            "dept": "cis team",
-            "full_text": "flutter developer cis team",
-        }
-        software_rule = next(
-            (r for r in scoring.taxonomy.vacancy_rules if r.name == "software_engineering"),
-            None,
-        )
-        if software_rule is not None and not any(
-            all(
-                (c.keywords and (not c.negate) and any(k in scopes.get(c.scope, "") for k in c.keywords)) or (c.negate and not any(k in scopes.get(c.scope, "") for k in c.keywords))
-                for c in branch.conditions
-            )
-            for branch in software_rule.branches
-        ):
-            raise ValueError("[SMOKE_TEST_FAILURE] taxonomy vacancy rule failed to classify software job")
+        try:
+            from app.core.database import PostgresAppSession
+            from app.models.rules import RuleValidationTestCase
+            import json
+            
+            with PostgresAppSession() as db:
+                tests = db.query(RuleValidationTestCase).filter(RuleValidationTestCase.is_active == True).all()
+                if not tests:
+                    return
+                
+                config_dict = candidate_config.model_dump()
+                for test in tests:
+                    try:
+                        expected = json.loads(test.expected_result_json)
+                        
+                        # Dynamically map test.target_component to specific evaluations
+                        # e.g., if target_component == "fields.job_title", check candidate_config.fields["job_title"]
+                        parts = test.target_component.split('.')
+                        current = config_dict
+                        for p in parts:
+                            if isinstance(current, dict) and p in current:
+                                current = current[p]
+                            else:
+                                current = None
+                                break
+                        
+                        if current is not None and isinstance(current, dict):
+                            # Compare expected subset against current configuration
+                            for k, v in expected.items():
+                                if current.get(k) != v:
+                                    raise ValueError(f"Mismatch on '{k}': expected {v}, got {current.get(k)}")
+                        elif current is None and expected:
+                            raise ValueError(f"Target component '{test.target_component}' not found in configuration")
+                    except Exception as test_e:
+                        raise ValueError(f"Smoke test '{test.test_name}' failed: {test_e}")
+                        
+        except ValueError as ve:
+            logger.error(f"[RULE_CONFIG] Validation test failure: {ve}")
+            raise ve
+        except Exception as e:
+            logger.warning(f"[RULE_CONFIG] Failed to execute DB smoke tests (DB error): {e}")

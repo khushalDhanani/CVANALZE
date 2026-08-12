@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 import time
 from typing import Any
@@ -49,7 +50,10 @@ class EnterprisePerformanceService:
     """
 
     # L1 In-Memory Cache
-    _l1_cache = LRUMemoryCache(maxsize=5000, default_ttl=3600.0)
+    _l1_cache = LRUMemoryCache(
+        maxsize=settings.PERFORMANCE_L1_CACHE_MAX_SIZE, 
+        default_ttl=settings.PERFORMANCE_L1_CACHE_TTL_SECONDS
+    )
 
     # Telemetry metrics storage
     _metrics = {
@@ -193,6 +197,10 @@ class EnterprisePerformanceService:
         l2_total = cls._metrics["l2_hits"] + cls._metrics["l2_misses"]
         l2_ratio = round((cls._metrics["l2_hits"] / l2_total * 100.0), 2) if l2_total > 0 else 0.0
 
+        from app.repositories.llm_trace import LLMTraceMetrics
+        from app.services.ollama_transport import OllamaTransport
+        from app.services.quality_metrics import QualityMetrics
+
         return {
             "cache_telemetry": {
                 "l1_memory_hits": cls._metrics["l1_hits"],
@@ -212,4 +220,7 @@ class EnterprisePerformanceService:
                 "sequence": "Stage 1 (Profiling) -> Stage 2 (Embedding) -> Stage 3 (Vector Retrieval) -> Stage 4 (Prefilter) -> Stage 5 (Confidence Gate) -> Stage 6 (LLM) -> Stage 7 (Scoring Engine) -> Stage 8 (Ranking)",
                 "semantic_retrieval_precedes_scoring": True,
             },
+            "llm_telemetry": LLMTraceMetrics.report(),
+            "ollama_transport": OllamaTransport.get_metrics(),
+            "quality_telemetry": QualityMetrics.report(),
         }

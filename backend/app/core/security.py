@@ -1,6 +1,12 @@
+from __future__ import annotations
+import base64
+import binascii
 import hashlib
 import hmac
+import json
+import time
 from dataclasses import dataclass
+from http.cookies import CookieError, SimpleCookie
 
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -15,6 +21,9 @@ from app.schemas.contracts import AccessTier, ErrorCode
 class AuthenticatedPrincipal:
     role: AccessTier
     key_fingerprint: str
+
+
+SESSION_COOKIE_NAME = "cv_analyzer_session"
 
 
 class AccessControlMiddleware:
@@ -51,8 +60,10 @@ class AccessControlMiddleware:
             )
             return
 
-        api_key = _extract_api_key(Headers(scope=scope))
-        principal = authenticate_api_key(api_key)
+        headers = Headers(scope=scope)
+        principal = authenticate_session_token(extract_session_token(headers))
+        if principal is None:
+            principal = authenticate_api_key(extract_api_key(headers))
         if principal is None:
             await self._reject(
                 scope,
@@ -114,13 +125,69 @@ def authenticate_api_key(api_key: str | None) -> AuthenticatedPrincipal | None:
     return None
 
 
-def _extract_api_key(headers: Headers) -> str | None:
+def create_session_token(principal: AuthenticatedPrincipal, issued_at: int | None = None) -> str:
+    signing_key = _session_signing_key()
+    if not signing_key:
+        raise ValueError("A session signing key of at least 32 characters is required.")
+    timestamp = int(time.time()) if issued_at is None else issued_at
+    payload = {
+        "exp": timestamp + settings.AUTH_SESSION_TTL_SECONDS,
+        "fingerprint": principal.key_fingerprint,
+        "role": principal.role.value,
+        "v": 1,
+    }
+    encoded_payload = _base64url_encode(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    signature = hmac.new(signing_key, encoded_payload.encode("ascii"), hashlib.sha256).digest()
+    return f"{encoded_payload}.{_base64url_encode(signature)}"
+
+
+def authenticate_session_token(token: str | None, now: int | None = None) -> AuthenticatedPrincipal | None:
+    if not token:
+        return None
+    signing_key = _session_signing_key()
+    if not signing_key:
+        return None
+    encoded_payload, separator, encoded_signature = token.partition(".")
+    if not separator or not encoded_payload or not encoded_signature:
+        return None
+    try:
+        supplied_signature = _base64url_decode(encoded_signature)
+        expected_signature = hmac.new(signing_key, encoded_payload.encode("ascii"), hashlib.sha256).digest()
+        if not hmac.compare_digest(supplied_signature, expected_signature):
+            return None
+        payload = json.loads(_base64url_decode(encoded_payload))
+        expires_at = int(payload["exp"])
+        role = AccessTier(str(payload["role"]))
+        fingerprint = str(payload["fingerprint"])
+    except (binascii.Error, KeyError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if payload.get("v") != 1 or expires_at <= (int(time.time()) if now is None else now):
+        return None
+    if role not in (AccessTier.RECRUITER, AccessTier.ADMINISTRATOR) or not fingerprint:
+        return None
+    return AuthenticatedPrincipal(role=role, key_fingerprint=fingerprint)
+
+
+def extract_api_key(headers: Headers) -> str | None:
     authorization = headers.get("authorization", "").strip()
     scheme, separator, credentials = authorization.partition(" ")
     if separator and scheme.lower() == "bearer" and credentials.strip():
         return credentials.strip()
     header_key = headers.get("x-api-key", "").strip()
     return header_key or None
+
+
+def extract_session_token(headers: Headers) -> str | None:
+    raw_cookie = headers.get("cookie", "")
+    if not raw_cookie:
+        return None
+    cookies = SimpleCookie()
+    try:
+        cookies.load(raw_cookie)
+    except CookieError:
+        return None
+    morsel = cookies.get(SESSION_COOKIE_NAME)
+    return morsel.value if morsel else None
 
 
 def _matches_any(candidate: str, configured_keys: list[str]) -> bool:
@@ -132,7 +199,21 @@ def _matches_any(candidate: str, configured_keys: list[str]) -> bool:
 
 
 def _fingerprint(api_key: str) -> str:
-    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+    salt = b"cv_analyzer_api_key_fingerprint_salt"
+    return hmac.new(salt, api_key.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+
+
+def _session_signing_key() -> bytes | None:
+    configured = settings.AUTH_SESSION_SIGNING_KEY.encode("utf-8")
+    return configured if len(configured) >= 32 else None
+
+
+def _base64url_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+
+
+def _base64url_decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
 def _role_allows(actual: AccessTier, required: AccessTier) -> bool:

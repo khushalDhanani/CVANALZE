@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -7,8 +8,7 @@ from app.schemas.analysis import OptimizedCandidateProfile
 from app.schemas.normalized_resume import NormalizedResume
 from app.schemas.profile import DynamicCandidateProfile
 from app.services.candidate_domain_service import CandidateDomainService
-from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
-from app.services.job_taxonomy import TaxonomyClassifier
+from app.services.job_taxonomy import CandidateResumeDTO, TaxonomyClassifier
 
 
 @dataclass
@@ -35,8 +35,12 @@ class CandidateAnalysisContext:
     cand_tax_domain: str = ""
     cand_families: list[str] = field(default_factory=list)
     cand_primary_family: str | None = None
+    professional_skills: list[str] = field(default_factory=list)
+    experience_titles: list[str] = field(default_factory=list)
+    education_evidence: list[str] = field(default_factory=list)
     domain_candidate_text: str = ""
     is_software_cand: bool = False
+    cand_hierarchy: Any | None = None
 
     @classmethod
     def create(
@@ -55,10 +59,22 @@ class CandidateAnalysisContext:
         # 1. Normalize CV & Profile Text
         profile_parts = [cv_text]
         current_role = None
-        normalized_experience = normalized_resume.experience.deterministic_years if normalized_resume else None
-        exp_years = deterministic_experience if deterministic_experience is not None else normalized_experience
+        normalized_experience = normalized_resume.experience.authoritative_years if normalized_resume else None
+        exp_years = normalized_experience if normalized_experience is not None else deterministic_experience
         if exp_years is None:
             exp_years = candidate_experience
+        if exp_years is None and isinstance(resume_json, dict):
+            raw_exp = resume_json.get("total_experience_years") or resume_json.get("experience_years")
+            if raw_exp is not None:
+                try:
+                    exp_years = float(raw_exp)
+                except (ValueError, TypeError):
+                    pass
+
+        if optimized_profile:
+            optimized_profile = CandidateDomainService.validate_optimized_profile(
+                optimized_profile, cv_text, resume_json, domain_repository
+            )
 
         if optimized_profile:
             profile_parts.extend(
@@ -101,18 +117,23 @@ class CandidateAnalysisContext:
         if not current_role and normalized_resume and normalized_resume.employment:
             current_role = normalized_resume.employment[0].job_title.normalized_value
 
+        if current_role:
+            validated_roles = CandidateDomainService.validate_job_roles(
+                [current_role], cv_text, resume_json, domain_repository
+            )
+            current_role = validated_roles[0] if validated_roles else None
+
         if not current_role:
             m = re.search(
-                r"(?:current\s*role|position|title)\s*:\s*([^\n]+)",
+                r"(?:current\s*role|position|designation|job\s*title)\s*:\s*([^\n]+)",
                 cv_text,
                 re.IGNORECASE,
             )
             if m:
-                current_role = m.group(1).strip()
-            else:
-                m_header = re.search(r"##\s*([^\n]+)", cv_text)
-                if m_header:
-                    current_role = m_header.group(1).strip()
+                validated_roles = CandidateDomainService.validate_job_roles(
+                    [m.group(1)], cv_text, resume_json, domain_repository
+                )
+                current_role = validated_roles[0] if validated_roles else None
 
         # Text normalization inline (mirrors ScoringEngine._normalize_text)
         raw_combined = " ".join(filter(None, profile_parts))
@@ -120,6 +141,7 @@ class CandidateAnalysisContext:
         norm_text = re.sub(r"\s+", " ", norm_text).strip()
 
         # 2. Taxonomy Classification (cached)
+        resume_evidence = CandidateResumeDTO.from_resume(cv_text, resume_json=resume_json)
         cand_tax_domain, cand_families_list = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
         cand_families = list(cand_families_list)
 
@@ -157,8 +179,13 @@ class CandidateAnalysisContext:
             resume_json=resume_json,
             domain_repository=domain_repository,
         )
-        if optimized_profile and optimized_profile.professional_domains:
-            cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
+        profile_domain = str(cand_domain_profile.get("professional_domain") or "").strip()
+        profile_department = str(cand_domain_profile.get("recommended_department") or "").strip()
+        if profile_domain:
+            cand_tax_domain = profile_domain
+        if profile_department:
+            cand_families = [profile_department]
+            cand_primary_family = profile_department
 
         cand_domain = cand_domain_profile.get("professional_domain", "")
 
@@ -171,15 +198,10 @@ class CandidateAnalysisContext:
             domain_repository=domain_repository,
         )
 
-        # 5. Software Candidate Guard Flag — use DB family compatibility instead of hardcoded patterns
-        it_software_family = "Software Engineering & Development"
-        is_software_cand = False
-        if cand_primary_family:
-            is_compat, score = DynamicTaxonomyService.check_family_compatibility(cand_primary_family, it_software_family)
-            if is_compat and score >= 0.4:
-                is_software_cand = True
-        if not is_software_cand:
-            is_software_cand = "Information Technology" in cand_tax_domain or "Software" in cand_tax_domain
+        # 5. Software Candidate Guard Flag from configured evidence patterns.
+        guard_patterns = RuleConfigManager.get_compiled_cross_domain_guard()["software_candidate_patterns"]
+        software_evidence = " ".join([domain_candidate_text, cand_tax_domain, cand_domain, current_role or ""])
+        is_software_cand = any(pattern.search(software_evidence) for pattern in guard_patterns)
 
         return cls(
             cv_text=cv_text,
@@ -196,6 +218,9 @@ class CandidateAnalysisContext:
             cand_tax_domain=cand_tax_domain,
             cand_families=cand_families,
             cand_primary_family=cand_primary_family,
+            professional_skills=resume_evidence.skills,
+            experience_titles=resume_evidence.experience_titles,
+            education_evidence=resume_evidence.education,
             domain_candidate_text=domain_candidate_text,
             is_software_cand=is_software_cand,
         )
@@ -210,8 +235,21 @@ class CandidateAnalysisContext:
         if optimized_profile is None:
             return
 
+        optimized_profile = CandidateDomainService.validate_optimized_profile(
+            optimized_profile, self.cv_text, self.resume_json, domain_repository
+        )
+
+        deterministic_role = self.current_role
+        deterministic_domain = self.cand_tax_domain
+        deterministic_profile_domain = self.cand_domain
+        deterministic_families = list(self.cand_families)
+        deterministic_primary_family = self.cand_primary_family
         self.optimized_profile = optimized_profile
+        self.professional_skills = list(dict.fromkeys([*self.professional_skills, *optimized_profile.core_skills, *optimized_profile.inferred_skills]))
         if optimized_profile.current_role:
+            self.experience_titles = list(dict.fromkeys([optimized_profile.current_role, *self.experience_titles]))
+        self.education_evidence = list(dict.fromkeys([*self.education_evidence, *optimized_profile.education_domains]))
+        if optimized_profile.current_role and not self.current_role:
             self.current_role = optimized_profile.current_role
         if self.candidate_experience is None and optimized_profile.relevant_experience_years is not None:
             try:
@@ -231,7 +269,7 @@ class CandidateAnalysisContext:
         self.norm_text = re.sub(r"[^a-zA-Z0-9\s#+./-]", " ", " ".join(filter(None, profile_parts))).lower()
         self.norm_text = re.sub(r"\s+", " ", self.norm_text).strip()
 
-        if optimized_profile.professional_domains:
+        if optimized_profile.professional_domains and self.cand_tax_domain in ("", "Unknown"):
             llm_domain = optimized_profile.professional_domains[0]
             canonical_domains = set(RuleConfigManager.get_taxonomy_rules().canonical_domains)
             if llm_domain in canonical_domains:
@@ -254,23 +292,25 @@ class CandidateAnalysisContext:
             resume_json=self.resume_json,
             domain_repository=domain_repository,
         )
-        if optimized_profile.professional_domains:
-            self.cand_domain_profile["professional_domain"] = optimized_profile.professional_domains[0]
-        self.cand_domain = self.cand_domain_profile.get("professional_domain", self.cand_domain)
+        self.cand_domain = deterministic_profile_domain or self.cand_domain_profile.get("professional_domain", self.cand_domain)
+        profile_department = str(self.cand_domain_profile.get("recommended_department") or "").strip()
+        if self.cand_domain and deterministic_domain in ("", "Unknown"):
+            self.cand_tax_domain = self.cand_domain
+        if profile_department and not deterministic_families:
+            self.cand_families = [profile_department]
+            self.cand_primary_family = profile_department
+        if deterministic_domain not in ("", "Unknown"):
+            self.cand_tax_domain = deterministic_domain
+            self.cand_families = deterministic_families
+            self.cand_primary_family = deterministic_primary_family
+        if deterministic_role:
+            self.current_role = deterministic_role
         self.domain_candidate_text = CandidateDomainService.build_domain_candidate_text(
             cv_text=self.cv_text,
             current_role=self.current_role,
             optimized_profile=optimized_profile,
             domain_repository=domain_repository,
         )
-        guard = RuleConfigManager.get_compiled_cross_domain_guard()
-        # Replace hardcoded patterns with DB family compatibility check
-        it_software_family = "Software Engineering & Development"
-        self.is_software_cand = False
-        if self.cand_primary_family:
-            is_compat, score = DynamicTaxonomyService.check_family_compatibility(self.cand_primary_family, it_software_family)
-            if is_compat and score >= 0.4:
-                self.is_software_cand = True
-        if not self.is_software_cand:
-            self.is_software_cand = "Information Technology" in self.cand_domain or "Software" in self.cand_domain
-        _ = guard  # retained for backward compat; patterns no longer used for is_software_cand
+        guard_patterns = RuleConfigManager.get_compiled_cross_domain_guard()["software_candidate_patterns"]
+        software_evidence = " ".join([self.domain_candidate_text, self.cand_tax_domain, self.cand_domain, self.current_role or ""])
+        self.is_software_cand = any(pattern.search(software_evidence) for pattern in guard_patterns)

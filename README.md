@@ -32,7 +32,8 @@ Client
 External/runtime services
   -> Redis: RQ, distributed locks, processing records, and cache tier
   -> PostgreSQL/pgvector: embeddings and vector-backed services
-  -> MSSQL: configured recruiting, taxonomy, and system data
+  -> MSSQL: configured recruiting, taxonomy, and system data (Strictly READ-ONLY; enforced on startup)
+  -> RQ cron -> integration snapshot sync: pulls taxonomy, candidates, and vacancies from MSSQL into PostgreSQL
   -> Ollama: pooled generation and embedding transport
   -> shared uploads volume: retained raw files, results, file cache, and training data
 ```
@@ -44,7 +45,7 @@ Key boundaries are intentionally centralized:
 - `backend/app/schemas/` owns legacy-compatible API models and typed normalized resume/job contexts.
 - `backend/app/services/` owns upload, extraction, matching, scoring, queueing, Ollama, embedding, search, recommendations, and synchronization workflows.
 - `backend/app/repositories/` owns jobs, results, processing records, cache data, and training data.
-- `backend/scripts/migrations/` contains explicit PostgreSQL and MSSQL migrations; production startup never mutates schemas.
+- `backend/scripts/migrations/` contains explicit PostgreSQL migrations; production startup never mutates schemas. MSSQL is considered a static read-only enterprise source and is never migrated.
 
 ## API access model
 
@@ -52,15 +53,21 @@ Key boundaries are intentionally centralized:
 access. Configuration, reprocessing, cache administration, warmup, synchronization, training data, model health, taxonomy mutation, and performance metrics require
 administrator access. Uncharacterized `/api/*` routes fail closed as administrator-only.
 
-Authenticate with either header:
+Non-browser clients can authenticate with either header:
 
 ```http
 Authorization: Bearer <api-key>
 X-API-Key: <api-key>
 ```
 
-Administrator keys inherit recruiter permissions. `AUTH_ENABLED=false` is available for local development, but production and staging always require authentication.
-Protected endpoints return HTTP 503 when authentication is required and no keys are configured.
+Administrator keys inherit recruiter permissions. `AUTH_ENABLED` is the single authentication switch in every environment. When it is `false`, protected routes bypass
+authentication centrally; when it is `true`, the existing recruiter/administrator policy is enforced. Protected endpoints return HTTP 503 when authentication is
+enabled and no keys are configured.
+
+The frontend does not embed either API key. A recruiter or administrator enters an issued key at sign-in; `POST /api/auth/session` validates it and returns an eight-hour,
+signed `HttpOnly`, `Secure` (in production), `SameSite=Strict` session cookie. The browser discards the entered key after that exchange and sends only the cookie on
+subsequent requests. `GET /api/auth/session` checks the current session, and `DELETE /api/auth/session` signs out. Deploy the frontend and API on HTTPS origins within
+the same site, list the exact frontend origin in `ALLOWED_ORIGINS`, and keep credentialed CORS enabled.
 
 The characterized endpoint inventory and successful response shapes are in [Phase 0 API contracts](backend/docs/phase0-api-contracts.md). The enforced policy is
 documented in [Phase 6](backend/docs/phase6-api-operational-reliability.md).
@@ -150,11 +157,13 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `APP_ENVIRONMENT` | `development` | Enables production/staging containment when set to `production`, `prod`, or `staging`. |
-| `AUTH_ENABLED` | `false` | Enables API-key enforcement locally; production/staging always enforce it. |
+| `AUTH_ENABLED` | `false` (`true` in Compose) | Enables the existing API-key/session authentication and recruiter/administrator authorization policy. |
 | `RECRUITER_API_KEYS` | `[]` | JSON array of recruiter secrets. |
 | `ADMINISTRATOR_API_KEYS` | `[]` | JSON array of administrator secrets. |
+| `AUTH_SESSION_SIGNING_KEY` | empty | Independent random secret of at least 32 characters used only to sign browser sessions. |
+| `AUTH_SESSION_TTL_SECONDS` | `28800` | Lifetime of the signed browser session cookie. |
 | `ALLOWED_ORIGINS` | `["http://localhost:8081"]` | Explicit trusted CORS origins; wildcard entries are ignored. |
-| `CORS_ALLOW_CREDENTIALS` | `false` | Enables credentialed cross-origin requests only for trusted origins. |
+| `CORS_ALLOW_CREDENTIALS` | `false` (`true` in Compose) | Enables browser session cookies only for explicitly trusted origins. |
 | `RATE_LIMIT_ENABLED` | `true` | Enables the per-process application containment limit. |
 | `RATE_LIMIT_REQUESTS` | `300` local, `120` Compose | Requests allowed per socket-peer bucket and window. |
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Sliding-window duration. |
@@ -164,7 +173,9 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `MAX_HR_FEEDBACK_LENGTH_CHARS` | `10000` | Maximum HR review feedback length. |
 | `INITIALIZE_DATABASE_ON_STARTUP` | `true` local | Allows local schema initialization; ignored in production/staging. |
 | `STARTUP_CACHE_WARMUP_ENABLED` | `true` | Starts best-effort cache warmup during lifespan startup. |
-| `DOCUMENT_PARSER_WORKERS` | `1` | Maximum concurrent Docling conversions in one API/worker process. Keep at `1` on memory-constrained machines. |
+| `DOCUMENT_PARSER_WORKERS` | `1` | Maximum concurrent isolated Docling conversions in one API/worker process. Keep at `1` on memory-constrained machines. |
+| `EXTRACTION_TIMEOUT_SECONDS` | `300` | Hard process deadline for text-rich PDFs and DOCX documents. Must remain below the RQ job timeout. |
+| `SCANNED_EXTRACTION_TIMEOUT_SECONDS` | `600` | Hard process deadline for scanned or unclassified PDFs that require OCR. Must remain below the RQ job timeout. |
 | `DOCUMENT_TABLE_STRUCTURE_ENABLED` | `true` | Enables Docling's table-structure model; the lightweight Compose override disables it to reduce memory. |
 | `PREFER_NATIVE_TEXT_EXTRACTION` | `false` | Uses sufficient PyMuPDF/python-docx text without loading Docling; enabled by the lightweight Compose override. |
 | `AUTO_MIGRATE` | `false` | Opt-in local automatic migration; ignored in production/staging. |
@@ -173,19 +184,41 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PG_DB_URL` | local PostgreSQL URL | PostgreSQL/pgvector connection string. |
-| `DB_SERVER`, `DB_PORT`, `DB_NAME` | local/empty | Optional MSSQL location and database. Empty `DB_NAME` disables the MSSQL engine. |
-| `DB_USER`, `DB_PASSWORD` | empty | MSSQL credentials. |
-| `DB_ENCRYPT`, `DB_TRUST_CERT` | `true`; template trust is `false` | ODBC encryption and certificate trust policy. |
+| `POSTGRES_APP_URL` | local PostgreSQL URL | PostgreSQL/pgvector connection string. |
+| `MSSQL_READ_ONLY_URL` | empty | MSSQL connection string. Required for enterprise data. |
+| `MSSQL_READONLY_ENFORCEMENT` | `true` | Fails startup when MSSQL write permissions are present or cannot be verified. Production requires `true`; local development may explicitly use `false` with a security warning. |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for RQ, locks, processing records, and cache. |
-| `RQ_QUEUE_NAME` | `cv-processing` | Queue consumed by the API and worker. |
+| `RQ_QUEUE_NAME` | `cv-processing` | Primary CV-processing queue consumed by the worker. |
+| `RQ_WORKER_MAX_JOBS` | `0` | Optional number of jobs processed before the worker exits and Docker restarts it; zero is unlimited. |
 | `RQ_JOB_TIMEOUT_SECONDS` | `900` | Worker execution timeout. |
 | `RQ_RESULT_TTL_SECONDS` | `604800` | RQ result retention in seconds. |
 | `RQ_MAX_RETRIES` | `2` | Retries after the first attempt. |
 | `RQ_RETRY_INTERVAL_SECONDS` | `30` | Delay between retries. |
+| `CV_JOB_RECONCILIATION_INTERVAL_SECONDS` | `60` | Interval for reconciling durable PostgreSQL job state with Redis/RQ. |
+| `CV_JOB_STALE_AFTER_SECONDS` | `1200` | Maximum inactive processing lease before crash recovery. |
+| `CV_JOB_HISTORY_HOURS` | `24` | Recent terminal-job window returned when the queue UI reloads. |
+| `CV_JOB_LIST_LIMIT` | `100` | Maximum recent terminal jobs returned in addition to every active job. |
 | `RQ_DEVELOPMENT_FALLBACK_ENABLED` | `true` | Allows the in-process fallback only in local/development/test environments. |
-| `PROCESSING_JOB_TTL_SECONDS` | `604800` | Redis processing-record retention. |
+| `PROCESSING_JOB_TTL_SECONDS` | `604800` | Redis/file compatibility-cache retention for PostgreSQL processing records. |
 | `PROCESSING_JOB_LOCK_TIMEOUT_SECONDS` | `1200` | Distributed execution-lock lease. |
+
+MSSQL must be configured with a dedicated application login, never `sa`, `db_owner`, or another shared operator account. Create a database user for that login, grant `CONNECT`, and grant `SELECT` only on the tables or views read by the MSSQL models. Do not grant broad roles such as `sysadmin`, `db_owner`, `db_datawriter`, or permissions such as `CONTROL`, `ALTER`, `CREATE`, `EXECUTE`, `INSERT`, `UPDATE`, or `DELETE`.
+
+Before deployment, inspect the credential while connected as that credential:
+
+```sql
+SELECT ORIGINAL_LOGIN() AS login_name, USER_NAME() AS database_user, DB_NAME() AS database_name;
+SELECT permission_name FROM fn_my_permissions(NULL, 'SERVER') ORDER BY permission_name;
+SELECT permission_name FROM fn_my_permissions(NULL, 'DATABASE') ORDER BY permission_name;
+SELECT roles.name AS role_name
+FROM sys.database_role_members AS memberships
+INNER JOIN sys.database_principals AS roles ON roles.principal_id = memberships.role_principal_id
+INNER JOIN sys.database_principals AS members ON members.principal_id = memberships.member_principal_id
+WHERE members.name = USER_NAME()
+ORDER BY roles.name;
+```
+
+Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explicit `false` is accepted only outside production/staging and emits a security warning; it is intended solely for temporary local development.
 | `JOB_NOT_FOUND_COMPATIBILITY_UNTIL` | unset | Optional ISO-8601 deadline for the legacy unknown-job response. |
 
 ### Upload policy
@@ -215,7 +248,7 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `LLM_ENABLED` | `true` | Enables semantic generation; deterministic scoring remains available when disabled. |
 | `EMBEDDING_ENABLED` | `true` | Enables embedding-backed retrieval and related features. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint; Compose defaults to `host.docker.internal`. |
-| `OLLAMA_MODEL` | `qwen3:4b` | Generation model. |
+| `OLLAMA_MODEL` | `gemma3:4b` | Generation model. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model. |
 | `OLLAMA_REQUEST_TIMEOUT` | `60` | Compatibility timeout used by the shared client. |
 | `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout for every Ollama operation. |
@@ -255,11 +288,10 @@ cd backend
 uv sync --frozen
 ```
 
-Run the explicit migration for each configured database:
+Run the explicit migration for the PostgreSQL database:
 
 ```bash
-uv run python scripts/run_migrations.py --dialect postgres
-uv run python scripts/run_migrations.py --dialect mssql
+uv run python scripts/run_migrations.py
 ```
 
 Start the API and worker in separate terminals from `backend/` so they share the same configured paths:
@@ -269,11 +301,11 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ```bash
-uv run rq worker --url redis://localhost:6379/0 cv-processing
+uv run python start_worker.py
 ```
 
-If `RQ_QUEUE_NAME` or `REDIS_URL` changes, pass the same values to the worker. The in-process fallback is a development containment path, not a substitute for a
-worker in deployed environments.
+The worker reads `REDIS_URL` and `RQ_QUEUE_NAME` from the shared settings and consumes the primary CV queue, `shadow_validation`, and `default`. The in-process
+fallback is a development containment path, not a substitute for a worker in deployed environments.
 
 The API exposes service discovery at `http://localhost:8000/`, dependency health at `http://localhost:8000/health`, and OpenAPI UI at
 `http://localhost:8000/docs`.
@@ -287,7 +319,9 @@ provide deployment values through the shell or an ignored root `.env`, including
 POSTGRES_PASSWORD=replace-with-a-unique-secret
 RECRUITER_API_KEYS=["replace-with-a-generated-recruiter-secret"]
 ADMINISTRATOR_API_KEYS=["replace-with-a-generated-administrator-secret"]
+AUTH_SESSION_SIGNING_KEY=replace-with-an-independent-random-secret-at-least-32-characters
 ALLOWED_ORIGINS=["https://recruiting.example.com"]
+CORS_ALLOW_CREDENTIALS=true
 ```
 
 Start infrastructure, apply migrations, and then start the application processes:
@@ -295,22 +329,35 @@ Start infrastructure, apply migrations, and then start the application processes
 ```bash
 docker compose up -d pgvector redis
 docker compose --profile tools run --rm migrate-postgres
-docker compose up -d api worker
+docker compose up -d api worker auxiliary-worker scheduler
 ```
 
-The API and worker share `backend/uploads`, use the same queue and service configuration, wait for healthy Redis/PostgreSQL, and restart unless stopped. The worker
-must retain access to that shared volume because RQ payloads contain only job IDs. The Compose stack expects Ollama on the Docker host by default.
+PostgreSQL normalized rule tables are the only source of CV rule configuration; Redis is a cache and the application has no bundled or hardcoded rule profile. On a
+clean database, `/config` directs an administrator to a structured initial setup screen generated from `GET /api/config/schema`. The completed options are validated
+by the authoritative backend model and persisted through `POST /api/config/initialize`; no rule JSON file, test fixture, or frontend seed is used. The setup screen
+starts with one conservative, typed baseline from `GET /api/config/system-default`, which must be reviewed and explicitly activated by an administrator.
+After activation, `GET /api/config/rules` returns a deterministic administrator-only inventory of normalized system rules, thresholds, penalties, and weights for the
+active profile. The `/config` screen renders this inventory directly from PostgreSQL and does not maintain a frontend rule catalog.
+`/health` returns `503` with `rule_configuration: unavailable` until activation. Both RQ workers remain alive but do not open their execution lanes until the active
+profile passes schema validation, safety gates, and synthetic smoke tests. They detect a later activation automatically without requiring a restart.
+Migration `024` seeds the required PostgreSQL-managed `optimized_match` prompt version and response schema. The CV worker additionally reports
+`prompt_configuration: PROMPT_NOT_READY` and leaves FIFO jobs queued whenever that exact active prompt contract is missing or invalid. Prompt activation is detected
+automatically; no worker restart or prompt fallback is required.
 
-Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `DB_*` variables to the API/worker through a deployment override and run the MSSQL
-migration command as a separate release step.
+The API and CV worker share `backend/uploads`, use the same queue and service configuration, and wait for healthy Redis/PostgreSQL. The scheduler registers recurring
+canonical MSSQL snapshot synchronization and validation metric jobs for the auxiliary worker. The CV worker consumes only `cv-processing`; the auxiliary worker consumes
+only `default` and `shadow_validation`. The CV worker must retain access to the shared volume because RQ payloads contain only job IDs. The Compose stack expects Ollama
+on the Docker host by default.
+
+Compose does not provision MSSQL. If MSSQL-backed features are enabled, supply `MSSQL_READ_ONLY_URL` to the API/worker through a deployment override.
 
 ### Lightweight Docker on Apple Silicon
 
 For an 8 GB M1-class Mac, layer the local override over the production-safe base file:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml build api worker
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker
+docker compose -f docker-compose.yml -f docker-compose.local.yml build api worker auxiliary-worker scheduler
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector redis api worker auxiliary-worker scheduler
 ```
 
 The override limits the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.
@@ -323,7 +370,7 @@ responses are bounded and validated, and every generation or embedding batch unl
 Deterministic extraction and scoring remain available. To opt into host Ollama features, start with one feature and a small installed model:
 
 ```bash
-LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker
+LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker scheduler
 ```
 
 Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. The local profile uses `qwen3:1.7b`, keeps `nomic-embed-text` for the existing 768-dimensional
@@ -344,7 +391,7 @@ uv run python scripts/verify_schema_drift.py
 
 ```bash
 docker compose config
-docker compose build api worker migrate-postgres
+docker compose build api worker scheduler migrate-postgres
 ```
 
 After deployment, smoke-test public health, authenticated recruiter/admin routes, both upload and polling aliases, worker processing/retry behavior, request IDs,
@@ -358,7 +405,7 @@ error envelopes, configured rate limits, and Ollama-disabled fallback.
 - Legacy filename result lookup is preserved when the alias identifies exactly one canonical CV. Ambiguous aliases no longer select an unrelated candidate.
 - Legacy job statuses adapt to canonical states. `error_details` remains present but never exposes a traceback.
 - Top-level error `detail` remains alongside the canonical error envelope.
-- PDF/DOCX-only uploads, production authentication, collision rejection, safe input limits, and default unknown-job HTTP 404 are intentional containment changes.
+- PDF/DOCX-only uploads, configurable authentication, collision rejection, safe input limits, and default unknown-job HTTP 404 are intentional containment changes.
 - Versioned extraction, matching, prompt, model, vacancy, and content identities deliberately prevent stale cache reuse.
 
 ## Remaining limitations

@@ -13,11 +13,13 @@ from app.repositories.llm_cache import LLMCacheEntry
 from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import OllamaLLMService
 from app.services.ollama_transport import (
+    OllamaCircuitOpenError,
     OllamaModelUnavailableError,
     OllamaSchemaValidationError,
     OllamaTimeoutError,
     OllamaTransport,
     OllamaTransportResult,
+    OllamaUnavailableError,
 )
 
 
@@ -30,6 +32,8 @@ def reset_transport(monkeypatch):
     monkeypatch.setattr(settings, "EMBEDDING_ENABLED", True)
     monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 1)
     monkeypatch.setattr(settings, "OLLAMA_RETRY_BACKOFF_SECONDS", 0.0)
+    monkeypatch.setattr(settings, "OLLAMA_RETRY_JITTER_SECONDS", 0.0)
+    monkeypatch.setattr(settings, "OLLAMA_RESIDENCY_ENABLED", False)
     yield
     OllamaTransport.close()
     OllamaTransport.reset_metrics()
@@ -143,12 +147,12 @@ def test_transport_retries_connection_error_then_succeeds(monkeypatch):
     client = _install_client(
         monkeypatch,
         httpx.ConnectError("offline", request=request),
-        _response({"models": [{"name": "qwen3:4b"}]}),
+        _response({"models": [{"name": "gemma3:4b"}]}),
     )
 
     result = OllamaTransport.get_tags()
 
-    assert [model.name for model in result.value.models] == ["qwen3:4b"]
+    assert [model.name for model in result.value.models] == ["gemma3:4b"]
     assert result.attempts == 2
     assert client.stream.call_count == 2
     assert OllamaTransport.get_metrics()["retries"] == 1
@@ -164,7 +168,7 @@ def test_transport_uses_exponential_backoff(monkeypatch):
         monkeypatch,
         httpx.ConnectError("offline", request=request),
         httpx.ConnectError("offline", request=request),
-        _response({"models": [{"name": "qwen3:4b"}]}),
+        _response({"models": [{"name": "gemma3:4b"}]}),
     )
 
     result = OllamaTransport.get_tags()
@@ -220,6 +224,55 @@ def test_generation_schema_failure_returns_fallback_after_retries(monkeypatch):
     assert result is None
     assert client.stream.call_count == 3
     assert client.stream.call_args_list[-1].kwargs["json"]["keep_alive"] == 0
+
+
+def test_length_terminated_generation_is_never_accepted(monkeypatch):
+    _disable_cache(monkeypatch)
+    incomplete = json.dumps({"skill_matches": [], "inferred_skills": [], "missing_critical": [], "semantic_reason": "partial"})
+    client = _install_client(
+        monkeypatch,
+        _response({"response": incomplete, "done_reason": "length"}),
+        _response({"response": incomplete, "done_reason": "length"}),
+    )
+
+    result = OllamaLLMService.call_qwen("analyze", "phase5", "length-stop")
+
+    assert result is None
+    assert client.stream.call_count == 3
+
+
+def test_residency_policy_keeps_model_loaded(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_RESIDENCY_ENABLED", True)
+    monkeypatch.setattr(settings, "OLLAMA_EMBEDDING_EXPECTED_DIMENSION", 0)
+    client = _install_client(monkeypatch, _response({"model": settings.EMBEDDING_MODEL, "embeddings": [[0.1, 0.2]]}))
+
+    OllamaTransport.embed(settings.EMBEDDING_MODEL, ["resume"])
+
+    unload_calls = [request_call for request_call in client.stream.call_args_list if request_call.kwargs.get("json", {}).get("keep_alive") == 0]
+    assert unload_calls == []
+    assert OllamaTransport.get_metrics()["residency_skips"] == 1
+
+
+def test_circuit_breaker_fails_fast_after_threshold(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 0)
+    monkeypatch.setattr(settings, "OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD", 2)
+    monkeypatch.setattr(settings, "OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS", 30.0)
+    request = httpx.Request("GET", "http://ollama.test/api/tags")
+    client = _install_client(
+        monkeypatch,
+        httpx.ConnectError("offline", request=request),
+        httpx.ConnectError("offline", request=request),
+    )
+
+    with pytest.raises(OllamaUnavailableError):
+        OllamaTransport.get_tags()
+    with pytest.raises(OllamaUnavailableError):
+        OllamaTransport.get_tags()
+    with pytest.raises(OllamaCircuitOpenError):
+        OllamaTransport.get_tags()
+
+    assert client.stream.call_count == 2
+    assert OllamaTransport.get_metrics()["circuit_rejections"] == 1
 
 
 def test_unavailable_model_is_mapped_without_retry(monkeypatch):
@@ -287,7 +340,7 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
             time.sleep(0.02)
             yield httpx.Response(
                 200,
-                json={"models": [{"name": "qwen3:4b"}]},
+                json={"models": [{"name": "gemma3:4b"}]},
                 request=httpx.Request("GET", "http://ollama.test/api/tags"),
             )
         finally:
@@ -301,14 +354,24 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
         results = list(executor.map(lambda _: OllamaTransport.get_tags(), range(2)))
 
     assert maximum_active == 1
-    assert all(result.value.models[0].name == "qwen3:4b" for result in results)
+    assert all(result.value.models[0].name == "gemma3:4b" for result in results)
 
 
 def test_embedding_rejects_non_finite_values_and_still_unloads(monkeypatch):
     monkeypatch.setattr(settings, "OLLAMA_EMBEDDING_EXPECTED_DIMENSION", 0)
+    
+    mock_resp = httpx.Response(
+        200,
+        text='{"model": "nomic-embed-text", "embeddings": [[NaN, 0.2]]}',
+        request=httpx.Request("POST", "http://ollama.test/api"),
+    )
+    context = MagicMock()
+    context.__enter__.return_value = mock_resp
+    context.__exit__.return_value = False
+
     client = _install_client(
         monkeypatch,
-        _response({"model": "nomic-embed-text", "embeddings": [[float("nan"), 0.2]]}),
+        context,
     )
 
     with pytest.raises(OllamaSchemaValidationError):

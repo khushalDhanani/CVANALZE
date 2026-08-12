@@ -4,7 +4,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import fitz
 import pytest
 from docx import Document
-from fastapi import BackgroundTasks, HTTPException, UploadFile
+from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
 from starlette.datastructures import Headers
 
@@ -262,7 +262,7 @@ async def test_reprocess_missing_raw_returns_409_without_deleting_result(monkeyp
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        await reprocess_candidate("cv_resume", BackgroundTasks())
+        await reprocess_candidate("cv_resume")
 
     assert exc_info.value.status_code == 409
     assert result_path.exists()

@@ -1,8 +1,11 @@
+from __future__ import annotations
 import json
 import re
 from typing import Any
 
 from app.core.config import settings
+from app.services.context_packer import estimate_tokens, pack_cv_context
+from app.services.llm_input_security import harden_prompt, sanitize_string_list, sanitize_untrusted_text
 
 PROMPT_VERSION = settings.OPTIMIZED_PROMPT_VERSION
 
@@ -26,26 +29,34 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
 
     Returns: (prompt_str, estimated_token_count, char_count)
     """
-    cleaned_cv = _clean_cv_text(cv_text)[:7500]
+    packed_context = pack_cv_context(
+        _clean_cv_text(cv_text),
+        max_tokens=settings.LLM_CONTEXT_CV_TOKEN_BUDGET,
+        deidentify=settings.LLM_DEIDENTIFY_MATCHING_INPUTS,
+    )
+    cleaned_cv = packed_context.text
 
     compact_vacancies = []
-    for vac in filtered_vacancies:
+    ordered_vacancies = sorted(filtered_vacancies, key=lambda vac: str(vac.get("vacancy_id") or vac.get("id") or ""))
+    for vac in ordered_vacancies:
         vac_id = vac.get("vacancy_id") or vac.get("id")
         item = {
             "vacancy_id": vac_id,
-            "title": vac.get("title") or vac.get("job_title"),
-            "department": vac.get("department_name") or vac.get("department"),
+            "title": sanitize_untrusted_text(str(vac.get("title") or vac.get("job_title") or "")).text,
+            "department": sanitize_untrusted_text(str(vac.get("department_name") or vac.get("department") or "")).text,
         }
         if vac.get("required_skills"):
-            item["required_skills"] = vac.get("required_skills")
+            item["required_skills"] = sanitize_string_list(vac.get("required_skills"))
         if vac.get("preferred_keywords"):
-            item["preferred_keywords"] = vac.get("preferred_keywords")
+            item["preferred_keywords"] = sanitize_string_list(vac.get("preferred_keywords"))
         if vac.get("min_experience_years") is not None:
             item["min_exp"] = vac.get("min_experience_years")
-        if vac.get("education_requirements"):
-            item["education_req"] = vac.get("education_requirements")
+        education_requirement = vac.get("education_requirements") or vac.get("required_education") or vac.get("education")
+        if education_requirement:
+            education_values = education_requirement if isinstance(education_requirement, (list, tuple, set)) else [education_requirement]
+            item["education_req"] = sanitize_string_list(education_values)
         if vac.get("certifications"):
-            item["certifications"] = vac.get("certifications")
+            item["certifications"] = sanitize_string_list(vac.get("certifications"))
 
         compact_vacancies.append(item)
 
@@ -61,90 +72,31 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
     canonical_domains = taxonomy.canonical_domains
     domain_list_str = ", ".join(f'"{d}"' for d in canonical_domains)
 
-    # Gather valid department names from the seed data as an extra grounding signal
+    # Gather valid department names from the repository as an extra grounding signal
     try:
-        import json as _json, os as _os
-        _seed_path = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "data", "department_domains_seed.json")
-        with open(_seed_path, "r", encoding="utf-8") as _f:
-            _seed = _json.load(_f)
-        dept_names = [d.get("industry_label") or d.get("department_name") for d in _seed.get("domains", []) if d.get("is_active")]
-        dept_names = [d for d in dept_names if d]
+        from app.repositories.department_domain import department_domain_repository
+
+        domains = department_domain_repository.get_all_domains()
+        dept_names = [d.department_name for d in domains if d.is_active and d.department_name]
     except Exception:
         dept_names = []
     dept_list_str = ", ".join(f'"{d}"' for d in dept_names) if dept_names else "(see canonical_domains list)"
 
     input_json = json.dumps(structured_input, separators=(",", ":"), ensure_ascii=False)
 
-    prompt = f"""/think
-{input_json}
+    # Try to load prompt template from database
+    from app.services.prompt_service import PromptService
+    prompt = PromptService.get_prompt(
+        prompt_name="optimized_match",
+        placeholders={
+            "input_json": input_json,
+            "domain_list_str": domain_list_str,
+            "dept_list_str": dept_list_str
+        }
+    )
 
-EVIDENCE-BASED REASONING RULES:
-1. Do NOT make assumptions or infer experience not explicitly supported by the CV.
-2. EVERY conclusion in semantic_reason must reference specific evidence from the CV.
-3. If evidence is missing for a requirement, state "No evidence found" — do not guess.
-4. Do not use generic phrases like "strong experience" unless backed by specific skills, projects, or responsibilities cited from the CV.
-5. Compare the candidate against each vacancy requirement item by item.
-6. If there is a mismatch (department, domain, education, role, technology, skills), explicitly report it.
-7. Never increase semantic_fit_score based on assumptions — score only on verified evidence.
-8. If there is no genuine match with any active vacancy, set active_vacancy_summary to "No suitable active vacancy found.".
-9. IMPORTANT (EXPERIENCE): Calculate `relevant_experience_years` strictly by summing the total duration of the chronological work history. E.g., "2014 to 2015" (1 yr) + "2023 to present" (~3 yrs) = 4.0 years. Do NOT default to 0.0 if dates are present.
-10. IMPORTANT (DOMAIN): `professional_domain` MUST be strictly selected from this list: [{domain_list_str}]. Do NOT invent domains.
-    If NONE of the listed domains genuinely fits the candidate, set `professional_domain` to "NO_SUITABLE_MATCH" and set `professional_domains` to ["NO_SUITABLE_MATCH"].
-11. IMPORTANT (DEPARTMENT): `recommended_department` MUST be selected from this list: [{dept_list_str}]. Do NOT invent department names.
-    If no department fits, set `recommended_department` to "NO_SUITABLE_MATCH".
-12. EVIDENCE CITATION: Every field in `candidate_profile` (skills, domain, department, strengths, roles) must be justified by specific text from the CV.
-    For each field include only what is directly evidenced — do not infer beyond the stated facts.
-
-INSTRUCTIONS:
-Return ONLY valid JSON matching the exact schema below without markdown wrapper, thinking tokens, or extra commentary.
-
-Expected JSON Schema:
-{{
-  "candidate_profile": {{
-    "core_skills": ["List of explicitly stated skills"],
-    "inferred_skills": ["List of logical inferred skills, e.g. React implies JavaScript"],
-    "relevant_experience_years": 5.0,
-    "education_domains": ["Extracted education domains/degrees"],
-    "certifications": ["Extracted certifications"],
-    "current_role": "Current or most recent job title",
-    "professional_domains": ["Extracted professional domain areas"],
-    "recommended_department": "Most suitable department for candidate",
-    "professional_domain": "Candidate's specialized professional domain",
-    "strengths": ["Key candidate strengths from skills, experience, projects"],
-    "suitable_job_roles": ["List of suitable market job roles"]
-  }},
-  "active_vacancy_summary": "Summary of genuine active vacancy match if genuine match exists; otherwise 'No suitable active vacancy found.'",
-  "ai_career_summary": "Independent AI analysis of candidate's profile, strengths, recommended department, and suitable job roles.",
-  "matched_vacancies": [
-    {{
-      "vacancy_id": 101,
-      "semantic_reason": "Clear explanation of semantic fit based on CV evidence, citing specific skills, projects, or roles. If no fit, state 'No evidence found for X requirement'.",
-      "inferred_skills": ["Inferred skills relevant to this specific vacancy"],
-      "matched_skills": ["Skills from required_skills present in CV"],
-      "missing_critical": ["Critical requirements missing"],
-      "semantic_fit_score": 85.0,
-      "career_transition_detected": false,
-      "career_transition_note": "Optional notes if dynamic career transition detected",
-      "classified_requirements": [
-        {{
-          "requirement_id": "req_1",
-          "description": "Requirement description",
-          "tier": "MANDATORY",
-          "status": "SATISFIED",
-          "failure_reason": null
-        }}
-      ],
-      "evidence_snippets": {{
-        "req_1": {{
-          "cv_evidence": "Quote or verified fact from CV text",
-          "vacancy_evidence": "Exact requirement text from vacancy"
-        }}
-      }}
-    }}
-  ]
-}}
-"""
+    prompt = harden_prompt(prompt)
     char_count = len(prompt)
-    token_estimate = max(1, char_count // 4)
+    token_estimate = max(1, estimate_tokens(prompt))
 
     return prompt, token_estimate, char_count

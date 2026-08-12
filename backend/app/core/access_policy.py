@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 
 from app.schemas.contracts import AccessTier
@@ -13,6 +14,9 @@ class EndpointPolicy:
 ENDPOINT_POLICIES: tuple[EndpointPolicy, ...] = (
     EndpointPolicy("GET", "/", AccessTier.PUBLIC),
     EndpointPolicy("GET", "/health", AccessTier.PUBLIC),
+    EndpointPolicy("GET", "/api/auth/session", AccessTier.PUBLIC),
+    EndpointPolicy("POST", "/api/auth/session", AccessTier.PUBLIC),
+    EndpointPolicy("DELETE", "/api/auth/session", AccessTier.PUBLIC),
     EndpointPolicy("GET", "/api/match/health", AccessTier.ADMINISTRATOR),
     EndpointPolicy("POST", "/api/match/analyze", AccessTier.RECRUITER),
     EndpointPolicy("POST", "/api/match/upload", AccessTier.RECRUITER),
@@ -22,6 +26,7 @@ ENDPOINT_POLICIES: tuple[EndpointPolicy, ...] = (
     EndpointPolicy("GET", "/api/match/training-data", AccessTier.ADMINISTRATOR),
     EndpointPolicy("POST", "/api/cv/upload", AccessTier.RECRUITER),
     EndpointPolicy("POST", "/api/cv/match", AccessTier.RECRUITER),
+    EndpointPolicy("POST", "/api/v1/cv/extract-experience", AccessTier.RECRUITER),
     EndpointPolicy("GET", "/api/cv/status/{cv_key}", AccessTier.RECRUITER),
     EndpointPolicy("GET", "/api/jobs", AccessTier.RECRUITER),
     EndpointPolicy("POST", "/api/jobs/cache/invalidate", AccessTier.ADMINISTRATOR),
@@ -32,9 +37,15 @@ ENDPOINT_POLICIES: tuple[EndpointPolicy, ...] = (
     EndpointPolicy("GET", "/api/master-data/skills", AccessTier.RECRUITER),
     EndpointPolicy("POST", "/api/master-data/warm", AccessTier.ADMINISTRATOR),
     EndpointPolicy("POST", "/api/batch/match-candidates", AccessTier.RECRUITER),
+    EndpointPolicy("GET", "/api/batch/jobs/{batch_job_id}", AccessTier.RECRUITER),
     EndpointPolicy("WEBSOCKET", "/api/batch/ws/progress", AccessTier.RECRUITER),
-    EndpointPolicy("GET", "/api/config/match", AccessTier.ADMINISTRATOR),
-    EndpointPolicy("PUT", "/api/config/match", AccessTier.ADMINISTRATOR),
+    EndpointPolicy("GET", "/api/config/active", AccessTier.ADMINISTRATOR),
+    EndpointPolicy("GET", "/api/config/schema", AccessTier.ADMINISTRATOR),
+    EndpointPolicy("GET", "/api/config/system-default", AccessTier.ADMINISTRATOR),
+    EndpointPolicy("GET", "/api/config/rules", AccessTier.ADMINISTRATOR),
+    EndpointPolicy("POST", "/api/config/initialize", AccessTier.ADMINISTRATOR),
+    EndpointPolicy("POST", "/api/config/versions", AccessTier.ADMINISTRATOR),
+    EndpointPolicy("POST", "/api/config/versions/{version_tag}/activate", AccessTier.ADMINISTRATOR),
     EndpointPolicy("POST", "/api/candidates/search", AccessTier.RECRUITER),
     EndpointPolicy("GET", "/api/candidates", AccessTier.RECRUITER),
     EndpointPolicy("GET", "/api/candidates/{candidate_id}", AccessTier.RECRUITER),
