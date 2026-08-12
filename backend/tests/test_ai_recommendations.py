@@ -102,7 +102,6 @@ def test_candidate_recommendations_all_domains():
         assert len(recs["strengths"]) > 0
         assert recs["overall_match_confidence"] == 92.0
         assert len(recs["best_vacancies"]) > 0
-        assert len(recs["related_skills"]) >= 0
         assert len(recs["missing_qualifications"]) > 0
         assert len(recs["recommended_certifications"]) > 0
         assert len(recs["career_transitions"]) > 0

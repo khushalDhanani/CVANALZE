@@ -723,7 +723,6 @@ export interface CandidateRecommendationsResponse {
   strengths?: string[];
   overall_match_confidence?: number;
   best_vacancies?: any[];
-  related_skills?: string[];
   missing_qualifications?: MissingQualification[];
   recommended_certifications?: string[];
   talent_pools?: string[];

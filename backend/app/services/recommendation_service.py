@@ -110,7 +110,6 @@ class RecommendationService:
                 "overall_match_confidence": 0.0,
                 "actionable_suggestions": [],
                 "best_vacancies": [],
-                "related_skills": [],
                 "missing_qualifications": [],
                 "recommended_certifications": [],
                 "career_transitions": [],
@@ -227,16 +226,6 @@ class RecommendationService:
 
         overall_confidence = best_vacancies[0]["score"] if best_vacancies else 0.0
 
-        # 3. Semantically Related Skills Recommendations (via DomainEmbeddingService with no live Ollama generation)
-        related_skills_set = set()
-        for skill in candidate_skills[:5]:
-            eqs = DomainEmbeddingService.find_semantic_equivalents(term=skill, category="skills", limit=3, allow_live_generation=False)
-            for eq in eqs:
-                eq_term = eq["term"].title()
-                if eq_term.lower() not in cand_skills_lower_set:
-                    related_skills_set.add(eq_term)
-
-        related_skills = list(related_skills_set)[: settings.MAX_RELATED_SKILLS]
 
         # 4. Missing Qualifications & Skill Gap Insights (Aggregated across suitable openings)
         missing_quals = []
@@ -473,7 +462,6 @@ class RecommendationService:
             "strengths": strengths,
             "overall_match_confidence": overall_confidence,
             "best_vacancies": best_vacancies,
-            "related_skills": related_skills,
             "missing_qualifications": missing_quals,
             "recommended_certifications": recommended_certs,
             "career_transitions": career_transitions,

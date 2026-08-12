@@ -793,16 +793,6 @@ export default function CandidateDetailScreen() {
                 </View>
               </View>
             )}
-            {recommendations?.related_skills && recommendations.related_skills.length > 0 && (
-              <View className="pt-2 mt-2 border-t border-border">
-                <Text className="text-[11px] font-sans-bold text-text-muted uppercase tracking-wider mb-1">Semantically Related Skills:</Text>
-                <View className="flex-row flex-wrap gap-1">
-                  {recommendations.related_skills.map((skill, idx) => (
-                    <Badge key={idx} label={skill} tone="neutral" />
-                  ))}
-                </View>
-              </View>
-            )}
           </Card>
         )}
 
