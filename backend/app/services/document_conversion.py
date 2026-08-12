@@ -1,9 +1,8 @@
 from __future__ import annotations
+import multiprocessing
 import time
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from io import BytesIO
-from threading import Lock
+from threading import BoundedSemaphore, Lock
 from typing import Any
 
 from docling.datamodel.base_models import DocumentStream
@@ -12,11 +11,13 @@ from docling_pp_ocrv6 import PPOCRv6Options
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
 from app.core.config import settings
+from app.core.error_handlers import DocumentExtractionTimeoutError
 from app.core.logging import logger
 from app.services.resume_text_normalizer import ResumeTextNormalizer
-from app.services.upload_service import UploadService
+from app.services.upload_service import UploadService, UploadTooLargeError, UploadValidationError
 
 _OCR_ENGINE = "PP-OCRv6-Medium"
+_PROCESS_SHUTDOWN_GRACE_SECONDS = 5.0
 
 
 class MarkdownResult:
@@ -88,7 +89,8 @@ def _init_ocr_converter() -> DocumentConverter:
 _fast_converter_instance: DocumentConverter | None = None
 _ocr_converter_instance: DocumentConverter | None = None
 _converter_lock = Lock()
-_parser_thread_pool = ThreadPoolExecutor(max_workers=max(1, settings.DOCUMENT_PARSER_WORKERS), thread_name_prefix="docling_parser")
+_parser_slots = BoundedSemaphore(value=max(1, settings.DOCUMENT_PARSER_WORKERS))
+_parser_process_context = multiprocessing.get_context("spawn")
 
 
 def _get_fast_converter() -> DocumentConverter:
@@ -306,13 +308,98 @@ class DocumentConversionService:
         content: bytes,
         timeout_seconds: float | None = None,
     ) -> MarkdownResult:
-        timeout = timeout_seconds if timeout_seconds is not None else settings.EXTRACTION_TIMEOUT_SECONDS
-        future = _parser_thread_pool.submit(cls.generate, filename, content)
+        timeout = timeout_seconds if timeout_seconds is not None else cls._default_timeout(filename, content)
+        if timeout <= 0:
+            raise ValueError("Document extraction timeout must be greater than zero.")
+        deadline = time.monotonic() + timeout
+        if not _parser_slots.acquire(timeout=timeout):
+            cls._raise_timeout(filename, timeout)
+
+        receiver = None
+        sender = None
+        process = None
         try:
-            return future.result(timeout=timeout)
-        except FuturesTimeoutError as exc:
-            logger.error(f"Extraction timed out after {timeout} seconds for '{filename}'.")
-            raise TimeoutError(f"Extraction timed out after {timeout} seconds for '{filename}'.") from exc
+            receiver, sender = _parser_process_context.Pipe(duplex=False)
+            process = _parser_process_context.Process(target=_isolated_conversion_worker, args=(sender, filename, content), name="docling-extraction")
+            process.start()
+            sender.close()
+            sender = None
+
+            payload = cls._wait_for_isolated_result(receiver, process, deadline)
+            if payload is None:
+                cls._stop_process(process)
+                cls._raise_timeout(filename, timeout)
+            process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+            if process.is_alive():
+                cls._stop_process(process)
+            return cls._decode_isolated_result(payload)
+        finally:
+            if receiver is not None:
+                receiver.close()
+            if sender is not None:
+                sender.close()
+            if process is not None and not process.is_alive():
+                process.close()
+            _parser_slots.release()
+
+    @staticmethod
+    def _default_timeout(filename: str, content: bytes) -> float:
+        normalized = UploadService.normalize_filename(filename)
+        if normalized.extension == "pdf":
+            pdf_type, _native_text, _native_char_count, _has_images = _classify_pdf(content)
+            if pdf_type in ("SCANNED_PDF", "UNKNOWN_PDF"):
+                return settings.SCANNED_EXTRACTION_TIMEOUT_SECONDS
+        return settings.EXTRACTION_TIMEOUT_SECONDS
+
+    @staticmethod
+    def _wait_for_isolated_result(receiver: Any, process: Any, deadline: float) -> dict[str, Any] | None:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            if receiver.poll(min(0.1, remaining)):
+                return receiver.recv()
+            if not process.is_alive():
+                process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+                if receiver.poll():
+                    return receiver.recv()
+                raise RuntimeError(f"Document extraction process exited unexpectedly with code {process.exitcode}.")
+
+    @staticmethod
+    def _stop_process(process: Any) -> None:
+        if not process.is_alive():
+            process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+            return
+        process.terminate()
+        process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+        if process.is_alive() and hasattr(process, "kill"):
+            process.kill()
+            process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
+
+    @staticmethod
+    def _raise_timeout(filename: str, timeout: float) -> None:
+        logger.error(f"Extraction timed out after {timeout} seconds for '{filename}'; isolated extraction deadline enforced.")
+        raise DocumentExtractionTimeoutError(f"Extraction timed out after {timeout} seconds for '{filename}'.")
+
+    @staticmethod
+    def _decode_isolated_result(payload: dict[str, Any]) -> MarkdownResult:
+        if payload.get("status") == "ok":
+            return MarkdownResult.from_dict(payload["result"])
+        message = str(payload.get("message") or "Document extraction failed.")
+        error_type = payload.get("error_type")
+        if error_type == "UploadTooLargeError":
+            raise UploadTooLargeError()
+        if error_type == "UploadValidationError":
+            raise UploadValidationError(
+                message,
+                code=str(payload.get("code") or "invalid_upload"),
+                status_code=int(payload.get("status_code") or 400),
+            )
+        if error_type == "ValueError":
+            raise ValueError(message)
+        if error_type == "TimeoutError":
+            raise TimeoutError(message)
+        raise RuntimeError(message)
 
     @staticmethod
     def _convert_fast(filename: str, content: bytes) -> tuple[str, float, Any]:
@@ -380,6 +467,28 @@ class DocumentConversionService:
                 else:
                     recovered.append(text)
         return "\n\n".join(recovered + [raw_text]) if recovered else raw_text
+
+
+def _isolated_conversion_worker(sender: Any, filename: str, content: bytes) -> None:
+    try:
+        result = DocumentConversionService.generate(filename, content)
+        sender.send({"status": "ok", "result": result.to_dict()})
+    except UploadTooLargeError as exc:
+        sender.send({"status": "error", "error_type": "UploadTooLargeError", "message": str(exc)})
+    except UploadValidationError as exc:
+        sender.send(
+            {
+                "status": "error",
+                "error_type": "UploadValidationError",
+                "message": str(exc),
+                "code": exc.code,
+                "status_code": exc.status_code,
+            }
+        )
+    except Exception as exc:
+        sender.send({"status": "error", "error_type": type(exc).__name__, "message": str(exc)})
+    finally:
+        sender.close()
 
 
 MarkdownGenerator = DocumentConversionService

@@ -1,6 +1,84 @@
 # Work Status
 
 ## Last Completed Task
+**Dedicated MSSQL SELECT-only credential cutover**
+
+### Architecture Impact Analysis
+- Preserved MSSQL as an external source-data pool and kept every application query/API contract unchanged.
+- Replaced the local `sa`/`dbo` connection (`sysadmin=1`, `CONTROL SERVER`) with a dedicated SQL Server login/user that has schema-level SELECT and explicit DML/EXECUTE/ALTER denial.
+- Restored fail-closed MSSQL enforcement locally and retained mandatory production enforcement.
+
+### Files Changed
+- Local ignored credential configuration: `.env`.
+- Task record: `workstatus.md`.
+- No production source or tracked deployment configuration was changed.
+
+### Implementation Plan
+- Audit the live identity and database updateability without exposing the connection string.
+- Create a new login/user without server or database role membership, grant only SELECT on `dbo`, and explicitly deny schema DML, EXECUTE, and ALTER.
+- Verify identity, effective permissions, representative SELECT access, and rejected DML before switching the local URL.
+- Re-enable enforcement, recreate backend services, and confirm API/worker health.
+
+### Code Changes
+- Updated the ignored local `MSSQL_READ_ONLY_URL` to the newly generated dedicated reader identity.
+- Restored `MSSQL_READONLY_ENFORCEMENT=true`.
+- Created SQL Server login/user `cv_analyzer_reader_15ca6a2b12` in `AIRIS_TEST` with `GRANT SELECT ON SCHEMA::dbo` and explicit schema denials for `INSERT`, `UPDATE`, `DELETE`, `EXECUTE`, and `ALTER`.
+
+### Verification Checklist
+- [x] Live pre-cutover audit confirmed `AIRIS_TEST` is `READ_WRITE` and the old application identity was `sa`/`dbo`, `sysadmin=1`.
+- [x] New identity reports `sysadmin=0` and no effective write-capable server, database, schema, or object permissions.
+- [x] Representative `RecruitCandidateMst` SELECT succeeds and a zero-row DELETE is rejected by SQL Server.
+- [x] API startup logs `MSSQL credential verified as read-only.` with enforcement enabled.
+- [x] API health returns HTTP 200/`status=ok`; MSSQL, PostgreSQL, Redis, Ollama, rules, prompts, and taxonomy report online.
+- [x] CV worker is healthy and listening on `cv-processing`.
+- [x] Removed only the stale `cv-processing-worker-1` RQ registration left by forced container replacement; queued jobs and application data were untouched.
+- [x] `git diff --check` passes.
+
+### Refactoring Performed
+- None; this was a credential and runtime cutover using the existing read-only enforcement architecture.
+
+## Previous Task
+**Hard-isolated scanned-PDF extraction timeout**
+
+### Architecture Impact Analysis
+- Preserved `DocumentConversionService` as the single document-extraction boundary and retained the existing `MarkdownResult` contract.
+- Replaced the non-cancellable thread watchdog with a spawn-isolated parser process that can be terminated without poisoning the only parser slot.
+- Kept the outer RQ deadline authoritative and made deterministic extraction timeouts terminal so RQ does not repeat the identical OCR workload.
+
+### Files Changed
+- Parser isolation and timeout contract: `backend/app/services/document_conversion.py` and `backend/app/core/error_handlers.py`.
+- Configuration and queue behavior: `backend/app/core/config.py` and `backend/app/services/processing_queue.py`.
+- Deployment and operations guidance: `backend/.env.example`, `docker-compose.yml`, `docker-compose.local.yml`, and `README.md`.
+- Focused contracts: `backend/tests/test_batch_processing.py`, `backend/tests/test_lightweight_runtime.py`, and `backend/tests/test_phase4_background_processing.py`.
+- Task record: `workstatus.md`.
+
+### Implementation Plan
+- Run `generate_with_timeout` in one spawn-isolated child process per extraction while retaining direct `generate` compatibility.
+- Enforce one parser slot, terminate then kill timed-out children, and serialize only the established extraction result/error boundary.
+- Give scanned/unknown PDFs a 600-second deadline, retain 300 seconds for other documents, and validate both below the 900-second RQ timeout.
+- Persist isolated extraction timeout as non-retryable `JOB_STUCK` and return normally to RQ to suppress redundant retry scheduling.
+
+### Code Changes
+- Added a hard process lifecycle around Docling conversion, including bounded result polling, graceful termination, forced kill, connection cleanup, and parser-slot release.
+- Added document-type timeout selection using the existing PyMuPDF classifier.
+- Added `DocumentExtractionTimeoutError` and terminal queue handling with the existing safe error message/code.
+- Exposed both extraction deadlines through production and local Compose and documented their ordering invariant.
+
+### Verification Checklist
+- [x] The retained input is a valid two-page, image-only CorelDRAW PDF (807,956 bytes), requiring OCR.
+- [x] Scanned/unknown PDFs select the 600-second deadline while ordinary documents retain 300 seconds.
+- [x] Configuration rejects non-positive extraction deadlines or deadlines at/above the RQ job timeout.
+- [x] Timeout handling terminates the isolated parser and has a forced-kill fallback.
+- [x] Queue handling persists non-retryable `JOB_STUCK` and avoids RQ scheduling another deterministic attempt.
+- [x] Focused tests were updated for termination, timeout selection, and queue terminal-state contracts.
+- [x] `git diff --check` passes.
+- [ ] Tests/builds were not executed because repository instructions require explicit permission.
+- [ ] Running services were not rebuilt or restarted; the active worker still uses the previous image until redeployed.
+
+### Refactoring Performed
+- Replaced the shared parser thread pool with a bounded isolated-process lifecycle while keeping conversion logic and callers unchanged.
+
+## Previous Task
 **Enterprise MSSQL startup read-only enforcement**
 
 ### Architecture Impact Analysis

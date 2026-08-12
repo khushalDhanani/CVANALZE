@@ -20,9 +20,19 @@ def test_document_converter_initialization_is_lazy_and_reused(monkeypatch):
 
 def test_document_parser_defaults_to_single_worker():
     assert settings.DOCUMENT_PARSER_WORKERS == 1
+    assert settings.EXTRACTION_TIMEOUT_SECONDS == 300.0
+    assert settings.SCANNED_EXTRACTION_TIMEOUT_SECONDS == 600.0
     assert settings.DOCUMENT_TABLE_STRUCTURE_ENABLED is True
     assert settings.PREFER_NATIVE_TEXT_EXTRACTION is False
-    assert document_conversion._parser_thread_pool._max_workers == 1
+    assert document_conversion._parser_process_context.get_start_method() == "spawn"
+
+
+def test_scanned_pdf_uses_extended_timeout(monkeypatch):
+    monkeypatch.setattr(document_conversion, "_classify_pdf", MagicMock(return_value=("SCANNED_PDF", "", 0, True)))
+
+    timeout = document_conversion.DocumentConversionService._default_timeout("resume.pdf", b"%PDF-scanned")
+
+    assert timeout == settings.SCANNED_EXTRACTION_TIMEOUT_SECONDS
 
 
 def test_native_first_mode_skips_docling_for_text_rich_pdf(monkeypatch):

@@ -105,6 +105,7 @@ class Settings(BaseSettings):
     PERFORMANCE_L1_CACHE_MAX_SIZE: int = 5000
     PERFORMANCE_L1_CACHE_TTL_SECONDS: float = 3600.0
     EXTRACTION_TIMEOUT_SECONDS: float = 300.0
+    SCANNED_EXTRACTION_TIMEOUT_SECONDS: float = 600.0
     EXTRACTION_PARSER_VERSION: str = "1.0.0"
     EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
     EXPERIENCE_CALCULATOR_VERSION: str = "2.0.0"
@@ -226,6 +227,10 @@ class Settings(BaseSettings):
             raise ValueError("CV_QUEUE_MAX_SIZE must be at least 1.")
         if self.RULE_CONFIG_RETRY_INTERVAL_SECONDS <= 0:
             raise ValueError("RULE_CONFIG_RETRY_INTERVAL_SECONDS must be greater than zero.")
+        if self.EXTRACTION_TIMEOUT_SECONDS <= 0 or self.SCANNED_EXTRACTION_TIMEOUT_SECONDS <= 0:
+            raise ValueError("Document extraction timeouts must be greater than zero.")
+        if max(self.EXTRACTION_TIMEOUT_SECONDS, self.SCANNED_EXTRACTION_TIMEOUT_SECONDS) >= self.RQ_JOB_TIMEOUT_SECONDS:
+            raise ValueError("Document extraction timeouts must remain below RQ_JOB_TIMEOUT_SECONDS.")
         if self.IS_PRODUCTION:
             if not self.MSSQL_READONLY_ENFORCEMENT:
                 raise ValueError("MSSQL_READONLY_ENFORCEMENT must be true in production environments.")

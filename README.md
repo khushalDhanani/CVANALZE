@@ -173,7 +173,9 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `MAX_HR_FEEDBACK_LENGTH_CHARS` | `10000` | Maximum HR review feedback length. |
 | `INITIALIZE_DATABASE_ON_STARTUP` | `true` local | Allows local schema initialization; ignored in production/staging. |
 | `STARTUP_CACHE_WARMUP_ENABLED` | `true` | Starts best-effort cache warmup during lifespan startup. |
-| `DOCUMENT_PARSER_WORKERS` | `1` | Maximum concurrent Docling conversions in one API/worker process. Keep at `1` on memory-constrained machines. |
+| `DOCUMENT_PARSER_WORKERS` | `1` | Maximum concurrent isolated Docling conversions in one API/worker process. Keep at `1` on memory-constrained machines. |
+| `EXTRACTION_TIMEOUT_SECONDS` | `300` | Hard process deadline for text-rich PDFs and DOCX documents. Must remain below the RQ job timeout. |
+| `SCANNED_EXTRACTION_TIMEOUT_SECONDS` | `600` | Hard process deadline for scanned or unclassified PDFs that require OCR. Must remain below the RQ job timeout. |
 | `DOCUMENT_TABLE_STRUCTURE_ENABLED` | `true` | Enables Docling's table-structure model; the lightweight Compose override disables it to reduce memory. |
 | `PREFER_NATIVE_TEXT_EXTRACTION` | `false` | Uses sufficient PyMuPDF/python-docx text without loading Docling; enabled by the lightweight Compose override. |
 | `AUTO_MIGRATE` | `false` | Opt-in local automatic migration; ignored in production/staging. |

@@ -16,6 +16,12 @@ class PromptError(Exception):
     """Raised when critical LLM prompts cannot be loaded."""
     pass
 
+
+class DocumentExtractionTimeoutError(TimeoutError):
+    """Raised when isolated document extraction exceeds its hard deadline."""
+
+    pass
+
 from app.core.logging import logger
 from app.repositories.processing_job import ProcessingJobPersistenceError
 from app.schemas.contracts import CanonicalError, ErrorCode, ErrorResponse
