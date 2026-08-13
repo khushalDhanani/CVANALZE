@@ -50,10 +50,23 @@ class _StructuredGeneration:
 
 class OllamaLLMService:
     _model_digests: dict[str, str] = {}
+    _thinking_model_families = frozenset({"deepseek-r1", "gpt-oss", "qwen3", "qwen3.5"})
 
     @staticmethod
     def _model_identifier_hash(model: str) -> str:
         return hashlib.sha256(model.strip().encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _supports_thinking(cls, model: str) -> bool:
+        model_family = model.strip().lower().split(":", 1)[0].rsplit("/", 1)[-1]
+        return model_family in cls._thinking_model_families
+
+    @staticmethod
+    def _remove_legacy_thinking_directive(prompt: str) -> tuple[str, bool]:
+        lines = prompt.splitlines()
+        if lines and lines[0].strip().lower() in {"/think", "/no_think"}:
+            return "\n".join(lines[1:]).lstrip(), True
+        return prompt, False
 
     @classmethod
     def _trace(
@@ -305,7 +318,10 @@ class OllamaLLMService:
         profiler: PipelineProfiler | None = None,
     ) -> TModel | None:
         model = settings.OLLAMA_MODEL
-        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        request_prompt, removed_legacy_directive = cls._remove_legacy_thinking_directive(prompt)
+        if removed_legacy_directive:
+            logger.warning(f"[OLLAMA] operation={operation} model='{model}' prompt_directive=REMOVED")
+        prompt_hash = hashlib.sha256(request_prompt.encode("utf-8")).hexdigest()
         if not settings.LLM_ENABLED:
             logger.info(f"[OLLAMA] operation={operation} model='{model}' status=DISABLED_FALLBACK")
             cls._trace(
@@ -322,7 +338,7 @@ class OllamaLLMService:
             return None
 
         resolved_cache_key = cache_key or LLMCacheRepository.extraction_cache_key(
-            document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            document_hash=hashlib.sha256(request_prompt.encode("utf-8")).hexdigest(),
             prompt_version=prompt_version,
             model_version=model,
             extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
@@ -358,13 +374,15 @@ class OllamaLLMService:
         else:
             logger.info(f"[OLLAMA] operation={operation} model='{model}' cache=MISS")
 
-        directive = "/think" if think else "/no_think"
-        normalized_prompt = prompt if prompt.startswith(directive) else f"{directive}\n{prompt}"
+        supports_thinking = cls._supports_thinking(model)
+        resolved_think = think if supports_thinking else None
+        if think and not supports_thinking:
+            logger.info(f"[OLLAMA] operation={operation} model='{model}' thinking=UNSUPPORTED_OMITTED")
         payload = OllamaTransport.build_generation_payload(
             model=model,
-            prompt=normalized_prompt,
+            prompt=request_prompt,
             response_schema=response_model.model_json_schema(),
-            think=think,
+            think=resolved_think,
             options=options,
         )
 
@@ -391,7 +409,7 @@ class OllamaLLMService:
                 validation_ms=validation_ms,
             )
 
-        prompt_chars = len(normalized_prompt)
+        prompt_chars = len(request_prompt)
         logger.info(
             f"[OLLAMA] operation={operation} model='{model}' status=CALLING "
             f"prompt_chars={prompt_chars} estimated_tokens={max(1, prompt_chars // 4)}"
@@ -407,7 +425,8 @@ class OllamaLLMService:
             duration_ms = round((time.perf_counter() - llm_started) * 1000.0, 2)
             logger.error(
                 f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK "
-                f"error={type(exc).__name__} duration_ms={duration_ms} prompt_chars={prompt_chars}"
+                f"error={type(exc).__name__} status_code={getattr(exc, 'status_code', 'none')} "
+                f"retryable={exc.retryable} duration_ms={duration_ms} prompt_chars={prompt_chars} detail={exc}"
             )
             if profiler:
                 profiler.metrics.ollama_request_ms = duration_ms
@@ -465,7 +484,7 @@ class OllamaLLMService:
         LLMCacheRepository.save_cached_entry(
             resolved_cache_key,
             LLMCacheEntry(
-                prompt=normalized_prompt,
+                prompt=request_prompt,
                 raw_response=generation.raw_response,
                 structured_data=generation.structured_data,
                 reasoning=generation.reasoning,

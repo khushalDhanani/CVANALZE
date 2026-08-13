@@ -49,18 +49,20 @@ class OllamaLiveAccessDisabledError(OllamaError):
 
 
 class OllamaHTTPError(OllamaError):
-    def __init__(self, message: str, *, operation: str, status_code: int, retryable: bool):
+    def __init__(self, message: str, *, operation: str, status_code: int, retryable: bool, detail: str = ""):
         super().__init__(message, operation=operation, retryable=retryable)
         self.status_code = status_code
+        self.detail = detail
 
 
 class OllamaModelUnavailableError(OllamaHTTPError):
-    def __init__(self, model: str, *, operation: str):
+    def __init__(self, model: str, *, operation: str, detail: str = ""):
         super().__init__(
-            f"Ollama model '{model}' is unavailable.",
+            f"Ollama model '{model}' is unavailable." + (f" Detail: {detail}" if detail else ""),
             operation=operation,
             status_code=404,
             retryable=False,
+            detail=detail,
         )
         self.model = model
 
@@ -369,26 +371,37 @@ class OllamaTransport:
                 last_error = exc
             except httpx.TimeoutException as exc:
                 cls._record_timeout()
-                last_error = OllamaTimeoutError("Ollama request timed out.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama request timed out." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaTimeoutError(message, operation=operation)
                 last_error.__cause__ = exc
             except (httpx.ConnectError, httpx.NetworkError, httpx.RequestError) as exc:
-                last_error = OllamaUnavailableError("Ollama is unavailable.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama is unavailable." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaUnavailableError(message, operation=operation)
                 last_error.__cause__ = exc
             except json.JSONDecodeError as exc:
-                last_error = OllamaInvalidResponseError("Ollama returned invalid JSON.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama returned invalid JSON." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaInvalidResponseError(message, operation=operation)
                 last_error.__cause__ = exc
             except ValidationError as exc:
-                last_error = OllamaSchemaValidationError("Ollama response failed schema validation.", operation=operation)
+                detail = cls._validation_error_detail(exc)
+                message = "Ollama response failed schema validation." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaSchemaValidationError(message, operation=operation)
                 last_error.__cause__ = exc
             except (TypeError, ValueError) as exc:
-                last_error = OllamaInvalidResponseError("Ollama response could not be normalized.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama response could not be normalized." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaInvalidResponseError(message, operation=operation)
                 last_error.__cause__ = exc
 
             assert last_error is not None
             should_retry = last_error.retryable and attempt < total_attempts
             logger.warning(
                 f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} "
-                f"status={'RETRY' if should_retry else 'FAILED'} error={type(last_error).__name__}"
+                f"status={'RETRY' if should_retry else 'FAILED'} error={type(last_error).__name__} "
+                f"status_code={getattr(last_error, 'status_code', 'none')} retryable={last_error.retryable} detail={last_error}"
             )
             if not should_retry:
                 break
@@ -413,7 +426,10 @@ class OllamaTransport:
             last_error = OllamaUnavailableError("Ollama request failed.", operation=operation)
         if last_error.retryable and isinstance(last_error, (OllamaUnavailableError, OllamaTimeoutError, OllamaHTTPError)):
             cls._circuit_failure(operation)
-        logger.error(f"[OLLAMA] operation={operation} status=FAILED duration_ms={duration_ms} error={type(last_error).__name__}")
+        logger.error(
+            f"[OLLAMA] operation={operation} status=FAILED duration_ms={duration_ms} error={type(last_error).__name__} "
+            f"status_code={getattr(last_error, 'status_code', 'none')} retryable={last_error.retryable} detail={last_error}"
+        )
         raise last_error
 
     @classmethod
@@ -642,18 +658,20 @@ class OllamaTransport:
         model: str,
         prompt: str,
         response_schema: dict[str, Any],
-        think: bool,
+        think: bool | None,
         options: dict[str, Any],
     ) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "model": model,
             "prompt": prompt,
             "format": response_schema,
             "stream": False,
-            "think": think,
             "keep_alive": settings.OLLAMA_KEEP_ALIVE,
             "options": options,
         }
+        if think is not None:
+            payload["think"] = think
+        return payload
 
     @staticmethod
     def build_embedding_payload(*, model: str, inputs: list[str]) -> dict[str, Any]:
@@ -805,7 +823,41 @@ class OllamaTransport:
     @staticmethod
     def _validate_error_field(data: dict[str, Any], *, operation: str) -> None:
         if data.get("error"):
-            raise OllamaInvalidResponseError("Ollama returned an error response.", operation=operation, retryable=False)
+            detail = OllamaTransport._sanitize_error_detail(data.get("error"))
+            message = "Ollama returned an error response." + (f" Detail: {detail}" if detail else "")
+            raise OllamaInvalidResponseError(message, operation=operation, retryable=False)
+
+    @staticmethod
+    def _sanitize_error_detail(value: Any) -> str:
+        return " ".join(str(value or "").split())[:300]
+
+    @staticmethod
+    def _validation_error_detail(exc: ValidationError) -> str:
+        details: list[str] = []
+        for error in exc.errors(include_url=False, include_context=False, include_input=False)[:5]:
+            location = ".".join(str(part) for part in error.get("loc", ())) or "response"
+            details.append(f"{location}:{error.get('type', 'validation_error')}")
+        return ", ".join(details)[:300]
+
+    @classmethod
+    def _read_error_detail(cls, response: httpx.Response) -> str:
+        limit = min(4096, max(1, settings.OLLAMA_MAX_RESPONSE_BYTES))
+        content = bytearray()
+        for chunk in response.iter_bytes():
+            remaining = limit - len(content)
+            if remaining <= 0:
+                break
+            content.extend(chunk[:remaining])
+        raw = bytes(content)
+        if not raw:
+            return ""
+        try:
+            decoded = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return cls._sanitize_error_detail(raw.decode("utf-8", errors="replace"))
+        if isinstance(decoded, dict):
+            return cls._sanitize_error_detail(decoded.get("error") or decoded.get("message"))
+        return cls._sanitize_error_detail(decoded)
 
     @staticmethod
     def _validate_returned_model(requested: str, returned: str, *, operation: str) -> None:
@@ -855,14 +907,17 @@ class OllamaTransport:
         if response.status_code < 400:
             return
         model = str((payload or {}).get("model") or "")
+        detail = cls._read_error_detail(response)
         if response.status_code == 404 and model:
-            raise OllamaModelUnavailableError(model, operation=operation)
+            raise OllamaModelUnavailableError(model, operation=operation, detail=detail)
         retryable = response.status_code in (408, 429) or response.status_code >= 500
+        message = f"Ollama returned HTTP {response.status_code}." + (f" Detail: {detail}" if detail else "")
         raise OllamaHTTPError(
-            f"Ollama returned HTTP {response.status_code}.",
+            message,
             operation=operation,
             status_code=response.status_code,
             retryable=retryable,
+            detail=detail,
         )
 
     @classmethod

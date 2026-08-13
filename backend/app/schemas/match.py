@@ -54,7 +54,7 @@ class VacancyFitScoreBreakdown(BaseModel):
     semantic_similarity_score: float = Field(default=0.0, description="Dense vector nomic-embed-text similarity score (0-100)")
     overall_fit_score: float = Field(default=0.0, description="Final weighted vacancy fit score (0-100)")
     hierarchy_mismatch_penalty: float = Field(default=0.0, description="Penalty deduction applied for hierarchy mismatch")
-    is_hierarchy_valid: bool = Field(default=True, description="Whether MSSQL parent-child hierarchy validation passed")
+    is_hierarchy_valid: bool | None = Field(default=True, description="Whether MSSQL parent-child hierarchy validation passed; null when validation was unavailable")
     match_status: str = Field(default="MATCHED", description="MATCHED, POTENTIAL_MATCH, or NO_STRONG_VACANCY_MATCH")
 
 

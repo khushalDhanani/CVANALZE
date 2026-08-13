@@ -14,6 +14,8 @@ from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import OllamaLLMService
 from app.services.ollama_transport import (
     OllamaCircuitOpenError,
+    OllamaHTTPError,
+    OllamaInvalidResponseError,
     OllamaModelUnavailableError,
     OllamaSchemaValidationError,
     OllamaTimeoutError,
@@ -286,6 +288,40 @@ def test_unavailable_model_is_mapped_without_retry(monkeypatch):
     assert OllamaTransport.get_metrics()["retries"] == 0
 
 
+def test_http_error_preserves_bounded_sanitized_ollama_detail(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 0)
+    detail = " unsupported\n option " + ("x" * 400)
+    _install_client(monkeypatch, _response({"error": detail}, status_code=400))
+
+    with pytest.raises(OllamaHTTPError) as exc_info:
+        OllamaTransport.get_tags()
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.retryable is False
+    assert exc_info.value.detail.startswith("unsupported option ")
+    assert "\n" not in exc_info.value.detail
+    assert len(exc_info.value.detail) == 300
+
+
+def test_success_status_error_field_preserves_sanitized_detail(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 0)
+    _install_client(monkeypatch, _response({"error": " invalid\n schema "}))
+
+    with pytest.raises(OllamaInvalidResponseError, match="Detail: invalid schema"):
+        OllamaTransport.get_tags()
+
+
+def test_schema_error_logs_locations_without_response_values(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 0)
+    _install_client(monkeypatch, _response({"models": "private-response-value"}))
+
+    with pytest.raises(OllamaSchemaValidationError) as exc_info:
+        OllamaTransport.get_tags()
+
+    assert "models:list_type" in str(exc_info.value)
+    assert "private-response-value" not in str(exc_info.value)
+
+
 def test_embedding_service_routes_through_shared_transport(monkeypatch):
     transport_result = OllamaTransportResult(
         value=[[0.1, 0.2, 0.3]],
@@ -310,6 +346,18 @@ def test_batch_embedding_does_not_fan_out_to_single_inputs(monkeypatch):
 
     assert result is None
     embed.assert_called_once_with("embedding-model", ["one", "two"])
+
+
+def test_embedding_throttle_logs_skipped_single_and_batch_requests(monkeypatch):
+    warning = MagicMock()
+    monkeypatch.setattr("app.services.embedding_service.logger.warning", warning)
+    EmbeddingService._failed_models_cache["embedding-model"] = time.time()
+
+    assert EmbeddingService._call_ollama_embed("embedding-model", "resume") is None
+    assert EmbeddingService._call_ollama_batch_embed("embedding-model", ["resume"]) is None
+
+    assert warning.call_count == 2
+    assert all("RECENT_MODEL_FAILURE" in request.args[0] for request in warning.call_args_list)
 
 
 def test_disabled_llm_returns_fallback_without_transport(monkeypatch):

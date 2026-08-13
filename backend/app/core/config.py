@@ -123,10 +123,10 @@ class Settings(BaseSettings):
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = ""
     OLLAMA_MODEL: str = "gemma3:1b"  # or qwen2.5:3b etc based on what's available
-    OLLAMA_REQUEST_TIMEOUT: float = 300.0
+    OLLAMA_REQUEST_TIMEOUT: float = 90.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0
-    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 300.0
+    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 90.0
     OLLAMA_EMBED_TIMEOUT_SECONDS: float = 30.0
     OLLAMA_UNLOAD_TIMEOUT_SECONDS: float = 10.0
     OLLAMA_MAX_RETRIES: int = 0
@@ -164,7 +164,7 @@ class Settings(BaseSettings):
     LLM_TRACE_RETENTION_DAYS: int = 30
     LLM_SHADOW_QUALITY_ENABLED: bool = True
     LLM_CONFIDENCE_CALIBRATION_PATH: Path = Path("app/data/evaluations/confidence_calibration.json")
-    OPTIMIZED_PROMPT_VERSION: str = "3.5"
+    OPTIMIZED_PROMPT_VERSION: str = "3.6"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 
     # LLM Bypass Configuration

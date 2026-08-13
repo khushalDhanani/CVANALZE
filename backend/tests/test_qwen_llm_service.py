@@ -68,7 +68,7 @@ def _generation_payload(client: MagicMock) -> dict:
     raise AssertionError("No generation request was recorded.")
 
 
-def test_ollama_default_model_is_qwen3_4b():
+def test_ollama_default_model_is_gemma3_1b():
     assert settings.OLLAMA_MODEL == "gemma3:1b"
 
 
@@ -105,8 +105,8 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
     assert isinstance(result, DynamicCandidateProfile)
     payload = _generation_payload(client)
     assert payload["model"] == "gemma3:1b"
-    assert payload["prompt"].startswith("/no_think")
-    assert payload["think"] is False
+    assert payload["prompt"] == "Extract candidate CV details"
+    assert "think" not in payload
     assert payload["format"] == DynamicCandidateProfile.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
     assert payload["keep_alive"] == settings.OLLAMA_KEEP_ALIVE
@@ -138,8 +138,8 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
     assert isinstance(result, QwenCVAnalysis)
     payload = _generation_payload(client)
     assert payload["model"] == "gemma3:1b"
-    assert payload["prompt"].startswith("/think")
-    assert payload["think"] is True
+    assert payload["prompt"] == "Score CV fit for Python Developer"
+    assert "think" not in payload
     assert payload["format"] == QwenCVAnalysis.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
 
@@ -173,8 +173,8 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
     assert isinstance(result, DynamicMappingResponse)
     payload = _generation_payload(client)
     assert payload["model"] == "gemma3:1b"
-    assert payload["prompt"].startswith("/think")
-    assert payload["think"] is True
+    assert payload["prompt"] == "Score candidate dynamic mapping"
+    assert "think" not in payload
     assert payload["format"] == DynamicMappingResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
 
@@ -214,10 +214,55 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
     assert isinstance(result, OptimizedLLMMatchResponse)
     payload = _generation_payload(client)
     assert payload["model"] == "gemma3:1b"
-    assert payload["prompt"].startswith("/think")
-    assert payload["think"] is True
+    assert payload["prompt"] == "Perform optimized match evaluation"
+    assert "think" not in payload
     assert payload["format"] == OptimizedLLMMatchResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
+
+
+def test_thinking_model_retains_native_think_parameter(monkeypatch):
+    _disable_llm_cache(monkeypatch)
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "qwen3:1.7b")
+    client = _mock_transport_client(
+        monkeypatch,
+        {
+            "response": json.dumps({
+                "skill_matches": ["Python"],
+                "inferred_skills": [],
+                "missing_critical": [],
+                "semantic_reason": "Good match",
+            }),
+        },
+    )
+
+    result = OllamaLLMService.call_qwen("Score CV fit", "1.0", "thinking-model-cache-key")
+
+    assert isinstance(result, QwenCVAnalysis)
+    payload = _generation_payload(client)
+    assert payload["prompt"] == "Score CV fit"
+    assert payload["think"] is True
+
+
+def test_legacy_thinking_directive_is_removed_before_generation(monkeypatch):
+    _disable_llm_cache(monkeypatch)
+    client = _mock_transport_client(
+        monkeypatch,
+        {
+            "response": json.dumps({
+                "skill_matches": ["Python"],
+                "inferred_skills": [],
+                "missing_critical": [],
+                "semantic_reason": "Good match",
+            }),
+        },
+    )
+
+    result = OllamaLLMService.call_qwen("/think\nScore CV fit", "1.0", "legacy-directive-cache-key")
+
+    assert isinstance(result, QwenCVAnalysis)
+    payload = _generation_payload(client)
+    assert payload["prompt"] == "Score CV fit"
+    assert "think" not in payload
 
 
 def test_ollama_unload_model_sends_keep_alive_zero(monkeypatch):

@@ -1,6 +1,50 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Vacancy Hierarchy Tri-State Validation Fix**:
+    - Traced repeated vacancy matching failures to `HierarchyClassificationResult.is_hierarchy_valid=None` being passed into a score-breakdown schema that accepted only booleans.
+    - Aligned the vacancy-fit response schema and frontend API type with the existing tri-state hierarchy contract: `true` is valid, `false` is invalid, and `null` means validation was unavailable.
+    - Preserved scoring behavior so only an explicit `false` triggers hierarchy rejection; an unknown value remains eligible for the other deterministic gates.
+    - Added focused regression coverage for preserving the unknown hierarchy-validation state.
+    - Per repository instructions, did not build, run, restart, or test services.
+1. **2026-08-13 RQ Worker Registration Collision Fix**:
+    - Traced the auxiliary-worker restart loop to the fixed `cv-analyzer-auxiliary-worker` name colliding with an existing active/stale Redis registration.
+    - Added a shared collision-resistant RQ identity builder that retains stable role prefixes and appends a per-process UUID.
+    - Applied unique identities consistently to auxiliary and primary CV workers, eliminating the same latent restart collision without deleting Redis workers, queues, or jobs.
+    - Added worker startup logging for the resolved identity and focused tests for worker wiring, stable prefixes, uniqueness, and invalid roles.
+    - Per repository instructions, did not build, run, restart, or test services.
+1. **2026-08-13 PostgreSQL Migration JSON Bind-Parsing Fix**:
+    - Diagnosed migration 025 failure as SQLAlchemy `text()` interpreting JSON tokens such as `:true` and `:false` as bind parameters.
+    - Added one raw-driver migration execution helper for trusted repository SQL files and routed both forward and rollback scripts through it.
+    - Preserved parameterized SQLAlchemy execution for migration-history queries and writes.
+    - Kept migration 025 unchanged; its failed transaction was not recorded as applied and can be retried after rebuilding the migration image.
+    - Added focused regression coverage proving JSON literals are passed unchanged without bind-parameter parsing.
+    - Per repository instructions, did not rerun migrations, tests, builds, or services.
+1. **2026-08-13 Ollama Response Integrity Remediation**:
+    - Removed Qwen-specific thinking directives from maintained prompt seeds and removed the obsolete duplicate optimized prompt from the generic seeder while preserving the checksum of already-issued migration 024.
+    - Added versioned PostgreSQL migration 026 to activate model-neutral optimized prompt version `3.6`, remove legacy directives from generic prompts, and invalidate version-bound caches safely.
+    - Added centralized defensive removal of legacy first-line thinking directives and prompt-readiness rejection for incompatible active optimized prompts.
+    - Versioned the optimized prompt cache key so persisted `3.5` cache entries cannot shadow the corrected `3.6` database prompt.
+    - Preserved bounded, whitespace-normalized Ollama error details for HTTP and JSON error envelopes and included status, retryability, and safe detail in transport/generation fallback logs.
+    - Added explicit deterministic-fallback and embedding-throttle logging so missing LLM/embedding results no longer disappear silently.
+    - Aligned Docker and local generation deadlines at 90 seconds and made the Docker request/generation timeout values required root-environment inputs.
+    - Added focused regression coverage for sanitized server detail, JSON error envelopes, legacy prompt normalization, prompt readiness, native thinking-model behavior, and throttle observability.
+    - Per repository instructions, did not run tests, builds, migrations, or services.
+1. **2026-08-13 End-to-End Ollama Response Audit (No Fix Applied)**:
+    - Confirmed all Ollama HTTP traffic is centralized in `OllamaTransport`: generation and unload use `/api/generate`, embeddings use `/api/embed`, and discovery uses `/api/tags`.
+    - Confirmed generation sends `stream=false`, reads the complete response body, and parses one JSON object; a live local request using the repository payload shape returned the expected non-streaming envelope and structured JSON response.
+    - Confirmed the configured generation model `gemma3:1b` and embedding model `nomic-embed-text` match the locally installed `gemma3:1b` and `nomic-embed-text:latest` models.
+    - Found the versioned optimized-match PostgreSQL prompt migration still stores a leading `/think` directive, so the active Gemma request can retain Qwen-specific prompt content despite transport-level capability handling.
+    - Found HTTP and JSON error handling discards Ollama's diagnostic error body, logs only exception class names, then converts generation failure to `None`; optimized matching consequently continues without an LLM result.
+    - Found embedding connection/model failures activate a 60-second model throttle whose subsequent early returns are not logged.
+    - No application code, migrations, database state, builds, tests, or services were changed or executed; only read-only source, local model inventory, and one minimal local generation request were used.
+1. **2026-08-13 Gemma 3 Ollama Generation Compatibility Fix**:
+    - Centralized thinking-capability resolution in `OllamaLLMService` for recognized thinking model families.
+    - Removed Qwen-specific `/think` and `/no_think` prompt prefixes from the shared structured-generation path.
+    - Changed the centralized generation payload builder to omit `think` for Gemma 3 and other non-thinking models while preserving native `think` requests for supported models.
+    - Kept `/api/generate`, `/api/embed`, model selection, retries, caching, timeouts, and response contracts unchanged.
+    - Updated focused payload tests for `gemma3:1b` and added coverage ensuring a Qwen 3 model retains the native thinking parameter.
+    - Per repository instructions, did not run tests, builds, services, or migrations.
 1. **2026-08-13 Docker Ollama Model Source Consolidation**:
     - Set the repository-root Docker environment override to `OLLAMA_MODEL=gemma3:1b`.
     - Changed `docker-compose.yml` to require `OLLAMA_MODEL` from the repository-root environment instead of maintaining a second fallback value.
@@ -107,17 +151,28 @@
     - Verified all edge-cases via a robust test suite (`tests/test_hiring_risk_analyzer.py`), confirming that score and match states remain entirely immutable during this phase.
 
 ## Pending Work / Side Effects Found
-- Recreate the backend Docker services when deployment execution is authorized so existing containers receive `OLLAMA_MODEL=gemma3:1b`.
+- Rebuild and recreate the auxiliary and primary worker containers so their new unique RQ identities take effect; old Redis registrations can expire naturally.
+- Rebuild/recreate the API and worker containers so the nullable hierarchy response contract takes effect, then reprocess the failed CV job.
+- Rebuild the `migrate-postgres` image before retrying migrations; `docker compose run` alone can reuse the pre-fix image.
+- Apply `backend/scripts/migrations/postgres/026_ollama_response_integrity.sql`, then rebuild/recreate backend services so prompt version `3.6`, timeout settings, and transport diagnostics become active.
+- Run the focused Ollama service/transport and prompt-readiness tests when execution is authorized.
 - The backend suite is not currently green: the latest full run reported 106 failures and 571 passes. This cleanup did not attempt broad product-code or substantive-test remediation.
 - The three preserved legacy test modules now live under `backend/tests/`, but 7 of their 11 tests expose outdated contracts and require a separate behavioral/test-contract decision.
 - Apply `backend/scripts/migrations/postgres/025_hiring_risks_integrity.sql` through the normal deployment process, then restart application/worker processes so the active policy and prompt are loaded.
 - Run the focused Hiring Risks tests and the broader regression suite when execution is authorized; tests were added but intentionally not executed during this task.
-- Fix is intentionally pending per the diagnostic-only request: align hierarchy nullability across backend/API/frontend and restore the explicit `False` hard-rejection behavior.
-- Capture/log the sanitized Ollama HTTP status and response detail to confirm the exact optimized-match 4xx cause; review `think=True` compatibility with `gemma3:4b`.
 - The full test suite (`pytest tests/`) reported 72 failures (out of 624 tests) previously regarding schema updates. These are still pending structural fix actions.
 - *Side Effect Found* -> Legacy Tests expecting old keyword structures -> *Required Adjustment*: Update mocks in `test_classification_normalization.py`, `test_department_domain_repository.py`, and other taxonomy tests.
 
 ## Important Decisions
+- Preserved hierarchy validity as a tri-state value rather than coercing unknown validation to `true` or `false`; only confirmed hierarchy mismatches are hard rejections.
+- Avoided deleting or force-unregistering the existing RQ worker because Redis cannot safely distinguish a stale registration from a live worker solely by name; unique per-process names remove the collision safely.
+- Execute only trusted repository migration-file contents with `exec_driver_sql`; retain bound parameters for application SQL and migration metadata operations.
+- Versioned the corrected optimized prompt as `3.6` instead of editing the active `3.5` record in place so prompt-version cache identities are invalidated deterministically.
+- Preserved migration 024 unchanged because the migration runner checks applied-file SHA-256 values; all database correction is isolated in forward migration 026.
+- Limited persisted prompt cleanup to global model-neutral prompt records; tenant- or model-specific prompt contracts are not rewritten.
+- Retained deterministic fallback behavior but made every generation fallback and embedding throttle decision explicit in logs.
+- Classified the endpoint and non-streaming parser as correct based on both source inspection and a live local response; identified prompt compatibility and swallowed diagnostic context as the remaining response defects.
+- Treat Ollama's `think` field as capability-specific and omit it for non-thinking models rather than sending `false`; do not mix model-specific slash directives into shared prompts.
 - Kept the repository-root `.env` as the sole Docker value source for `OLLAMA_MODEL`; `docker-compose.yml` validates and passes it through, while environment-specific Compose files inherit it.
 - Kept the Docker Ollama model check diagnostic-only; did not change `.env`, Compose files, or running containers without an explicit fix/redeploy request.
 - Preserved assertion-based tests even when currently failing; cleanup did not hide product regressions by deleting substantive coverage.
@@ -139,6 +194,44 @@
 - The `HiringRiskAnalyzer` relies strictly on deterministic `match_result` failures; Gemma acts purely as an explanation generator, preserving full explainability and pipeline integrity.
 
 ## Files Changed
+- `backend/app/schemas/match.py`
+- `frontend/src/types/api.ts`
+- `backend/tests/test_vacancy_fit_scoring.py`
+- `workstatus.md` (vacancy hierarchy tri-state validation fix recorded)
+- `backend/app/core/rq_worker_identity.py`
+- `backend/start_aux_worker.py`
+- `backend/start_worker.py`
+- `backend/tests/test_aux_worker.py`
+- `backend/tests/test_worker_cleanup.py`
+- `backend/tests/test_rq_worker_identity.py`
+- `workstatus.md` (RQ worker registration collision fix recorded)
+- `backend/scripts/run_migrations.py`
+- `backend/tests/test_migration_runner.py`
+- `workstatus.md` (PostgreSQL migration JSON bind-parsing fix recorded)
+- `backend/app/core/config.py`
+- `backend/app/services/embedding_service.py`
+- `backend/app/services/llm_service.py`
+- `backend/app/services/match_service.py`
+- `backend/app/services/ollama_transport.py`
+- `backend/app/services/prompt_service.py`
+- `backend/scripts/seed_prompts.py`
+- `backend/scripts/migrations/postgres/026_ollama_response_integrity.sql`
+- `backend/scripts/migrations/postgres/026_ollama_response_integrity_down.sql`
+- `backend/tests/test_phase5_ollama_standardization.py`
+- `backend/tests/test_prompt_service.py`
+- `backend/tests/test_qwen_llm_service.py`
+- `.env`
+- `backend/.env`
+- `backend/.env.example`
+- `docker-compose.yml`
+- `docker-compose.local.yml`
+- `README.md`
+- `workstatus.md` (Ollama response integrity remediation recorded)
+- `workstatus.md` (end-to-end Ollama response audit recorded)
+- `backend/app/services/ollama_transport.py`
+- `backend/app/services/llm_service.py`
+- `backend/tests/test_qwen_llm_service.py`
+- `workstatus.md` (Gemma 3 generation compatibility fix recorded)
 - `.env`
 - `docker-compose.yml`
 - `docker-compose.local.yml`

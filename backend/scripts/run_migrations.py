@@ -29,6 +29,11 @@ def compute_checksum(content: str) -> str:
     return hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()
 
 
+def execute_migration_sql(conn: Any, content: str) -> None:
+    """Execute a trusted migration file without treating PostgreSQL JSON text as SQLAlchemy bind parameters."""
+    conn.exec_driver_sql(content)
+
+
 def get_db_url() -> str:
     """
     Detects target database URL for PostgreSQL.
@@ -165,7 +170,7 @@ def run_migrations(db_url: str, dry_run: bool = False, dialect: str = "postgres"
         # Execute migration inside transaction
         try:
             with engine.begin() as conn:
-                conn.execute(text(content))
+                execute_migration_sql(conn, content)
                 now = datetime.now(timezone.utc)
                 conn.execute(
                     text("""
@@ -244,7 +249,7 @@ def run_rollback(db_url: str, steps: str = "1", dry_run: bool = False, dialect: 
 
         try:
             with engine.begin() as conn:
-                conn.execute(text(content))
+                execute_migration_sql(conn, content)
 
                 conn.execute(
                     text("DELETE FROM cvai.schema_migrations WHERE version = :version"),

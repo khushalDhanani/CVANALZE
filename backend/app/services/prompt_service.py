@@ -55,7 +55,15 @@ class PromptService:
             if not readiness.ready:
                 logger.error("Required optimized_match prompt is not ready: %s", readiness.reason)
                 raise PromptError("PROMPT_UNAVAILABLE")
-        cache_key = f"prompt_tmpl:{prompt_name}:{tenant_id or 'none'}:{model or 'none'}:{target_schema or 'none'}:{language}:{environment}"
+            from app.core.config import settings
+
+            version_scope = settings.OPTIMIZED_PROMPT_VERSION
+        else:
+            version_scope = "active"
+        cache_key = (
+            f"prompt_tmpl:{prompt_name}:{version_scope}:{tenant_id or 'none'}:{model or 'none'}:"
+            f"{target_schema or 'none'}:{language}:{environment}"
+        )
         
         template = config_cache_manager.get(cache_key)
         
@@ -246,6 +254,9 @@ class PromptService:
                 )
             if prompt is None:
                 return PromptReadiness(False, f"Required active prompt version {settings.OPTIMIZED_PROMPT_VERSION} is unavailable.")
+            prompt_lines = prompt.system_instruction.lstrip().splitlines()
+            if prompt_lines and prompt_lines[0].strip().lower() in {"/think", "/no_think"}:
+                return PromptReadiness(False, "Required prompt contains a model-specific thinking directive.")
             missing_placeholders = cls.OPTIMIZED_MATCH_PLACEHOLDERS - cls.get_placeholders(prompt.system_instruction)
             if missing_placeholders:
                 return PromptReadiness(False, "Required prompt placeholders are invalid.")

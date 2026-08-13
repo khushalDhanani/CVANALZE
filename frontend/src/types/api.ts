@@ -205,7 +205,7 @@ export interface VacancyFitScoreBreakdown {
   semantic_similarity_score: number;
   overall_fit_score: number;
   hierarchy_mismatch_penalty: number;
-  is_hierarchy_valid: boolean;
+  is_hierarchy_valid: boolean | null;
   match_status: string;
 }
 

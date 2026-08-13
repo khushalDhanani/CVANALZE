@@ -365,6 +365,11 @@ class MatchService:
                         "unsupported_claims": len(grounding_report.unsupported_claims),
                     },
                 )
+            else:
+                logger.warning(
+                    f"[OLLAMA] operation=optimized_match model='{settings.OLLAMA_MODEL}' "
+                    "status=DETERMINISTIC_FALLBACK reason=NO_VALID_LLM_RESPONSE"
+                )
 
             optimized_profile = optimized_response.candidate_profile if optimized_response else None
             candidate_context.apply_optimized_profile(

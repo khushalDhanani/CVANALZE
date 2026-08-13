@@ -269,6 +269,7 @@ class EmbeddingService:
     @classmethod
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
         if cls._is_model_throttled(model):
+            logger.warning(f"[EMBEDDING] request=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE retry_window_seconds=60")
             return None
 
         try:
@@ -293,6 +294,7 @@ class EmbeddingService:
     @classmethod
     def _call_ollama_batch_embed(cls, model: str, texts: list[str]) -> list[list[float]] | None:
         if cls._is_model_throttled(model):
+            logger.warning(f"[EMBEDDING] batch=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE retry_window_seconds=60")
             return None
 
         try:

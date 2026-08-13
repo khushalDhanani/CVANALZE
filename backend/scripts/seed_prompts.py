@@ -8,8 +8,7 @@ sys.path.insert(0, str(backend_dir))
 from app.core.database import PostgresAppSession
 from app.models.prompts import PromptTemplateMaster
 
-DYNAMIC_MAPPING = """/think
-{input_json}
+DYNAMIC_MAPPING = """{input_json}
 
 Provide your analysis in the EXACT JSON format below.
 DO NOT include any markdown formatting like ```json or ```.
@@ -28,8 +27,7 @@ Expected JSON Schema:
 }}
 """
 
-MATCH_ANALYSIS = """/think
-{input_json}
+MATCH_ANALYSIS = """{input_json}
 
 Provide your analysis in the EXACT JSON format below.
 DO NOT include any markdown formatting like ```json or ```.
@@ -45,78 +43,7 @@ Expected JSON Schema:
 }}
 """
 
-OPTIMIZED_MATCH = """/think
-{input_json}
-
-EVIDENCE-BASED REASONING RULES:
-1. Do NOT make assumptions or infer experience not explicitly supported by the CV.
-2. EVERY conclusion in semantic_reason must reference specific evidence from the CV.
-3. If evidence is missing for a requirement, state "No evidence found" — do not guess.
-4. Do not use generic phrases like "strong experience" unless backed by specific skills, projects, or responsibilities cited from the CV.
-5. Compare the candidate against each vacancy requirement item by item.
-6. If there is a mismatch (department, domain, education, role, technology, skills), explicitly report it.
-7. Never increase semantic_fit_score based on assumptions — score only on verified evidence.
-8. If there is no genuine match with any active vacancy, set active_vacancy_summary to "No suitable active vacancy found.".
-9. IMPORTANT (EXPERIENCE): Calculate `relevant_experience_years` strictly by summing the total duration of the chronological work history. E.g., "2014 to 2015" (1 yr) + "2023 to present" (~3 yrs) = 4.0 years. Do NOT default to 0.0 if dates are present.
-10. IMPORTANT (DOMAIN): `professional_domain` MUST be strictly selected from this list: [{domain_list_str}]. Do NOT invent domains.
-    If NONE of the listed domains genuinely fits the candidate, set `professional_domain` to "NO_SUITABLE_MATCH" and set `professional_domains` to ["NO_SUITABLE_MATCH"].
-11. IMPORTANT (DEPARTMENT): `recommended_department` MUST be selected from this list: [{dept_list_str}]. Do NOT invent department names.
-    If no department fits, set `recommended_department` to "NO_SUITABLE_MATCH".
-12. EVIDENCE CITATION: Every field in `candidate_profile` (skills, domain, department, strengths, roles) must be justified by specific text from the CV.
-    For each field include only what is directly evidenced — do not infer beyond the stated facts.
-
-INSTRUCTIONS:
-Return ONLY valid JSON matching the exact schema below without markdown wrapper, thinking tokens, or extra commentary.
-
-Expected JSON Schema:
-{{
-  "candidate_profile": {{
-    "core_skills": ["List of explicitly stated skills"],
-    "inferred_skills": ["List of logical inferred skills, e.g. React implies JavaScript"],
-    "relevant_experience_years": 5.0,
-    "education_domains": ["Extracted education domains/degrees"],
-    "certifications": ["Extracted certifications"],
-    "current_role": "Current or most recent job title",
-    "professional_domains": ["Extracted professional domain areas"],
-    "recommended_department": "Most suitable department for candidate",
-    "professional_domain": "Candidate's specialized professional domain",
-    "strengths": ["Key candidate strengths from skills, experience, projects"],
-    "suitable_job_roles": ["List of suitable market job roles"]
-  }},
-  "active_vacancy_summary": "Summary of genuine active vacancy match if genuine match exists; otherwise 'No suitable active vacancy found.'",
-  "ai_career_summary": "Independent AI analysis of candidate's profile, strengths, recommended department, and suitable job roles.",
-  "matched_vacancies": [
-    {{
-      "vacancy_id": 101,
-      "semantic_reason": "Clear explanation of semantic fit based on CV evidence, citing specific skills, projects, or roles. If no fit, state 'No evidence found for X requirement'.",
-      "inferred_skills": ["Inferred skills relevant to this specific vacancy"],
-      "matched_skills": ["Skills from required_skills present in CV"],
-      "missing_critical": ["Critical requirements missing"],
-      "semantic_fit_score": 85.0,
-      "career_transition_detected": false,
-      "career_transition_note": "Optional notes if dynamic career transition detected",
-      "classified_requirements": [
-        {{
-          "requirement_id": "req_1",
-          "description": "Requirement description",
-          "tier": "MANDATORY",
-          "status": "SATISFIED",
-          "failure_reason": null
-        }}
-      ],
-      "evidence_snippets": {{
-        "req_1": {{
-          "cv_evidence": "Quote or verified fact from CV text",
-          "vacancy_evidence": "Exact requirement text from vacancy"
-        }}
-      }}
-    }}
-  ]
-}}
-"""
-
-PROFILE_EXTRACTION = """/no_think
-{input_json}
+PROFILE_EXTRACTION = """{input_json}
 
 Provide your analysis in the EXACT JSON format below.
 DO NOT include any markdown formatting like ```json or ```.
@@ -243,11 +170,6 @@ def seed_prompts():
             "prompt_name": "match_analysis",
             "version_tag": "1.0.0",
             "system_instruction": MATCH_ANALYSIS,
-        },
-        {
-            "prompt_name": "optimized_match",
-            "version_tag": "2.0.0",
-            "system_instruction": OPTIMIZED_MATCH,
         },
         {
             "prompt_name": "profile_extraction",
