@@ -246,6 +246,17 @@ def test_transport_retries_connection_error_then_succeeds(monkeypatch):
     assert OllamaTransport.get_metrics()["retries"] == 1
 
 
+def test_tags_log_identifies_model_as_not_applicable(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="cv_analyzer")
+    _install_client(monkeypatch, _response({"models": [{"name": "llama3.2:3b"}]}))
+
+    OllamaTransport.get_tags()
+
+    assert "operation=tags" in caplog.text
+    assert "model='not_applicable'" in caplog.text
+    assert "model='none'" not in caplog.text
+
+
 def test_transport_uses_exponential_backoff(monkeypatch):
     monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 2)
     monkeypatch.setattr(settings, "OLLAMA_RETRY_BACKOFF_SECONDS", 0.25)

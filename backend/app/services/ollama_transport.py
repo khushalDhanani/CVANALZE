@@ -325,7 +325,7 @@ class OllamaTransport:
         last_error: OllamaError | None = None
         cls._circuit_before_request(operation)
 
-        requested_model = str((payload or {}).get("model") or "none").strip()
+        requested_model = str((payload or {}).get("model") or "not_applicable").strip()
         generation_options = (payload or {}).get("options", {})
         num_ctx = generation_options.get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
         num_predict = generation_options.get("num_predict", "default") if operation not in ("tags", "embed", "unload") else None

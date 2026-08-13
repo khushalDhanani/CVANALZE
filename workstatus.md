@@ -1,6 +1,28 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Ollama Tags Telemetry Clarity Fix**:
+    - Audited all application-side Ollama integrations and reconfirmed `/api/generate`, `/api/embed`, `/api/tags`, and unload operations remain centralized in `OllamaTransport`, with generation and embedding callers routed through the existing services.
+    - Corrected misleading `/api/tags` configuration telemetry from `model='none'` to `model='not_applicable'`, accurately reflecting that model discovery has no model request payload.
+    - Preserved the configured generation model, model-readiness validation, three-second tags deadline, centralized retry count, request payload, response handling, and health API contract.
+    - Added focused regression coverage requiring the model-independent tags label and preventing the ambiguous legacy value from returning.
+    - Files changed: `backend/app/services/ollama_transport.py`, `backend/tests/test_phase5_ollama_standardization.py`, `workstatus.md`.
+    - Pending work: rebuild/recreate the API and worker containers and run the focused Ollama transport test; these actions were not performed because repository instructions require explicit authorization.
+    - Important decision: no timeout, retry, model-selection, or health behavior was changed because the supplied entry was successful request telemetry rather than evidence of an operational failure.
+1. **2026-08-13 Ollama Tags Log Interpretation (No Fix Applied)**:
+    - Confirmed the reported entry is normal request-configuration telemetry for the model-discovery/readiness `GET /api/tags` operation, not an error.
+    - Confirmed `model='none'` is expected because the tags request has no model payload, while `timeout_s=3.0` comes from the dedicated `OLLAMA_TAGS_TIMEOUT_SECONDS` setting and zero retries matches the current centralized retry configuration.
+    - Files changed: `workstatus.md` only.
+    - Pending work: inspect the immediately following `status=SUCCESS`, `status=MODEL_MISSING`, or `status=FALLBACK` entry if Ollama readiness is still in question.
+    - Important decision: no Ollama transport, model, timeout, retry, health endpoint, or Docker configuration change is justified by this informational line alone.
+1. **2026-08-13 RQ Cron Scheduler Redis Timeout Resilience**:
+    - Traced the scheduler exit to `redis.exceptions.TimeoutError` escaping RQ's recurring-job enqueue loop; the existing shutdown wrapper only handled Redis connection failures during deregistration.
+    - Extended the existing `ResilientCronScheduler` to tolerate transient Redis connection and timeout errors during recurring enqueue, cron-state persistence, heartbeat, and shutdown deregistration while preserving unexpected exception propagation.
+    - Added a five-second retry floor after a Redis failure so an overdue recurring job cannot cause a hot retry loop.
+    - Added focused regression coverage for enqueue timeouts, retry pacing, runtime Redis-operation timeouts, and unexpected enqueue failures.
+    - Files changed: `backend/start_scheduler.py`, `backend/tests/test_background_sync_jobs.py`, `workstatus.md`.
+    - Pending work: rebuild/recreate the scheduler container and run the focused scheduler tests; these actions were not performed because repository instructions require explicit authorization.
+    - Important decision: recovery remains inside the existing scheduler process and preserves the current job registrations, queues, intervals, and RQ contracts; no competing Redis client or scheduler implementation was introduced.
 1. **2026-08-13 Docker Desktop Duplicate Log Display Diagnosis**:
     - Compared the Docker Desktop unified Logs view with the raw `docker logs` streams for both `cv_analyzer_api` and `cv_analyzer_worker`.
     - Confirmed raw container output records each API request, health check, Ollama operation, and worker pipeline event only once; the application and worker are not executing those operations twice.
