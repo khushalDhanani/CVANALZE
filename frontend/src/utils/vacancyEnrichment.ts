@@ -1,4 +1,8 @@
 import type { DualEvidence, EnrichedJobEvaluation } from '@/types/api';
+import { humanizeRecruiterText } from '@/utils/candidateDetail';
+
+export const VACANCY_AI_EXPLANATION_LABEL = 'AI Match Explanation';
+export const RELATED_SKILLS_LABEL = 'Related Skills Identified';
 
 export interface VacancyEvidencePresentation {
   label: string;
@@ -44,8 +48,8 @@ export function getVacancyEnrichmentPresentation(match: Partial<EnrichedJobEvalu
   ].filter(Boolean);
 
   return {
-    reasoning: cleanText(match.llm_reason) || cleanText(match.semantic_reason),
-    recommendation: cleanText(match.recommendation),
+    reasoning: humanizeRecruiterText(match.llm_reason) || humanizeRecruiterText(match.semantic_reason) || '',
+    recommendation: humanizeRecruiterText(match.recommendation) || '',
     inferredSkills,
     qualityFlags,
     evidence,

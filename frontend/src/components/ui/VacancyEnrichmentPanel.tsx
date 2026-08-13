@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import type { EnrichedJobEvaluation } from '@/types/api';
-import { getVacancyEnrichmentPresentation } from '@/utils/vacancyEnrichment';
+import { getVacancyEnrichmentPresentation, RELATED_SKILLS_LABEL, VACANCY_AI_EXPLANATION_LABEL } from '@/utils/vacancyEnrichment';
 import { Badge } from './Badge';
 
 interface VacancyEnrichmentPanelProps {
@@ -12,13 +12,15 @@ interface VacancyEnrichmentPanelProps {
 export function VacancyEnrichmentPanel({ match, showDecisionMetadata = true }: VacancyEnrichmentPanelProps) {
   const { reasoning, recommendation, inferredSkills, qualityFlags, evidence, metadata } = getVacancyEnrichmentPresentation(match);
 
-  if (!reasoning && !recommendation && inferredSkills.length === 0 && qualityFlags.length === 0 && evidence.length === 0 && metadata.length === 0) return null;
+  const hasVisibleContent = Boolean(reasoning) || inferredSkills.length > 0 || evidence.length > 0
+    || (showDecisionMetadata && (Boolean(recommendation) || qualityFlags.length > 0 || metadata.length > 0));
+  if (!hasVisibleContent) return null;
 
   return (
     <View className="gap-2 mt-1">
       {reasoning ? (
         <View className="p-2 border rounded bg-primary/5 border-primary/10">
-          <Text className="mb-1 text-xs leading-4 text-text-primary font-sans-bold">AI Match Rationale</Text>
+          <Text className="mb-1 text-xs leading-4 text-text-primary font-sans-bold">{VACANCY_AI_EXPLANATION_LABEL}</Text>
           <Text className="text-xs leading-4 text-text-primary">{reasoning}</Text>
         </View>
       ) : null}
@@ -30,7 +32,7 @@ export function VacancyEnrichmentPanel({ match, showDecisionMetadata = true }: V
       ) : null}
       {inferredSkills.length > 0 ? (
         <View className="gap-1">
-          <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Additional Skills Identified</Text>
+          <Text className="text-[11px] font-sans-bold text-text-muted uppercase">{RELATED_SKILLS_LABEL}</Text>
           <View className="flex-row flex-wrap gap-1">{inferredSkills.map((skill, index) => <Badge key={`${skill}-${index}`} label={skill} tone="info" />)}</View>
         </View>
       ) : null}
@@ -40,7 +42,7 @@ export function VacancyEnrichmentPanel({ match, showDecisionMetadata = true }: V
       ) : null}
       {evidence.length > 0 ? (
         <View className="gap-1 p-2 border rounded bg-background border-border">
-          <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Grounded Evidence</Text>
+          <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Supporting Evidence</Text>
           {evidence.slice(0, 5).map(({ label, evidence: item }, index) => (
             <View key={`${label}-${index}`} className="gap-0.5">
               <Text className="text-[11px] font-sans-bold text-text-primary">{label}</Text>

@@ -1,6 +1,18 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Phase 3 Recruiter UI Cleanup and Quality Contracts**:
+    - Audited the candidate detail page for repeated fit, recommendation, domain, experience, education, missing-skill, AI-reasoning, and hiring-risk presentation; kept the overall/canonical skills metrics in the summary, per-vacancy scores in vacancy context, and factual details in their dedicated sections.
+    - Removed the repeated skills percentage from the detailed Skills card, removed repeated total experience from the timeline card, removed match rationale from the summary header, and suppresses the primary concern from the secondary concerns list when it is identical.
+    - Renamed the secondary tab and cards to `Processing Details`, `Technical Details`, and `Debug Information`; humanized the reprocess confirmation so cache JSON, embeddings, score breakdowns, and multi-stage pipeline terminology are no longer shown in the recruiter flow.
+    - Added shared recruiter-term humanization for confidence, mandatory gaps, domain alignment/conflict, semantic reasoning, experience gaps, education concerns, and related AI-identified skills without adding candidate-, department-, or domain-specific mappings.
+    - Replaced ambiguous zero/negative fallbacks with evidence-aware states such as `Not identified from CV`, `Not enough evidence`, and `Not available in the analysis`; legacy unconfirmed `0 years` defaults no longer appear as factual experience, and an analysis with no recommendation now routes to Manual Review instead of No Strong Match.
+    - Kept `llm_reason` and `semantic_reason` intact through normalization and renders both Potential Match and Manual Review explanations under `AI Match Explanation`; raw calibration versions, baseline identities, RRF fields, stage flags, and retrieval paths remain excluded from the normal recruiter presentation.
+    - Added focused contracts for complete candidate-summary fields, canonical 80% / 8 matched / 2 missing skill presentation, missing experience/education/domain/skills, humanized metadata, technical-value exclusion, and AI-reasoning survival for Potential Match and Manual Review.
+    - Files changed: `frontend/src/app/candidates/[id].tsx`, `frontend/src/components/ui/ExperienceTimelineCard.tsx`, `frontend/src/components/ui/VacancyEnrichmentPanel.tsx`, `frontend/src/utils/candidateDetail.ts`, `frontend/src/utils/candidateDecisionEvidence.ts`, `frontend/src/utils/vacancyEnrichment.ts`, `frontend/src/__tests__/candidateDetailEnrichment.test.ts`, `workstatus.md`.
+    - Verification: `git diff --check` passed; the already-running Expo instance completed a fresh web/SSR bundle and logged application startup without a new candidate-page error. Tests, builds, service starts, and restarts were not executed under the repository execution restriction.
+    - Pending work: run the focused frontend contract test, TypeScript check, and responsive recruiter-view inspection when execution is explicitly authorized.
+    - Important decision: backend metrics, taxonomy, recommendation status, vacancy grouping, and Ollama outputs remain authoritative; Phase 3 changes only presentation, evidence routing, and missing-data semantics.
 1. **2026-08-13 Candidate Detail Recruiter-Label UI Error Fix**:
     - Traced the running Expo error to the raw `suitable_job_roles` badge map in `candidates/[id].tsx`, where runtime API values were trusted as strings and used directly as React keys and text labels.
     - Added page-level normalization for suggested roles, interview focus areas, and talent pools so primitive and supported legacy object-shaped values become clean strings, blank/invalid entries are omitted, and duplicate labels are removed before rendering.

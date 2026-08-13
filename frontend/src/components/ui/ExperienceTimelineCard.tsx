@@ -29,14 +29,12 @@ export type {
 interface ExperienceTimelineCardProps {
   analysis?: ExperienceGapAnalysisData | any | null;
   experienceAssessment?: string | null;
-  totalExperienceYears?: number | null;
   candidateData?: any | null;
 }
 
 export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   analysis,
   experienceAssessment,
-  totalExperienceYears,
   candidateData,
 }) => {
   const [showUndated, setShowUndated] = useState(false);
@@ -51,92 +49,6 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   const canonicalJobs = analysis?.canonical_jobs || [];
   const hrIndicators = analysis?.hr_review_indicators || [];
   const hrObs = summary?.hr_observations || [];
-
-  const rawState =
-    candidateData?.experience_state ||
-    candidateData?.experience_summary?.experience_state ||
-    candidateData?.validation_status ||
-    summary?.validation_status;
-
-  const resolveCanonicalExperienceYears = (): number | null => {
-    if (typeof totalExperienceYears === 'number' && !isNaN(totalExperienceYears)) {
-      return totalExperienceYears;
-    }
-
-    const sources = [candidateData, analysis];
-    for (const src of sources) {
-      if (!src || typeof src !== 'object') continue;
-
-      if (typeof src.experience_years === 'number' && !isNaN(src.experience_years)) {
-        return src.experience_years;
-      }
-      if (typeof src.total_experience_years === 'number' && !isNaN(src.total_experience_years)) {
-        return src.total_experience_years;
-      }
-      if (typeof src.authoritative_years === 'number' && !isNaN(src.authoritative_years)) {
-        return src.authoritative_years;
-      }
-
-      const expSum = src.experience_summary;
-      if (expSum && typeof expSum === 'object') {
-        if (typeof expSum.authoritative_years === 'number' && !isNaN(expSum.authoritative_years)) {
-          return expSum.authoritative_years;
-        }
-        if (typeof expSum.experience_years === 'number' && !isNaN(expSum.experience_years)) {
-          return expSum.experience_years;
-        }
-        if (typeof expSum.stated_years === 'number' && !isNaN(expSum.stated_years)) {
-          return expSum.stated_years;
-        }
-      }
-
-      const qMetrics = src.quality_metrics;
-      if (qMetrics && typeof qMetrics === 'object' && typeof qMetrics.experience_years === 'number' && !isNaN(qMetrics.experience_years)) {
-        return qMetrics.experience_years;
-      }
-    }
-
-    if (typeof summary?.total_verified_years === 'number' && !isNaN(summary.total_verified_years)) {
-      return summary.total_verified_years;
-    }
-
-    return null;
-  };
-
-  const canonicalYears = resolveCanonicalExperienceYears();
-
-  const experienceState =
-    rawState ||
-    (canonicalYears !== null && canonicalYears > 0 ? 'CALCULATED' : (canonicalYears === 0 ? 'ZERO_CONFIRMED' : 'UNKNOWN'));
-
-  const formatDisplayExperience = (years: number | null): string | undefined => {
-    const rawGross =
-      candidateData?.gross_display ||
-      candidateData?.experience_summary?.gross_display ||
-      summary?.gross_display;
-
-    if (typeof rawGross === 'string' && rawGross.trim().length > 0) {
-      return rawGross;
-    }
-
-    if (experienceState === 'UNKNOWN') {
-      return 'Experience Present (Dates Unparseable)';
-    }
-
-    if (years === null || years === undefined) return undefined;
-
-    if (years === 0 || experienceState === 'ZERO_CONFIRMED') {
-      return '0 years 0 months';
-    }
-
-    const totalMonths = Math.round(years * 12);
-    const yearsPart = Math.floor(totalMonths / 12);
-    const monthsPart = totalMonths % 12;
-    return `${yearsPart} year${yearsPart !== 1 ? 's' : ''} ${monthsPart} month${monthsPart !== 1 ? 's' : ''}`;
-  };
-
-  const experienceDisplayText = formatDisplayExperience(canonicalYears);
-
 
   const formatEmpType = (type?: string | null): string | undefined => {
     if (!type || type.trim().length === 0) return undefined;
@@ -387,19 +299,6 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
       {/* Single Source KPI Summary from Backend summary object */}
       {summary ? (
         <View className="flex-row flex-wrap gap-2">
-          {experienceDisplayText ? (
-          <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">
-            <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">
-              Total Experience
-            </Text>
-            <Text className="text-xs font-sans-bold text-text-primary">
-              {experienceDisplayText}
-            </Text>
-
-
-          </View>
-          ) : null}
-
           {typeof summary.total_employment_gaps_count === 'number' && typeof summary.unexplained_gaps_count === 'number' ? (
           <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">
             <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">

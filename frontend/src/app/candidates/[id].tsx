@@ -33,6 +33,7 @@ import {
   buildCandidateDetailViewModel,
   cleanCandidateText,
   cleanRecommendationText,
+  humanizeRecruiterText,
   normalizeCandidateMatchAnalysis,
   normalizeCandidateRouteId,
   responseMatchesCandidateId,
@@ -40,7 +41,7 @@ import {
 import { getProcessingProvenanceRows } from '@/utils/processingProvenance';
 import { getReanalysisErrorPresentation, type ReanalysisErrorPresentation } from '@/utils/reanalysisError';
 import { reanalyzeCandidateAndCommit } from '@/utils/candidateReanalysis';
-import { buildCandidateDecisionEvidence, buildVacancyDecisionEvidence } from '@/utils/candidateDecisionEvidence';
+import { buildCandidateDecisionEvidence, buildCandidateSkillsSummaryPresentation, buildVacancyDecisionEvidence } from '@/utils/candidateDecisionEvidence';
 
 type TabType = 'overview' | 'processing';
 
@@ -321,6 +322,14 @@ export default function CandidateDetailScreen() {
     () => data && candidateView ? buildCandidateDecisionEvidence(data, candidateView, analysis, recommendations) : null,
     [analysis, candidateView, data, recommendations],
   );
+  const skillsSummary = useMemo(
+    () => decisionEvidence ? buildCandidateSkillsSummaryPresentation(decisionEvidence.skills) : null,
+    [decisionEvidence],
+  );
+  const additionalConcerns = useMemo(() => {
+    const primaryConcern = candidateSummary?.mainConcern.toLocaleLowerCase();
+    return decisionEvidence?.concerns.filter((concern) => concern.toLocaleLowerCase() !== primaryConcern) || [];
+  }, [candidateSummary, decisionEvidence]);
   const vacancyMatches = useMemo(() => {
     const matches = [bestMatch, ...(analysis?.suitable_openings || []), ...(analysis?.unsuitable_openings || [])].filter(Boolean);
     const seen = new Set<string>();
@@ -374,7 +383,7 @@ export default function CandidateDetailScreen() {
     const hasRecordedVersion = provenanceRows.some(({ recorded }) => recorded);
     return (
       <Card className="p-3 shadow-none border-border">
-        <Text className="mb-1 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Processing Provenance</Text>
+        <Text className="mb-1 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Debug Information</Text>
         <Text className="mb-3 text-[11px] font-sans text-text-muted">
           {hasRecordedVersion
             ? 'Versions used to produce this stored result. These identifiers help administrators verify cache freshness and reproduce decisions.'
@@ -406,26 +415,35 @@ export default function CandidateDetailScreen() {
               <CheckCircle size={14} color={COLORS.primary} />
               <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Skills Match</Text>
             </View>
-            {decisionEvidence.skills.score != null ? <Badge label={`${Math.round(decisionEvidence.skills.score)}%`} tone="info" /> : null}
+            {skillsSummary?.matchedLabel || skillsSummary?.missingLabel ? (
+              <View className="flex-row flex-wrap gap-1">
+                {skillsSummary.matchedLabel ? <Badge label={skillsSummary.matchedLabel} tone="success" /> : null}
+                {skillsSummary.missingLabel ? <Badge label={skillsSummary.missingLabel} tone={decisionEvidence.skills.missingRequired.length ? 'warning' : 'neutral'} /> : null}
+              </View>
+            ) : null}
           </View>
           <View className="flex-row flex-wrap gap-3">
             <View className="flex-1 min-w-[200px] gap-1.5">
               <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-success">Matched Skills</Text>
               {decisionEvidence.skills.matched.length > 0
                 ? decisionEvidence.skills.matched.map((skill) => <Text key={skill} className="text-xs text-text-primary">✓ {skill}</Text>)
-                : <Text className="text-xs text-text-muted">No required skill matches were recorded.</Text>}
+                : skillsSummary?.missingLabel
+                  ? <Text className="text-xs text-text-muted">No required skill matches were found in the CV.</Text>
+                  : <Text className="text-xs text-text-muted">Required skills were not identified for this vacancy.</Text>}
             </View>
             <View className="flex-1 min-w-[200px] gap-1.5">
               <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-danger">Missing Required Skills</Text>
               {decisionEvidence.skills.missingRequired.length > 0
                 ? decisionEvidence.skills.missingRequired.map((skill) => <Text key={skill} className="text-xs text-text-primary">• {skill}</Text>)
-                : <Text className="text-xs text-success">No missing required skills were recorded.</Text>}
+                : skillsSummary?.matchedLabel
+                  ? <Text className="text-xs text-success">All identified required skills are matched.</Text>
+                  : <Text className="text-xs text-text-muted">Missing-skill evidence is not available.</Text>}
             </View>
             <View className="flex-1 min-w-[200px] gap-1.5">
               <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-text-muted">Additional Candidate Skills</Text>
               {decisionEvidence.skills.additional.length > 0
                 ? <View className="flex-row flex-wrap gap-1">{decisionEvidence.skills.additional.map((skill) => <Badge key={skill} label={skill} tone="neutral" />)}</View>
-                : <Text className="text-xs text-text-muted">No additional extracted skills were recorded.</Text>}
+                : <Text className="text-xs text-text-muted">Additional skills were not identified from the CV.</Text>}
             </View>
           </View>
         </Card>
@@ -452,7 +470,7 @@ export default function CandidateDetailScreen() {
       ) : (
         <Card className="gap-2 p-3 shadow-none border-border">
           <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Experience</Text>
-          <Text className="text-xs text-text-muted">No structured employment history was extracted from the CV.</Text>
+          <Text className="text-xs text-text-muted">Employment history was not identified from the CV.</Text>
         </Card>
       )}
 
@@ -468,11 +486,11 @@ export default function CandidateDetailScreen() {
               {education.grade ? <Text className="text-[11px] text-text-primary">{education.grade}</Text> : null}
               {education.details ? <Text className="text-[11px] text-text-primary">{education.details}</Text> : null}
             </View>
-          )) : <Text className="text-xs text-text-muted">No structured education history was extracted from the CV.</Text>}
+          )) : <Text className="text-xs text-text-muted">Education was not identified from the CV.</Text>}
           {decisionEvidence?.education ? (
             <View className={`gap-1 p-2 border rounded ${decisionEvidence.education.status === 'MATCHED' ? 'bg-success/5 border-success/20' : 'bg-warning/10 border-warning/30'}`}>
               <Text className={`text-xs font-sans-bold ${decisionEvidence.education.status === 'MATCHED' ? 'text-success' : 'text-warning'}`}>
-                {decisionEvidence.education.status === 'MATCHED' ? '✓ Education Match' : decisionEvidence.education.status === 'CONFLICT' ? '⚠ Education Conflict' : 'Education Review'}
+                {decisionEvidence.education.status === 'MATCHED' ? '✓ Education Match' : decisionEvidence.education.status === 'CONFLICT' ? '⚠ Education Concern' : 'Education Review'}
               </Text>
               {decisionEvidence.education.requirement ? <Text className="text-xs text-text-primary">Vacancy requirement: {decisionEvidence.education.requirement}</Text> : null}
               {decisionEvidence.education.candidateEvidence ? <Text className="text-xs text-text-primary">CV evidence: {decisionEvidence.education.candidateEvidence}</Text> : null}
@@ -499,15 +517,17 @@ export default function CandidateDetailScreen() {
               <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-success">Key Strengths</Text>
               {decisionEvidence.strengths.length > 0
                 ? decisionEvidence.strengths.map((strength) => <Text key={strength} className="text-xs leading-4 text-text-primary">✓ {strength}</Text>)
-                : <Text className="text-xs text-text-muted">No structured strengths were recorded.</Text>}
+                : <Text className="text-xs text-text-muted">Not enough evidence was available to identify key strengths.</Text>}
             </View>
             <View className="flex-1 min-w-[240px] gap-1.5">
               <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-danger">Key Concerns</Text>
-              {decisionEvidence.concerns.length > 0
-                ? decisionEvidence.concerns.map((concern) => <Text key={concern} className="text-xs leading-4 text-text-primary">⚠ {concern}</Text>)
-                : vacancyMatches.length > 0
-                  ? <Text className="text-xs text-success">No major concern was identified in the current evidence.</Text>
-                  : <Text className="text-xs text-text-muted">No vacancy evidence is available to assess candidate concerns.</Text>}
+              {additionalConcerns.length > 0
+                ? additionalConcerns.map((concern) => <Text key={concern} className="text-xs leading-4 text-text-primary">⚠ {concern}</Text>)
+                : decisionEvidence.concerns.length > 0
+                  ? <Text className="text-xs text-text-muted">The primary concern is summarized above; no additional concern was identified.</Text>
+                  : vacancyMatches.length > 0
+                    ? <Text className="text-xs text-success">No major concern was identified in the current evidence.</Text>
+                    : <Text className="text-xs text-text-muted">Not enough vacancy evidence is available to assess candidate concerns.</Text>}
             </View>
           </View>
         </Card>
@@ -525,12 +545,13 @@ export default function CandidateDetailScreen() {
         {vacancyMatches.length > 0 ? vacancyMatches.map((match: any, index: number) => {
           const evidence = buildVacancyDecisionEvidence(match);
           const rawStatus = match.vacancy_match_status || match.match_status || match.classification;
+          const vacancyDepartment = cleanCandidateText(match.department_name || match.department);
           return (
             <View key={String(match.vacancy_id || match.job_id || index)} className="gap-2 p-3 border rounded bg-background border-border">
               <View className="flex-row flex-wrap items-start justify-between gap-2">
                 <View className="flex-1 min-w-[200px]">
                   <Text className="text-sm font-sans-bold text-text-primary">{cleanCandidateText(match.job_title) || 'Vacancy title not available'}</Text>
-                  {cleanCandidateText(match.department_name || match.department) ? <Text className="text-xs text-text-muted">{match.department_name || match.department}</Text> : null}
+                  {vacancyDepartment ? <Text className="text-xs text-text-muted">{vacancyDepartment}</Text> : null}
                 </View>
                 <VacancyMatchStatusBadge status={rawStatus} score={evidence.overallFit} />
               </View>
@@ -578,11 +599,11 @@ export default function CandidateDetailScreen() {
           <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">AI Match Explanation</Text>
         </View>
         <Text className="text-[11px] leading-4 text-text-muted">AI-generated interpretation is not confirmed CV evidence. Verify it against the factual skills, experience, and education above.</Text>
-        {analysis?.ai_career_summary ? <Text className="text-xs leading-5 text-text-primary">{cleanRecommendationText(analysis.ai_career_summary)}</Text> : null}
+        {analysis?.ai_career_summary ? <Text className="text-xs leading-5 text-text-primary">{humanizeRecruiterText(analysis.ai_career_summary)}</Text> : null}
         {recommendations?.experience_assessment ? (
           <View className="gap-1">
             <Text className="text-[11px] font-sans-bold text-text-primary">Experience interpretation</Text>
-            <Text className="text-xs leading-4 text-text-primary">{cleanRecommendationText(recommendations.experience_assessment)}</Text>
+            <Text className="text-xs leading-4 text-text-primary">{humanizeRecruiterText(recommendations.experience_assessment)}</Text>
           </View>
         ) : null}
         {vacancyMatches.some((match: any) => cleanCandidateText(match.llm_reason || match.semantic_reason))
@@ -592,7 +613,7 @@ export default function CandidateDetailScreen() {
                 <VacancyEnrichmentPanel match={match} showDecisionMetadata={false} />
               </View>
             ) : null)
-          : !analysis?.ai_career_summary ? <Text className="text-xs text-text-muted">No AI explanation was recorded for this analysis.</Text> : null}
+          : !analysis?.ai_career_summary ? <Text className="text-xs text-text-muted">An AI match explanation is not available for this analysis.</Text> : null}
       </Card>
 
       {/* 8. Secondary Information */}
@@ -675,7 +696,7 @@ export default function CandidateDetailScreen() {
             <Text numberOfLines={showFullText ? undefined : 8} className="text-[11px] font-mono text-text-primary leading-5">{candidateView.extractedText}</Text>
           </View>
         ) : null}
-        <Text className="text-[11px] text-text-muted">Processing versions and technical provenance are available in the Processing Pipeline tab.</Text>
+        <Text className="text-[11px] text-text-muted">Administrative processing details are available in the Processing Details tab.</Text>
       </Card>
     </View>
   );
@@ -701,7 +722,7 @@ export default function CandidateDetailScreen() {
       )}
 
       {data && (cleanCandidateText(data.filename || data.id) || rawTimestamp || typeof data.ocr_applied === 'boolean' || data.page_count != null || cleanCandidateText(data.status)) ? <Card className="p-3 shadow-none border-border">
-        <Text className="mb-2 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Processing Metadata</Text>
+        <Text className="mb-2 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Technical Details</Text>
         <View className="gap-2">
           {cleanCandidateText(data.filename || data.id) ? (
           <View className="flex-row items-center justify-between">
@@ -797,7 +818,7 @@ export default function CandidateDetailScreen() {
                 <View className="flex-1 min-w-0">
                   <Text numberOfLines={1} ellipsizeMode="tail" className="text-xl font-sans-bold text-text-primary">{candidateSummary.name}</Text>
                   <Text numberOfLines={1} ellipsizeMode="tail" className="text-sm font-sans-bold text-text-primary">
-                    {candidateSummary.role || 'Latest role not available'}
+                    {candidateSummary.role || 'Latest role not identified from CV'}
                   </Text>
                   {candidateSummary.company ? <Text numberOfLines={1} ellipsizeMode="tail" className="text-xs text-text-muted">{candidateSummary.company}</Text> : null}
                 </View>
@@ -811,24 +832,26 @@ export default function CandidateDetailScreen() {
             <View className="flex-row flex-wrap gap-2">
               <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
                 <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Overall Match</Text>
-                <Text className="text-base font-sans-bold text-primary">{candidateSummary.overallFit != null ? `${Math.round(candidateSummary.overallFit)}%` : 'Not available'}</Text>
+                <Text className="text-base font-sans-bold text-primary">{candidateSummary.overallFit != null ? `${Math.round(candidateSummary.overallFit)}%` : 'Not enough evidence'}</Text>
                 {candidateSummary.matchConfidence != null ? <Text className="text-[10px] text-text-muted">Match Confidence {Math.round(candidateSummary.matchConfidence)}%</Text> : null}
               </View>
               <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
                 <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Experience</Text>
-                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.totalExperience || 'Not available'}</Text>
-                <Text className="text-[10px] text-text-muted">Relevant: {candidateSummary.relevantExperience || 'Not available'}</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.totalExperience || 'Not identified from CV'}</Text>
+                <Text className="text-[10px] text-text-muted">Relevant: {candidateSummary.relevantExperience || 'Not enough evidence'}</Text>
               </View>
               <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
-                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Skills Match</Text>
-                <Text className="text-base font-sans-bold text-text-primary">{candidateSummary.skillsFit != null ? `${Math.round(candidateSummary.skillsFit)}%` : 'Not available'}</Text>
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Required Skills</Text>
+                <Text className="text-base font-sans-bold text-text-primary">{skillsSummary?.scoreLabel || 'Not enough evidence'}</Text>
                 <Text className="text-[10px] text-text-muted">
-                  {candidateSummary.requiredSkillsCount != null ? `${candidateSummary.matchedSkillsCount} / ${candidateSummary.requiredSkillsCount} required skills matched` : 'Required-skill count not available'}
+                  {candidateSummary.requiredSkillsCount != null
+                    ? `${candidateSummary.matchedSkillsCount} / ${candidateSummary.requiredSkillsCount} required skills matched`
+                    : 'Required skills not identified'}
                 </Text>
               </View>
               <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
                 <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Candidate Domain</Text>
-                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.domain || 'Not available'}</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.domain || 'Not identified from CV'}</Text>
                 {candidateSummary.department ? <Text className="text-[10px] text-text-muted">Department: {candidateSummary.department}</Text> : null}
               </View>
             </View>
@@ -840,11 +863,6 @@ export default function CandidateDetailScreen() {
                 <Text className="text-xs leading-4 text-text-primary">{candidateSummary.mainConcern}</Text>
               </View>
             </View>
-            {candidateSummary.matchRationale ? (
-              <Text numberOfLines={2} ellipsizeMode="tail" className="text-[11px] leading-4 text-text-muted">
-                <Text className="font-sans-bold text-text-primary">Match rationale: </Text>{candidateSummary.matchRationale}
-              </Text>
-            ) : null}
           </View>
         ) : null}
       </View>
@@ -853,7 +871,7 @@ export default function CandidateDetailScreen() {
       <View className="flex-row gap-4 px-4 overflow-x-auto border-b bg-surface border-border">
         {[
           { id: 'overview', label: 'Overview', icon: <Activity size={14} color={activeTab === 'overview' ? COLORS.primary : COLORS.textMuted} /> },
-          { id: 'processing', label: 'Processing Pipeline', icon: <Layers size={14} color={activeTab === 'processing' ? COLORS.primary : COLORS.textMuted} /> },
+          { id: 'processing', label: 'Processing Details', icon: <Layers size={14} color={activeTab === 'processing' ? COLORS.primary : COLORS.textMuted} /> },
         ].map(tab => (
           <Pressable
             key={tab.id}
@@ -912,7 +930,7 @@ export default function CandidateDetailScreen() {
             <View className="flex-row items-center justify-between pb-2 border-b border-border">
               <View className="flex-row items-center gap-2">
                 <AlertTriangle size={16} color={COLORS.danger} />
-                <Text className="text-sm font-sans-bold text-text-primary">Reprocess Source CV & Purge Cache</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">Reprocess Source CV</Text>
               </View>
               <Pressable
                 onPress={() => setReprocessModalVisible(false)}
@@ -927,12 +945,12 @@ export default function CandidateDetailScreen() {
             </Text>
             <View className="bg-danger/10 p-2.5 rounded-md border border-danger/30">
               <Text className="text-[11px] font-sans text-danger leading-4">
-                ⚠️ This permanently purges cached extraction JSON, LLM reasoning, embeddings, and match score breakdowns, and restarts the complete multi-stage pipeline.
+                This clears the stored analysis for this CV and restarts candidate processing. The current result will be replaced when processing completes.
               </Text>
             </View>
             <View className="flex-row justify-end gap-2 mt-2">
               <Button label="Cancel" variant="ghost" size="sm" onPress={() => setReprocessModalVisible(false)} />
-              <Button label="Purge Cache & Reprocess" variant="destructive" size="sm" onPress={handleConfirmReprocess} />
+              <Button label="Reprocess CV" variant="destructive" size="sm" onPress={handleConfirmReprocess} />
             </View>
           </Card>
         </View>

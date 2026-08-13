@@ -1,6 +1,6 @@
-import { buildCandidateDetailViewModel, buildCandidateFiveSecondSummary, normalizeCandidateMatchAnalysis } from '../utils/candidateDetail';
-import { buildCandidateDecisionEvidence, buildVacancyDecisionEvidence } from '../utils/candidateDecisionEvidence';
-import { getVacancyEnrichmentPresentation } from '../utils/vacancyEnrichment';
+import { buildCandidateDetailViewModel, buildCandidateFiveSecondSummary, humanizeRecruiterText, normalizeCandidateMatchAnalysis } from '../utils/candidateDetail';
+import { buildCandidateDecisionEvidence, buildCandidateSkillsSummaryPresentation, buildVacancyDecisionEvidence } from '../utils/candidateDecisionEvidence';
+import { getVacancyEnrichmentPresentation, RELATED_SKILLS_LABEL, VACANCY_AI_EXPLANATION_LABEL } from '../utils/vacancyEnrichment';
 import type { EnrichedJobEvaluation } from '../types/api';
 
 function assertEquals(actual: unknown, expected: unknown): void {
@@ -25,6 +25,10 @@ const manualReviewOpening = {
   inferred_skills: ['HPLC'],
   calibrated_confidence: 0.72,
   calibration_version: 'calibration-2',
+  scoring_profile_code: 'baseline-identity-1.0.0',
+  rrf_score: 0.8123,
+  stage0_compatible: true,
+  retrieval_path: 'taxonomy_vector_hybrid',
   quality_flags: ['LIMITED_EVIDENCE'],
   retrieval_provenance: { vector_rank: 2 },
   llm_classified_requirements: [{ requirement_id: 'chemistry', description: 'Chemistry education', tier: 'MANDATORY', status: 'SATISFIED' }],
@@ -58,6 +62,12 @@ assertEquals(cardPresentation.evidence[0].evidence, manualReviewOpening.llm_evid
 assertEquals(cardPresentation.evidence[0].label, 'Chemistry education');
 assertEquals(cardPresentation.metadata.includes('Match Confidence 72%'), true);
 assertEquals(cardPresentation.metadata.some((item) => item.includes('Calibration') || item.includes('vector rank')), false);
+assertEquals(VACANCY_AI_EXPLANATION_LABEL, 'AI Match Explanation');
+assertEquals(RELATED_SKILLS_LABEL, 'Related Skills Identified');
+const normalRecruiterPresentation = JSON.stringify(cardPresentation);
+['baseline-identity-1.0.0', 'rrf_score', 'stage0', 'retrieval_path', 'taxonomy_vector_hybrid'].forEach((technicalValue) => {
+  assertEquals(normalRecruiterPresentation.includes(technicalValue), false);
+});
 
 const suitableOpening = { ...manualReviewOpening, vacancy_id: 11, job_id: '11', vacancy_match_status: 'MATCHED', classification: 'HIGH' };
 const normalizedSuitable = normalizeCandidateMatchAnalysis({
@@ -104,6 +114,7 @@ assertEquals([summary.matchedSkillsCount, summary.requiredSkillsCount], [1, 1]);
 assertEquals(summary.domain, 'Production Team');
 assertEquals(summary.matchConfidence, 35);
 assertEquals(summary.mainConcern, "Candidate's documented education does not satisfy vacancy requirement 'SSC'.");
+assertEquals(summary.totalExperience, undefined);
 
 const decisionEvidence = buildCandidateDecisionEvidence(
   { scan_id: 'candidate-1', filename: 'candidate.pdf', parsed_at: '2026-08-13', markdown: '' },
@@ -116,6 +127,124 @@ assertEquals(decisionEvidence.skills.missingRequired, []);
 assertEquals(decisionEvidence.skills.additional, ['SAP', 'Fire Safety']);
 assertEquals(decisionEvidence.education?.status, 'CONFLICT');
 assertEquals(decisionEvidence.education?.requirement, 'Education Mismatch: SSC');
+
+const phaseThreeMatchedSkills = ['React', 'TypeScript', 'REST APIs', 'Git', 'Testing', 'HTML', 'CSS', 'SQL'];
+const phaseThreeMissingSkills = ['Redux', 'AWS'];
+const phaseThreeAnalysis = {
+  professional_domain: 'Software Engineering',
+  recommended_department: 'Product Engineering',
+  best_match: {
+    vacancy_fit_score: 78,
+    vacancy_match_status: 'POTENTIAL_MATCH',
+    skills_score: 80,
+    matched_skills: phaseThreeMatchedSkills,
+    missing_skills: phaseThreeMissingSkills,
+    calibrated_confidence: 0.74,
+    hiring_risks: [{ severity: 'MEDIUM', title: 'Limited leadership evidence' }],
+  },
+};
+const phaseThreeCandidate = {
+  name: 'Dinesh Patil',
+  jobTitle: 'Production Engineer',
+  company: 'ABC Industries',
+  experience: [],
+  education: [],
+  certifications: [],
+  skills: [...phaseThreeMatchedSkills, 'Next.js'],
+  projects: [],
+};
+const phaseThreeData = {
+  scan_id: 'candidate-phase-3',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-13',
+  markdown: '',
+  gross_display: '7.5 Years',
+  dynamic_profile: { relevant_experience_years: 6.5 },
+};
+const phaseThreeSummary = buildCandidateFiveSecondSummary(phaseThreeData, phaseThreeCandidate, phaseThreeAnalysis);
+assertEquals([
+  phaseThreeSummary.name,
+  phaseThreeSummary.role,
+  phaseThreeSummary.company,
+  phaseThreeSummary.totalExperience,
+  phaseThreeSummary.relevantExperience,
+  phaseThreeSummary.overallFit,
+  phaseThreeSummary.skillsFit,
+  phaseThreeSummary.domain,
+  phaseThreeSummary.recommendation,
+  phaseThreeSummary.mainConcern,
+], ['Dinesh Patil', 'Production Engineer', 'ABC Industries', '7.5 Years', '6.5 Years', 78, 80, 'Software Engineering', 'POTENTIAL MATCH', 'Limited leadership evidence']);
+
+const phaseThreeEvidence = buildCandidateDecisionEvidence(phaseThreeData, phaseThreeCandidate, phaseThreeAnalysis);
+const phaseThreeSkills = buildCandidateSkillsSummaryPresentation(phaseThreeEvidence.skills);
+assertEquals(phaseThreeSkills, { scoreLabel: '80% Skills Match', matchedLabel: '8 Matched', missingLabel: '2 Missing' });
+
+const missingDataCandidate = { name: 'Candidate Profile', experience: [], education: [], certifications: [], skills: [], projects: [] };
+const missingDataSummary = buildCandidateFiveSecondSummary(
+  { scan_id: 'candidate-missing', filename: 'candidate.pdf', parsed_at: '2026-08-13', markdown: '', gross_display: '0 years 0 months' },
+  missingDataCandidate,
+  {},
+);
+assertEquals([
+  missingDataSummary.totalExperience,
+  missingDataSummary.relevantExperience,
+  missingDataSummary.overallFit,
+  missingDataSummary.skillsFit,
+  missingDataSummary.requiredSkillsCount,
+  missingDataSummary.domain,
+], [undefined, undefined, undefined, undefined, undefined, undefined]);
+assertEquals(missingDataSummary.recommendation, 'MANUAL REVIEW');
+assertEquals(missingDataSummary.mainConcern, 'Match analysis is not available for this candidate.');
+const missingDataEvidence = buildCandidateDecisionEvidence(
+  { scan_id: 'candidate-missing', filename: 'candidate.pdf', parsed_at: '2026-08-13', markdown: '', gross_display: '0 years 0 months' },
+  missingDataCandidate,
+  {},
+);
+assertEquals(missingDataEvidence.skills, { score: undefined, matched: [], missingRequired: [], additional: [] });
+assertEquals(missingDataEvidence.education, undefined);
+assertEquals(missingDataEvidence.strengths, []);
+assertEquals(buildCandidateSkillsSummaryPresentation(missingDataEvidence.skills), {});
+
+assertEquals(humanizeRecruiterText('mandatory_failure'), 'Mandatory Requirement Gap');
+assertEquals(humanizeRecruiterText('domain_alignment'), 'Domain Match');
+assertEquals(humanizeRecruiterText('cross_domain_guard'), 'Role/Domain Conflict');
+assertEquals(humanizeRecruiterText('experience_gap'), 'Experience Gap');
+assertEquals(humanizeRecruiterText('education_conflict'), 'Education Concern');
+
+const semanticPotentialOpening = {
+  ...manualReviewOpening,
+  vacancy_id: 12,
+  job_id: '12',
+  llm_reason: undefined,
+  semantic_reason: 'Potential fit retained for manual review.',
+  vacancy_match_status: 'POTENTIAL_MATCH',
+};
+const normalizedSemanticPotential = normalizeCandidateMatchAnalysis({
+  match_status: 'POTENTIAL_MATCH',
+  best_match: semanticPotentialOpening,
+  suitable_openings: [],
+  unsuitable_openings: [semanticPotentialOpening],
+});
+const semanticPotential = (normalizedSemanticPotential?.unsuitable_openings as typeof semanticPotentialOpening[])[0];
+assertSame(semanticPotential, semanticPotentialOpening);
+assertEquals(getVacancyEnrichmentPresentation(semanticPotential as Partial<EnrichedJobEvaluation>).reasoning, 'Potential fit retained for manual review.');
+
+const explicitManualReviewOpening = {
+  ...manualReviewOpening,
+  vacancy_id: 13,
+  job_id: '13',
+  vacancy_match_status: 'MANUAL_REVIEW',
+  llm_reason: 'AI explanation retained for explicit manual review.',
+};
+const normalizedExplicitManualReview = normalizeCandidateMatchAnalysis({
+  match_status: 'MANUAL_REVIEW',
+  best_match: explicitManualReviewOpening,
+  suitable_openings: [],
+  unsuitable_openings: [explicitManualReviewOpening],
+});
+const explicitManualReview = (normalizedExplicitManualReview?.unsuitable_openings as typeof explicitManualReviewOpening[])[0];
+assertSame(explicitManualReview, explicitManualReviewOpening);
+assertEquals(getVacancyEnrichmentPresentation(explicitManualReview as Partial<EnrichedJobEvaluation>).reasoning, 'AI explanation retained for explicit manual review.');
 
 const vacancyEvidence = buildVacancyDecisionEvidence({
   vacancy_fit_score: 78,

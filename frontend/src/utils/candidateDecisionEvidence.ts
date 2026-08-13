@@ -1,6 +1,6 @@
 import type { CandidateRecommendationsResponse, CVUploadResponse, JobMatchScore } from '@/types/api';
 import type { CandidateDetailViewModel } from '@/utils/candidateDetail';
-import { cleanCandidateText, cleanRecommendationText, resolveVacancyFitScore } from '@/utils/candidateDetail';
+import { cleanCandidateText, humanizeRecruiterText, resolveVacancyFitScore } from '@/utils/candidateDetail';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -23,6 +23,12 @@ export interface CandidateDecisionEvidence {
   education?: EducationDecisionEvidence;
   strengths: string[];
   concerns: string[];
+}
+
+export interface CandidateSkillsSummaryPresentation {
+  scoreLabel?: string;
+  matchedLabel?: string;
+  missingLabel?: string;
 }
 
 export interface VacancyDecisionEvidence {
@@ -54,6 +60,17 @@ const uniqueText = (values: unknown[]): string[] => {
   });
 };
 
+const uniqueRecruiterText = (values: unknown[]): string[] => {
+  const seen = new Set<string>();
+  return values.map(humanizeRecruiterText).filter((value): value is string => {
+    if (!value) return false;
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const getRequirements = (match: UnknownRecord): UnknownRecord[] => ['mandatory_requirements', 'preferred_requirements', 'optional_requirements'].flatMap((key) => {
   const requirements = match[key];
   return Array.isArray(requirements) ? requirements.filter(isRecord) : [];
@@ -61,7 +78,7 @@ const getRequirements = (match: UnknownRecord): UnknownRecord[] => ['mandatory_r
 
 const getRequirementEvidence = (requirement: UnknownRecord, key: 'cv_evidence' | 'vacancy_evidence'): string | undefined => {
   const evidence = requirement.evidence;
-  return isRecord(evidence) ? cleanRecommendationText(evidence[key]) : undefined;
+  return isRecord(evidence) ? humanizeRecruiterText(evidence[key]) : undefined;
 };
 
 const findEducationEvidence = (match: UnknownRecord): EducationDecisionEvidence | undefined => {
@@ -76,9 +93,9 @@ const findEducationEvidence = (match: UnknownRecord): EducationDecisionEvidence 
   const decisionStatus = status === 'SATISFIED' ? 'MATCHED' : status === 'FAILED' || status === 'PARTIALLY_SATISFIED' ? 'CONFLICT' : 'REVIEW';
   return {
     status: decisionStatus,
-    requirement: getRequirementEvidence(educationRequirement, 'vacancy_evidence') || cleanRecommendationText(educationRequirement.description),
+    requirement: getRequirementEvidence(educationRequirement, 'vacancy_evidence') || humanizeRecruiterText(educationRequirement.description),
     candidateEvidence: getRequirementEvidence(educationRequirement, 'cv_evidence'),
-    explanation: cleanRecommendationText(educationRequirement.failure_reason),
+    explanation: humanizeRecruiterText(educationRequirement.failure_reason),
   };
 };
 
@@ -101,19 +118,26 @@ const buildConcerns = (data: CVUploadResponse, match: UnknownRecord, recommendat
   const hiringRisks = (Array.isArray(match.hiring_risks) ? match.hiring_risks.filter(isRecord) : [])
     .sort((left, right) => (severityRank[cleanCandidateText(right.severity)?.toUpperCase() || 'UNKNOWN'] || 0) - (severityRank[cleanCandidateText(left.severity)?.toUpperCase() || 'UNKNOWN'] || 0));
   const gapAnalysis = isRecord(data.experience_gap_analysis) ? data.experience_gap_analysis : {};
-  const missingSkills = uniqueText(Array.isArray(match.missing_skills) ? match.missing_skills : []);
   const values = [
-    ...mandatoryFailures.map((failure) => cleanRecommendationText(failure.reason) || cleanRecommendationText(failure.description)),
+    ...mandatoryFailures.map((failure) => humanizeRecruiterText(failure.reason) || humanizeRecruiterText(failure.description)),
     ...getRequirements(match)
       .filter((requirement) => ['FAILED', 'PARTIALLY_SATISFIED'].includes(cleanCandidateText(requirement.status)?.toUpperCase() || ''))
-      .map((requirement) => cleanRecommendationText(requirement.failure_reason) || cleanRecommendationText(requirement.description)),
-    ...hiringRisks.map((risk) => cleanRecommendationText(risk.title) || cleanRecommendationText(risk.explanation)),
-    ...(recommendations?.missing_qualifications || []).map((qualification) => cleanRecommendationText(qualification.requirement) || cleanRecommendationText(qualification.impact)),
-    ...(recommendations?.risk_flags || []).map(cleanRecommendationText),
-    ...(Array.isArray(gapAnalysis.hr_review_indicators) ? gapAnalysis.hr_review_indicators.map(cleanRecommendationText) : []),
-    missingSkills.length ? `Missing required skills: ${missingSkills.slice(0, 3).join(', ')}.` : undefined,
+      .map((requirement) => humanizeRecruiterText(requirement.failure_reason) || humanizeRecruiterText(requirement.description)),
+    ...hiringRisks.map((risk) => humanizeRecruiterText(risk.title) || humanizeRecruiterText(risk.explanation)),
+    ...(recommendations?.missing_qualifications || []).map((qualification) => humanizeRecruiterText(qualification.requirement) || humanizeRecruiterText(qualification.impact)),
+    ...(recommendations?.risk_flags || []).map(humanizeRecruiterText),
+    ...(Array.isArray(gapAnalysis.hr_review_indicators) ? gapAnalysis.hr_review_indicators.map(humanizeRecruiterText) : []),
   ];
-  return uniqueText(values).slice(0, 4);
+  return uniqueRecruiterText(values).slice(0, 4);
+};
+
+export const buildCandidateSkillsSummaryPresentation = (skills: CandidateSkillsEvidence): CandidateSkillsSummaryPresentation => {
+  const requiredCount = skills.matched.length + skills.missingRequired.length;
+  return {
+    scoreLabel: skills.score != null ? `${Math.round(skills.score)}% Skills Match` : undefined,
+    matchedLabel: requiredCount > 0 ? `${skills.matched.length} Matched` : undefined,
+    missingLabel: requiredCount > 0 ? `${skills.missingRequired.length} Missing` : undefined,
+  };
 };
 
 export const buildCandidateDecisionEvidence = (
@@ -127,13 +151,11 @@ export const buildCandidateDecisionEvidence = (
   const scoreBreakdown = isRecord(match.score_breakdown) ? match.score_breakdown : {};
   const matched = getMatchSkills(match, 'matched');
   const missingRequired = getMatchSkills(match, 'missing');
-  const matchedCriteria = uniqueText(Array.isArray(match.matched_criteria) ? match.matched_criteria : []);
+  const matchedCriteria = uniqueRecruiterText(Array.isArray(match.matched_criteria) ? match.matched_criteria : []);
   const comparedSkills = new Set([...matched, ...missingRequired].map((skill) => skill.toLocaleLowerCase()));
   const additional = uniqueText(candidate.skills).filter((skill) => !comparedSkills.has(skill.toLocaleLowerCase()));
   const factualStrengths = [
-    matched.length ? `Matches required skills: ${matched.slice(0, 4).join(', ')}.` : undefined,
     candidate.certifications.length ? `Recorded certifications: ${candidate.certifications.slice(0, 3).join(', ')}.` : undefined,
-    cleanCandidateText(data.gross_display) ? `${cleanCandidateText(data.gross_display)} total experience documented.` : undefined,
     matchedCriteria.length ? `Other matched evidence: ${matchedCriteria.slice(0, 3).join(', ')}.` : undefined,
   ];
   const strengths = uniqueText(factualStrengths).slice(0, 4);
@@ -157,14 +179,14 @@ export const buildVacancyDecisionEvidence = (rawMatch: JobMatchScore | UnknownRe
   const mandatoryFailures = Array.isArray(match.mandatory_failures) ? match.mandatory_failures.filter(isRecord) : [];
   const missingSkills = uniqueText(Array.isArray(match.missing_skills) ? match.missing_skills : []);
   const matchedSkills = uniqueText(Array.isArray(match.matched_skills) ? match.matched_skills : []);
-  const missingCriteria = uniqueText(Array.isArray(match.missing_criteria) ? match.missing_criteria : []);
-  const matchedCriteria = uniqueText(Array.isArray(match.matched_criteria) ? match.matched_criteria : []);
+  const missingCriteria = uniqueRecruiterText(Array.isArray(match.missing_criteria) ? match.missing_criteria : []);
+  const matchedCriteria = uniqueRecruiterText(Array.isArray(match.matched_criteria) ? match.matched_criteria : []);
   const failedRequirement = getRequirements(match).find((requirement) => ['FAILED', 'PARTIALLY_SATISFIED'].includes(cleanCandidateText(requirement.status)?.toUpperCase() || ''));
   const mainGap = mandatoryFailures
-    .map((failure) => cleanRecommendationText(failure.reason) || cleanRecommendationText(failure.description))
+    .map((failure) => humanizeRecruiterText(failure.reason) || humanizeRecruiterText(failure.description))
     .find(Boolean)
-    || (failedRequirement ? cleanRecommendationText(failedRequirement.failure_reason) || cleanRecommendationText(failedRequirement.description) : undefined)
-    || cleanRecommendationText(match.domain_mismatch_reason)
+    || (failedRequirement ? humanizeRecruiterText(failedRequirement.failure_reason) || humanizeRecruiterText(failedRequirement.description) : undefined)
+    || humanizeRecruiterText(match.domain_mismatch_reason)
     || (missingSkills.length ? `Missing required skills: ${missingSkills.slice(0, 3).join(', ')}.` : undefined)
     || missingCriteria[0];
   const whyItFits = matchedCriteria.length

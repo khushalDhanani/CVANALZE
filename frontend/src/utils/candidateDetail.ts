@@ -59,7 +59,6 @@ export interface CandidateFiveSecondSummary {
   matchConfidence?: number;
   recommendation: CandidateSummaryRecommendation;
   mainConcern: string;
-  matchRationale?: string;
 }
 
 const isRecord = (value: unknown): value is UnknownRecord => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -125,8 +124,19 @@ const normalizeRecommendation = (rawStatus: unknown, requiresReview: boolean): C
   if (status && ['MATCHED', 'HIGH', 'STRONG', 'STRONG MATCH', 'HIGHLY RECOMMENDED', 'HIRE', 'DB MATCH'].includes(status)) return 'STRONG MATCH';
   if (status && ['POTENTIAL MATCH', 'PARTIAL MATCH', 'MEDIUM', 'POTENTIAL FIT', 'RECOMMENDED', 'CONSIDER'].includes(status)) return 'POTENTIAL MATCH';
   if (status && ['MANUAL REVIEW', 'NEEDS FURTHER REVIEW', 'HR REVIEW REQUIRED'].includes(status)) return 'MANUAL REVIEW';
-  if (!status && requiresReview) return 'MANUAL REVIEW';
+  if (!status || requiresReview) return 'MANUAL REVIEW';
   return 'NO STRONG MATCH';
+};
+
+const resolveTotalExperience = (data: CVUploadResponse): string | undefined => {
+  const experienceSummary = isRecord(data.experience_summary) ? data.experience_summary : {};
+  const experienceState = cleanCandidateText(data.experience_state ?? experienceSummary.experience_state)?.toUpperCase();
+  const grossDisplay = cleanCandidateText(data.gross_display);
+  const numericYears = asFiniteNumber(data.total_experience_years ?? data.experience_years);
+  const hasConfirmedZero = experienceState === 'ZERO_CONFIRMED';
+  const grossIsZero = Boolean(grossDisplay && /^0(?:\.0+)?\s+years?(?:\s+0\s+months?)?$/i.test(grossDisplay));
+  if ((grossIsZero || numericYears === 0) && !hasConfirmedZero) return undefined;
+  return grossDisplay || formatYears(numericYears);
 };
 
 const collectRequirementSkills = (match: UnknownRecord, status: 'matched' | 'missing'): string[] => {
@@ -159,7 +169,7 @@ const findFailedRequirementConcern = (match: UnknownRecord): string | undefined 
     const requirements = Array.isArray(match[key]) ? match[key] : [];
     const failed = requirements.filter(isRecord).find((requirement) => ['FAILED', 'PARTIALLY_SATISFIED'].includes(cleanCandidateText(requirement.status)?.toUpperCase() || ''));
     if (!failed) continue;
-    return cleanRecommendationText(failed.failure_reason) || cleanRecommendationText(failed.description);
+    return humanizeRecruiterText(failed.failure_reason) || humanizeRecruiterText(failed.description);
   }
   return undefined;
 };
@@ -167,7 +177,7 @@ const findFailedRequirementConcern = (match: UnknownRecord): string | undefined 
 const findMainConcern = (data: CVUploadResponse, analysis: UnknownRecord, match: UnknownRecord, recommendations?: CandidateRecommendationsResponse | null): string => {
   const mandatoryFailures = Array.isArray(match.mandatory_failures) ? match.mandatory_failures.filter(isRecord) : [];
   const mandatoryConcern = mandatoryFailures
-    .map((failure) => cleanRecommendationText(failure.reason) || cleanRecommendationText(failure.description))
+    .map((failure) => humanizeRecruiterText(failure.reason) || humanizeRecruiterText(failure.description))
     .find(Boolean);
   if (mandatoryConcern) return mandatoryConcern;
 
@@ -179,22 +189,22 @@ const findMainConcern = (data: CVUploadResponse, analysis: UnknownRecord, match:
     .sort((left, right) => (severityRank[cleanCandidateText(right.severity)?.toUpperCase() || 'UNKNOWN'] || 0) - (severityRank[cleanCandidateText(left.severity)?.toUpperCase() || 'UNKNOWN'] || 0));
   const topRisk = hiringRisks[0];
   if (topRisk) {
-    const riskConcern = cleanRecommendationText(topRisk.explanation) || cleanRecommendationText(topRisk.title);
+    const riskConcern = humanizeRecruiterText(topRisk.explanation) || humanizeRecruiterText(topRisk.title);
     if (riskConcern) return riskConcern;
   }
 
   const missingQualification = recommendations?.missing_qualifications?.[0];
-  if (missingQualification) return cleanRecommendationText(missingQualification.requirement) || cleanRecommendationText(missingQualification.impact) || 'A qualification requires recruiter review.';
+  if (missingQualification) return humanizeRecruiterText(missingQualification.requirement) || humanizeRecruiterText(missingQualification.impact) || 'A qualification requires recruiter review.';
 
-  const recommendationRisk = recommendations?.risk_flags?.map(cleanRecommendationText).find(Boolean);
+  const recommendationRisk = recommendations?.risk_flags?.map(humanizeRecruiterText).find(Boolean);
   if (recommendationRisk) return recommendationRisk;
 
-  const domainConcern = cleanRecommendationText(match.domain_mismatch_reason);
+  const domainConcern = humanizeRecruiterText(match.domain_mismatch_reason);
   if (domainConcern) return domainConcern;
 
   const gapAnalysis = isRecord(data.experience_gap_analysis) ? data.experience_gap_analysis : isRecord(analysis.experience_gap_analysis) ? analysis.experience_gap_analysis : {};
   const gapIndicators = Array.isArray(gapAnalysis.hr_review_indicators) ? gapAnalysis.hr_review_indicators : [];
-  const gapConcern = gapIndicators.map(cleanRecommendationText).find(Boolean);
+  const gapConcern = gapIndicators.map(humanizeRecruiterText).find(Boolean);
   if (gapConcern) return gapConcern;
 
   const missingSkills = uniqueText(Array.isArray(match.missing_skills) ? match.missing_skills : []);
@@ -222,7 +232,7 @@ export const buildCandidateFiveSecondSummary = (
   const matchedSkills = uniqueText([...(Array.isArray(match.matched_skills) ? match.matched_skills : []), ...collectRequirementSkills(match, 'matched')]);
   const missingSkills = uniqueText([...(Array.isArray(match.missing_skills) ? match.missing_skills : []), ...collectRequirementSkills(match, 'missing')]);
   const requiredSkills = uniqueText([...matchedSkills, ...missingSkills]);
-  const totalExperience = cleanCandidateText(data.gross_display) || formatYears(data.total_experience_years ?? data.experience_years);
+  const totalExperience = resolveTotalExperience(data);
   const relevantExperience = formatYears(dynamicProfile.relevant_experience_years);
   const requiresReview = Boolean(match.hr_review_required) || (Array.isArray(match.mandatory_failures) && match.mandatory_failures.length > 0);
   const rawRecommendation = recommendations?.hiring_recommendation || match.vacancy_match_status || match.match_status || analysis.match_status;
@@ -242,7 +252,6 @@ export const buildCandidateFiveSecondSummary = (
     matchConfidence: asPercent(match.calibrated_confidence ?? match.confidence),
     recommendation: normalizeRecommendation(rawRecommendation, requiresReview),
     mainConcern: findMainConcern(data, analysis, match, recommendations),
-    matchRationale: cleanRecommendationText(match.reason),
   };
 };
 
@@ -275,6 +284,23 @@ export const cleanRecommendationText = (value: unknown): string | undefined => {
     .replace(/[\s,;]+$/g, '')
     .trim();
   return displayText || undefined;
+};
+
+const RECRUITER_TERM_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bcalibrated[_\s-]?confidence\b/gi, 'Match Confidence'],
+  [/\bmandatory[_\s-]?failure\b/gi, 'Mandatory Requirement Gap'],
+  [/\bdomain[_\s-]?alignment\b/gi, 'Domain Match'],
+  [/\bcross[_\s-]?domain[_\s-]?guard\b/gi, 'Role/Domain Conflict'],
+  [/\bsemantic[_\s-]?reason\b/gi, 'AI Match Explanation'],
+  [/\bexperience[_\s-]?gap\b/gi, 'Experience Gap'],
+  [/\beducation[_\s-]?conflict\b/gi, 'Education Concern'],
+  [/\binferred[_\s-]?skills\b/gi, 'Related Skills Identified'],
+];
+
+export const humanizeRecruiterText = (value: unknown): string | undefined => {
+  const cleaned = cleanRecommendationText(value);
+  if (!cleaned) return undefined;
+  return RECRUITER_TERM_REPLACEMENTS.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), cleaned);
 };
 
 const firstCandidateText = (...values: unknown[]): string | undefined => {
