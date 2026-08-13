@@ -1,4 +1,5 @@
-import { buildCandidateFiveSecondSummary, normalizeCandidateMatchAnalysis } from '../utils/candidateDetail';
+import { buildCandidateDetailViewModel, buildCandidateFiveSecondSummary, normalizeCandidateMatchAnalysis } from '../utils/candidateDetail';
+import { buildCandidateDecisionEvidence, buildVacancyDecisionEvidence } from '../utils/candidateDecisionEvidence';
 import { getVacancyEnrichmentPresentation } from '../utils/vacancyEnrichment';
 import type { EnrichedJobEvaluation } from '../types/api';
 
@@ -103,3 +104,40 @@ assertEquals([summary.matchedSkillsCount, summary.requiredSkillsCount], [1, 1]);
 assertEquals(summary.domain, 'Production Team');
 assertEquals(summary.matchConfidence, 35);
 assertEquals(summary.mainConcern, "Candidate's documented education does not satisfy vacancy requirement 'SSC'.");
+
+const decisionEvidence = buildCandidateDecisionEvidence(
+  { scan_id: 'candidate-1', filename: 'candidate.pdf', parsed_at: '2026-08-13', markdown: '' },
+  { name: 'Divyesh Patel', experience: [], education: [], certifications: [], skills: ['Maintenance Work', 'SAP', 'Fire Safety'], projects: [] },
+  summaryAnalysis,
+);
+assertEquals(decisionEvidence.skills.score, 100);
+assertEquals(decisionEvidence.skills.matched, ['Maintenance Work']);
+assertEquals(decisionEvidence.skills.missingRequired, []);
+assertEquals(decisionEvidence.skills.additional, ['SAP', 'Fire Safety']);
+assertEquals(decisionEvidence.education?.status, 'CONFLICT');
+assertEquals(decisionEvidence.education?.requirement, 'Education Mismatch: SSC');
+
+const vacancyEvidence = buildVacancyDecisionEvidence({
+  vacancy_fit_score: 78,
+  skills_score: 82,
+  experience_score: 75,
+  education_score: 100,
+  matched_criteria: ['Organic chemistry', 'Laboratory safety'],
+  missing_skills: ['Industrial HPLC'],
+});
+assertEquals([vacancyEvidence.overallFit, vacancyEvidence.skillsFit, vacancyEvidence.experienceFit, vacancyEvidence.educationFit], [78, 82, 75, 100]);
+assertEquals(vacancyEvidence.whyItFits, 'Matched evidence: Organic chemistry, Laboratory safety.');
+assertEquals(vacancyEvidence.mainGap, 'Missing required skills: Industrial HPLC.');
+
+const multiDegreeView = buildCandidateDetailViewModel({
+  scan_id: 'candidate-education',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-13',
+  markdown: '',
+  education: [
+    { degree: 'M.Sc. Organic Chemistry', institution: 'Example University', start_date: '2025', is_current: true },
+    { degree: 'B.Sc. Chemistry', institution: 'Example University', start_date: '2020', end_date: '2023' },
+  ],
+});
+assertEquals(multiDegreeView.education.length, 2);
+assertEquals(multiDegreeView.education.map((item) => item.dates), ['2025 – Present', '2020 – 2023']);

@@ -1,6 +1,26 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Candidate Detail Recruiter-Label UI Error Fix**:
+    - Traced the running Expo error to the raw `suitable_job_roles` badge map in `candidates/[id].tsx`, where runtime API values were trusted as strings and used directly as React keys and text labels.
+    - Added page-level normalization for suggested roles, interview focus areas, and talent pools so primitive and supported legacy object-shaped values become clean strings, blank/invalid entries are omitted, and duplicate labels are removed before rendering.
+    - Replaced the unsafe raw array maps with the normalized display lists without changing the API contract, candidate scoring, recommendation logic, Ollama integration, or the Phase 1/2 information hierarchy.
+    - Files changed: `frontend/src/app/candidates/[id].tsx`, `workstatus.md`.
+    - Verification: `git diff --check` passed; the already-running Expo instance hot-rebundled successfully and emitted no recurrence of the logged candidate-page error after the change. Per repository instructions, no build, test, server start, or service restart was run.
+    - Pending work: none for the reported UI error; focused type-check/test execution remains available when explicitly authorized.
+    - Important decision: normalize only at the presentation boundary to preserve backward compatibility with persisted legacy analysis data and avoid inventing candidate information.
+1. **2026-08-13 Phase 2 Hiring-Decision Evidence Hierarchy**:
+    - Reorganized the candidate overview into the requested sequence: Candidate Summary, Skills Match, Experience, Education, Strengths & Risks, Vacancy Analysis, AI Match Explanation, and Secondary Information.
+    - Added a dedicated decision-evidence view model that consumes the backend's canonical vacancy and component scores without recalculating fit, and separates matched skills, missing required skills, and additional CV-extracted candidate skills.
+    - Restored factual employment history ahead of interpretation, retained company/designation/date/responsibility evidence, formatted durations as years/months, and moved overlap/gap review indicators after the factual timeline.
+    - Preserved distinct degrees from the same institution, added explicit start/end or ongoing date rendering, and shows Education Match or Education Conflict only when supported by structured candidate/vacancy requirement evidence.
+    - Limited initial strengths and concerns to four decision-oriented items, prioritizing matched requirements, CV certifications, documented experience, mandatory failures, failed requirements, severity-ranked hiring risks, qualification gaps, experience issues, and required-skill gaps.
+    - Rebuilt every vacancy card around recruiter evidence: canonical overall status/score, Skills/Experience/Education scores, deterministic matched evidence, the main supported gap, and the existing HR Review action.
+    - Moved all Ollama reasoning out of vacancy evidence and the header into a separately labeled `AI Match Explanation` section with an explicit warning that AI interpretation is not confirmed CV evidence; raw reasoning/property names and retrieval metadata remain hidden.
+    - Retained contact details, projects, interview focus, suggested roles, talent pools, similar candidates, extracted CV text, and processing provenance as secondary or Processing Pipeline information.
+    - Files changed: `frontend/src/app/candidates/[id].tsx`, `frontend/src/utils/candidateDecisionEvidence.ts`, `frontend/src/utils/candidateDetail.ts`, `frontend/src/components/ui/ExperienceTimelineCard.tsx`, `frontend/src/components/ui/VacancyEnrichmentPanel.tsx`, `frontend/src/__tests__/candidateDetailEnrichment.test.ts`, `workstatus.md`.
+    - Pending work: run the focused frontend contract test, TypeScript check, and responsive visual inspection when execution is explicitly authorized and a frontend service is available.
+    - Important decision: extracted CV fields and deterministic backend requirement evaluations remain the factual source; Ollama explanations and inferred skills are presented only as clearly qualified interpretation.
 1. **2026-08-13 Phase 1 Recruiter 5-Second Candidate Summary**:
     - Audited the running Compose stack and current build state before implementation: API, worker, auxiliary worker, and scheduler images were built nine minutes before the audit; PostgreSQL, Redis, and the primary worker were healthy; the API responded but remained unhealthy because Ollama was offline; no standalone frontend build output or frontend Compose service was present.
     - Audited the live candidate detail/recommendation payload and the complete frontend/backend field path for identity, latest role/company, total and relevant experience, domain/department/family, fit, confidence, recommendation, skills, education conflicts, hiring risks, experience gaps, and Ollama reasoning.

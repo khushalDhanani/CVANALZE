@@ -242,7 +242,7 @@ export const buildCandidateFiveSecondSummary = (
     matchConfidence: asPercent(match.calibrated_confidence ?? match.confidence),
     recommendation: normalizeRecommendation(rawRecommendation, requiresReview),
     mainConcern: findMainConcern(data, analysis, match, recommendations),
-    matchRationale: cleanRecommendationText(match.llm_reason) || cleanRecommendationText(match.semantic_reason) || cleanRecommendationText(match.reason),
+    matchRationale: cleanRecommendationText(match.reason),
   };
 };
 
@@ -315,6 +315,12 @@ export const responseMatchesCandidateId = (data: CVUploadResponse, requestedId: 
   return identifiers.includes(requested);
 };
 
+const formatCandidateDateRange = (value: UnknownRecord): string | undefined => {
+  const start = firstCandidateText(value.start_date, value.start, value.from);
+  const end = Boolean(value.is_current) ? 'Present' : firstCandidateText(value.end_date, value.end, value.to);
+  return start || end ? [start, end].filter(Boolean).join(' – ') : undefined;
+};
+
 const mapExperience = (value: unknown): CandidateExperienceView | undefined => {
   if (!isRecord(value)) {
     const description = cleanCandidateText(value);
@@ -329,7 +335,7 @@ const mapExperience = (value: unknown): CandidateExperienceView | undefined => {
   const item: CandidateExperienceView = {
     title: firstCandidateText(value.job_title, value.role, value.position, value.title),
     company: firstCandidateText(value.company, value.company_name, value.employer),
-    dates: firstCandidateText(isRecord(value.interval) ? value.interval.raw_value : undefined, value.dates, value.duration),
+    dates: firstCandidateText(isRecord(value.interval) ? value.interval.raw_value : undefined, value.dates, formatCandidateDateRange(value), value.duration),
     responsibilities,
   };
   return item.title || item.company || item.dates || item.responsibilities.length ? item : undefined;
@@ -371,7 +377,7 @@ const mapEducation = (value: unknown): CandidateEducationView | undefined => {
   const item: CandidateEducationView = {
     degree: firstCandidateText(value.degree, value.qualification),
     institution: firstCandidateText(value.institution, value.university, value.school),
-    dates: firstCandidateText(value.passing_year, value.dates, value.year, isRecord(value.interval) ? value.interval.raw_value : undefined),
+    dates: firstCandidateText(isRecord(value.interval) ? value.interval.raw_value : undefined, value.dates, formatCandidateDateRange(value), value.passing_year, value.year),
     grade: firstCandidateText(value.grade, value.score, value.gpa),
     details: firstCandidateText(value.details, value.description),
   };
@@ -389,7 +395,9 @@ const mergeEducationSources = (...sources: unknown[]): CandidateEducationView[] 
         const sameDegree = item.degree && candidate.degree?.toLocaleLowerCase() === item.degree.toLocaleLowerCase();
         const sameInstitution = item.institution && candidate.institution?.toLocaleLowerCase() === item.institution.toLocaleLowerCase();
         const sameDetails = item.details && candidate.details?.toLocaleLowerCase() === item.details.toLocaleLowerCase();
-        return Boolean(sameDegree || sameInstitution || sameDetails);
+        const compatibleInstitution = sameInstitution || !item.institution || !candidate.institution;
+        const compatibleDegree = sameDegree || !item.degree || !candidate.degree;
+        return Boolean((sameDegree && compatibleInstitution) || (sameInstitution && compatibleDegree) || sameDetails);
       });
       if (!existing) {
         merged.push(item);
