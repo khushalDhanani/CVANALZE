@@ -1,6 +1,17 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Compact Candidate CV Intelligence Dashboard**:
+    - Refactored the candidate detail route into the requested Candidate Summary → Tabs → Compact Sections flow, with a five-second summary for name/latest role, overall match, recommendation, experience, skills match, domain, top strength, and main concern.
+    - Replaced the long overview/processing stack with seven always-visible horizontal tabs: Overview, Skills, Experience, Education, Matches, Risks, and CV. The tab bar remains outside the content scroller so it stays available while the selected section scrolls.
+    - Added progressive disclosure for skills, employment history, education/certifications, vacancy matches, strengths/risks, AI reasoning, projects/interview focus/suggested roles/talent pools/similar candidates, and extracted CV text; no CV data source or recruiter action was removed.
+    - Added responsive two-column recruiter sections on desktop for the overview, education, risks, and CV details, plus responsive vacancy-card grids, while retaining compact single-column mobile presentation and 44px interaction targets.
+    - Moved filename, extraction method, page/status data, processing provenance, version fields, calibration profile, RRF score, stage flags, retrieval path/provenance, and taxonomy path into a collapsed Technical Details panel under the CV tab.
+    - Added `frontend/src/__tests__/candidateDashboard.test.mjs` to protect the summary fields, seven-tab navigation, expansion controls, desktop layout, collapsed technical metadata, and removal of Processing as a primary recruiter tab.
+    - Files changed: `frontend/src/app/candidates/[id].tsx`, `frontend/src/__tests__/candidateDashboard.test.mjs`, and `workstatus.md`.
+    - Verification: candidate dashboard contracts passed; compact-density contracts passed; canonical match-status tests passed (16/16); canonical rendering tests passed (5/5); app-source TypeScript passed; Expo web production export completed with all 15 static routes; targeted `git diff --check` passed.
+    - Pending work: repository-wide TypeScript still reports the two existing test-fixture cast errors in `candidateReanalysisFlow.test.ts` and `hiringRiskConfig.test.ts`; the existing `candidateDetailGeneric.test.mjs` still fails its backend MATCHED-selection assertion. The repository has no local ESLint executable/config compatible with the temporary ESLint 9 runner, so a clean targeted lint result was unavailable.
+    - Important decision: API calls, payloads, candidate normalization, backend scoring, matching, extraction, Ollama integration, re-analysis behavior, and HR review behavior remain unchanged; compactness is implemented only through presentation, responsive composition, tab routing, and local disclosure state.
 1. **2026-08-13 Complete Compact Recruiter Frontend Upgrade**:
     - Standardized the Expo SDK 57 / NativeWind frontend around compact density conventions: 12px cards, 8px component gaps, 12px related-section rhythm, 16px major-section rhythm, 18–20px page titles, and responsive controls that retain 44px mobile interaction areas while rendering at 36–40px on wider screens.
     - Extended and adopted the shared `PageHeader` across every non-dashboard route; added leading and metadata composition without changing existing callers, routing, APIs, state, or business logic. The dashboard intentionally retains its compact branded health hero.
