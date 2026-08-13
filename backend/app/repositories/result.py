@@ -1,4 +1,5 @@
 from __future__ import annotations
+import copy
 import json
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,12 @@ class ResultRepository:
             "experience_version": str(data.get("experience_version") or ""),
             "taxonomy_version": str(data.get("taxonomy_version") or ""),
             "matching_version": str(data.get("matching_version") or ""),
+            "rule_config_version": str(data.get("rule_config_version") or ""),
+            "hiring_risk_policy_version": str(data.get("hiring_risk_policy_version") or ""),
+            "hiring_risk_prompt_version": str(data.get("hiring_risk_prompt_version") or ""),
+            "hiring_risk_prompt_identity": str(data.get("hiring_risk_prompt_identity") or ""),
+            "optimized_prompt_version": str(data.get("optimized_prompt_version") or ""),
+            "llm_model_version": str(data.get("llm_model_version") or ""),
             "parser_version": str(data.get("parser_version") or ""),
             "full_name": str(data.get("full_name") or data.get("candidate_name") or ""),
             "email": str(data.get("email") or ""),
@@ -76,6 +83,50 @@ class ResultRepository:
             default=str,
         )
         return hashlib.sha256(normalized_json.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def enforce_hiring_risk_freshness(cls, data: dict[str, Any]) -> dict[str, Any]:
+        match_analysis = data.get("match_analysis")
+        if not isinstance(match_analysis, dict):
+            return data
+
+        from app.core.config import settings
+        from app.core.rule_config_manager import RuleConfigManager
+        from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
+        from app.services.prompt_service import PromptService
+
+        try:
+            config = RuleConfigManager.get_config()
+            current_policy_version = HiringRiskAnalyzer.get_policy_version(config)
+            current_prompt_version = PromptService.get_active_prompt_version(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+            current_prompt_identity = PromptService.get_active_prompt_identity(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+            versions_match = all(
+                (
+                    data.get("rule_config_version") == config.version,
+                    data.get("hiring_risk_policy_version") == current_policy_version,
+                    data.get("hiring_risk_prompt_version") == current_prompt_version,
+                    data.get("hiring_risk_prompt_identity") == current_prompt_identity,
+                    data.get("llm_model_version") == settings.OLLAMA_MODEL,
+                )
+            )
+        except Exception as exc:
+            logger.warning(f"Unable to verify persisted Hiring Risk versions: {exc}")
+            versions_match = False
+        if versions_match:
+            return data
+
+        sanitized = copy.deepcopy(data)
+        sanitized_analysis = sanitized.get("match_analysis") or {}
+        best_match = sanitized_analysis.get("best_match")
+        if isinstance(best_match, dict):
+            best_match["hiring_risks"] = []
+        for key in ("suitable_openings", "unsuitable_openings"):
+            for match in sanitized_analysis.get(key) or []:
+                if isinstance(match, dict):
+                    match["hiring_risks"] = []
+        sanitized["hiring_risks_stale"] = True
+        logger.warning("[HIRING_RISKS] Suppressed stale persisted risks pending version-aware reprocessing.")
+        return sanitized
 
     @classmethod
     def fetch_next_generation_sequence(cls) -> int:
@@ -246,7 +297,7 @@ class ResultRepository:
             val = _REDIS_CLIENT.get(redis_key)
             if not val:
                 raise FileNotFoundError(f"Result not found in Redis: {redis_key}")
-            return json.loads(val)
+            return cls.enforce_hiring_risk_freshness(json.loads(val))
 
         cv_key = str(filepath).split("/")[-1].removesuffix(".json")
         res = cls.read_result_by_filename(cv_key)
@@ -287,12 +338,24 @@ class ResultRepository:
                 r_exp_ver = redis_data.get("experience_version")
                 r_tax_ver = redis_data.get("taxonomy_version")
                 r_match_ver = redis_data.get("matching_version")
+                r_rule_ver = redis_data.get("rule_config_version")
+                r_hiring_policy_ver = redis_data.get("hiring_risk_policy_version")
+                r_hiring_prompt_ver = redis_data.get("hiring_risk_prompt_version")
+                r_hiring_prompt_identity = redis_data.get("hiring_risk_prompt_identity")
+                r_optimized_prompt_ver = redis_data.get("optimized_prompt_version")
+                r_model_ver = redis_data.get("llm_model_version")
 
                 db_schema = db_data.get("schema_version")
                 db_doc_hash = db_data.get("document_hash") or db_data.get("cv_hash")
                 db_exp_ver = db_data.get("experience_version")
                 db_tax_ver = db_data.get("taxonomy_version")
                 db_match_ver = db_data.get("matching_version")
+                db_rule_ver = db_data.get("rule_config_version")
+                db_hiring_policy_ver = db_data.get("hiring_risk_policy_version")
+                db_hiring_prompt_ver = db_data.get("hiring_risk_prompt_version")
+                db_hiring_prompt_identity = db_data.get("hiring_risk_prompt_identity")
+                db_optimized_prompt_ver = db_data.get("optimized_prompt_version")
+                db_model_ver = db_data.get("llm_model_version")
 
                 metadata_matches = (
                     (r_gen == db_gen if (r_gen and db_gen) else True)
@@ -303,6 +366,12 @@ class ResultRepository:
                     and (r_exp_ver == db_exp_ver if (r_exp_ver and db_exp_ver) else True)
                     and (r_tax_ver == db_tax_ver if (r_tax_ver and db_tax_ver) else True)
                     and (r_match_ver == db_match_ver if (r_match_ver and db_match_ver) else True)
+                    and (r_rule_ver == db_rule_ver if (r_rule_ver and db_rule_ver) else True)
+                    and (r_hiring_policy_ver == db_hiring_policy_ver if (r_hiring_policy_ver and db_hiring_policy_ver) else True)
+                    and (r_hiring_prompt_ver == db_hiring_prompt_ver if (r_hiring_prompt_ver and db_hiring_prompt_ver) else True)
+                    and (r_hiring_prompt_identity == db_hiring_prompt_identity if (r_hiring_prompt_identity and db_hiring_prompt_identity) else True)
+                    and (r_optimized_prompt_ver == db_optimized_prompt_ver if (r_optimized_prompt_ver and db_optimized_prompt_ver) else True)
+                    and (r_model_ver == db_model_ver if (r_model_ver and db_model_ver) else True)
                 )
 
                 if metadata_matches:
@@ -310,7 +379,7 @@ class ResultRepository:
                         f"[RESULT_PARITY] cv_key={cv_key} redis_generation={r_gen} db_generation={db_gen} "
                         f"redis_seq={r_seq} db_seq={db_seq} redis_checksum={r_chk[:12] if r_chk else 'NONE'} db_checksum={db_chk[:12] if db_chk else 'NONE'} action=HIT"
                     )
-                    return redis_data
+                    return cls.enforce_hiring_risk_freshness(redis_data)
                 else:
                     logger.warning(
                         f"[RESULT_PARITY] cv_key={cv_key} redis_generation={r_gen} db_generation={db_gen} "
@@ -318,18 +387,18 @@ class ResultRepository:
                     )
                     cv_result_cache_manager.delete(filename)
                     cv_result_cache_manager.set(filename, db_data, ttl=cls.CACHE_TTL_SECONDS)
-                    return db_data
+                    return cls.enforce_hiring_risk_freshness(db_data)
             else:
                 logger.info(
                     f"[RESULT_PARITY] cv_key={cv_key} redis_generation=NONE db_generation={db_gen} "
                     f"redis_seq=NONE db_seq={db_seq} redis_checksum=NONE db_checksum={db_chk[:12] if db_chk else 'NONE'} action=REHYDRATE"
                 )
                 cv_result_cache_manager.set(filename, db_data, ttl=cls.CACHE_TTL_SECONDS)
-                return db_data
+                return cls.enforce_hiring_risk_freshness(db_data)
 
         if redis_data:
             cls.ensure_canonical_metadata(redis_data)
-            return redis_data
+            return cls.enforce_hiring_risk_freshness(redis_data)
 
 
         try:
@@ -339,7 +408,7 @@ class ResultRepository:
                 if disk_file.exists():
                     data = json.loads(disk_file.read_text(encoding="utf-8"))
                     cv_result_cache_manager.set(filename, data, ttl=cls.CACHE_TTL_SECONDS)
-                    return data
+                    return cls.enforce_hiring_risk_freshness(data)
         except Exception:
             pass
         return None

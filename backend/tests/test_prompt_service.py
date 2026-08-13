@@ -76,6 +76,24 @@ def test_prompt_fallback_chain(db_session):
     res = PromptService.get_prompt("test_prompt", {"val": "2"}, model="qwen")
     assert res == "Generic: 2"
 
+
+def test_prompt_resolution_returns_active_database_version(db_session):
+    prompt = PromptTemplateMaster(
+        prompt_name="hiring_risk_explanation",
+        version_tag="7.2.1",
+        system_instruction="Risks: {prompt_payload}",
+        is_active=True,
+    )
+    db_session.add(prompt)
+    db_session.commit()
+
+    resolved = PromptService.get_prompt_with_version("hiring_risk_explanation", {"prompt_payload": "[]"})
+
+    assert resolved.prompt == "Risks: []"
+    assert resolved.version_tag == "7.2.1"
+    assert PromptService.get_active_prompt_version("hiring_risk_explanation") == "7.2.1"
+    assert PromptService.get_active_prompt_identity("hiring_risk_explanation").startswith("7.2.1:")
+
 def test_missing_placeholder(db_session):
     p = PromptTemplateMaster(
         prompt_name="test_prompt",

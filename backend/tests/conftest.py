@@ -97,12 +97,19 @@ def mock_prompt_service(monkeypatch, request):
     if request.module and "test_prompt_service" in request.module.__name__:
         return
         
-    from app.services.prompt_service import PromptReadiness, PromptService
+    from app.services.prompt_service import PromptReadiness, PromptService, ResolvedPrompt
     
     def mocked_fetch_prompt_from_db(cls, prompt_name, tenant_id, model, target_schema, language, environment):
         return "NO_SUITABLE_MATCH recommended_department MUST be selected from EVIDENCE CITATION"
         
     monkeypatch.setattr(PromptService, "_fetch_prompt_from_db", classmethod(mocked_fetch_prompt_from_db))
+    monkeypatch.setattr(
+        PromptService,
+        "get_prompt_with_version",
+        classmethod(lambda _cls, prompt_name, placeholders, **kwargs: ResolvedPrompt("SAFE TEST PROMPT", "test-prompt-v1")),
+    )
+    monkeypatch.setattr(PromptService, "get_active_prompt_version", classmethod(lambda _cls, *args, **kwargs: "test-prompt-v1"))
+    monkeypatch.setattr(PromptService, "get_active_prompt_identity", classmethod(lambda _cls, *args, **kwargs: "test-prompt-v1:test-hash"))
     monkeypatch.setattr(
         PromptService,
         "check_required_optimized_match_prompt",

@@ -50,13 +50,13 @@ class SystemRuleConfigFactory:
             workflow=WorkflowRules(),
             hiring_risks=HiringRiskConfig(
                 policies={
-                    "MIN_EXPERIENCE_FAILED": HiringRiskPolicy(severity="CRITICAL", manual_review=False),
-                    "EXPERIENCE_UNKNOWN": HiringRiskPolicy(severity="UNKNOWN", manual_review=True),
-                    "MISSING_MANDATORY_SKILL": HiringRiskPolicy(severity="CRITICAL", manual_review=False),
-                    "MISSING_PREFERRED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=False),
-                    "UNVERIFIED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=True),
-                    "DOMAIN_MISMATCH": HiringRiskPolicy(severity="HIGH", manual_review=False),
-                    "OVERQUALIFIED": HiringRiskPolicy(severity="LOW", manual_review=False),
+                    "MIN_EXPERIENCE_FAILED": HiringRiskPolicy(severity="CRITICAL", manual_review=False, category="Experience"),
+                    "EXPERIENCE_UNKNOWN": HiringRiskPolicy(severity="UNKNOWN", manual_review=True, category="Experience"),
+                    "MISSING_MANDATORY_SKILL": HiringRiskPolicy(severity="CRITICAL", manual_review=False, category="Skills"),
+                    "MISSING_PREFERRED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=False, category="Skills"),
+                    "UNVERIFIED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=True, category="Skills"),
+                    "DOMAIN_MISMATCH": HiringRiskPolicy(severity="HIGH", manual_review=False, category="Domain", source="CrossDomainGuard"),
+                    "OVERQUALIFIED": HiringRiskPolicy(severity="LOW", manual_review=False, category="Experience"),
                 }
             ),
         )

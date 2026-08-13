@@ -219,6 +219,17 @@ IMPORTANT RULES
 13. Output valid JSON matching the requested schema.
 """
 
+HIRING_RISK_EXPLANATION = """You explain deterministic hiring risks to recruiters.
+
+INPUT:
+{prompt_payload}
+
+Return only the structured JSON required by the response schema.
+You may write only title and explanation text for the supplied risk_code values.
+Do not add risks or change risk codes, categories, severity, evidence, source, scores, match status, or manual-review decisions.
+Use only the supplied evidence. Do not infer personal or protected attributes.
+"""
+
 
 def seed_prompts():
     print("Seeding prompt templates to DB...")
@@ -247,6 +258,11 @@ def seed_prompts():
             "prompt_name": "work_experience_extraction_v1",
             "version_tag": "1.0.0",
             "system_instruction": WORK_EXPERIENCE,
+        },
+        {
+            "prompt_name": "hiring_risk_explanation",
+            "version_tag": "1.0.0",
+            "system_instruction": HIRING_RISK_EXPLANATION,
         },
     ]
 

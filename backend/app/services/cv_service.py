@@ -10,6 +10,7 @@ from app.core.cache import CacheIndex, CacheInvalidator, CacheKey, doc_cache_man
 from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, normalize_source_candidate_id, resolve_cv_identity
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 from app.repositories.result import ResultRepository
 from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import (
@@ -19,6 +20,8 @@ from app.services.document_parser import (
     ResumeJsonExtractor,
 )
 from app.services.embedding_service import EmbeddingService
+from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
+from app.services.prompt_service import PromptService
 from app.services.upload_service import UploadService
 
 _cv_locks: dict[str, asyncio.Lock] = {}
@@ -101,6 +104,13 @@ async def process_cv_file(
     run_now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
     result_generation_id = f"gen_{run_now_ts}_{cv_hash[:8]}"
     generation_sequence = ResultRepository.fetch_next_generation_sequence()
+    current_rule_config = RuleConfigManager.get_config()
+    current_rule_config_version = current_rule_config.version
+    current_hiring_risk_policy_version = HiringRiskAnalyzer.get_policy_version(current_rule_config)
+    current_hiring_risk_prompt_version = PromptService.get_active_prompt_version(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+    current_hiring_risk_prompt_identity = PromptService.get_active_prompt_identity(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+    current_optimized_prompt_version = settings.OPTIMIZED_PROMPT_VERSION
+    current_llm_model_version = settings.OLLAMA_MODEL
 
     async with get_cv_lock(cv_key):
 
@@ -122,12 +132,39 @@ async def process_cv_file(
                 existing_hash = existing_data.get("cv_hash")
                 existing_parser_version = existing_data.get("parser_version")
                 existing_schema_version = existing_data.get("schema_version")
+                existing_rule_config_version = existing_data.get("rule_config_version")
+                existing_hiring_risk_policy_version = existing_data.get("hiring_risk_policy_version")
+                existing_hiring_risk_prompt_version = existing_data.get("hiring_risk_prompt_version")
+                existing_hiring_risk_prompt_identity = existing_data.get("hiring_risk_prompt_identity")
+                existing_optimized_prompt_version = existing_data.get("optimized_prompt_version")
+                existing_llm_model_version = existing_data.get("llm_model_version")
+                existing_matching_version = existing_data.get("matching_version")
 
                 hash_matches = existing_hash == cv_hash
                 parser_matches = existing_parser_version == settings.EXTRACTION_PARSER_VERSION
                 schema_matches = existing_schema_version == settings.EXTRACTION_SCHEMA_VERSION
+                rule_config_matches = existing_rule_config_version == current_rule_config_version
+                hiring_policy_matches = existing_hiring_risk_policy_version == current_hiring_risk_policy_version
+                hiring_prompt_matches = existing_hiring_risk_prompt_version == current_hiring_risk_prompt_version
+                hiring_prompt_identity_matches = existing_hiring_risk_prompt_identity == current_hiring_risk_prompt_identity
+                optimized_prompt_matches = existing_optimized_prompt_version == current_optimized_prompt_version
+                llm_model_matches = existing_llm_model_version == current_llm_model_version
+                matching_version_matches = existing_matching_version == settings.MATCHING_VERSION
 
-                if hash_matches and parser_matches and schema_matches:
+                if all(
+                    (
+                        hash_matches,
+                        parser_matches,
+                        schema_matches,
+                        rule_config_matches,
+                        hiring_policy_matches,
+                        hiring_prompt_matches,
+                        hiring_prompt_identity_matches,
+                        optimized_prompt_matches,
+                        llm_model_matches,
+                        matching_version_matches,
+                    )
+                ):
                     logger.info(f"[CACHE_HIT] Reusing existing JSON for '{cv_key}' ({result_filename}).")
                     existing_data["status"] = "COMPLETED"
                     existing_data["original_status"] = "CACHE_HIT"
@@ -342,8 +379,6 @@ async def process_cv_file(
             raw_fc = contact_info.get("field_confidence") or {}
             raw_fct = contact_info.get("field_confidence_tiers") or {}
 
-            from app.core.rule_config_manager import RuleConfigManager
-
             name_tier = contact_info.get("name_confidence_level") or contact_info.get("name_confidence_tier") or raw_fct.get("name") or RuleConfigManager.get_confidence_tier("name", name_confidence)
             loc_tier = contact_info.get("location_confidence_tier") or raw_fct.get("location") or RuleConfigManager.get_confidence_tier("location", raw_fc.get("location"))
             title_tier = contact_info.get("job_title_confidence_tier") or raw_fct.get("job_title") or RuleConfigManager.get_confidence_tier("job_title", raw_fc.get("job_title"))
@@ -421,6 +456,12 @@ async def process_cv_file(
                 "experience_version": getattr(settings, "EXPERIENCE_CALCULATOR_VERSION", "2.0.0"),
                 "taxonomy_version": getattr(settings, "TAXONOMY_VERSION", "1.5.0"),
                 "matching_version": getattr(settings, "MATCHING_VERSION", "2.1.0"),
+                "rule_config_version": current_rule_config_version,
+                "hiring_risk_policy_version": current_hiring_risk_policy_version,
+                "hiring_risk_prompt_version": current_hiring_risk_prompt_version,
+                "hiring_risk_prompt_identity": current_hiring_risk_prompt_identity,
+                "optimized_prompt_version": current_optimized_prompt_version,
+                "llm_model_version": current_llm_model_version,
                 "created_at": created_at,
                 "updated_at": updated_at,
 

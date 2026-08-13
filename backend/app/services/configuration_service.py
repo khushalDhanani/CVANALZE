@@ -434,7 +434,19 @@ class ConfigurationService:
             ce_rule = SystemRule(rule_type="domain_embedding_meta", rule_name="canonical_equivalents", target_value=json.dumps(de_cfg.canonical_equivalents))
             de_comp.system_rules.append(ce_rule)
 
-        # 8. Workflow state machine
+        # 8. Hiring Risks
+        hiring_risks_comp = RuleComponent(component_type="hiring_risks", component_name="policies", profile_id=profile.profile_id)
+        for risk_code, policy in config.hiring_risks.policies.items():
+            hiring_risks_comp.system_rules.append(
+                SystemRule(
+                    rule_type="hiring_risk_policy",
+                    rule_name=risk_code,
+                    target_value=json.dumps(policy.model_dump(mode="json"), sort_keys=True),
+                )
+            )
+        db.add(hiring_risks_comp)
+
+        # 9. Workflow state machine
         workflow_comp = RuleComponent(component_type="workflow", component_name="job_states", profile_id=profile.profile_id)
         workflow_comp.system_rules.append(
             SystemRule(

@@ -77,6 +77,14 @@ class HiringRisk(BaseModel):
     source: str = Field(..., description="System component that identified the risk")
     requires_manual_review: bool = Field(default=False, description="Whether this risk triggers manual review")
 
+
+class RiskEvidenceEvent(BaseModel):
+    failure_code: str = Field(..., description="Stable deterministic failure identity")
+    requirement_id: str | None = Field(default=None, description="Structured requirement identifier")
+    evidence: list[str] = Field(default_factory=list, description="Deterministic evidence safe for recruiter display")
+    source: str = Field(..., description="System component that emitted the failure")
+    integrity_domain: str | None = Field(default=None, description="Deferred integrity domain, when applicable")
+
 class JobMatchResult(BaseModel):
     job_id: str = Field(..., description="Unique job opening ID")
     job_title: str = Field(..., description="Job position title")

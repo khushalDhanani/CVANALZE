@@ -9,6 +9,9 @@ from app.core.database import PostgresAppSession
 from app.models.result import CVResult
 from app.repositories.result import ResultRepository
 from app.services.cv_service import get_stable_cv_key, process_cv_file
+from app.core.rule_config_manager import RuleConfigManager
+from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
+from app.services.prompt_service import PromptService
 
 
 
@@ -41,6 +44,13 @@ async def test_cache_hit_persistence_and_sync(monkeypatch):
         "cv_hash": cv_hash,
         "parser_version": settings.EXTRACTION_PARSER_VERSION,
         "schema_version": settings.EXTRACTION_SCHEMA_VERSION,
+        "matching_version": settings.MATCHING_VERSION,
+        "rule_config_version": RuleConfigManager.get_config().version,
+        "hiring_risk_policy_version": HiringRiskAnalyzer.get_policy_version(),
+        "hiring_risk_prompt_version": PromptService.get_active_prompt_version(HiringRiskAnalyzer.PROMPT_NAME) or "missing",
+        "hiring_risk_prompt_identity": PromptService.get_active_prompt_identity(HiringRiskAnalyzer.PROMPT_NAME) or "missing",
+        "optimized_prompt_version": settings.OPTIMIZED_PROMPT_VERSION,
+        "llm_model_version": settings.OLLAMA_MODEL,
         "status": "COMPLETED",
         "progress": 100,
         "markdown": "Mock parsed markdown",

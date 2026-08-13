@@ -264,8 +264,12 @@ class ScoringRules(BaseModel):
     domain_embedding: DomainEmbeddingRules
 
 class HiringRiskPolicy(BaseModel):
+    enabled: bool = True
     severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
     manual_review: bool
+    category: str = "Requirements"
+    title: str | None = None
+    source: str | None = None
 
 class HiringRiskConfig(BaseModel):
     policies: dict[str, HiringRiskPolicy] = Field(default_factory=dict)
@@ -758,6 +762,17 @@ class RuleConfigManager:
                 )
                 if workflow_rule:
                     base_dict["workflow"] = json.loads(workflow_rule.target_value)
+
+            elif comp.component_type == "hiring_risks":
+                policies: dict[str, Any] = {}
+                for rule in comp.system_rules:
+                    if rule.rule_type != "hiring_risk_policy" or not rule.target_value:
+                        continue
+                    policy = json.loads(rule.target_value)
+                    if not isinstance(policy, dict):
+                        raise ValueError(f"Hiring Risk policy '{rule.rule_name}' must be a JSON object.")
+                    policies[rule.rule_name] = policy
+                base_dict["hiring_risks"] = {"policies": policies}
 
         return base_dict
 

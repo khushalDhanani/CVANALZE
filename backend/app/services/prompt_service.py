@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import string
 from typing import Any, NamedTuple, Optional, Set
@@ -18,6 +19,11 @@ from app.models.prompts import PromptTemplateMaster
 class PromptReadiness(NamedTuple):
     ready: bool
     reason: str
+
+
+class ResolvedPrompt(NamedTuple):
+    prompt: str
+    version_tag: str
 
 
 class PromptService:
@@ -69,7 +75,133 @@ class PromptService:
         except KeyError as e:
             logger.error(f"Missing required placeholder {e} in prompt template '{prompt_name}'")
             raise PromptError(f"Missing required placeholder {e}")
-            
+
+    @classmethod
+    def get_prompt_with_version(
+        cls,
+        prompt_name: str,
+        placeholders: dict[str, Any],
+        tenant_id: Optional[str] = None,
+        model: Optional[str] = None,
+        target_schema: Optional[str] = None,
+        language: str = "en",
+        environment: str = "production",
+    ) -> ResolvedPrompt:
+        cache_key = f"prompt_tmpl_versioned:{prompt_name}:{tenant_id or 'none'}:{model or 'none'}:{target_schema or 'none'}:{language}:{environment}"
+        cached = config_cache_manager.get(cache_key)
+        if isinstance(cached, dict) and cached.get("template") and cached.get("version_tag"):
+            template = str(cached["template"])
+            version_tag = str(cached["version_tag"])
+        else:
+            record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
+            if record is None:
+                logger.error(f"Prompt template '{prompt_name}' not found in DB.")
+                raise PromptError("PROMPT_UNAVAILABLE")
+            template = record.system_instruction
+            version_tag = record.version_tag
+            config_cache_manager.set(cache_key, {"template": template, "version_tag": version_tag})
+        try:
+            return ResolvedPrompt(prompt=template.format(**placeholders), version_tag=version_tag)
+        except KeyError as e:
+            logger.error(f"Missing required placeholder {e} in prompt template '{prompt_name}'")
+            raise PromptError(f"Missing required placeholder {e}")
+
+    @classmethod
+    def get_active_prompt_version(
+        cls,
+        prompt_name: str,
+        tenant_id: Optional[str] = None,
+        model: Optional[str] = None,
+        target_schema: Optional[str] = None,
+        language: str = "en",
+        environment: str = "production",
+    ) -> str | None:
+        cache_key = f"prompt_version:{prompt_name}:{tenant_id or 'none'}:{model or 'none'}:{target_schema or 'none'}:{language}:{environment}"
+        cached = config_cache_manager.get(cache_key)
+        if isinstance(cached, str) and cached:
+            return None if cached == "__MISSING__" else cached
+        try:
+            record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
+        except Exception as exc:
+            logger.warning(f"Failed to resolve active prompt version for '{prompt_name}': {exc}")
+            record = None
+        version_tag = record.version_tag if record is not None else None
+        config_cache_manager.set(cache_key, version_tag or "__MISSING__")
+        return version_tag
+
+    @classmethod
+    def get_active_prompt_identity(
+        cls,
+        prompt_name: str,
+        tenant_id: Optional[str] = None,
+        model: Optional[str] = None,
+        target_schema: Optional[str] = None,
+        language: str = "en",
+        environment: str = "production",
+    ) -> str | None:
+        cache_key = f"prompt_identity:{prompt_name}:{tenant_id or 'none'}:{model or 'none'}:{target_schema or 'none'}:{language}:{environment}"
+        cached = config_cache_manager.get(cache_key)
+        if isinstance(cached, str) and cached:
+            return None if cached == "__MISSING__" else cached
+        try:
+            record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
+        except Exception as exc:
+            logger.warning(f"Failed to resolve active prompt identity for '{prompt_name}': {exc}")
+            record = None
+        identity = None
+        if record is not None:
+            prompt_hash = hashlib.sha256(record.system_instruction.encode("utf-8")).hexdigest()
+            identity = f"{record.version_tag}:{prompt_hash}"
+        config_cache_manager.set(cache_key, identity or "__MISSING__")
+        return identity
+
+    @classmethod
+    def _fetch_prompt_record_from_db(
+        cls,
+        prompt_name: str,
+        tenant_id: Optional[str],
+        model: Optional[str],
+        target_schema: Optional[str],
+        language: str,
+        environment: str,
+    ) -> PromptTemplateMaster | None:
+        with PostgresAppSession() as db:
+            query = db.query(PromptTemplateMaster).filter(
+                PromptTemplateMaster.prompt_name == prompt_name,
+                PromptTemplateMaster.is_active == True,
+                PromptTemplateMaster.language == language,
+                PromptTemplateMaster.environment == environment,
+            )
+            if prompt_name == cls.OPTIMIZED_MATCH_PROMPT_NAME:
+                from app.core.config import settings
+
+                query = query.filter(PromptTemplateMaster.version_tag == settings.OPTIMIZED_PROMPT_VERSION)
+            exact_match = query.filter(
+                PromptTemplateMaster.tenant_id == tenant_id,
+                PromptTemplateMaster.model == model,
+                PromptTemplateMaster.target_schema == target_schema,
+            ).order_by(PromptTemplateMaster.version_tag.desc()).first()
+            if exact_match:
+                db.expunge(exact_match)
+                return exact_match
+            if tenant_id is not None:
+                tenant_fallback = query.filter(
+                    PromptTemplateMaster.tenant_id.is_(None),
+                    PromptTemplateMaster.model == model,
+                    PromptTemplateMaster.target_schema == target_schema,
+                ).order_by(PromptTemplateMaster.version_tag.desc()).first()
+                if tenant_fallback:
+                    db.expunge(tenant_fallback)
+                    return tenant_fallback
+            generic_match = query.filter(
+                PromptTemplateMaster.tenant_id.is_(None),
+                PromptTemplateMaster.model.is_(None),
+                PromptTemplateMaster.target_schema.is_(None),
+            ).order_by(PromptTemplateMaster.version_tag.desc()).first()
+            if generic_match:
+                db.expunge(generic_match)
+            return generic_match
+
     @classmethod
     def _fetch_prompt_from_db(
         cls,
@@ -80,49 +212,8 @@ class PromptService:
         language: str,
         environment: str
     ) -> Optional[str]:
-        with PostgresAppSession() as db:
-            query = db.query(PromptTemplateMaster).filter(
-                PromptTemplateMaster.prompt_name == prompt_name,
-                PromptTemplateMaster.is_active == True,
-                PromptTemplateMaster.language == language,
-                PromptTemplateMaster.environment == environment
-            )
-            if prompt_name == cls.OPTIMIZED_MATCH_PROMPT_NAME:
-                from app.core.config import settings
-
-                query = query.filter(PromptTemplateMaster.version_tag == settings.OPTIMIZED_PROMPT_VERSION)
-            
-            # 1. Exact match
-            exact_match = query.filter(
-                PromptTemplateMaster.tenant_id == tenant_id,
-                PromptTemplateMaster.model == model,
-                PromptTemplateMaster.target_schema == target_schema
-            ).order_by(PromptTemplateMaster.version_tag.desc()).first()
-            
-            if exact_match:
-                return exact_match.system_instruction
-                
-            # 2. Fallback to generic tenant, specific model & schema
-            if tenant_id is not None:
-                fallback_match_1 = query.filter(
-                    PromptTemplateMaster.tenant_id.is_(None),
-                    PromptTemplateMaster.model == model,
-                    PromptTemplateMaster.target_schema == target_schema
-                ).order_by(PromptTemplateMaster.version_tag.desc()).first()
-                if fallback_match_1:
-                    return fallback_match_1.system_instruction
-                
-            # 3. Ultimate fallback to generic (no tenant, no model, no schema)
-            generic_match = query.filter(
-                PromptTemplateMaster.tenant_id.is_(None),
-                PromptTemplateMaster.model.is_(None),
-                PromptTemplateMaster.target_schema.is_(None)
-            ).order_by(PromptTemplateMaster.version_tag.desc()).first()
-            
-            if generic_match:
-                return generic_match.system_instruction
-                
-            return None
+        record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
+        return record.system_instruction if record else None
 
     @classmethod
     def get_placeholders(cls, template: str) -> Set[str]:
@@ -214,5 +305,8 @@ class PromptService:
         
         # Invalidate cache so that next request pulls the newly activated prompt
         config_cache_manager.delete_by_pattern(f"prompt_tmpl:{prompt.prompt_name}:*")
+        config_cache_manager.delete_by_pattern(f"prompt_tmpl_versioned:{prompt.prompt_name}:*")
+        config_cache_manager.delete_by_pattern(f"prompt_version:{prompt.prompt_name}:*")
+        config_cache_manager.delete_by_pattern(f"prompt_identity:{prompt.prompt_name}:*")
         
         return prompt

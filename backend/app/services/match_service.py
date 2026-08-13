@@ -24,9 +24,11 @@ from app.services.candidate_domain_service import CandidateDomainService
 from app.services.confidence_calibration import ConfidenceCalibrationService
 from app.services.document_parser import ResumeJsonExtractor
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
+from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
 from app.services.llm_grounding_service import GroundingReport, LLMGroundingService
 from app.services.llm_service import OllamaLLMService
 from app.services.matching_quality_gate import MatchingQualityGate, MatchingReadiness
+from app.services.prompt_service import PromptService
 from app.services.resume_normalizer import ResumeNormalizer
 from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
@@ -136,8 +138,13 @@ class MatchService:
 
         vacancy_ids = sorted(str(job.get("vacancy_id") or job.get("id") or "") for job in openings if job.get("vacancy_id") is not None or job.get("id") is not None)
         vacancy_version = JobRepository.compute_matching_vacancy_version(openings)
-        rule_version = RuleConfigManager.get_config().version
+        rule_config = RuleConfigManager.get_config()
+        rule_version = rule_config.version
+        hiring_risk_policy_version = HiringRiskAnalyzer.get_policy_version(rule_config)
         taxonomy_version = department_domain_repository.get_version()
+        hiring_risk_prompt_version = PromptService.get_active_prompt_version(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+        hiring_risk_prompt_identity = PromptService.get_active_prompt_identity(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+        match_prompt_version = f"optimized:{settings.OPTIMIZED_PROMPT_VERSION}|hiring-risk:{hiring_risk_prompt_identity}"
 
         # 4. Match Result Cache Check (instant repeat searches)
         t_cache_start = asyncio.get_event_loop().time()
@@ -146,11 +153,11 @@ class MatchService:
             candidate_id=cv_key,
             vacancy_version=vacancy_version,
             vacancy_ids=vacancy_ids,
-            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
+            prompt_version=match_prompt_version,
             model_version=settings.OLLAMA_MODEL,
             extraction_version=extraction_version,
             matching_version=settings.MATCHING_VERSION,
-            rule_version=rule_version,
+            rule_version=f"{rule_version}|hiring-risk:{hiring_risk_policy_version}",
             taxonomy_version=taxonomy_version,
         ).to_key()
 
@@ -735,6 +742,9 @@ class MatchService:
                 "quality_gate": quality_gate.as_dict(),
                 "rule_version": rule_version,
                 "taxonomy_version": taxonomy_version,
+                "hiring_risk_prompt_version": hiring_risk_prompt_version,
+                "hiring_risk_prompt_identity": hiring_risk_prompt_identity,
+                "hiring_risk_policy_version": hiring_risk_policy_version,
             },
         )
 
