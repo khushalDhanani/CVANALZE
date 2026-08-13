@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from app.core.config import settings
+from app.prompts.match_analysis import build_job_requirements
 from app.services.context_packer import estimate_tokens, pack_cv_context
 from app.services.llm_input_security import harden_prompt, sanitize_string_list, sanitize_untrusted_text
 
@@ -72,6 +73,7 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
         vacancy_description = vac.get("job_description") or vac.get("description")
         if vacancy_description:
             item["description"] = sanitize_untrusted_text(str(vacancy_description)).text
+        item["requirements"] = build_job_requirements(vac)
 
         compact_vacancies.append(item)
 

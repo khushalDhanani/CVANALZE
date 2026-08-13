@@ -30,6 +30,12 @@ Expected JSON Schema:
 
 MATCH_ANALYSIS = """{input_json}
 
+Assess every supplied requirement separately. Use only exact facts from the CV and JD.
+For DIRECT, INFERRED, or PARTIAL matches, cv_evidence must cite the explicit CV fact supporting the classification.
+For MISSING or NOT_ASSESSABLE, use an empty cv_evidence string instead of inventing evidence.
+Confidence is certainty in the evidence classification, not a match score. Impact is the recruiting consequence; a missing mandatory requirement is CRITICAL.
+Return exactly one requirement_assessments item for every supplied requirement_id and do not add requirements.
+
 Provide your analysis in the EXACT JSON format below.
 DO NOT include any markdown formatting like ```json or ```.
 DO NOT include any thinking tokens or explanations outside the JSON object.
@@ -40,7 +46,21 @@ Expected JSON Schema:
   "skill_matches": ["skill1", "skill2"],
   "inferred_skills": ["inferred1", "inferred2"],
   "missing_critical": ["missing1"],
-  "semantic_reason": "A brief explanation of why the candidate fits or lacks fit"
+  "semantic_reason": "A concise overall explanation grounded in the requirement assessments",
+  "requirement_assessments": [
+    {{
+      "requirement_id": "skill_1",
+      "requirement": "Python",
+      "category": "SKILL",
+      "mandatory": true,
+      "cv_evidence": "Built Python APIs using FastAPI",
+      "jd_evidence": "Python",
+      "rationale": "The resume explicitly demonstrates the required technology in delivered API work.",
+      "match_type": "DIRECT",
+      "confidence": 0.98,
+      "impact": "LOW"
+    }}
+  ]
 }}
 """
 
@@ -160,7 +180,7 @@ def seed_prompts():
         },
         {
             "prompt_name": "match_analysis",
-            "version_tag": "1.0.0",
+            "version_tag": "1.1.0",
             "system_instruction": MATCH_ANALYSIS,
         },
         {

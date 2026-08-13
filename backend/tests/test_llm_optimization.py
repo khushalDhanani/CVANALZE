@@ -119,6 +119,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
                 main_concern="The CV does not state the deployment scale expected by the vacancy. Recruiters should verify production ownership and traffic volume rather than infer them.",
                 ai_match_explanation="The high score reflects the explicit Python overlap between the CV and vacancy. The score remains limited by the missing deployment-scale evidence.",
                 semantic_fit_score=90.0,
+                requirement_assessments=[],
             )
         ],
         active_vacancy_summary="Python vacancy evaluated.",
@@ -197,6 +198,7 @@ def test_optimized_vacancy_match_rejects_single_sentence_decision_narratives():
             main_concern="The CV does not state deployment scale. Recruiters should verify production ownership.",
             ai_match_explanation="The score reflects the Python match. Missing deployment evidence limits confidence.",
             semantic_fit_score=80.0,
+            requirement_assessments=[],
         )
 
 
@@ -229,6 +231,7 @@ async def test_end_to_end_optimized_match_service(monkeypatch):
                 main_concern="The CV does not quantify production ownership for the React work required by the vacancy. Recruiters should verify project scale and individual contribution.",
                 ai_match_explanation="The score is driven by the direct React match between the CV and vacancy. It is constrained by the absence of quantified delivery evidence in the CV.",
                 semantic_fit_score=85.0,
+                requirement_assessments=[],
             )
         ],
         active_vacancy_summary="Frontend vacancy evaluated.",

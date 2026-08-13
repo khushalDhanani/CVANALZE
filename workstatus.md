@@ -1,6 +1,18 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Requirement-Level CV/JD Match Analysis**:
+    - Added stable requirement normalization for required skills, preferred keywords, minimum/maximum experience, education, certifications, technologies, responsibilities, and vacancy descriptions, including explicit-only mandatory flags.
+    - Upgraded the legacy `match_analysis` contract and live optimized matching contract with required per-requirement CV evidence, JD evidence, rationale, match type, 0-1 confidence, and recruiter impact fields while preserving summary and legacy lineage fields.
+    - Added grounding that rejects unknown IDs, canonicalizes requirement/JD data from supplied vacancies, downgrades unsupported positive CV claims, fills omitted assessments as `NOT_ASSESSABLE`, and derives backward-compatible classified requirements and evidence snippets.
+    - Propagated grounded assessments through `MatchService` as additive `llm_requirement_assessments` without changing deterministic scoring, eligibility, retry, timeout, cache, HTTP client, model selection, or Ollama transport behavior.
+    - Added migration 029 up/down for optimized prompt 3.9/schema v4 and match-analysis prompt 1.1, including readiness enforcement and rollback to optimized prompt 3.8.
+    - Updated the recruiter vacancy evidence panel to prefer enriched requirement rows showing mandatory status, match type, confidence, impact, CV/JD evidence, and rationale, with legacy evidence fallback for historical analyses.
+    - Added focused backend/frontend contracts for requirement normalization, prompt inputs, schema validation, grounding, pipeline propagation, migration versioning, enriched rendering, and legacy compatibility.
+    - Files changed: backend match/optimized prompt builders, analysis schemas, grounding/match/prompt services, config, prompt seeding, migration 029 up/down, focused backend tests, frontend API types, vacancy enrichment presentation/component/tests, and `workstatus.md`.
+    - Verification: `git diff --check` passed for tracked changes; targeted language-server diagnostics found no code errors in the changed prompt, grounding, new test, or frontend files. Backend diagnostics reported only unavailable local `pydantic`/`sqlalchemy`/`pytest` import environments and existing optional-session warnings. Tests, builds, and migrations were not run because repository instructions require explicit authorization.
+    - Pending work: apply migration 029, rebuild/recreate application workers, reprocess candidates for generated requirement assessments, and run the focused backend/frontend tests and frontend type-check when explicitly authorized.
+    - Important decision: model confidence and impact are explanatory only; deterministic scoring and match classification remain authoritative, and historical persisted analyses continue through the legacy evidence fallback.
 1. **2026-08-13 Decision Narrative Validator Startup Fix**:
     - Traced the API restart loop to an unterminated Python string in `OptimizedVacancyMatch.require_two_or_three_sentences`; the punctuation literal opened with an ASCII quote but ended with a typographic curly quote.
     - Replaced the curly quote with the correct ASCII delimiter, restoring valid module syntax while preserving the intended `.`, `!`, and `?` sentence-ending validation.

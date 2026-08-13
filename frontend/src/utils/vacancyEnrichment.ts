@@ -1,4 +1,4 @@
-import type { DualEvidence, EnrichedJobEvaluation } from '@/types/api';
+import type { DualEvidence, EnrichedJobEvaluation, LlmRequirementAssessment } from '@/types/api';
 import { humanizeRecruiterText } from '@/utils/candidateDetail';
 
 export const VACANCY_AI_EXPLANATION_LABEL = 'AI Match Explanation';
@@ -7,6 +7,7 @@ export const RELATED_SKILLS_LABEL = 'Related Skills Identified';
 export interface VacancyEvidencePresentation {
   label: string;
   evidence: DualEvidence;
+  assessment?: LlmRequirementAssessment;
 }
 
 export interface VacancyEnrichmentPresentation {
@@ -32,9 +33,16 @@ export function getVacancyEnrichmentPresentation(match: Partial<EnrichedJobEvalu
     ? match.quality_flags.map((flag) => QUALITY_FLAG_LABELS[cleanText(flag)]).filter((flag): flag is string => Boolean(flag))
     : [];
   const requirementLabels = new Map((match.llm_classified_requirements || []).map((item) => [item.requirement_id, cleanText(item.description)]));
-  const evidence = Object.entries(match.llm_evidence_snippets || {})
-    .filter(([, item]) => item?.cv_evidence || item?.vacancy_evidence)
-    .map(([requirementId, item], index) => ({ label: requirementLabels.get(requirementId) || `Requirement ${index + 1}`, evidence: item }));
+  const assessments = Array.isArray(match.llm_requirement_assessments) ? match.llm_requirement_assessments : [];
+  const evidence = assessments.length > 0
+    ? assessments.map((assessment) => ({
+        label: cleanText(assessment.requirement) || assessment.requirement_id,
+        evidence: { cv_evidence: cleanText(assessment.cv_evidence), vacancy_evidence: cleanText(assessment.jd_evidence) },
+        assessment,
+      }))
+    : Object.entries(match.llm_evidence_snippets || {})
+        .filter(([, item]) => item?.cv_evidence || item?.vacancy_evidence)
+        .map(([requirementId, item], index) => ({ label: requirementLabels.get(requirementId) || `Requirement ${index + 1}`, evidence: item }));
   const initialScreeningRank = Number(match.retrieval_provenance?.prefilter_rank);
   const confidence = typeof match.calibrated_confidence === 'number'
     ? `Match Confidence ${Math.round(match.calibrated_confidence * 100)}%`
@@ -43,7 +51,7 @@ export function getVacancyEnrichmentPresentation(match: Partial<EnrichedJobEvalu
       : '';
   const metadata = [
     confidence,
-    match.llm_classified_requirements?.length ? `${match.llm_classified_requirements.length} grounded requirements` : '',
+    assessments.length ? `${assessments.length} assessed requirements` : match.llm_classified_requirements?.length ? `${match.llm_classified_requirements.length} grounded requirements` : '',
     Number.isInteger(initialScreeningRank) && initialScreeningRank > 0 ? `Ranked #${initialScreeningRank} During Initial Screening` : '',
   ].filter(Boolean);
 

@@ -112,6 +112,7 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
                 main_concern="The CV does not describe the production scale required by the vacancy. Recruiters should verify deployment ownership rather than assume it from the skill match.",
                 ai_match_explanation="The score reflects the explicit Python overlap between the CV and vacancy. Missing production-scale evidence prevents a fully supported assessment.",
                 semantic_fit_score=90.0,
+                requirement_assessments=[],
             )
         ],
         active_vacancy_summary="Python vacancy evaluated.",
@@ -163,6 +164,7 @@ def test_llm_cache_entry_backward_compatible():
                 main_concern="The CV does not describe the production scale required by the vacancy. Recruiters should verify deployment ownership rather than assume it from the skill match.",
                 ai_match_explanation="The score reflects the explicit Python overlap between the CV and vacancy. Missing production-scale evidence prevents a fully supported assessment.",
                 semantic_fit_score=90.0,
+                requirement_assessments=[],
             )
         ],
         active_vacancy_summary="Python vacancy evaluated.",

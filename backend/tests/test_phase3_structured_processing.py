@@ -8,6 +8,7 @@ from app.schemas.analysis import (
     OptimizedCandidateProfile,
     OptimizedLLMMatchResponse,
     OptimizedVacancyMatch,
+    RequirementAssessment,
     RequirementEvidence,
 )
 from app.schemas.candidate_context import CandidateAnalysisContext
@@ -120,7 +121,7 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
         deterministic_experience=normalized.experience.deterministic_years,
     )
     job_contexts = [
-        JobEvaluationContext.create({"id": "job-1", "title": "Python Developer", "department": "Engineering"}),
+        JobEvaluationContext.create({"id": "job-1", "title": "Python Developer", "department": "Engineering", "required_skills": ["Python"]}),
         JobEvaluationContext.create({"id": "job-2", "title": "API Developer", "department": "Engineering"}),
     ]
     scoring_calls: list[tuple[int, int, float | None]] = []
@@ -167,6 +168,20 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
                     "Missing deployment evidence limits certainty about the remaining role requirements."
                 ),
                 semantic_fit_score=80.0,
+                requirement_assessments=[
+                    RequirementAssessment(
+                        requirement_id="skill_1",
+                        requirement="Python",
+                        category="SKILL",
+                        mandatory=True,
+                        cv_evidence="Python",
+                        jd_evidence="Python",
+                        rationale="The CV explicitly lists the required skill.",
+                        match_type="DIRECT",
+                        confidence=0.98,
+                        impact="LOW",
+                    )
+                ],
                 classified_requirements=[
                     ClassifiedRequirementItem(requirement_id="python", description="Python", status="SATISFIED")
                 ],
@@ -205,8 +220,9 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
     assert {experience for _, _, experience in scoring_calls} == {2.0}
     enriched_job = next(match for match in result.unsuitable_openings if match.job_id == "job-1")
     missing_llm_job = next(match for match in result.unsuitable_openings if match.job_id == "job-2")
-    assert [item.requirement_id for item in enriched_job.llm_classified_requirements] == ["python"]
-    assert enriched_job.llm_evidence_snippets["python"].cv_evidence == "Python"
+    assert [item.requirement_id for item in enriched_job.llm_classified_requirements] == ["skill_1"]
+    assert enriched_job.llm_evidence_snippets["skill_1"].cv_evidence == "Python"
+    assert enriched_job.llm_requirement_assessments[0].requirement_id == "skill_1"
     assert "LLM_VACANCY_EVALUATION_MISSING" in missing_llm_job.quality_flags
     assert result.quality_metadata["missing_llm_vacancy_ids"] == 1
 

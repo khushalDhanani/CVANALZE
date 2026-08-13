@@ -43,11 +43,21 @@ export function VacancyEnrichmentPanel({ match, showDecisionMetadata = true }: V
       {evidence.length > 0 ? (
         <View className="gap-1 p-2 border rounded bg-background border-border">
           <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Supporting Evidence</Text>
-          {evidence.slice(0, 5).map(({ label, evidence: item }, index) => (
+          {evidence.map(({ label, evidence: item, assessment }, index) => (
             <View key={`${label}-${index}`} className="gap-0.5">
               <Text className="text-[11px] font-sans-bold text-text-primary">{label}</Text>
+              {assessment ? (
+                <View className="flex-row flex-wrap gap-1">
+                  <Badge label={assessment.mandatory ? 'Mandatory' : 'Non-mandatory'} tone={assessment.mandatory ? 'warning' : 'neutral'} />
+                  <Badge label={assessment.match_type.replace(/_/g, ' ')} tone={assessment.match_type === 'DIRECT' ? 'success' : assessment.match_type === 'MISSING' ? 'danger' : 'info'} />
+                  <Badge label={`${Math.round(assessment.confidence * 100)}% confidence`} tone="neutral" />
+                  <Badge label={`${assessment.impact} impact`} tone={assessment.impact === 'CRITICAL' || assessment.impact === 'HIGH' ? 'warning' : 'neutral'} />
+                </View>
+              ) : null}
               {item.cv_evidence ? <Text className="text-[11px] leading-4 text-text-primary">CV: {item.cv_evidence}</Text> : null}
+              {assessment && !item.cv_evidence ? <Text className="text-[11px] leading-4 text-text-muted">CV: No supporting evidence found</Text> : null}
               {item.vacancy_evidence ? <Text className="text-[11px] leading-4 text-text-muted">Vacancy: {item.vacancy_evidence}</Text> : null}
+              {assessment?.rationale ? <Text className="text-[11px] leading-4 text-text-primary">Rationale: {assessment.rationale}</Text> : null}
             </View>
           ))}
         </View>

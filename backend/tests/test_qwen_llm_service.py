@@ -119,6 +119,7 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
         "inferred_skills": ["FastAPI"],
         "missing_critical": [],
         "semantic_reason": "Good match",
+        "requirement_assessments": [],
     }
     client = _mock_transport_client(
         monkeypatch,
@@ -199,6 +200,7 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch, caplog):
                 "main_concern": "The CV does not describe the production scale expected by the vacancy. Recruiters should verify deployment ownership rather than infer it.",
                 "ai_match_explanation": "The high score reflects the direct Python overlap between the CV and vacancy. Missing production-scale evidence limits complete confidence.",
                 "semantic_fit_score": 90.0,
+                "requirement_assessments": [],
             }
         ],
         "active_vacancy_summary": "Python vacancy evaluated.",
@@ -244,6 +246,7 @@ def test_thinking_model_retains_native_think_parameter(monkeypatch):
                 "inferred_skills": [],
                 "missing_critical": [],
                 "semantic_reason": "Good match",
+                "requirement_assessments": [],
             }),
         },
     )
@@ -266,6 +269,7 @@ def test_legacy_thinking_directive_is_removed_before_generation(monkeypatch):
                 "inferred_skills": [],
                 "missing_critical": [],
                 "semantic_reason": "Good match",
+                "requirement_assessments": [],
             }),
         },
     )

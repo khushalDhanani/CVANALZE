@@ -69,6 +69,7 @@ def test_grounding_removes_unknown_ids_and_unsupported_claims(monkeypatch):
                     "The missing ownership evidence limits the confidence of the assessment."
                 ),
                 semantic_fit_score=80.0,
+                requirement_assessments=[],
                 matched_skills=["Python", "Kubernetes"],
                 inferred_skills=["FastAPI"],
                 evidence_snippets={"skill-python": RequirementEvidence(cv_evidence="Python", vacancy_evidence="Python")},
@@ -80,6 +81,7 @@ def test_grounding_removes_unknown_ids_and_unsupported_claims(monkeypatch):
                 main_concern="Vacancy 999 is absent from the supplied vacancy data, so its requirements cannot be compared with the CV. Recruiters need the missing JD before assessing risk.",
                 ai_match_explanation="The low score cannot be independently explained because vacancy 999 has no supplied JD evidence. The CV's Python mention alone is insufficient for a role match.",
                 semantic_fit_score=10.0,
+                requirement_assessments=[],
                 matched_skills=["Python"],
             ),
         ],

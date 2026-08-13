@@ -34,6 +34,18 @@ const manualReviewOpening = {
   retrieval_provenance: { vector_rank: 2 },
   llm_classified_requirements: [{ requirement_id: 'chemistry', description: 'Chemistry education', tier: 'MANDATORY', status: 'SATISFIED' }],
   llm_evidence_snippets: { chemistry: { cv_evidence: 'BSc Chemistry', vacancy_evidence: 'Chemistry degree required' } },
+  llm_requirement_assessments: [{
+    requirement_id: 'chemistry',
+    requirement: 'Chemistry degree required',
+    category: 'EDUCATION',
+    mandatory: true,
+    cv_evidence: 'BSc Chemistry',
+    jd_evidence: 'Chemistry degree required',
+    rationale: 'The degree directly satisfies the education requirement.',
+    match_type: 'DIRECT' as const,
+    confidence: 0.96,
+    impact: 'LOW' as const,
+  }],
 };
 
 const normalized = normalizeCandidateMatchAnalysis({
@@ -54,13 +66,18 @@ assertEquals(normalizedManualReview.inferred_skills, manualReviewOpening.inferre
 assertEquals(normalizedManualReview.recommendation, manualReviewOpening.recommendation);
 assertEquals(normalizedManualReview.calibrated_confidence, manualReviewOpening.calibrated_confidence);
 assertEquals(normalizedManualReview.llm_evidence_snippets, manualReviewOpening.llm_evidence_snippets);
+assertEquals(normalizedManualReview.llm_requirement_assessments, manualReviewOpening.llm_requirement_assessments);
 
 const cardPresentation = getVacancyEnrichmentPresentation(normalizedManualReview as Partial<EnrichedJobEvaluation>);
 assertEquals(cardPresentation.reasoning, manualReviewOpening.ai_match_explanation);
 assertEquals(cardPresentation.recommendation, manualReviewOpening.recommendation);
 assertEquals(cardPresentation.inferredSkills, manualReviewOpening.inferred_skills);
 assertEquals(cardPresentation.evidence[0].evidence, manualReviewOpening.llm_evidence_snippets.chemistry);
-assertEquals(cardPresentation.evidence[0].label, 'Chemistry education');
+assertEquals(cardPresentation.evidence[0].label, 'Chemistry degree required');
+assertEquals(cardPresentation.evidence[0].assessment?.match_type, 'DIRECT');
+assertEquals(cardPresentation.evidence[0].assessment?.mandatory, true);
+assertEquals(cardPresentation.evidence[0].assessment?.confidence, 0.96);
+assertEquals(cardPresentation.evidence[0].assessment?.impact, 'LOW');
 assertEquals(cardPresentation.metadata.includes('Match Confidence 72%'), true);
 assertEquals(cardPresentation.metadata.some((item) => item.includes('Calibration') || item.includes('vector rank')), false);
 assertEquals(VACANCY_AI_EXPLANATION_LABEL, 'AI Match Explanation');

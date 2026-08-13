@@ -30,7 +30,7 @@ class PromptService:
     OPTIMIZED_MATCH_PROMPT_NAME = "optimized_match"
     OPTIMIZED_MATCH_LANGUAGE = "en"
     OPTIMIZED_MATCH_ENVIRONMENT = "production"
-    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v3"
+    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v4"
     OPTIMIZED_MATCH_PLACEHOLDERS = {"input_json", "domain_list_str", "dept_list_str"}
     OPTIMIZED_MATCH_SCHEMA_FIELDS = {
         "candidate_profile",
@@ -45,9 +45,23 @@ class PromptService:
         "main_concern",
         "ai_match_explanation",
         "semantic_fit_score",
+        "requirement_assessments",
+    }
+    OPTIMIZED_MATCH_ASSESSMENT_SCHEMA_FIELDS = {
+        "requirement_id",
+        "requirement",
+        "category",
+        "mandatory",
+        "cv_evidence",
+        "jd_evidence",
+        "rationale",
+        "match_type",
+        "confidence",
+        "impact",
     }
     OPTIMIZED_MATCH_REQUIRED_INSTRUCTION = "VACANCY COVERAGE:"
     OPTIMIZED_MATCH_NARRATIVE_INSTRUCTION = "DECISION NARRATIVES:"
+    OPTIMIZED_MATCH_REQUIREMENT_INSTRUCTION = "REQUIREMENT ASSESSMENTS:"
     HIRING_RISK_PROMPT_NAME = "hiring_risk_explanation"
     HIRING_RISK_DEFAULT_VERSION = "default-1.0.0"
     HIRING_RISK_DEFAULT_TEMPLATE = """You explain deterministic hiring risks to recruiters.
@@ -322,6 +336,8 @@ Use only the supplied evidence. Do not infer personal or protected attributes.
                 return PromptReadiness(False, "Required prompt does not enforce complete per-vacancy coverage.")
             if cls.OPTIMIZED_MATCH_NARRATIVE_INSTRUCTION not in prompt.system_instruction:
                 return PromptReadiness(False, "Required prompt does not enforce detailed decision narratives.")
+            if cls.OPTIMIZED_MATCH_REQUIREMENT_INSTRUCTION not in prompt.system_instruction:
+                return PromptReadiness(False, "Required prompt does not enforce requirement-level assessments.")
             missing_placeholders = cls.OPTIMIZED_MATCH_PLACEHOLDERS - cls.get_placeholders(prompt.system_instruction)
             if missing_placeholders:
                 return PromptReadiness(False, "Required prompt placeholders are invalid.")
@@ -335,6 +351,10 @@ Use only the supplied evidence. Do not infer personal or protected attributes.
             matched_vacancies_schema = schema.get("properties", {}).get("matched_vacancies", {}) if isinstance(schema, dict) else {}
             matched_vacancy_item_schema = matched_vacancies_schema.get("items", {}) if isinstance(matched_vacancies_schema, dict) else {}
             matched_vacancy_required = set(matched_vacancy_item_schema.get("required") or {}) if isinstance(matched_vacancy_item_schema, dict) else set()
+            assessment_schema = matched_vacancy_item_schema.get("properties", {}).get("requirement_assessments", {}) if isinstance(matched_vacancy_item_schema, dict) else {}
+            assessment_item_schema = assessment_schema.get("items", {}) if isinstance(assessment_schema, dict) else {}
+            assessment_required = set(assessment_item_schema.get("required") or {}) if isinstance(assessment_item_schema, dict) else set()
+            assessment_fields = set(assessment_item_schema.get("properties") or {}) if isinstance(assessment_item_schema, dict) else set()
             if (
                 not isinstance(schema, dict)
                 or schema.get("$id") != cls.OPTIMIZED_MATCH_SCHEMA_ID
@@ -344,6 +364,10 @@ Use only the supplied evidence. Do not infer personal or protected attributes.
                 or matched_vacancies_schema.get("type") != "array"
                 or matched_vacancy_item_schema.get("type") != "object"
                 or not cls.OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS.issubset(matched_vacancy_required)
+                or assessment_schema.get("type") != "array"
+                or assessment_item_schema.get("type") != "object"
+                or not cls.OPTIMIZED_MATCH_ASSESSMENT_SCHEMA_FIELDS.issubset(assessment_required)
+                or not cls.OPTIMIZED_MATCH_ASSESSMENT_SCHEMA_FIELDS.issubset(assessment_fields)
             ):
                 return PromptReadiness(False, "Required prompt response schema is incompatible.")
             return PromptReadiness(True, "READY")

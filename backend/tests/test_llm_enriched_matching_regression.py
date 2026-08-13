@@ -63,6 +63,7 @@ def sample_llm_match():
             "The high score reflects five-plus years of Flutter and Dart evidence against the vacancy's core requirements. "
             "Missing scale and ownership details prevent complete certainty."
         ),
+        requirement_assessments=[],
         semantic_fit_score=90.0,
     )
 
@@ -170,6 +171,7 @@ def test_2_multiple_vacancies_score_independently(sample_candidate_context):
             main_concern="The CV does not state the scale of the production mobile applications required by the vacancy. Recruiters should verify release ownership and user volume.",
             ai_match_explanation="The high score is driven by direct Flutter and Dart matches between the CV and vacancy. Missing delivery-scale evidence limits full confidence.",
             semantic_fit_score=90.0,
+            requirement_assessments=[],
         ),
         "201": OptimizedVacancyMatch(
             vacancy_id=201,
@@ -191,6 +193,7 @@ def test_2_multiple_vacancies_score_independently(sample_candidate_context):
                 "The low score reflects the conflict between the CV's software experience and the vacancy's plant-operations requirements. "
                 "No supplied CV evidence closes that domain gap."
             ),
+            requirement_assessments=[],
             semantic_fit_score=10.0,
         ),
     }
@@ -289,6 +292,7 @@ async def test_3_faulty_vacancy_does_not_destroy_other_matches():
                     "The high score is driven by direct Flutter and Dart evidence against the vacancy requirements. "
                     "Missing ownership details limit confidence in the complete seniority match."
                 ),
+                requirement_assessments=[],
                 semantic_fit_score=90.0,
             )
         ],

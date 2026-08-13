@@ -374,6 +374,7 @@ class MatchService:
                         "inferred_skills": len(match.inferred_skills),
                         "requirements": len(match.classified_requirements),
                         "evidence": len(match.evidence_snippets),
+                        "requirement_assessments": len(match.requirement_assessments),
                     }
                     for match in optimized_response.matched_vacancies
                 }
@@ -388,6 +389,7 @@ class MatchService:
                         "inferred_skills": len(match.inferred_skills),
                         "requirements": len(match.classified_requirements),
                         "evidence": len(match.evidence_snippets),
+                        "requirement_assessments": len(match.requirement_assessments),
                     }
                     for match in optimized_response.matched_vacancies
                 }
@@ -530,6 +532,7 @@ class MatchService:
                         retrieval_provenance=retrieval_provenance,
                         llm_classified_requirements=llm_match.classified_requirements if llm_match else [],
                         llm_evidence_snippets=llm_match.evidence_snippets if llm_match else {},
+                        llm_requirement_assessments=llm_match.requirement_assessments if llm_match else [],
                     )
                     evaluated_matches.append(enriched_match)
                     raw_counts = raw_llm_lineage.get(vac_id_str, {})

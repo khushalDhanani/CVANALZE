@@ -213,6 +213,19 @@ export interface LlmClassifiedRequirement {
   failure_reason?: string | null;
 }
 
+export interface LlmRequirementAssessment {
+  requirement_id: string;
+  requirement: string;
+  category: string;
+  mandatory: boolean;
+  cv_evidence: string;
+  jd_evidence: string;
+  rationale: string;
+  match_type: 'DIRECT' | 'INFERRED' | 'PARTIAL' | 'MISSING' | 'NOT_ASSESSABLE';
+  confidence: number;
+  impact: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
 export type CanonicalVacancyMatchStatus =
   | 'MATCHED'
   | 'POTENTIAL_MATCH'
@@ -304,6 +317,7 @@ export interface JobMatchScore {
   retrieval_provenance?: Record<string, unknown>;
   llm_classified_requirements?: LlmClassifiedRequirement[];
   llm_evidence_snippets?: Record<string, DualEvidence>;
+  llm_requirement_assessments?: LlmRequirementAssessment[];
   llm_model_used?: string | null;
   classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   retrieval_source?: 'keyword' | 'vector' | 'both' | string;
