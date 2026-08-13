@@ -139,6 +139,8 @@ class EnrichedJobMatchResult(JobMatchResult):
 
 
 class EnrichedCandidateAnalysis(BaseModel):
+    analysis_run_id: str | None = Field(default=None, description="End-to-end analysis execution identifier")
+    analysis_version: str | None = Field(default=None, description="Version identifier for the current candidate analysis")
     status: str | None = Field(default="COMPLETED", description="Status of processing job")
     progress: int | None = Field(default=100, description="Progress percentage")
     stage: str | None = Field(default="complete", description="Current stage")

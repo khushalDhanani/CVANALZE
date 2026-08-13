@@ -7,6 +7,7 @@ from typing import Any, TypeVar, cast
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from app.core.analysis_context import get_analysis_candidate, get_analysis_run_id
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.metrics import _metrics
@@ -154,7 +155,7 @@ class OllamaLLMService:
     @staticmethod
     def is_operational_failure(exc: OllamaError) -> bool:
         return (
-            isinstance(exc, (OllamaModelUnavailableError, OllamaTimeoutError, OllamaUnavailableError))
+            isinstance(exc, (OllamaInvalidResponseError, OllamaModelUnavailableError, OllamaTimeoutError, OllamaUnavailableError))
             or isinstance(exc, OllamaHTTPError) and exc.retryable
         )
 
@@ -448,8 +449,11 @@ class OllamaLLMService:
             )
 
         prompt_chars = len(request_prompt)
+        analysis_run_id = get_analysis_run_id()
+        analysis_candidate = get_analysis_candidate()
         logger.info(
-            f"[OLLAMA] operation={operation} model='{model}' status=CALLING "
+            f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+            f"model='{model}' status=CALLING "
             f"prompt_chars={prompt_chars} estimated_tokens={max(1, prompt_chars // 4)}"
         )
         llm_started = time.perf_counter()
@@ -463,7 +467,8 @@ class OllamaLLMService:
             duration_ms = round((time.perf_counter() - llm_started) * 1000.0, 2)
             propagate_failure = cls.is_operational_failure(exc)
             logger.error(
-                f"[OLLAMA] operation={operation} model='{model}' status={'PROPAGATED' if propagate_failure else 'FALLBACK'} "
+                f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} model='{model}' "
+                f"status={'PROPAGATED' if propagate_failure else 'FALLBACK'} "
                 f"error={type(exc).__name__} status_code={getattr(exc, 'status_code', 'none')} "
                 f"retryable={exc.retryable} duration_ms={duration_ms} prompt_chars={prompt_chars} detail={exc}"
             )

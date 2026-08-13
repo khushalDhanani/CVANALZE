@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, cast
 
+from app.core.analysis_context import get_analysis_run_id
 from app.core.cache import CacheIndex, CacheKey, match_result_cache_manager
 from app.core.config import settings
 from app.core.cv_identity import normalize_source_candidate_id
@@ -52,6 +53,7 @@ class MatchService:
         resume_json: dict[str, Any] | None = None,
         normalized_resume: NormalizedResume | None = None,
         deterministic_experience: float | None = None,
+        force_reanalysis: bool = False,
         _shadow_run: bool = False,
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
@@ -68,6 +70,8 @@ class MatchService:
 
         document_hash = (document_hash or "").strip() or hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
         cv_key = str(cv_key or candidate_id).strip()
+        analysis_run_id = get_analysis_run_id()
+        logger.info(f"analysis_run_id={analysis_run_id} candidate={cv_key or 'not_available'} operation=match_analysis status=START")
         source_candidate_id = normalize_source_candidate_id(source_candidate_id)
         extraction_version = f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
         quality_gate = MatchingQualityGate()
@@ -162,7 +166,7 @@ class MatchService:
             taxonomy_version=taxonomy_version,
         ).to_key()
 
-        cached_result = match_result_cache_manager.get(match_cache_key)
+        cached_result = None if force_reanalysis else match_result_cache_manager.get(match_cache_key)
         if cached_result is not None:
             logger.info(f"[MATCH_CACHE_HIT] Returning cached match result for doc={document_hash[:12]}...")
             profiler.metrics.cache_hit = True
@@ -343,7 +347,7 @@ class MatchService:
             filtered_vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in llm_vacancy_dicts]
             cache_key = LLMCacheRepository.compute_composite_hash(
                 document_hash=document_hash,
-                candidate_id=cv_key,
+                candidate_id=f"{cv_key}:{analysis_run_id}" if force_reanalysis else cv_key,
                 vacancy_ids=filtered_vacancy_ids,
                 vacancy_version=vacancy_version,
                 prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
@@ -766,6 +770,8 @@ class MatchService:
         gap_analysis = ExperienceGapService.analyze_timeline(resume_json or {}, cv_text)
 
         result = EnrichedCandidateAnalysis(
+            analysis_run_id=analysis_run_id,
+            analysis_version=analysis_run_id,
             match_status=top_level_match_status,
             primary_department=recommended_dept,
             recommended_department=recommended_dept,
@@ -850,6 +856,8 @@ class MatchService:
         except Exception:
             config_version = None
         return EnrichedCandidateAnalysis(
+            analysis_run_id=get_analysis_run_id(),
+            analysis_version=get_analysis_run_id(),
             status=status.value,
             stage="matching_quality_gate",
             match_status=status,
@@ -988,6 +996,8 @@ class MatchService:
         summary = "NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation." if is_global_empty else "NO_SUITABLE_MATCH: No compatible active vacancies found for this candidate profile."
         
         return EnrichedCandidateAnalysis(
+            analysis_run_id=get_analysis_run_id(),
+            analysis_version=get_analysis_run_id(),
             match_status=status,
             primary_department=industry_dept or None,
             recommended_department=industry_dept or None,
@@ -1022,7 +1032,9 @@ class MatchService:
 
     @staticmethod
     async def analyze_from_result_file(result_json_path: str | Path) -> dict[str, Any]:
-        data = ResultRepository.read_result(result_json_path)
+        source_data = ResultRepository.read_result(result_json_path)
+        candidate_key = str(source_data.get("id") or source_data.get("scan_id") or Path(result_json_path).stem)
+        data = ResultRepository.resolve_result(candidate_key) or source_data
 
         cv_text = data.get("markdown")
         if not cv_text:
@@ -1040,16 +1052,19 @@ class MatchService:
             resume_json=data.get("resume_json"),
             normalized_resume=stored_normalized_resume,
             deterministic_experience=(stored_normalized_resume.experience.authoritative_years if stored_normalized_resume else ((data.get("quality_metrics") or {}).get("experience_years") or None)),
+            force_reanalysis=True,
         )
 
-        # Merge back into data
-        data["enriched_match_analysis"] = enriched_analysis.model_dump()
+        analysis_payload = enriched_analysis.model_dump()
+        data["match_analysis"] = analysis_payload
+        data["enriched_match_analysis"] = analysis_payload
+        data["analysis_run_id"] = get_analysis_run_id()
+        data["analysis_version"] = data["analysis_run_id"]
 
-        # Save back or save as new
-        path = Path(result_json_path)
-        new_filename = f"{path.stem}_enriched.json"
-
-        new_path = ResultRepository.save_result(new_filename, data)
-
-        data["enriched_result_file_path"] = str(new_path)
+        canonical_filename = ResultRepository.canonical_filename(data, result_json_path)
+        ResultRepository.atomic_save_result(canonical_filename, data)
+        logger.info(
+            f"analysis_run_id={data['analysis_run_id']} candidate={cv_key} canonical_result_updated=true "
+            f"candidate_api_result_version={data['analysis_version']}"
+        )
         return data

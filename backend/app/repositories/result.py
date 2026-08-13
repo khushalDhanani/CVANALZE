@@ -191,6 +191,21 @@ class ResultRepository:
         return cls.atomic_save_result(filename, data)
 
     @classmethod
+    def canonical_filename(cls, data: dict[str, Any], fallback_reference: str | Path) -> str:
+        canonical_key = cls._optional_str(data.get("id")) or cls._optional_str(data.get("scan_id"))
+        if not canonical_key:
+            reference = str(fallback_reference)
+            if reference.startswith("redis://cv_result:"):
+                reference = reference.removeprefix("redis://cv_result:")
+            canonical_key = Path(reference).name.removesuffix(".json")
+        return f"{canonical_key.removesuffix('.json')}.json"
+
+    @staticmethod
+    def _is_historical_result_reference(reference: str | Path) -> bool:
+        stem = str(reference).split("/")[-1].removesuffix(".json").lower()
+        return stem.endswith(("_enriched", "_reprocessed", "_latest"))
+
+    @classmethod
     def atomic_save_result(cls, filename: str, data: dict[str, Any]) -> str:
         cls.ensure_canonical_metadata(data)
         cv_key = filename.removesuffix(".json")
@@ -257,7 +272,12 @@ class ResultRepository:
 
                 result_obj.raw_data = data
                 session.commit()
-                logger.info(f"Atomically saved result to PostgreSQL 'cv_results' for cv_key '{cv_key}' (gen={data.get('result_generation_id')}, seq={data.get('generation_sequence')}).")
+                logger.info(
+                    f"analysis_run_id={data.get('analysis_run_id', 'not_available')} candidate={cv_key} "
+                    f"canonical_result_updated={bool(data.get('match_analysis'))} "
+                    f"candidate_api_result_version={data.get('analysis_version') or data.get('result_generation_id', 'not_available')} "
+                    f"generation_sequence={data.get('generation_sequence', 'not_available')}"
+                )
         except Exception as exc:
             data["persistence_status"] = cls.PERSISTENCE_DEGRADED
             data["persistence_error"] = cls.PERSISTENCE_ERROR_MESSAGE
@@ -524,6 +544,8 @@ class ResultRepository:
                     cursor, keys = _REDIS_CLIENT.scan(cursor=cursor, match=pattern, count=100)
                     for key in keys:
                         redis_path = f"redis://{key}"
+                        if cls._is_historical_result_reference(redis_path):
+                            continue
                         try:
                             data = cls.read_result(redis_path)
                             if cls._result_matches_scan_id(data, scan_id):
@@ -540,6 +562,8 @@ class ResultRepository:
                 target = f"%{scan_id}%"
                 db_results = session.query(CVResult.cv_key, CVResult.raw_data).filter(CVResult.cv_key.ilike(target)).all()
                 for row in db_results:
+                    if cls._is_historical_result_reference(row.cv_key):
+                        continue
                     if row.raw_data and cls._result_matches_scan_id(row.raw_data, scan_id):
                         results.append(row.cv_key)
         except Exception as exc:
@@ -617,6 +641,8 @@ class ResultRepository:
                 while True:
                     cursor, keys = _REDIS_CLIENT.scan(cursor=cursor, match=pattern, count=100)
                     for key in keys:
+                        if cls._is_historical_result_reference(key):
+                            continue
                         try:
                             val = _REDIS_CLIENT.get(key)
                             if val:
@@ -635,6 +661,8 @@ class ResultRepository:
             with PostgresAppSession() as session:
                 db_results = session.query(CVResult).order_by(CVResult.parsed_at.desc()).all()
                 for row in db_results:
+                    if cls._is_historical_result_reference(row.cv_key):
+                        continue
                     data = row.raw_data
                     if isinstance(data, dict):
                         item_id = str(data.get("id") or data.get("scan_id") or row.cv_key).lower()

@@ -2,11 +2,21 @@ import { apiClient } from './apiClient';
 import {
   CVMatchRequest,
   CVProcessingResponse,
+  CVUploadResponse,
   EnrichedCandidateAnalysis,
   HRReviewRequest,
   LlmHealthResponse,
   TrainingExample,
 } from '@/types/api';
+
+type ReanalysisClient = Pick<typeof apiClient, 'post'>;
+
+export const reanalyzeScan = (
+  scanId: string,
+  client: ReanalysisClient = apiClient,
+): Promise<CVUploadResponse> => client.post<CVUploadResponse>(
+  `/api/match/reanalyze/${encodeURIComponent(scanId)}`
+);
 
 export const matchService = {
   /**
@@ -54,10 +64,8 @@ export const matchService = {
   /**
    * Re-run LLM semantic matching on a previously parsed scan by scan_id.
    */
-  reanalyzeScan: (scanId: string): Promise<EnrichedCandidateAnalysis> => {
-    return apiClient.post<EnrichedCandidateAnalysis>(
-      `/api/match/reanalyze/${encodeURIComponent(scanId)}`
-    );
+  reanalyzeScan: (scanId: string): Promise<CVUploadResponse> => {
+    return reanalyzeScan(scanId);
   },
 
   /**

@@ -100,6 +100,8 @@ export interface CVMatchRequest {
   cv_text: string;
 }
 
+export type AnalysisExecutionState = 'NO_MATCH' | 'LLM_UNAVAILABLE' | 'LLM_TIMEOUT' | 'ANALYSIS_INVALID';
+
 export interface CVProcessingResponse {
   message: string;
   cv_key: string;
@@ -109,10 +111,11 @@ export interface CVProcessingResponse {
   is_complete?: boolean;
   failed_step?: string | null;
   error_details?: string | null;
-  error_code?: string | null;
+  error_code?: AnalysisExecutionState | string | null;
   error_message?: string | null;
   error_retryable?: boolean | null;
   correlation_id?: string | null;
+  analysis_run_id?: string | null;
   job_id?: string | null;
   job_state?: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED' | null;
   execution_mode?: 'RQ' | string | null;
@@ -138,6 +141,7 @@ export interface CVProcessingJobSummary {
   error_message?: string | null;
   error_retryable?: boolean | null;
   correlation_id?: string | null;
+  analysis_run_id?: string | null;
   created_at: string;
   updated_at: string;
   started_at?: string | null;
@@ -198,6 +202,14 @@ export interface RequirementEvaluation {
   status?: 'SATISFIED' | 'PARTIALLY_SATISFIED' | 'FAILED' | string;
   matched?: boolean;
   evidence?: DualEvidence | string;
+  failure_reason?: string | null;
+}
+
+export interface LlmClassifiedRequirement {
+  requirement_id: string;
+  description: string;
+  tier: 'MANDATORY' | 'PREFERRED' | 'OPTIONAL' | string;
+  status: 'SATISFIED' | 'PARTIALLY_SATISFIED' | 'FAILED' | string;
   failure_reason?: string | null;
 }
 
@@ -280,7 +292,16 @@ export interface JobMatchScore {
   reason: string;
   ranking_reason: string;
   llm_reason?: string | null;
+  semantic_reason?: string | null;
   inferred_skills?: string[];
+  semantic_score_boost?: number | null;
+  calibrated_confidence?: number | null;
+  calibration_version?: string | null;
+  quality_flags?: string[];
+  retrieval_provenance?: Record<string, unknown>;
+  llm_classified_requirements?: LlmClassifiedRequirement[];
+  llm_evidence_snippets?: Record<string, DualEvidence>;
+  llm_model_used?: string | null;
   classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   retrieval_source?: 'keyword' | 'vector' | 'both' | string;
   vector_score?: number | null;
@@ -305,13 +326,15 @@ export interface CandidateMatchAnalysis {
 export interface EnrichedJobEvaluation extends JobMatchScore {
   llm_reason: string;
   inferred_skills: string[];
-  semantic_score_boost: number;
+  semantic_score_boost?: number | null;
   classification: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   retrieval_source?: 'keyword' | 'vector' | 'both' | string;
   vector_score?: number | null;
 }
 
 export interface EnrichedCandidateAnalysis {
+  analysis_run_id?: string | null;
+  analysis_version?: string | null;
   status?: string | null;
   progress?: number | null;
   stage?: string | null;
@@ -329,6 +352,10 @@ export interface EnrichedCandidateAnalysis {
   suitable_job_roles?: string[];
   has_genuine_match?: boolean;
   active_vacancy_summary?: string;
+  scoring_profile_code?: string | null;
+  scoring_profile_version?: string | null;
+  config_version?: string | null;
+  prompt_version?: string | null;
   ai_career_summary?: string;
   best_match?: EnrichedJobEvaluation | null;
   suitable_openings: EnrichedJobEvaluation[];
@@ -336,6 +363,9 @@ export interface EnrichedCandidateAnalysis {
   rejection_policy_note: string;
   llm_model_used?: string;
   llm_skipped?: boolean;
+  freshness_status?: string | null;
+  source_watermark?: string | null;
+  quality_metadata?: Record<string, unknown>;
   match_status?: CanonicalVacancyMatchStatus | string | null;
   hiring_recommendation?: CanonicalVacancyMatchStatus | string | null;
   normalized_resume?: any;
@@ -422,6 +452,9 @@ export interface CVUploadResponse {
   field_confidence_tiers?: FieldConfidenceTiers | null;
   name_extraction_source?: string | null;
   id?: string | null;
+  analysis_run_id?: string | null;
+  analysis_version?: string | null;
+  result_generation_id?: string | null;
   candidate_id?: string | null;
   cv_id?: string | null;
   legacy_cv_keys?: string[] | null;
@@ -452,6 +485,7 @@ export interface CVUploadResponse {
   certifications?: Array<string | Record<string, unknown>> | Record<string, unknown> | null;
   resume_json?: CandidateResumeJson | null;
   normalized_resume?: Record<string, unknown> | null;
+  quality_metadata?: Record<string, unknown> | null;
   similar_candidates?: Array<Record<string, any>> | null;
   match_analysis?: CandidateMatchAnalysis | null;
   enriched_match_analysis?: EnrichedCandidateAnalysis | null;

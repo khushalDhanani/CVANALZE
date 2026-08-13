@@ -10,6 +10,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.analysis import analyze_cv_text, check_llm_health
+from app.core.analysis_context import analysis_run_context
 from app.core import lifecycle
 from app.core.config import Settings, settings
 from app.repositories.llm_cache import LLMCacheEntry
@@ -257,6 +258,18 @@ def test_tags_log_identifies_model_as_not_applicable(monkeypatch, caplog):
     assert "model='none'" not in caplog.text
 
 
+def test_transport_logs_analysis_run_id(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="cv_analyzer")
+    _install_client(monkeypatch, _response({"models": [{"name": "llama3.2:3b"}]}))
+
+    with analysis_run_context("analysis_contract_test"):
+        OllamaTransport.get_tags()
+
+    assert "analysis_run_id=analysis_contract_test" in caplog.text
+    assert "status=START" in caplog.text
+    assert "status=SUCCESS" in caplog.text
+
+
 def test_transport_uses_exponential_backoff(monkeypatch):
     monkeypatch.setattr(settings, "OLLAMA_MAX_RETRIES", 2)
     monkeypatch.setattr(settings, "OLLAMA_RETRY_BACKOFF_SECONDS", 0.25)
@@ -298,7 +311,7 @@ def test_transport_applies_uniform_timeout_retries(monkeypatch):
     assert metrics["failures"] == 1
 
 
-def test_invalid_generation_json_returns_fallback_after_retries(monkeypatch):
+def test_invalid_generation_json_propagates_after_retries(monkeypatch):
     _disable_cache(monkeypatch)
     client = _install_client(
         monkeypatch,
@@ -306,14 +319,14 @@ def test_invalid_generation_json_returns_fallback_after_retries(monkeypatch):
         _response({"response": "still not structured JSON"}),
     )
 
-    result = OllamaLLMService.call_qwen("analyze", "phase5", "invalid-json")
+    with pytest.raises(OllamaInvalidResponseError):
+        OllamaLLMService.call_qwen("analyze", "phase5", "invalid-json")
 
-    assert result is None
     assert client.stream.call_count == 3
     assert client.stream.call_args_list[-1].kwargs["json"]["keep_alive"] == 0
 
 
-def test_generation_schema_failure_returns_fallback_after_retries(monkeypatch):
+def test_generation_schema_failure_propagates_after_retries(monkeypatch):
     _disable_cache(monkeypatch)
     invalid_schema = json.dumps({"skill_matches": ["Python"]})
     client = _install_client(
@@ -322,9 +335,9 @@ def test_generation_schema_failure_returns_fallback_after_retries(monkeypatch):
         _response({"response": invalid_schema}),
     )
 
-    result = OllamaLLMService.call_qwen("analyze", "phase5", "invalid-schema")
+    with pytest.raises(OllamaSchemaValidationError):
+        OllamaLLMService.call_qwen("analyze", "phase5", "invalid-schema")
 
-    assert result is None
     assert client.stream.call_count == 3
     assert client.stream.call_args_list[-1].kwargs["json"]["keep_alive"] == 0
 
@@ -371,7 +384,8 @@ def test_generation_rejects_unload_completion_reason_before_parser(monkeypatch):
     assert client.stream.call_count == 2
 
 
-def test_generation_uses_prompt_oriented_generate_endpoint_and_payload(monkeypatch):
+def test_generation_uses_prompt_oriented_generate_endpoint_and_payload(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="cv_analyzer")
     client = _install_client(monkeypatch, _response({"response": "{}"}))
     response_schema = {"type": "object", "properties": {"result": {"type": "string"}}}
     options = {"temperature": 0.0, "num_ctx": 4096}
@@ -383,11 +397,12 @@ def test_generation_uses_prompt_oriented_generate_endpoint_and_payload(monkeypat
         options=options,
     )
 
-    result = OllamaTransport.generate(
-        operation="test_generation_contract",
-        payload=payload,
-        parser=lambda data: data["response"],
-    )
+    with analysis_run_context("analysis_generation_contract"):
+        result = OllamaTransport.generate(
+            operation="test_generation_contract",
+            payload=payload,
+            parser=lambda data: data["response"],
+        )
 
     generation_request = client.stream.call_args_list[0]
     assert generation_request.args == ("POST", "/api/generate")
@@ -402,6 +417,7 @@ def test_generation_uses_prompt_oriented_generate_endpoint_and_payload(monkeypat
         "think": True,
     }
     assert result.value == "{}"
+    assert "analysis_run_id=analysis_generation_contract" in caplog.text
 
 
 def test_non_streaming_response_is_joined_before_single_json_decode(monkeypatch):

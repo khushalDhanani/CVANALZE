@@ -6,6 +6,7 @@ from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 
+from app.core.analysis_context import async_analysis_run_context, new_analysis_run_id
 from app.core.cache import CacheIndex, CacheInvalidator, CacheKey, doc_cache_manager
 from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, normalize_source_candidate_id, resolve_cv_identity
@@ -93,9 +94,11 @@ async def process_cv_file(
     cv_id: str | int | None = None,
     force_reprocess: bool = False,
     storage_filename: str | None = None,
+    analysis_run_id: str | None = None,
 ) -> dict[str, Any]:
     identity = resolve_cv_identity(filename, candidate_id, cv_id)
     cv_key = identity.canonical_key
+    analysis_run_id = str(analysis_run_id or new_analysis_run_id())
     source_candidate_id = normalize_source_candidate_id(source_candidate_id if source_candidate_id is not None else identity.candidate_id)
     cv_hash = hashlib.sha256(content).hexdigest()
     result_filename = f"{cv_key}.json"
@@ -112,7 +115,7 @@ async def process_cv_file(
     current_optimized_prompt_version = settings.OPTIMIZED_PROMPT_VERSION
     current_llm_model_version = settings.OLLAMA_MODEL
 
-    async with get_cv_lock(cv_key):
+    async with async_analysis_run_context(analysis_run_id, cv_key), get_cv_lock(cv_key):
 
 
         current_stage = "initialization"
@@ -175,6 +178,8 @@ async def process_cv_file(
                     existing_data["identity"] = identity_metadata
                     existing_data["source_candidate_id"] = source_candidate_id
                     existing_data["legacy_cv_keys"] = legacy_cv_keys
+                    existing_data["analysis_run_id"] = analysis_run_id
+                    existing_data["analysis_version"] = analysis_run_id
 
                     # 1. Disk/Cache Persistence Parity
                     saved_path = await asyncio.to_thread(
@@ -234,6 +239,8 @@ async def process_cv_file(
                     "id": cv_key,
                     "scan_id": cv_key,
                     "result_generation_id": result_generation_id,
+                    "analysis_run_id": analysis_run_id,
+                    "analysis_version": analysis_run_id,
                     "generation_sequence": generation_sequence,
                     "status": "processing",
 
@@ -422,6 +429,8 @@ async def process_cv_file(
                 "id": cv_key,
                 "scan_id": cv_key,
                 "result_generation_id": result_generation_id,
+                "analysis_run_id": analysis_run_id,
+                "analysis_version": analysis_run_id,
                 "generation_sequence": generation_sequence,
                 "document_hash": cv_hash,
 
@@ -533,6 +542,8 @@ async def process_cv_file(
             failure_data = {
                 "id": cv_key,
                 "scan_id": cv_key,
+                "analysis_run_id": analysis_run_id,
+                "analysis_version": analysis_run_id,
                 "filename": filename,
                 "storage_filename": storage_filename,
                 "content_type": content_type,

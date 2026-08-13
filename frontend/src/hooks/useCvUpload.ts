@@ -462,7 +462,7 @@ export function useCvUpload() {
     try {
       const res = await matchService.reanalyzeScan(scanId);
       stopTimer();
-      setEnrichedResult(res);
+      setEnrichedResult(res.enriched_match_analysis ?? (res.match_analysis as unknown as EnrichedCandidateAnalysis) ?? null);
       setUploading(false);
       setIsComplete(true);
       setCurrentStepIndex(7);

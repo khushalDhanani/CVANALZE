@@ -42,6 +42,7 @@ async def list_processing_jobs():
             error_message=record.error.message if record.error else None,
             error_retryable=record.error.retryable if record.error else None,
             correlation_id=record.error.correlation_id if record.error else None,
+            analysis_run_id=record.rq_job_id or record.job_id,
             created_at=record.created_at,
             updated_at=record.updated_at,
             started_at=record.started_at,
@@ -95,6 +96,7 @@ async def upload_cv(
             job_state=record_state,
             execution_mode=record_exec_mode,
             retry_count=submission.record.attempt,
+            analysis_run_id=submission.record.rq_job_id or submission.record.job_id,
         )
     except CVIdentityCollisionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -168,6 +170,7 @@ async def get_cv_status(cv_key: str):
                 error_message=job.error.message if job and job.error else result.get("message") or result.get("error") or "CV processing failed.",
                 error_retryable=job.error.retryable if job and job.error else False,
                 correlation_id=job.error.correlation_id if job and job.error else None,
+                analysis_run_id=(job.rq_job_id or job.job_id) if job else result.get("analysis_run_id"),
                 job_id=job.job_id if job else None,
                 job_state=job_state_val or "FAILED",
                 execution_mode=exec_mode_val,
@@ -191,6 +194,7 @@ async def get_cv_status(cv_key: str):
                 job_state=payload.get("job_state", "PROCESSING"),
                 execution_mode=payload.get("execution_mode"),
                 retry_count=payload.get("retry_count"),
+                analysis_run_id=payload.get("analysis_run_id") or result.get("analysis_run_id"),
             )
         if "scan_id" not in result and "id" in result:
             result["scan_id"] = result["id"]
@@ -207,6 +211,7 @@ async def get_cv_status(cv_key: str):
                 job_state=job_state_val,
                 execution_mode=exec_mode_val,
                 retry_count=job.attempt,
+                analysis_run_id=result.get("analysis_run_id") or job.rq_job_id or job.job_id,
             )
         return CVUploadResponse(**result)
 

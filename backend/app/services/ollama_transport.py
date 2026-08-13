@@ -15,6 +15,7 @@ import httpx
 from filelock import FileLock, Timeout as FileLockTimeout
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from app.core.analysis_context import get_analysis_candidate, get_analysis_run_id
 from app.core.config import settings
 from app.core.logging import logger
 
@@ -319,9 +320,12 @@ class OllamaTransport:
     ) -> OllamaTransportResult[T]:
         retries = max(0, settings.OLLAMA_MAX_RETRIES if max_retries is None else max_retries)
         total_attempts = retries + 1
-        timeout_seconds = cls._operation_timeout(operation)
+        # The request timeout caps one attempt; the operation timeout owns the full budget, including retry backoff.
+        operation_timeout_seconds = cls._operation_timeout(operation)
+        attempt_timeout_seconds = cls._attempt_timeout(operation)
         started = time.perf_counter()
-        operation_deadline = deadline if deadline is not None else started + timeout_seconds
+        operation_deadline = deadline if deadline is not None else started + operation_timeout_seconds
+        total_budget_seconds = max(0.0, operation_deadline - started)
         last_error: OllamaError | None = None
         cls._circuit_before_request(operation)
 
@@ -329,42 +333,74 @@ class OllamaTransport:
         generation_options = (payload or {}).get("options", {})
         num_ctx = generation_options.get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
         num_predict = generation_options.get("num_predict", "default") if operation not in ("tags", "embed", "unload") else None
+        prompt = str((payload or {}).get("prompt") or "")
+        prompt_tokens = max(1, len(prompt) // 4) if prompt else 0
+        analysis_run_id = get_analysis_run_id()
+        analysis_candidate = get_analysis_candidate()
         logger.info(
-            f"[OLLAMA] operation={operation} path={path} model='{requested_model}' "
+            f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+            f"path={path} model='{requested_model}' "
             f"config: max_retries={retries} total_attempts={total_attempts} "
-            f"timeout_s={timeout_seconds}"
+            f"attempt_timeout_s={attempt_timeout_seconds} total_deadline_s={round(total_budget_seconds, 3)} "
+            f"prompt_tokens={prompt_tokens}"
             + (f" num_ctx={num_ctx}" if num_ctx is not None else "")
             + (f" num_predict={num_predict}" if num_predict is not None else "")
         )
 
         for attempt in range(1, total_attempts + 1):
-            remaining = operation_deadline - time.perf_counter()
-            if remaining <= 0:
+            attempt_started = time.perf_counter()
+            remaining_total = operation_deadline - attempt_started
+            if remaining_total <= 0:
                 cls._record_timeout()
                 last_error = OllamaTimeoutError(
                     "Ollama operation exceeded its total deadline.",
                     operation=operation,
                 )
+                logger.error(
+                    f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                    f"model='{requested_model}' "
+                    f"attempt={attempt}/{total_attempts} "
+                    f"attempt_timeout_s=0 total_deadline_s={round(total_budget_seconds, 3)} "
+                    f"elapsed_s={round(attempt_started - started, 3)} total_remaining_s=0 "
+                    f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} "
+                    f"status=DEADLINE_EXHAUSTED exception={type(last_error).__name__}"
+                )
                 break
 
+            attempt_timeout = min(attempt_timeout_seconds, remaining_total)
             cls._record_attempt(operation)
-            logger.info(f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} status=START")
+            logger.info(
+                f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                f"model='{requested_model}' "
+                f"attempt={attempt}/{total_attempts} "
+                f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                f"elapsed_s={round(attempt_started - started, 3)} total_remaining_s={round(remaining_total, 3)} "
+                f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} status=START exception=none"
+            )
             try:
                 response_data, response_bytes = cls._request_json(
                     operation=operation,
                     method=method,
                     path=path,
                     payload=payload,
-                    timeout_seconds=remaining,
+                    timeout_seconds=attempt_timeout,
                 )
                 cls._validate_error_field(response_data, operation=operation)
                 value = parser(response_data)
                 duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
+                attempt_elapsed = time.perf_counter() - attempt_started
+                total_remaining = max(0.0, operation_deadline - time.perf_counter())
+                response_prompt_tokens = response_data.get("prompt_eval_count", prompt_tokens)
                 cls._record_success(operation, duration_ms, response_bytes, response_data)
                 cls._circuit_success(operation)
                 logger.info(
-                    f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} status=SUCCESS "
-                    f"duration_ms={duration_ms} response_bytes={response_bytes}"
+                    f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                    f"model='{requested_model}' "
+                    f"attempt={attempt}/{total_attempts} "
+                    f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                    f"elapsed_s={round(attempt_elapsed, 3)} total_remaining_s={round(total_remaining, 3)} "
+                    f"prompt_tokens={response_prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} "
+                    f"status=SUCCESS exception=none response_bytes={response_bytes}"
                 )
                 return OllamaTransportResult(
                     value=value,
@@ -403,27 +439,41 @@ class OllamaTransport:
 
             assert last_error is not None
             should_retry = last_error.retryable and attempt < total_attempts
+            attempt_elapsed = time.perf_counter() - attempt_started
+            total_remaining = max(0.0, operation_deadline - time.perf_counter())
+            backoff = 0.0
+            if should_retry:
+                backoff = max(0.0, settings.OLLAMA_RETRY_BACKOFF_SECONDS) * (2 ** (attempt - 1))
+                backoff += random.uniform(0.0, max(0.0, settings.OLLAMA_RETRY_JITTER_SECONDS))
+            retry_fits = should_retry and (backoff <= 0 or backoff < total_remaining)
+            status = "TIMEOUT" if isinstance(last_error, OllamaTimeoutError) else "RETRY" if retry_fits else "FAILED"
             logger.warning(
-                f"[OLLAMA] operation={operation} path={path} model='{requested_model}' attempt={attempt}/{total_attempts} "
-                f"status={'RETRY' if should_retry else 'FAILED'} error={type(last_error).__name__} "
-                f"status_code={getattr(last_error, 'status_code', 'none')} retryable={last_error.retryable} detail={last_error}"
+                f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                f"model='{requested_model}' "
+                f"attempt={attempt}/{total_attempts} "
+                f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                f"elapsed_s={round(attempt_elapsed, 3)} total_remaining_s={round(total_remaining, 3)} "
+                f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} status={status} "
+                f"exception={type(last_error).__name__} retryable={last_error.retryable} "
+                f"retry_in_s={round(backoff, 3) if retry_fits else 'none'} detail={last_error}"
             )
             if not should_retry:
                 break
-            cls._record_retry()
-            backoff = max(0.0, settings.OLLAMA_RETRY_BACKOFF_SECONDS) * (2 ** (attempt - 1))
-            backoff += random.uniform(0.0, max(0.0, settings.OLLAMA_RETRY_JITTER_SECONDS))
-            remaining = operation_deadline - time.perf_counter()
-            if backoff <= 0:
-                continue
-            if backoff >= remaining:
+            if not retry_fits:
                 cls._record_timeout()
-                last_error = OllamaTimeoutError(
-                    "Ollama retry backoff exceeded the total deadline.",
-                    operation=operation,
+                logger.error(
+                    f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                    f"model='{requested_model}' "
+                    f"attempt={attempt}/{total_attempts} "
+                    f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                    f"elapsed_s={round(time.perf_counter() - started, 3)} total_remaining_s={round(total_remaining, 3)} "
+                    f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} "
+                    f"status=DEADLINE_EXHAUSTED exception={type(last_error).__name__} retry_in_s={round(backoff, 3)}"
                 )
                 break
-            time.sleep(backoff)
+            cls._record_retry()
+            if backoff > 0:
+                time.sleep(backoff)
 
         duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
         cls._record_failure(operation, duration_ms)
@@ -431,9 +481,15 @@ class OllamaTransport:
             last_error = OllamaUnavailableError("Ollama request failed.", operation=operation)
         if last_error.retryable and isinstance(last_error, (OllamaUnavailableError, OllamaTimeoutError, OllamaHTTPError)):
             cls._circuit_failure(operation)
+        total_remaining = max(0.0, operation_deadline - time.perf_counter())
         logger.error(
-            f"[OLLAMA] operation={operation} path={path} model='{requested_model}' status=FAILED "
-            f"duration_ms={duration_ms} error={type(last_error).__name__} "
+            f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+            f"path={path} model='{requested_model}' "
+            f"attempt={attempt}/{total_attempts} "
+            f"attempt_timeout_s={round(attempt_timeout_seconds, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+            f"elapsed_s={round(duration_ms / 1000.0, 3)} total_remaining_s={round(total_remaining, 3)} "
+            f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} status=FAILED "
+            f"exception={type(last_error).__name__} "
             f"status_code={getattr(last_error, 'status_code', 'none')} retryable={last_error.retryable} detail={last_error}"
         )
         raise last_error
@@ -825,6 +881,10 @@ class OllamaTransport:
         if operation == "unload":
             return max(0.001, settings.OLLAMA_UNLOAD_TIMEOUT_SECONDS)
         return max(0.001, settings.OLLAMA_GENERATE_TIMEOUT_SECONDS)
+
+    @classmethod
+    def _attempt_timeout(cls, operation: str) -> float:
+        return min(max(0.001, settings.OLLAMA_REQUEST_TIMEOUT), cls._operation_timeout(operation))
 
     @staticmethod
     def _require_requested_model(payload: dict[str, Any], *, operation: str) -> str:

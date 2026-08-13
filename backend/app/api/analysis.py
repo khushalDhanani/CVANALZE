@@ -3,6 +3,7 @@ from datetime import timezone, datetime
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from app.core.analysis_context import analysis_run_context, new_analysis_run_id
 from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, resolve_cv_identity
 from app.core.logging import logger
@@ -17,7 +18,7 @@ from app.schemas.analysis import (
 )
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse
 from app.services.match_service import MatchService
-from app.services.ollama_transport import OllamaError, OllamaModelUnavailableError, OllamaTimeoutError
+from app.services.ollama_transport import OllamaError, OllamaInvalidResponseError, OllamaModelUnavailableError, OllamaTimeoutError
 from app.services.processing_queue import (
     ProcessingQueueService,
     ProcessingQueueUnavailableError,
@@ -76,23 +77,33 @@ async def analyze_cv_text(payload: CVMatchRequest):
     if not payload.cv_text or not payload.cv_text.strip():
         raise HTTPException(status_code=400, detail="CV text content cannot be empty.")
 
+    analysis_run_id = new_analysis_run_id()
     try:
-        return await MatchService.analyze_single_cv(payload.cv_text)
+        with analysis_run_context(analysis_run_id):
+            return await MatchService.analyze_single_cv(payload.cv_text)
     except OllamaTimeoutError as exc:
         logger.error(
-            f"[OLLAMA] operation=analyze_cv_text status=TIMEOUT status_code={exc.status_code or 'none'} "
+            f"[OLLAMA] analysis_run_id={analysis_run_id} operation=analyze_cv_text status=TIMEOUT "
+            f"status_code={exc.status_code or 'none'} "
             f"retryable={exc.retryable} detail={exc}"
         )
         raise HTTPException(status_code=504, detail="LLM generation timed out.") from exc
     except OllamaModelUnavailableError as exc:
         logger.error(
-            f"[OLLAMA] operation=analyze_cv_text model='{exc.model}' status=UNAVAILABLE "
+            f"[OLLAMA] analysis_run_id={analysis_run_id} operation=analyze_cv_text model='{exc.model}' status=UNAVAILABLE "
             f"status_code={exc.status_code} retryable={exc.retryable} detail={exc}"
         )
         raise HTTPException(status_code=503, detail=f"Configured LLM model '{exc.model}' is unavailable.") from exc
+    except OllamaInvalidResponseError as exc:
+        logger.error(
+            f"[OLLAMA] analysis_run_id={analysis_run_id} operation=analyze_cv_text status=INVALID_RESPONSE "
+            f"retryable={exc.retryable} detail={exc}"
+        )
+        raise HTTPException(status_code=422, detail="LLM returned an invalid structured response.") from exc
     except OllamaError as exc:
         logger.error(
-            f"[OLLAMA] operation=analyze_cv_text status=UNAVAILABLE status_code={exc.status_code or 'none'} "
+            f"[OLLAMA] analysis_run_id={analysis_run_id} operation=analyze_cv_text status=UNAVAILABLE "
+            f"status_code={exc.status_code or 'none'} "
             f"retryable={exc.retryable} detail={exc}"
         )
         raise HTTPException(status_code=503, detail="LLM service is unavailable.") from exc
@@ -143,6 +154,7 @@ async def upload_and_analyze(
             job_state=record_state,
             execution_mode=record_exec_mode,
             retry_count=submission.record.attempt,
+            analysis_run_id=submission.record.rq_job_id or submission.record.job_id,
         )
 
     except CVIdentityCollisionError as exc:
@@ -192,6 +204,7 @@ async def get_match_status(cv_key: str):
                 error_message=job.error.message if job and job.error else result.get("message") or result.get("error") or "CV processing failed.",
                 error_retryable=job.error.retryable if job and job.error else False,
                 correlation_id=job.error.correlation_id if job and job.error else None,
+                analysis_run_id=(job.rq_job_id or job.job_id) if job else result.get("analysis_run_id"),
                 job_id=job.job_id if job else None,
                 job_state=job_state_val or "FAILED",
                 execution_mode=exec_mode_val,
@@ -222,6 +235,7 @@ async def get_match_status(cv_key: str):
                     job_state=job_state_val,
                     execution_mode=exec_mode_val,
                     retry_count=job.attempt,
+                    analysis_run_id=result.get("analysis_run_id") or job.rq_job_id or job.job_id,
                 )
             try:
                 return EnrichedCandidateAnalysis.model_validate(match_analysis)
@@ -243,6 +257,7 @@ async def get_match_status(cv_key: str):
                     ResultRepository.PERSISTENCE_DEGRADED if persistence_degraded else ResultRepository.PERSISTENCE_DURABLE
                 ),
                 persistence_error=ResultRepository.PERSISTENCE_ERROR_MESSAGE if persistence_degraded else None,
+                analysis_run_id=result.get("analysis_run_id") or ((job.rq_job_id or job.job_id) if job else None),
             )
 
         return CVProcessingResponse(
@@ -255,6 +270,7 @@ async def get_match_status(cv_key: str):
             job_state=job_state_val or "PROCESSING",
             execution_mode=exec_mode_val,
             retry_count=job.attempt if job else None,
+            analysis_run_id=result.get("analysis_run_id") or ((job.rq_job_id or job.job_id) if job else None),
         )
 
     if job:
@@ -274,18 +290,28 @@ async def get_match_status(cv_key: str):
 @router.post("/reanalyze/{scan_id}")
 async def reanalyze_scan(scan_id: str):
     """Re-run LLM semantic matching on a previously parsed CV (by scan_id)."""
-    matching_files = ResultRepository.find_results_by_scan_id(scan_id)
+    canonical_result = ResultRepository.resolve_result(scan_id)
+    if not canonical_result:
+        raise HTTPException(status_code=404, detail=f"No result found for scan_id: {scan_id}")
 
-    # Filter out already enriched files
-    original_files = [f for f in matching_files if not str(f).endswith("_enriched.json")]
-
-    if not original_files:
-        raise HTTPException(status_code=404, detail=f"No original result found for scan_id: {scan_id}")
-
-    file_path = original_files[0]
+    canonical_filename = ResultRepository.canonical_filename(canonical_result, scan_id)
+    analysis_run_id = new_analysis_run_id()
 
     try:
-        return await MatchService.analyze_from_result_file(file_path)
+        with analysis_run_context(analysis_run_id, scan_id):
+            return await MatchService.analyze_from_result_file(canonical_filename)
+    except OllamaTimeoutError as exc:
+        logger.error(f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={scan_id} operation=reanalyze_scan status=TIMEOUT retryable={exc.retryable} detail={exc}")
+        raise HTTPException(status_code=504, detail="LLM generation timed out during re-analysis.") from exc
+    except OllamaModelUnavailableError as exc:
+        logger.error(f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={scan_id} operation=reanalyze_scan model='{exc.model}' status=UNAVAILABLE retryable={exc.retryable} detail={exc}")
+        raise HTTPException(status_code=503, detail=f"Configured LLM model '{exc.model}' is unavailable.") from exc
+    except OllamaInvalidResponseError as exc:
+        logger.error(f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={scan_id} operation=reanalyze_scan status=INVALID_RESPONSE retryable={exc.retryable} detail={exc}")
+        raise HTTPException(status_code=422, detail="LLM returned an invalid structured response during re-analysis.") from exc
+    except OllamaError as exc:
+        logger.error(f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={scan_id} operation=reanalyze_scan status=UNAVAILABLE retryable={exc.retryable} detail={exc}")
+        raise HTTPException(status_code=503, detail="LLM service is unavailable during re-analysis.") from exc
     except Exception as exc:
         logger.exception(f"Failed to reanalyze CV: {exc}")
         raise HTTPException(status_code=500, detail="An internal error occurred during reanalysis.") from exc
@@ -294,22 +320,15 @@ async def reanalyze_scan(scan_id: str):
 @router.post("/hr-review")
 async def submit_hr_review(payload: HRReviewRequest):
     """Submit HR corrections/approvals for a match to build training data."""
-    matching_files = ResultRepository.find_results_by_scan_id(payload.scan_id)
-
-    if not matching_files:
+    data = ResultRepository.resolve_result(payload.scan_id)
+    if not data:
         raise HTTPException(status_code=404, detail=f"No result found for scan_id: {payload.scan_id}")
 
-    # Prefer enriched result if available
-    enriched_files = [f for f in matching_files if str(f).endswith("_enriched.json")]
-    file_path = enriched_files[0] if enriched_files else matching_files[0]
-
     try:
-        data = ResultRepository.read_result(file_path)
-
         cv_text = data.get("markdown", "")
 
-        # Get original analysis
-        match_analysis = data.get("enriched_match_analysis") or data.get("match_analysis")
+        # The canonical analysis is authoritative; the enriched field is a legacy compatibility alias.
+        match_analysis = data.get("match_analysis") or data.get("enriched_match_analysis")
         if not match_analysis:
             raise HTTPException(status_code=400, detail="Result file lacks match_analysis.")
 

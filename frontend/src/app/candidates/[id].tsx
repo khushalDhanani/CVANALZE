@@ -23,6 +23,7 @@ import {
   ComponentScoreBar,
   ErrorBanner,
   HiringRisksCard,
+  VacancyEnrichmentPanel,
 } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import {
@@ -47,6 +48,8 @@ import {
   responseMatchesCandidateId,
 } from '@/utils/candidateDetail';
 import { getProcessingProvenanceRows } from '@/utils/processingProvenance';
+import { getReanalysisErrorPresentation, type ReanalysisErrorPresentation } from '@/utils/reanalysisError';
+import { reanalyzeCandidateAndCommit } from '@/utils/candidateReanalysis';
 
 type TabType = 'overview' | 'processing';
 
@@ -94,6 +97,7 @@ export default function CandidateDetailScreen() {
   const [reprocessStatusMsg, setReprocessStatusMsg] = useState<string>('Initializing re-analysis...');
   const [stepStates, setStepStates] = useState<StepState[]>(Array(8).fill('pending'));
   const [isReanalyzing, setIsReanalyzing] = useState<boolean>(false);
+  const [reanalyzeError, setReanalyzeError] = useState<ReanalysisErrorPresentation | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -117,6 +121,7 @@ export default function CandidateDetailScreen() {
     setReviewModalVisible(false);
     setSelectedJobForReview(null);
     setIsReanalyzing(false);
+    setReanalyzeError(null);
     setIsReprocessing(false);
     setReprocessError(null);
     setRecommendationsError(null);
@@ -268,16 +273,22 @@ export default function CandidateDetailScreen() {
     if (!scanId) return;
     const requestedCandidateId = candidateCvId;
     setIsReanalyzing(true);
+    setReanalyzeError(null);
     try {
-      await matchService.reanalyzeScan(scanId);
-      setTimeout(() => {
-        if (activeCandidateIdRef.current !== requestedCandidateId) return;
-        fetchDetail();
-        setIsReanalyzing(false);
-      }, 1500);
-    } catch (err: any) {
-      console.warn('Reanalysis failed:', err);
-      setIsReanalyzing(false);
+      await reanalyzeCandidateAndCommit({
+        scanId,
+        reanalyze: matchService.reanalyzeScan,
+        commit: setData,
+        isCurrent: () => activeCandidateIdRef.current === requestedCandidateId,
+      });
+      if (activeCandidateIdRef.current !== requestedCandidateId) return;
+      setError(null);
+    } catch (requestError: unknown) {
+      if (activeCandidateIdRef.current === requestedCandidateId) {
+        setReanalyzeError(getReanalysisErrorPresentation(requestError));
+      }
+    } finally {
+      if (activeCandidateIdRef.current === requestedCandidateId) setIsReanalyzing(false);
     }
   };
 
@@ -370,6 +381,118 @@ export default function CandidateDetailScreen() {
         </Card>
         ) : null}
 
+        {/* Suitable Openings */}
+        {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
+          analysis.suitable_openings.slice(0, 5).map((match: any, idx: number) => {
+            const rawStatus = match.vacancy_match_status || match.match_status || match.classification;
+            const fitScore = resolveVacancyFitScore(match);
+            const isTop = idx === 0 && (rawStatus === 'MATCHED' || rawStatus === 'HIGH');
+            return (
+              <Card key={idx} className={`p-3 border-primary/40 shadow-none gap-2 ${idx > 0 ? 'mt-3 opacity-90 border-border' : ''}`}>
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 pr-2">
+                    <View className="flex-row items-center gap-1.5 mb-1">
+                      <Award size={14} color={isTop ? COLORS.primary : COLORS.textMuted} />
+                      <Text className={`text-xs font-sans-bold uppercase tracking-wider ${isTop ? 'text-primary' : 'text-text-muted'}`}>
+                        {isTop ? 'Top Job Match' : 'Evaluated Match'}
+                      </Text>
+                    </View>
+                    <Text className="text-sm font-sans-bold text-text-primary">{match.job_title}</Text>
+                    <Text className="text-[11px] font-sans-medium text-text-muted">{match.department_name || match.department}</Text>
+                  </View>
+                  <VacancyMatchStatusBadge
+                    status={rawStatus}
+                    score={fitScore}
+                  />
+                </View>
+
+                {/* Score Breakdown if present */}
+                {match.score_breakdown ? (
+                  <VacancyFitScoreBreakdownCard
+                    breakdown={match.score_breakdown}
+                    penalty={match.score_breakdown.hierarchy_mismatch_penalty}
+                    rejectionReason={match.domain_mismatch_reason || match.reason}
+                  />
+                ) : match.component_scores ? (
+                  <ComponentScoreBar scores={match.component_scores} />
+                ) : null}
+
+                <VacancyEnrichmentPanel match={match} />
+
+                {match.missing_skills && match.missing_skills.length > 0 && (
+                  <View className="mt-1">
+                    <Text className="text-[11px] font-sans-bold text-danger uppercase mb-1">Skill Gaps:</Text>
+                    <View className="flex-row flex-wrap gap-1">
+                      {match.missing_skills.map((s: string, sIdx: number) => (
+                        <Badge key={sIdx} label={s} tone="danger" />
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                <HiringRisksCard risks={match.hiring_risks} showEmpty={idx === 0} />
+
+                <View className="flex-row justify-end mt-2">
+                  <Button
+                    label="HR Review"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Edit3 size={12} color={COLORS.primary} />}
+                    onPress={() => {
+                      setSelectedJobForReview(match);
+                      setReviewModalVisible(true);
+                    }}
+                  />
+                </View>
+              </Card>
+            );
+          })
+        ) : bestMatch && analysis?.has_genuine_match ? (
+          <Card className="gap-2 p-3 shadow-none border-primary/40">
+            <View className="flex-row items-start justify-between">
+              <View className="flex-1 pr-2">
+                <View className="flex-row items-center gap-1.5 mb-1">
+                  <Award size={14} color={COLORS.primary} />
+                  <Text className="text-xs tracking-wider uppercase font-sans-bold text-primary">Top Job Match</Text>
+                </View>
+                <Text className="text-sm font-sans-bold text-text-primary">{bestMatch.job_title}</Text>
+                <Text className="text-[11px] font-sans-medium text-text-muted">{bestMatch.department_name}</Text>
+              </View>
+              <VacancyMatchStatusBadge
+                status={bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification}
+                score={resolveVacancyFitScore(bestMatch)}
+              />
+            </View>
+
+            {bestMatch.score_breakdown ? (
+              <VacancyFitScoreBreakdownCard
+                breakdown={bestMatch.score_breakdown}
+                penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
+                rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
+              />
+            ) : bestMatch.component_scores ? (
+              <ComponentScoreBar scores={bestMatch.component_scores} />
+            ) : null}
+
+            <VacancyEnrichmentPanel match={bestMatch} />
+
+            <HiringRisksCard risks={bestMatch.hiring_risks} showEmpty />
+
+            <View className="flex-row justify-end mt-2">
+              <Button
+                label="HR Review"
+                variant="secondary"
+                size="sm"
+                icon={<Edit3 size={12} color={COLORS.primary} />}
+                onPress={() => {
+                  setSelectedJobForReview(bestMatch);
+                  setReviewModalVisible(true);
+                }}
+              />
+            </View>
+          </Card>
+        ) : null}
+
         {/* Contact Info Card with FieldConfidenceView */}
         {candidateView && (candidateView.email || candidateView.phone || candidateView.location || candidateView.linkedin || candidateView.github) ? (
         <Card className="gap-2 p-3 shadow-none border-border">
@@ -425,23 +548,26 @@ export default function CandidateDetailScreen() {
               const jobTitle = cleanCandidateText(match.job_title);
               const departmentName = cleanCandidateText(match.department_name || match.department);
               return (
-              <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
-                <View className="flex-1 pr-2">
-                  {jobTitle ? <Text className="text-xs font-sans-bold text-text-primary">{jobTitle}</Text> : null}
-                  {departmentName ? <Text className="text-[11px] text-text-muted">{departmentName}</Text> : null}
+              <View key={idx} className="gap-2 p-2 border rounded bg-background border-border">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 pr-2">
+                    {jobTitle ? <Text className="text-xs font-sans-bold text-text-primary">{jobTitle}</Text> : null}
+                    {departmentName ? <Text className="text-[11px] text-text-muted">{departmentName}</Text> : null}
+                  </View>
+                  <View className="flex-row items-center gap-2">
+                    {fitScore != null ? <ScoreBadge score={fitScore} classification={match.classification} /> : null}
+                    <Button
+                      label="Review"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => {
+                        setSelectedJobForReview(match);
+                        setReviewModalVisible(true);
+                      }}
+                    />
+                  </View>
                 </View>
-                <View className="flex-row items-center gap-2">
-                  {fitScore != null ? <ScoreBadge score={fitScore} classification={match.classification} /> : null}
-                  <Button
-                    label="Review"
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => {
-                      setSelectedJobForReview(match);
-                      setReviewModalVisible(true);
-                    }}
-                  />
-                </View>
+                <VacancyEnrichmentPanel match={match} />
               </View>
               );
             })}
@@ -526,132 +652,6 @@ export default function CandidateDetailScreen() {
           </Card>
         ) : null} */}
 
-        {/* Suitable Openings */}
-        {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
-          analysis.suitable_openings.slice(0, 5).map((match: any, idx: number) => {
-            const rawStatus = match.vacancy_match_status || match.match_status || match.classification;
-            const fitScore = resolveVacancyFitScore(match);
-            const isTop = idx === 0 && (rawStatus === 'MATCHED' || rawStatus === 'HIGH');
-            return (
-              <Card key={idx} className={`p-3 border-primary/40 shadow-none gap-2 ${idx > 0 ? 'mt-3 opacity-90 border-border' : ''}`}>
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1 pr-2">
-                    <View className="flex-row items-center gap-1.5 mb-1">
-                      <Award size={14} color={isTop ? COLORS.primary : COLORS.textMuted} />
-                      <Text className={`text-xs font-sans-bold uppercase tracking-wider ${isTop ? 'text-primary' : 'text-text-muted'}`}>
-                        {isTop ? 'Top Job Match' : 'Evaluated Match'}
-                      </Text>
-                    </View>
-                    <Text className="text-sm font-sans-bold text-text-primary">{match.job_title}</Text>
-                    <Text className="text-[11px] font-sans-medium text-text-muted">{match.department_name || match.department}</Text>
-                  </View>
-                  <VacancyMatchStatusBadge
-                    status={rawStatus}
-                    score={fitScore}
-                  />
-                </View>
-
-                {/* Score Breakdown if present */}
-                {match.score_breakdown ? (
-                  <VacancyFitScoreBreakdownCard
-                    breakdown={match.score_breakdown}
-                    penalty={match.score_breakdown.hierarchy_mismatch_penalty}
-                    rejectionReason={match.domain_mismatch_reason || match.reason}
-                  />
-                ) : match.component_scores ? (
-                  <ComponentScoreBar scores={match.component_scores} />
-                ) : null}
-
-                {match.llm_reason ? (
-                  <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
-                    <Text className="mb-1 text-xs leading-4 text-text-primary font-sans-bold">AI Reasoning:</Text>
-                    <Text className="text-xs leading-4 text-text-primary">{match.llm_reason}</Text>
-                  </View>
-                ) : null}
-
-                {match.missing_skills && match.missing_skills.length > 0 && (
-                  <View className="mt-1">
-                    <Text className="text-[11px] font-sans-bold text-danger uppercase mb-1">Skill Gaps:</Text>
-                    <View className="flex-row flex-wrap gap-1">
-                      {match.missing_skills.map((s: string, sIdx: number) => (
-                        <Badge key={sIdx} label={s} tone="danger" />
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                {(match.recommendation && !match.llm_reason) ? (
-                  <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
-                    <Text className="text-xs leading-4 text-text-primary">💡 {match.recommendation}</Text>
-                  </View>
-                ) : null}
-
-                <HiringRisksCard risks={match.hiring_risks} showEmpty={idx === 0} />
-
-                <View className="flex-row justify-end mt-2">
-                  <Button
-                    label="HR Review"
-                    variant="secondary"
-                    size="sm"
-                    icon={<Edit3 size={12} color={COLORS.primary} />}
-                    onPress={() => {
-                      setSelectedJobForReview(match);
-                      setReviewModalVisible(true);
-                    }}
-                  />
-                </View>
-              </Card>
-            );
-          })
-        ) : bestMatch && analysis?.has_genuine_match ? (
-          <Card className="gap-2 p-3 shadow-none border-primary/40">
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1 pr-2">
-                <View className="flex-row items-center gap-1.5 mb-1">
-                  <Award size={14} color={COLORS.primary} />
-                  <Text className="text-xs tracking-wider uppercase font-sans-bold text-primary">Top Job Match</Text>
-                </View>
-                <Text className="text-sm font-sans-bold text-text-primary">{bestMatch.job_title}</Text>
-                <Text className="text-[11px] font-sans-medium text-text-muted">{bestMatch.department_name}</Text>
-              </View>
-              <VacancyMatchStatusBadge
-                status={bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification}
-                score={resolveVacancyFitScore(bestMatch)}
-              />
-            </View>
-
-            {bestMatch.score_breakdown ? (
-              <VacancyFitScoreBreakdownCard
-                breakdown={bestMatch.score_breakdown}
-                penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
-                rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
-              />
-            ) : bestMatch.component_scores ? (
-              <ComponentScoreBar scores={bestMatch.component_scores} />
-            ) : null}
-
-            {bestMatch.recommendation ? (
-              <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
-                <Text className="text-xs leading-4 text-text-primary">💡 {bestMatch.recommendation}</Text>
-              </View>
-            ) : null}
-
-            <HiringRisksCard risks={bestMatch.hiring_risks} showEmpty />
-
-            <View className="flex-row justify-end mt-2">
-              <Button
-                label="HR Review"
-                variant="secondary"
-                size="sm"
-                icon={<Edit3 size={12} color={COLORS.primary} />}
-                onPress={() => {
-                  setSelectedJobForReview(bestMatch);
-                  setReviewModalVisible(true);
-                }}
-              />
-            </View>
-          </Card>
-        ) : null}
 
         {/* Similar Candidates (pgvector) */}
         {data?.similar_candidates && data.similar_candidates.length > 0 && (
@@ -1015,6 +1015,7 @@ export default function CandidateDetailScreen() {
 
       {/* 3. Main Content Area */}
       <ScrollView className="flex-1 px-4 py-4">
+        {reanalyzeError ? <ErrorBanner title={reanalyzeError.title} message={reanalyzeError.message} /> : null}
         {loading && !isReprocessing ? (
           <View className="items-center justify-center flex-1 py-16">
             <ActivityIndicator size="large" color={COLORS.primary} />

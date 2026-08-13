@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.error_handlers import SystemConfigurationError
+from app.core.logging import logger
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,
@@ -113,6 +114,12 @@ def get_candidate_detail(candidate_id: str):
     result["experience_summary"] = canonical_exp
     result["work_experience"] = canonical_exp["normalized_employment"]
     result["experience_gap_analysis"] = canonical_exp.get("gap_analysis")
+
+    logger.info(
+        f"analysis_run_id={result.get('analysis_run_id', 'not_available')} candidate={stem} "
+        f"candidate_api_result_version={result.get('analysis_version') or result.get('result_generation_id', 'not_available')} "
+        f"status=RETURNED"
+    )
 
     return result
 
@@ -245,4 +252,5 @@ async def reprocess_candidate(candidate_id: str):
         "job_state": record_state,
         "execution_mode": record_exec_mode,
         "retry_count": submission.record.attempt,
+        "analysis_run_id": submission.record.rq_job_id or submission.record.job_id,
     }
