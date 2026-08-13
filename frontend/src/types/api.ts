@@ -296,6 +296,7 @@ export interface CandidateMatchAnalysis {
   parsed_at: string;
   full_name?: string | null;
   candidate_name?: string | null;
+  primary_department?: string | null;
   best_match?: JobMatchScore | null;
   suitable_openings: JobMatchScore[];
   unsuitable_openings?: JobMatchScore[];
@@ -321,9 +322,9 @@ export interface EnrichedCandidateAnalysis {
   parsed_at?: string;
   full_name?: string | null;
   candidate_name?: string | null;
-  primary_department?: string;
-  recommended_department?: string;
-  professional_domain?: string;
+  primary_department?: string | null;
+  recommended_department?: string | null;
+  professional_domain?: string | null;
   strengths?: string[];
   suitable_job_roles?: string[];
   has_genuine_match?: boolean;

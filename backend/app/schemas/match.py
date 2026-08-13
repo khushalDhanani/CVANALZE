@@ -225,7 +225,7 @@ class JobMatchResult(BaseModel):
 class CandidateMatchAnalysis(BaseModel):
     full_name: str | None = Field(default=None, description="Extracted candidate full name")
     candidate_name: str | None = Field(default=None, description="Extracted candidate name")
-    primary_department: str = Field(..., description="Top recommended department for candidate")
+    primary_department: str | None = Field(default=None, description="Top recommended department for candidate")
     best_match: JobMatchResult | None = Field(default=None, description="Top matching job opening")
     suitable_openings: list[JobMatchResult] = Field(..., description="Verified HIGH job matches with no hard disqualifiers, ranked by match score")
     unsuitable_openings: list[JobMatchResult] = Field(

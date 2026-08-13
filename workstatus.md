@@ -1,6 +1,14 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Nullable Primary Department Response Compatibility Fix**:
+    - Traced `GET /api/cv/status/{cv_key}` failures to completed results containing the valid no-department state `match_analysis.primary_department=null` while the nested response schema required a string.
+    - Aligned `CandidateMatchAnalysis.primary_department` with `EnrichedCandidateAnalysis` and the no-active-vacancy producer by making the field nullable with a `None` default.
+    - Preserved the response field and its meaning instead of fabricating an empty or fallback department during status serialization.
+    - Aligned frontend candidate-analysis contracts with the backend's nullable department and professional-domain fields; existing UI fallbacks already handle absent values.
+    - Added focused regression coverage proving a completed `CVUploadResponse` accepts a nested analysis with no primary department.
+    - Pending work: tests and services were not run because repository instructions prohibit them unless explicitly requested.
+    - Important decision: absence of a department is modeled as `null`; existing string-valued responses remain unchanged.
 1. **2026-08-13 Active Ollama Model Configuration Realignment**:
     - Traced the dashboard `CONFIG ERROR — Missing: qwen3:4b` to repository-root and backend-local environment overrides that disagreed with the centralized `llama3.2:3b` default.
     - Confirmed the live Ollama inventory contains `llama3.2:3b`, `gemma3:1b`, and `nomic-embed-text:latest`, but not `qwen3:4b`.
