@@ -325,11 +325,14 @@ class OllamaTransport:
         last_error: OllamaError | None = None
         cls._circuit_before_request(operation)
 
-        num_ctx = (payload or {}).get("options", {}).get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
+        generation_options = (payload or {}).get("options", {})
+        num_ctx = generation_options.get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
+        num_predict = generation_options.get("num_predict", "default") if operation not in ("tags", "embed", "unload") else None
         logger.info(
             f"[OLLAMA] operation={operation} config: max_retries={retries} total_attempts={total_attempts} "
             f"timeout_s={timeout_seconds}"
             + (f" num_ctx={num_ctx}" if num_ctx is not None else "")
+            + (f" num_predict={num_predict}" if num_predict is not None else "")
         )
 
         for attempt in range(1, total_attempts + 1):

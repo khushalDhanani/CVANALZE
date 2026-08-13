@@ -69,13 +69,13 @@ def test_llm_cache_entry_excludes_sensitive_prompt_and_reasoning():
         processing_time_ms=1234.56,
         token_count=450,
         inference_time_ms=1200000,
-        model="gemma3:1b",
+        model="llama3.2:3b",
         prompt_version="3.0",
     )
 
     key = LLMCacheRepository.extraction_cache_key(
         prompt_version="3.0",
-        model_version="gemma3:1b",
+        model_version="llama3.2:3b",
         extraction_version="1.0.0",
     )
 
@@ -121,7 +121,7 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
         processing_time_ms=500.0,
         token_count=200,
         inference_time_ms=450000,
-        model="gemma3:1b",
+        model="llama3.2:3b",
         prompt_version="3.0",
     )
 
@@ -130,7 +130,7 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:1b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
 
@@ -164,7 +164,7 @@ def test_llm_cache_entry_backward_compatible():
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:1b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
 

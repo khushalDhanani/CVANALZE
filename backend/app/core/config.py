@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = ""
-    OLLAMA_MODEL: str = "gemma3:1b"  # or qwen2.5:3b etc based on what's available
+    OLLAMA_MODEL: str = "llama3.2:3b"  # or qwen2.5:3b etc based on what's available
     OLLAMA_REQUEST_TIMEOUT: float = 90.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0
@@ -149,7 +149,8 @@ class Settings(BaseSettings):
     OLLAMA_LIVE_TESTS_ENABLED: bool = False
     OLLAMA_GENERATION_NUM_CTX: int = 4096
     OLLAMA_GENERATION_NUM_PREDICT: int = 1024
-    OLLAMA_OPTIMIZED_NUM_PREDICT: int = 2048
+    OLLAMA_OPTIMIZED_NUM_CTX: int = 8192
+    OLLAMA_OPTIMIZED_NUM_PREDICT: int = 3072
     PREFILTER_TOP_K: int = 60
     LLM_TOP_N: int = 12
     LLM_CV_MAX_CHARS: int = 4000          # Deprecated compatibility setting; token budgets are authoritative
@@ -229,6 +230,10 @@ class Settings(BaseSettings):
             raise ValueError("CV_QUEUE_MAX_SIZE must be at least 1.")
         if self.RULE_CONFIG_RETRY_INTERVAL_SECONDS <= 0:
             raise ValueError("RULE_CONFIG_RETRY_INTERVAL_SECONDS must be greater than zero.")
+        if min(self.OLLAMA_GENERATION_NUM_CTX, self.OLLAMA_GENERATION_NUM_PREDICT, self.OLLAMA_OPTIMIZED_NUM_CTX, self.OLLAMA_OPTIMIZED_NUM_PREDICT) <= 0:
+            raise ValueError("Ollama generation context and output limits must be greater than zero.")
+        if self.OLLAMA_OPTIMIZED_NUM_PREDICT >= self.OLLAMA_OPTIMIZED_NUM_CTX:
+            raise ValueError("OLLAMA_OPTIMIZED_NUM_PREDICT must be smaller than OLLAMA_OPTIMIZED_NUM_CTX.")
         if self.EXTRACTION_TIMEOUT_SECONDS <= 0 or self.SCANNED_EXTRACTION_TIMEOUT_SECONDS <= 0:
             raise ValueError("Document extraction timeouts must be greater than zero.")
         if max(self.EXTRACTION_TIMEOUT_SECONDS, self.SCANNED_EXTRACTION_TIMEOUT_SECONDS) >= self.RQ_JOB_TIMEOUT_SECONDS:

@@ -149,12 +149,12 @@ def test_transport_retries_connection_error_then_succeeds(monkeypatch):
     client = _install_client(
         monkeypatch,
         httpx.ConnectError("offline", request=request),
-        _response({"models": [{"name": "gemma3:1b"}]}),
+        _response({"models": [{"name": "llama3.2:3b"}]}),
     )
 
     result = OllamaTransport.get_tags()
 
-    assert [model.name for model in result.value.models] == ["gemma3:1b"]
+    assert [model.name for model in result.value.models] == ["llama3.2:3b"]
     assert result.attempts == 2
     assert client.stream.call_count == 2
     assert OllamaTransport.get_metrics()["retries"] == 1
@@ -170,7 +170,7 @@ def test_transport_uses_exponential_backoff(monkeypatch):
         monkeypatch,
         httpx.ConnectError("offline", request=request),
         httpx.ConnectError("offline", request=request),
-        _response({"models": [{"name": "gemma3:1b"}]}),
+        _response({"models": [{"name": "llama3.2:3b"}]}),
     )
 
     result = OllamaTransport.get_tags()
@@ -228,7 +228,8 @@ def test_generation_schema_failure_returns_fallback_after_retries(monkeypatch):
     assert client.stream.call_args_list[-1].kwargs["json"]["keep_alive"] == 0
 
 
-def test_length_terminated_generation_is_never_accepted(monkeypatch):
+def test_length_terminated_generation_is_never_accepted(monkeypatch, caplog):
+    caplog.set_level("WARNING", logger="cv_analyzer")
     _disable_cache(monkeypatch)
     incomplete = json.dumps({"skill_matches": [], "inferred_skills": [], "missing_critical": [], "semantic_reason": "partial"})
     client = _install_client(
@@ -240,7 +241,10 @@ def test_length_terminated_generation_is_never_accepted(monkeypatch):
     result = OllamaLLMService.call_qwen("analyze", "phase5", "length-stop")
 
     assert result is None
-    assert client.stream.call_count == 3
+    assert client.stream.call_count == 2
+    assert "status=OUTPUT_LIMIT" in caplog.text
+    assert "response_chars=" in caplog.text
+    assert f"num_predict={settings.OLLAMA_GENERATION_NUM_PREDICT}" in caplog.text
 
 
 def test_residency_policy_keeps_model_loaded(monkeypatch):
@@ -388,7 +392,7 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
             time.sleep(0.02)
             yield httpx.Response(
                 200,
-                json={"models": [{"name": "gemma3:1b"}]},
+                json={"models": [{"name": "llama3.2:3b"}]},
                 request=httpx.Request("GET", "http://ollama.test/api/tags"),
             )
         finally:
@@ -402,7 +406,7 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
         results = list(executor.map(lambda _: OllamaTransport.get_tags(), range(2)))
 
     assert maximum_active == 1
-    assert all(result.value.models[0].name == "gemma3:1b" for result in results)
+    assert all(result.value.models[0].name == "llama3.2:3b" for result in results)
 
 
 def test_embedding_rejects_non_finite_values_and_still_unloads(monkeypatch):

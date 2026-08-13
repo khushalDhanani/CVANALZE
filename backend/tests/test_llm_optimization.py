@@ -81,7 +81,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:1b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
     key2 = LLMCacheRepository.compute_composite_hash(
@@ -89,7 +89,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:1b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
     assert key1 == key2
@@ -100,7 +100,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:1b",
+        model_version="llama3.2:3b",
         matching_version="3.1",
     )
     assert key1 != key3

@@ -248,7 +248,7 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `LLM_ENABLED` | `true` | Enables semantic generation; deterministic scoring remains available when disabled. |
 | `EMBEDDING_ENABLED` | `true` | Enables embedding-backed retrieval and related features. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint; Compose defaults to `host.docker.internal`. |
-| `OLLAMA_MODEL` | `gemma3:1b` | Generation model. Required in the repository-root `.env` for Compose. |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Generation model. Required in the repository-root `.env` for Compose. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model. |
 | `OLLAMA_REQUEST_TIMEOUT` | `90` | Compatibility timeout used by the shared client. Required in the repository-root `.env` for Compose. |
 | `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout for every Ollama operation. |
@@ -272,7 +272,8 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `OLLAMA_LIVE_TESTS_ENABLED` | `false` | Explicit opt-in required by manual/live Ollama tests. |
 | `OLLAMA_GENERATION_NUM_CTX` | `4096` | Local-friendly generation context window. |
 | `OLLAMA_GENERATION_NUM_PREDICT` | `1024` | Output-token limit for profile and compatibility generation. |
-| `OLLAMA_OPTIMIZED_NUM_PREDICT` | `2048` | Output-token limit for optimized matching. |
+| `OLLAMA_OPTIMIZED_NUM_CTX` | `8192` | Dedicated context window for the larger optimized-match prompt and response. |
+| `OLLAMA_OPTIMIZED_NUM_PREDICT` | `3072` | Output-token limit for optimized matching. |
 
 `backend/app/core/config.py` also defines scoring, matching, extraction-version, batch, recommendation, and retrieval tuning. Treat changes to parser, schema, prompt,
 model, vacancy, and matching versions as cache-invalidating changes.

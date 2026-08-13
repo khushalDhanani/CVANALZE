@@ -241,7 +241,7 @@ class OllamaLLMService:
             think=True,
             options={
                 "num_predict": settings.OLLAMA_OPTIMIZED_NUM_PREDICT,
-                "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
+                "num_ctx": settings.OLLAMA_OPTIMIZED_NUM_CTX,
                 "temperature": 0.0,
                 "top_p": 0.9,
             },
@@ -389,9 +389,15 @@ class OllamaLLMService:
         def parse(data: dict[str, Any]) -> _StructuredGeneration:
             envelope = OllamaGenerateEnvelope.model_validate(data)
             if envelope.done_reason.lower() == "length":
+                logger.warning(
+                    f"[OLLAMA] operation={operation} model='{model}' status=OUTPUT_LIMIT "
+                    f"response_chars={len(envelope.response)} output_tokens={envelope.eval_count} "
+                    f"num_predict={options.get('num_predict', 'default')} num_ctx={options.get('num_ctx', 'default')}"
+                )
                 raise OllamaInvalidResponseError(
                     "Ollama generation reached the output limit and is incomplete.",
                     operation=operation,
+                    retryable=False,
                 )
             raw_response = envelope.response.strip() or envelope.thinking.strip()
             structured_data = OllamaTransport.extract_json(raw_response, operation=operation)
@@ -460,6 +466,9 @@ class OllamaLLMService:
             f"duration_ms={transport_result.duration_ms} "
             f"input_tokens={generation.envelope.prompt_eval_count} "
             f"output_tokens={generation.envelope.eval_count} "
+            f"response_chars={len(generation.raw_response)} "
+            f"num_predict={options.get('num_predict', 'default')} "
+            f"num_ctx={options.get('num_ctx', 'default')} "
             f"inference_ms={inference_ms}"
         )
 

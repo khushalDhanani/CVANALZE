@@ -368,10 +368,11 @@ class RecommendationService:
             resume_json, r.get("text") or r.get("markdown") or "", candidate_id=cv_key
         )
 
-        exp_years = float(canonical_exp["experience_years"])
+        canonical_exp_years = canonical_exp.get("experience_years")
+        exp_years = float(canonical_exp_years) if canonical_exp_years is not None else None
         exp_tier = canonical_exp["seniority"]
 
-        if exp_years < 1.0 and not resume_json.get("work_experience") and not norm_resume.get("employment"):
+        if exp_years is not None and exp_years < 1.0 and not resume_json.get("work_experience") and not norm_resume.get("employment"):
             risk_flags.append("Limited professional experience verified in profile.")
 
         experience_assessment = canonical_exp["experience_assessment"]

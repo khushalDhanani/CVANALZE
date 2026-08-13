@@ -1,6 +1,29 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Frontend Gap Audit for Today's Backend Implementations**:
+    - Compared today's hiring-risk policy, hierarchy tri-state, recommendation, optimized-match, Ollama transport, migration, and worker-identity changes with the frontend types, services, configuration screens, candidate detail views, and focused frontend tests.
+    - Confirmed the recommendation nullability fix, optimized-match budget/telemetry, Ollama response handling, migration execution, and RQ worker identity changes do not require frontend contract changes.
+    - Identified the missing active-profile editor and explicit frontend types for versioned hiring-risk policies, incomplete risk evidence/category/source presentation, missing processing-version metadata presentation, and missing visual treatment/test coverage for unknown hierarchy validation.
+    - Kept the audit diagnostic-only; no frontend application code, tests, builds, or services were changed or executed.
+1. **2026-08-13 Docker Ollama Model Alignment to Llama 3.2**:
+    - Confirmed the newly installed local generation model is `llama3.2:3b` while the running API and worker containers still use `gemma3:1b`.
+    - Updated the repository-root `.env`, the single Docker model source, to `OLLAMA_MODEL=llama3.2:3b`.
+    - Confirmed the application default and environment template already use `llama3.2:3b`; no duplicate model setting was introduced.
+    - Did not recreate containers, so the running API and worker remain on `gemma3:1b` until deployment is authorized.
+1. **2026-08-13 Nullable Canonical Experience Recommendation Fix**:
+    - Traced the `/api/recommendations/candidate/cv_1764311881` failure to `RecommendationService` converting the canonical unknown experience duration (`None`) with `float(None)`.
+    - Preserved the canonical experience engine's four-state contract instead of coercing unknown duration to zero.
+    - Limited the low-experience risk flag to known numeric durations so documented employment with unavailable dates is not mislabeled as limited experience.
+    - Added focused regression coverage for recommendations with documented employment and unparseable dates.
+    - Per repository instructions, did not rebuild, restart, or test services.
+1. **2026-08-13 Optimized Match Output Budget Fix**:
+    - Confirmed `optimized_match` explicitly requested 2,048 output tokens but shared the 4,096-token general context window, leaving only about 1,677 tokens after the observed 2,419-token prompt.
+    - Added a dedicated 8,192-token optimized-match context and raised its explicit output allowance to 3,072 tokens, leaving about 2,701 tokens of additional headroom for prompt framing and schema overhead at the observed prompt size.
+    - Added centralized success and truncation telemetry for response characters, actual output tokens, `num_predict`, and `num_ctx`.
+    - Made output-limit failures non-retryable because repeating an identical deterministic request with unchanged limits cannot complete the response.
+    - Added configuration validation and focused payload/retry regression coverage.
+    - Ran the two explicitly requested focused regression tests: 2 passed with 2 unrelated Redis-client deprecation warnings; did not build, start, or restart services or run the full suite.
 1. **2026-08-13 Vacancy Hierarchy Tri-State Validation Fix**:
     - Traced repeated vacancy matching failures to `HierarchyClassificationResult.is_hierarchy_valid=None` being passed into a score-breakdown schema that accepted only booleans.
     - Aligned the vacancy-fit response schema and frontend API type with the existing tri-state hierarchy contract: `true` is valid, `false` is invalid, and `null` means validation was unavailable.
@@ -33,7 +56,7 @@
 1. **2026-08-13 End-to-End Ollama Response Audit (No Fix Applied)**:
     - Confirmed all Ollama HTTP traffic is centralized in `OllamaTransport`: generation and unload use `/api/generate`, embeddings use `/api/embed`, and discovery uses `/api/tags`.
     - Confirmed generation sends `stream=false`, reads the complete response body, and parses one JSON object; a live local request using the repository payload shape returned the expected non-streaming envelope and structured JSON response.
-    - Confirmed the configured generation model `gemma3:1b` and embedding model `nomic-embed-text` match the locally installed `gemma3:1b` and `nomic-embed-text:latest` models.
+    - Confirmed the configured generation model `llama3.2:3b` and embedding model `nomic-embed-text` match the locally installed `llama3.2:3b` and `nomic-embed-text:latest` models.
     - Found the versioned optimized-match PostgreSQL prompt migration still stores a leading `/think` directive, so the active Gemma request can retain Qwen-specific prompt content despite transport-level capability handling.
     - Found HTTP and JSON error handling discards Ollama's diagnostic error body, logs only exception class names, then converts generation failure to `None`; optimized matching consequently continues without an LLM result.
     - Found embedding connection/model failures activate a 60-second model throttle whose subsequent early returns are not logged.
@@ -43,18 +66,18 @@
     - Removed Qwen-specific `/think` and `/no_think` prompt prefixes from the shared structured-generation path.
     - Changed the centralized generation payload builder to omit `think` for Gemma 3 and other non-thinking models while preserving native `think` requests for supported models.
     - Kept `/api/generate`, `/api/embed`, model selection, retries, caching, timeouts, and response contracts unchanged.
-    - Updated focused payload tests for `gemma3:1b` and added coverage ensuring a Qwen 3 model retains the native thinking parameter.
+    - Updated focused payload tests for `llama3.2:3b` and added coverage ensuring a Qwen 3 model retains the native thinking parameter.
     - Per repository instructions, did not run tests, builds, services, or migrations.
 1. **2026-08-13 Docker Ollama Model Source Consolidation**:
-    - Set the repository-root Docker environment override to `OLLAMA_MODEL=gemma3:1b`.
+    - Set the repository-root Docker environment override to `OLLAMA_MODEL=llama3.2:3b`.
     - Changed `docker-compose.yml` to require `OLLAMA_MODEL` from the repository-root environment instead of maintaining a second fallback value.
     - Removed the competing `qwen3:1.7b` declaration from `docker-compose.local.yml`; local Compose now inherits the required base environment value.
     - Updated local-profile documentation to use the inherited model instead of supplying another command-line model override.
     - Confirmed application integrations continue consuming the resolved model through `app.core.config.settings`.
     - Per repository instructions, did not build, test, start, or recreate Docker services.
 1. **2026-08-13 Docker Ollama Model Configuration Check (No Fix Applied)**:
-    - Confirmed the centralized application default, primary Compose fallback, backend example environment, README, and current backend-local environment use `gemma3:1b`.
-    - Found the repository-root `.env` still sets `OLLAMA_MODEL=gemma3:4b`; Docker Compose interpolation therefore overrides the `gemma3:1b` fallback in `docker-compose.yml`.
+    - Confirmed the centralized application default, primary Compose fallback, backend example environment, README, and current backend-local environment use `llama3.2:3b`.
+    - Found the repository-root `.env` still sets `OLLAMA_MODEL=gemma3:4b`; Docker Compose interpolation therefore overrides the `llama3.2:3b` fallback in `docker-compose.yml`.
     - Found `docker-compose.local.yml` still has a `qwen3:1.7b` fallback, although the current root `.env` value takes precedence when that override is used.
     - No Docker services, builds, tests, or application configuration files were changed or executed.
 1. **2026-08-13 Backend/Test Dead-Artifact Cleanup**:
@@ -151,6 +174,13 @@
     - Verified all edge-cases via a robust test suite (`tests/test_hiring_risk_analyzer.py`), confirming that score and match states remain entirely immutable during this phase.
 
 ## Pending Work / Side Effects Found
+- Add an active-profile hiring-risk policy editor covering `enabled`, `severity`, `manual_review`, `category`, `title`, and `source`, backed by full version creation and activation.
+- Render structured Hiring Risk evidence, category, source, and stable risk code where recruiter explainability requires them; add focused component tests for deterministic fallback and manual-review states.
+- Show `is_hierarchy_valid=null` as "validation unavailable" rather than silently treating it as visually indistinguishable from a confirmed valid hierarchy, while preserving backend eligibility behavior.
+- Add frontend types and an optional processing-metadata view for rule, prompt, model, optimized-prompt, and matching versions if operational provenance is intended for administrators.
+- Recreate the API and worker containers so `OLLAMA_MODEL=llama3.2:3b` becomes active, then verify startup model discovery.
+- Rebuild/recreate the API container so nullable canonical experience is handled by the recommendations endpoint, then reload `/cv_1764311881`.
+- Rebuild/recreate the API and worker containers so the optimized-match token budget takes effect, then reprocess the affected CV and confirm `done_reason=stop` in runtime logs.
 - Rebuild and recreate the auxiliary and primary worker containers so their new unique RQ identities take effect; old Redis registrations can expire naturally.
 - Rebuild/recreate the API and worker containers so the nullable hierarchy response contract takes effect, then reprocess the failed CV job.
 - Rebuild the `migrate-postgres` image before retrying migrations; `docker compose run` alone can reuse the pre-fix image.
@@ -164,6 +194,12 @@
 - *Side Effect Found* -> Legacy Tests expecting old keyword structures -> *Required Adjustment*: Update mocks in `test_classification_normalization.py`, `test_department_domain_repository.py`, and other taxonomy tests.
 
 ## Important Decisions
+- Classified today's frontend work as targeted parity work rather than a broad endpoint rewrite; backend-only reliability and deployment changes need no UI implementation.
+- Preserved `is_hierarchy_valid=null` as eligible for normal deterministic matching while requiring distinct informational UI copy from both confirmed valid and confirmed invalid hierarchy states.
+- Retained the repository-root `.env` as Docker's only Ollama model value source; Compose validates and passes it through without its own model fallback.
+- Kept unknown experience duration distinct from confirmed zero experience; recommendations may display the canonical assessment but must not perform numeric comparisons on `None`.
+- Gave `optimized_match` a dedicated context setting instead of increasing the context and memory footprint of every generation operation.
+- Classified `done_reason=length` as non-retryable because the retry payload and deterministic generation settings are unchanged.
 - Preserved hierarchy validity as a tri-state value rather than coercing unknown validation to `true` or `false`; only confirmed hierarchy mismatches are hard rejections.
 - Avoided deleting or force-unregistering the existing RQ worker because Redis cannot safely distinguish a stale registration from a live worker solely by name; unique per-process names remove the collision safely.
 - Execute only trusted repository migration-file contents with `exec_driver_sql`; retain bound parameters for application SQL and migration metadata operations.
@@ -194,6 +230,23 @@
 - The `HiringRiskAnalyzer` relies strictly on deterministic `match_result` failures; Gemma acts purely as an explanation generator, preserving full explainability and pipeline integrity.
 
 ## Files Changed
+- `workstatus.md` (frontend gap audit for today's backend implementations recorded)
+- `.env`
+- `workstatus.md` (Docker Ollama model alignment to `llama3.2:3b` recorded)
+- `backend/app/services/recommendation_service.py`
+- `backend/tests/test_ai_recommendations.py`
+- `workstatus.md` (nullable canonical experience recommendation fix recorded)
+- `backend/app/core/config.py`
+- `backend/app/services/llm_service.py`
+- `backend/app/services/ollama_transport.py`
+- `backend/.env.example`
+- `.env`
+- `docker-compose.yml`
+- `docker-compose.local.yml`
+- `README.md`
+- `backend/tests/test_qwen_llm_service.py`
+- `backend/tests/test_phase5_ollama_standardization.py`
+- `workstatus.md` (optimized-match output budget fix recorded)
 - `backend/app/schemas/match.py`
 - `frontend/src/types/api.ts`
 - `backend/tests/test_vacancy_fit_scoring.py`

@@ -69,7 +69,7 @@ def _generation_payload(client: MagicMock) -> dict:
 
 
 def test_ollama_default_model_is_gemma3_1b():
-    assert settings.OLLAMA_MODEL == "gemma3:1b"
+    assert settings.OLLAMA_MODEL == "llama3.2:3b"
 
 
 def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
@@ -104,7 +104,7 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, DynamicCandidateProfile)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:1b"
+    assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Extract candidate CV details"
     assert "think" not in payload
     assert payload["format"] == DynamicCandidateProfile.model_json_schema()
@@ -137,7 +137,7 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, QwenCVAnalysis)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:1b"
+    assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Score CV fit for Python Developer"
     assert "think" not in payload
     assert payload["format"] == QwenCVAnalysis.model_json_schema()
@@ -172,15 +172,18 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, DynamicMappingResponse)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:1b"
+    assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Score candidate dynamic mapping"
     assert "think" not in payload
     assert payload["format"] == DynamicMappingResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
 
 
-def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
+def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="cv_analyzer")
     _disable_llm_cache(monkeypatch)
+    monkeypatch.setattr(settings, "OLLAMA_OPTIMIZED_NUM_CTX", 8192)
+    monkeypatch.setattr(settings, "OLLAMA_OPTIMIZED_NUM_PREDICT", 3072)
     dummy_optimized = {
         "candidate_profile": {
             "core_skills": ["Python"],
@@ -213,11 +216,16 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, OptimizedLLMMatchResponse)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:1b"
+    assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Perform optimized match evaluation"
     assert "think" not in payload
     assert payload["format"] == OptimizedLLMMatchResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
+    assert payload["options"]["num_ctx"] == 8192
+    assert payload["options"]["num_predict"] == 3072
+    assert "response_chars=" in caplog.text
+    assert "num_predict=3072" in caplog.text
+    assert "num_ctx=8192" in caplog.text
 
 
 def test_thinking_model_retains_native_think_parameter(monkeypatch):
@@ -268,11 +276,11 @@ def test_legacy_thinking_directive_is_removed_before_generation(monkeypatch):
 def test_ollama_unload_model_sends_keep_alive_zero(monkeypatch):
     client = _mock_transport_client(monkeypatch, {})
 
-    success = OllamaLLMService.unload_model("gemma3:1b")
+    success = OllamaLLMService.unload_model("llama3.2:3b")
 
     assert success is True
     payload = client.stream.call_args.kwargs["json"]
-    assert payload["model"] == "gemma3:1b"
+    assert payload["model"] == "llama3.2:3b"
     assert payload["keep_alive"] == 0
 
 

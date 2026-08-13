@@ -174,6 +174,32 @@ def test_no_strong_match_cannot_coexist_with_genuine_match_summary():
     assert recs["industry_role"] == "Evidence-Supported Industry Role"
 
 
+def test_candidate_recommendations_preserve_unknown_experience_duration():
+    result = {
+        "id": "unknown_experience_candidate",
+        "status": "completed",
+        "markdown": "Production supervisor with documented employment but unavailable dates.",
+        "match_analysis": {
+            "suitable_job_roles": ["Production Supervisor"],
+            "suitable_openings": [],
+        },
+        "resume_json": {
+            "contact_info": {"name": "Unknown Experience Candidate"},
+            "skills": ["Production Planning"],
+            "work_experience": [{"job_title": "Production Supervisor", "company": "Example Industries"}],
+        },
+    }
+
+    with (
+        patch("app.repositories.result.ResultRepository.resolve_result", return_value=result),
+        patch("app.repositories.job.JobRepository.get_all_jobs", return_value=[{"id": 1, "title": "Production Supervisor"}]),
+    ):
+        recommendations = RecommendationService.get_candidate_recommendations("unknown_experience_candidate")
+
+    assert "Dates unparseable" in recommendations["experience_assessment"]
+    assert "Limited professional experience verified in profile." not in recommendations["risk_flags"]
+
+
 def test_rejected_departments_do_not_create_talent_pool_assignments():
     rejected_result = {
         "id": "rejected_candidate",
