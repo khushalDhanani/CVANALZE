@@ -1,6 +1,18 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Docker Ollama Model Source Consolidation**:
+    - Set the repository-root Docker environment override to `OLLAMA_MODEL=gemma3:1b`.
+    - Changed `docker-compose.yml` to require `OLLAMA_MODEL` from the repository-root environment instead of maintaining a second fallback value.
+    - Removed the competing `qwen3:1.7b` declaration from `docker-compose.local.yml`; local Compose now inherits the required base environment value.
+    - Updated local-profile documentation to use the inherited model instead of supplying another command-line model override.
+    - Confirmed application integrations continue consuming the resolved model through `app.core.config.settings`.
+    - Per repository instructions, did not build, test, start, or recreate Docker services.
+1. **2026-08-13 Docker Ollama Model Configuration Check (No Fix Applied)**:
+    - Confirmed the centralized application default, primary Compose fallback, backend example environment, README, and current backend-local environment use `gemma3:1b`.
+    - Found the repository-root `.env` still sets `OLLAMA_MODEL=gemma3:4b`; Docker Compose interpolation therefore overrides the `gemma3:1b` fallback in `docker-compose.yml`.
+    - Found `docker-compose.local.yml` still has a `qwen3:1.7b` fallback, although the current root `.env` value takes precedence when that override is used.
+    - No Docker services, builds, tests, or application configuration files were changed or executed.
 1. **2026-08-13 Backend/Test Dead-Artifact Cleanup**:
     - Audited tracked and untracked files under `backend/` and `backend/tests/` against Python imports, dynamic path loading, Docker/Compose, CI, migrations, documentation, and tests.
     - Removed unreferenced root-level scratch probes, hardcoded candidate/vacancy diagnostics, source-rewriting patch helpers, one-off cache/database commands, a generated audit log, and a print-only debug test.
@@ -95,6 +107,7 @@
     - Verified all edge-cases via a robust test suite (`tests/test_hiring_risk_analyzer.py`), confirming that score and match states remain entirely immutable during this phase.
 
 ## Pending Work / Side Effects Found
+- Recreate the backend Docker services when deployment execution is authorized so existing containers receive `OLLAMA_MODEL=gemma3:1b`.
 - The backend suite is not currently green: the latest full run reported 106 failures and 571 passes. This cleanup did not attempt broad product-code or substantive-test remediation.
 - The three preserved legacy test modules now live under `backend/tests/`, but 7 of their 11 tests expose outdated contracts and require a separate behavioral/test-contract decision.
 - Apply `backend/scripts/migrations/postgres/025_hiring_risks_integrity.sql` through the normal deployment process, then restart application/worker processes so the active policy and prompt are loaded.
@@ -105,6 +118,8 @@
 - *Side Effect Found* -> Legacy Tests expecting old keyword structures -> *Required Adjustment*: Update mocks in `test_classification_normalization.py`, `test_department_domain_repository.py`, and other taxonomy tests.
 
 ## Important Decisions
+- Kept the repository-root `.env` as the sole Docker value source for `OLLAMA_MODEL`; `docker-compose.yml` validates and passes it through, while environment-specific Compose files inherit it.
+- Kept the Docker Ollama model check diagnostic-only; did not change `.env`, Compose files, or running containers without an explicit fix/redeploy request.
 - Preserved assertion-based tests even when currently failing; cleanup did not hide product regressions by deleting substantive coverage.
 - Removed only files with no repository consumer and clear scratch, diagnostic, generated, obsolete migration-helper, or developer-only behavior.
 - Kept PostgreSQL as the only writable application database path and removed legacy helpers that imported removed engine aliases or attempted MSSQL mutation.
@@ -124,6 +139,12 @@
 - The `HiringRiskAnalyzer` relies strictly on deterministic `match_result` failures; Gemma acts purely as an explanation generator, preserving full explainability and pipeline integrity.
 
 ## Files Changed
+- `.env`
+- `docker-compose.yml`
+- `docker-compose.local.yml`
+- `README.md`
+- `workstatus.md` (Docker Ollama model consolidation recorded)
+- `workstatus.md` (Docker Ollama model configuration check recorded)
 - Root-level backend scratch/debug/patch/print/cache/database helper files (removed; see Git status for the complete enumerated set)
 - `backend/audit_output.log` (removed generated output)
 - `backend/tests/debug_test.py` (removed print-only debug test)

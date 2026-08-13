@@ -51,7 +51,7 @@ x-backend-environment: &backend-environment
   LLM_ENABLED: '${LLM_ENABLED:-true}'
   EMBEDDING_ENABLED: '${EMBEDDING_ENABLED:-true}'
   OLLAMA_BASE_URL: '${OLLAMA_BASE_URL:-http://host.docker.internal:11434}'
-  OLLAMA_MODEL: '${OLLAMA_MODEL:-gemma3:1b}'
+  OLLAMA_MODEL: '${OLLAMA_MODEL:?Set OLLAMA_MODEL in the repository root .env}'
   EMBEDDING_MODEL: '${EMBEDDING_MODEL:-nomic-embed-text}'
   OLLAMA_REQUEST_TIMEOUT: '${OLLAMA_REQUEST_TIMEOUT:-60}'
   OLLAMA_CONNECT_TIMEOUT_SECONDS: '${OLLAMA_CONNECT_TIMEOUT_SECONDS:-3}'

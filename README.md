@@ -248,7 +248,7 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `LLM_ENABLED` | `true` | Enables semantic generation; deterministic scoring remains available when disabled. |
 | `EMBEDDING_ENABLED` | `true` | Enables embedding-backed retrieval and related features. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint; Compose defaults to `host.docker.internal`. |
-| `OLLAMA_MODEL` | `gemma3:1b` | Generation model. |
+| `OLLAMA_MODEL` | `gemma3:1b` | Generation model. Required in the repository-root `.env` for Compose. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model. |
 | `OLLAMA_REQUEST_TIMEOUT` | `60` | Compatibility timeout used by the shared client. |
 | `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout for every Ollama operation. |
@@ -397,10 +397,11 @@ responses are bounded and validated, and every generation or embedding batch unl
 Deterministic extraction and scoring remain available. To opt into host Ollama features, start with one feature and a small installed model:
 
 ```bash
-LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker scheduler
+LLM_ENABLED=true docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker scheduler
 ```
 
-Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. The local profile uses `qwen3:1.7b`, keeps `nomic-embed-text` for the existing 768-dimensional
+Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. The local profile inherits `OLLAMA_MODEL` from the base Compose environment, keeps
+`nomic-embed-text` for the existing 768-dimensional
 vector contract, and never pulls models automatically. Configure the host Ollama process with `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, and a zero or short
 server keep-alive. Restart Ollama after changing its host environment. Local AI consumes unified memory outside Docker limits, but application serialization prevents
 the generation and embedding models from intentionally running in parallel. The base `docker-compose.yml` remains production-oriented and retains MSSQL ODBC support.
