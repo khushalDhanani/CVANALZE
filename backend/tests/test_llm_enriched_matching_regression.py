@@ -51,6 +51,18 @@ def sample_llm_match():
         gap_analysis="Candidate satisfies all primary technical requirements.",
         career_transition_note="Direct domain alignment in mobile engineering.",
         semantic_reason="Candidate has 5+ years building production mobile apps in Flutter/Dart.",
+        top_strength=(
+            "The CV documents more than five years building production applications with Flutter and Dart, directly matching the vacancy's mobile stack. "
+            "This is the strongest role-specific evidence."
+        ),
+        main_concern=(
+            "The CV does not quantify application scale or ownership expected by the senior vacancy. "
+            "Recruiters should verify architecture scope and release responsibility."
+        ),
+        ai_match_explanation=(
+            "The high score reflects five-plus years of Flutter and Dart evidence against the vacancy's core requirements. "
+            "Missing scale and ownership details prevent complete certainty."
+        ),
         semantic_fit_score=90.0,
     )
 
@@ -154,6 +166,9 @@ def test_2_multiple_vacancies_score_independently(sample_candidate_context):
             inferred_skills=["Flutter", "Dart"],
             gap_analysis="Strong fit",
             semantic_reason="Mobile app experience",
+            top_strength="The CV explicitly documents Flutter and Dart mobile development, matching the vacancy's required stack. This is the strongest technical overlap for vacancy 101.",
+            main_concern="The CV does not state the scale of the production mobile applications required by the vacancy. Recruiters should verify release ownership and user volume.",
+            ai_match_explanation="The high score is driven by direct Flutter and Dart matches between the CV and vacancy. Missing delivery-scale evidence limits full confidence.",
             semantic_fit_score=90.0,
         ),
         "201": OptimizedVacancyMatch(
@@ -164,6 +179,18 @@ def test_2_multiple_vacancies_score_independently(sample_candidate_context):
             inferred_skills=[],
             gap_analysis="Domain mismatch",
             semantic_reason="Candidate is in software, not plant operations",
+            top_strength=(
+                "The CV documents software engineering experience, but the plant-operations vacancy provides no matching software requirement. "
+                "No role-specific top strength can be confirmed from the supplied evidence."
+            ),
+            main_concern=(
+                "The CV shows a software background while the vacancy requires plant-operations experience. "
+                "This domain mismatch is the largest documented hiring risk."
+            ),
+            ai_match_explanation=(
+                "The low score reflects the conflict between the CV's software experience and the vacancy's plant-operations requirements. "
+                "No supplied CV evidence closes that domain gap."
+            ),
             semantic_fit_score=10.0,
         ),
     }
@@ -250,6 +277,18 @@ async def test_3_faulty_vacancy_does_not_destroy_other_matches():
                 inferred_skills=["Flutter", "Dart"],
                 gap_analysis="Strong fit",
                 semantic_reason="Direct Flutter match",
+                top_strength=(
+                    "The CV explicitly lists Flutter and Dart, directly matching the vacancy's mobile technology requirements. "
+                    "This is the strongest documented technical overlap."
+                ),
+                main_concern=(
+                    "The CV does not quantify production ownership for the mobile work expected by the vacancy. "
+                    "Recruiters should verify release scope and architecture responsibility."
+                ),
+                ai_match_explanation=(
+                    "The high score is driven by direct Flutter and Dart evidence against the vacancy requirements. "
+                    "Missing ownership details limit confidence in the complete seniority match."
+                ),
                 semantic_fit_score=90.0,
             )
         ],
@@ -270,3 +309,7 @@ async def test_3_faulty_vacancy_does_not_destroy_other_matches():
         assert analysis is not None
         # Valid vacancy 101 should be processed
         assert len(analysis.suitable_openings) >= 1 or len(analysis.unsuitable_openings) >= 1
+        assert analysis.best_match is not None
+        assert analysis.best_match.top_strength == mock_llm_response.matched_vacancies[0].top_strength
+        assert analysis.best_match.main_concern == mock_llm_response.matched_vacancies[0].main_concern
+        assert analysis.best_match.ai_match_explanation == mock_llm_response.matched_vacancies[0].ai_match_explanation

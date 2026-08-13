@@ -61,6 +61,12 @@ export interface CandidateFiveSecondSummary {
   mainConcern: string;
 }
 
+export interface CandidateDecisionNarratives {
+  topStrength: string;
+  mainConcern: string;
+  aiMatchExplanation: string;
+}
+
 const isRecord = (value: unknown): value is UnknownRecord => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 interface MatchScoreSource {
@@ -216,6 +222,74 @@ const findMainConcern = (data: CVUploadResponse, analysis: UnknownRecord, match:
   if (Object.keys(match).length === 0) return 'Match analysis is not available for this candidate.';
 
   return 'No major concern identified in the current analysis.';
+};
+
+const ensureDetailedNarrative = (primary: unknown, supportingSentence: string): string => {
+  const text = humanizeRecruiterText(primary);
+  if (!text) return supportingSentence;
+  const normalized = /[.!?]$/.test(text) ? text : `${text}.`;
+  const sentenceCount = normalized.match(/[.!?](?=\s|$)/g)?.length || 0;
+  return sentenceCount >= 2 ? normalized : `${normalized} ${supportingSentence}`;
+};
+
+export const buildCandidateDecisionNarratives = (
+  data: CVUploadResponse,
+  candidate: CandidateDetailViewModel,
+  rawAnalysis: unknown,
+  recommendations?: CandidateRecommendationsResponse | null,
+): CandidateDecisionNarratives => {
+  const analysis = isRecord(rawAnalysis) ? rawAnalysis : {};
+  const match = isRecord(analysis.best_match) ? analysis.best_match : {};
+  const matchedSkills = uniqueText([
+    ...(Array.isArray(match.matched_skills) ? match.matched_skills : []),
+    ...collectRequirementSkills(match, 'matched'),
+  ]);
+  const missingSkills = uniqueText([
+    ...(Array.isArray(match.missing_skills) ? match.missing_skills : []),
+    ...collectRequirementSkills(match, 'missing'),
+  ]);
+  const vacancyTitle = firstCandidateText(match.job_title, match.title) || 'the selected vacancy';
+  const score = resolveVacancyFitScore(match);
+  const scoreLabel = score == null ? 'not available' : `${Math.round(score)}%`;
+  const cvSkills = uniqueText(candidate.skills);
+  const topEvidence = matchedSkills.length ? matchedSkills.slice(0, 3) : cvSkills.slice(0, 3);
+  const matchedSkillsLabel = matchedSkills.slice(0, 3).join(', ');
+  const missingSkillsLabel = missingSkills.slice(0, 3).join(', ');
+  const matchedSkillNoun = `required skill match${matchedSkills.length === 1 ? '' : 'es'}`;
+  const comparisonSentence = matchedSkills.length
+    ? `Their background covers ${matchedSkills.length} ${matchedSkillNoun} for ${vacancyTitle}: ${matchedSkillsLabel}.`
+    : 'No role requirement is linked to the candidate’s experience, so a recruiter needs the missing position details before identifying a strongest match.';
+  const topStrengthFallback = topEvidence.length && matchedSkills.length
+    ? `The candidate’s strongest match for ${vacancyTitle} is ${topEvidence.join(', ')}, supported by both their experience and the position requirements. ` + comparisonSentence
+    : `The resume mentions ${topEvidence.length ? topEvidence.join(', ') : 'no specific skills, projects, achievements, or experience'}, `
+      + `but the current assessment does not connect that background to a requirement for ${vacancyTitle}. `
+      + 'A clear top strength cannot be determined until the missing candidate or role details are available.';
+
+  const baseConcern = findMainConcern(data, analysis, match, recommendations);
+  const missingSkillsRemainder = missingSkills.length > 3 ? ` and ${missingSkills.length - 3} more` : '';
+  const concernSupport = missingSkills.length
+    ? `Their profile does not show ${missingSkillsLabel}${missingSkillsRemainder}, so these role requirements should be tested during screening.`
+    : `No specific required-skill gap is identified for ${vacancyTitle}; `
+      + 'employment continuity and qualification fit still need review if the position details do not cover them.';
+  const mainConcernFallback = `${/[.!?]$/.test(baseConcern) ? baseConcern : `${baseConcern}.`} ${concernSupport}`;
+
+  const matchedRequirementNoun = `matched requirement${matchedSkills.length === 1 ? '' : 's'}`;
+  const missingRequirementNoun = `missing requirement${missingSkills.length === 1 ? '' : 's'}`;
+  const scoreEvidence = matchedSkills.length || missingSkills.length
+    ? `The ${scoreLabel} rating reflects ${matchedSkills.length} ${matchedRequirementNoun}${matchedSkills.length ? ` (${matchedSkillsLabel})` : ''} `
+      + `with ${missingSkills.length} ${missingRequirementNoun}${missingSkills.length ? ` (${missingSkillsLabel})` : ''} for ${vacancyTitle}.`
+    : `A ${scoreLabel} rating is recorded for ${vacancyTitle}, but the assessment does not identify which position requirements are met or missing.`;
+  const explanationSupport = 'Where candidate or role evidence is missing, the rating should be treated as incomplete '
+    + 'rather than assuming the requirement is met.';
+
+  return {
+    topStrength: ensureDetailedNarrative(match.top_strength, topStrengthFallback),
+    mainConcern: ensureDetailedNarrative(match.main_concern, mainConcernFallback),
+    aiMatchExplanation: ensureDetailedNarrative(
+      match.ai_match_explanation || match.llm_reason || match.semantic_reason,
+      `${scoreEvidence} ${explanationSupport}`,
+    ),
+  };
 };
 
 export const buildCandidateFiveSecondSummary = (

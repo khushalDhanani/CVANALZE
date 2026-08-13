@@ -293,6 +293,9 @@ export interface JobMatchScore {
   ranking_reason: string;
   llm_reason?: string | null;
   semantic_reason?: string | null;
+  top_strength?: string | null;
+  main_concern?: string | null;
+  ai_match_explanation?: string | null;
   inferred_skills?: string[];
   semantic_score_boost?: number | null;
   calibrated_confidence?: number | null;
@@ -325,6 +328,9 @@ export interface CandidateMatchAnalysis {
 
 export interface EnrichedJobEvaluation extends JobMatchScore {
   llm_reason: string;
+  top_strength?: string | null;
+  main_concern?: string | null;
+  ai_match_explanation?: string | null;
   inferred_skills: string[];
   semantic_score_boost?: number | null;
   classification: 'HIGH' | 'MEDIUM' | 'LOW' | string;
@@ -388,6 +394,9 @@ export interface OptimizedCandidateProfile {
 export interface OptimizedVacancyMatch {
   vacancy_id: number | string;
   semantic_reason?: string;
+  top_strength?: string;
+  main_concern?: string;
+  ai_match_explanation?: string;
   inferred_skills?: string[];
   matched_skills?: string[];
   missing_critical?: string[];

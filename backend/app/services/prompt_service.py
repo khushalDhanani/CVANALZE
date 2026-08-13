@@ -30,7 +30,7 @@ class PromptService:
     OPTIMIZED_MATCH_PROMPT_NAME = "optimized_match"
     OPTIMIZED_MATCH_LANGUAGE = "en"
     OPTIMIZED_MATCH_ENVIRONMENT = "production"
-    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v2"
+    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v3"
     OPTIMIZED_MATCH_PLACEHOLDERS = {"input_json", "domain_list_str", "dept_list_str"}
     OPTIMIZED_MATCH_SCHEMA_FIELDS = {
         "candidate_profile",
@@ -38,8 +38,16 @@ class PromptService:
         "ai_career_summary",
         "matched_vacancies",
     }
-    OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS = {"vacancy_id", "semantic_reason", "semantic_fit_score"}
+    OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS = {
+        "vacancy_id",
+        "semantic_reason",
+        "top_strength",
+        "main_concern",
+        "ai_match_explanation",
+        "semantic_fit_score",
+    }
     OPTIMIZED_MATCH_REQUIRED_INSTRUCTION = "VACANCY COVERAGE:"
+    OPTIMIZED_MATCH_NARRATIVE_INSTRUCTION = "DECISION NARRATIVES:"
     HIRING_RISK_PROMPT_NAME = "hiring_risk_explanation"
     HIRING_RISK_DEFAULT_VERSION = "default-1.0.0"
     HIRING_RISK_DEFAULT_TEMPLATE = """You explain deterministic hiring risks to recruiters.
@@ -312,6 +320,8 @@ Use only the supplied evidence. Do not infer personal or protected attributes.
                 return PromptReadiness(False, "Required prompt contains a model-specific thinking directive.")
             if cls.OPTIMIZED_MATCH_REQUIRED_INSTRUCTION not in prompt.system_instruction:
                 return PromptReadiness(False, "Required prompt does not enforce complete per-vacancy coverage.")
+            if cls.OPTIMIZED_MATCH_NARRATIVE_INSTRUCTION not in prompt.system_instruction:
+                return PromptReadiness(False, "Required prompt does not enforce detailed decision narratives.")
             missing_placeholders = cls.OPTIMIZED_MATCH_PLACEHOLDERS - cls.get_placeholders(prompt.system_instruction)
             if missing_placeholders:
                 return PromptReadiness(False, "Required prompt placeholders are invalid.")

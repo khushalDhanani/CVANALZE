@@ -48,7 +48,7 @@ export function getVacancyEnrichmentPresentation(match: Partial<EnrichedJobEvalu
   ].filter(Boolean);
 
   return {
-    reasoning: humanizeRecruiterText(match.llm_reason) || humanizeRecruiterText(match.semantic_reason) || '',
+    reasoning: humanizeRecruiterText(match.ai_match_explanation) || humanizeRecruiterText(match.llm_reason) || humanizeRecruiterText(match.semantic_reason) || '',
     recommendation: humanizeRecruiterText(match.recommendation) || '',
     inferredSkills,
     qualityFlags,

@@ -1,7 +1,9 @@
 from __future__ import annotations
+
+import re
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.config import settings
 from app.schemas.experience_gap import ExperienceGapAnalysis
@@ -66,6 +68,24 @@ class OptimizedCandidateProfile(BaseModel):
 class OptimizedVacancyMatch(BaseModel):
     vacancy_id: int | str
     semantic_reason: str = Field(..., min_length=1)
+    top_strength: str = Field(
+        ...,
+        min_length=80,
+        max_length=1200,
+        description="Two or three recruiter-style sentences identifying the strongest role match from the candidate's background and the role requirements",
+    )
+    main_concern: str = Field(
+        ...,
+        min_length=80,
+        max_length=1200,
+        description="Two or three sentences explaining the largest role-specific gap or the information missing to assess it",
+    )
+    ai_match_explanation: str = Field(
+        ...,
+        min_length=80,
+        max_length=1200,
+        description="Two or three recruiter-style sentences connecting the match score to specific candidate evidence and role requirements",
+    )
     inferred_skills: list[str] = Field(default_factory=list)
     matched_skills: list[str] = Field(default_factory=list)
     missing_critical: list[str] = Field(default_factory=list)
@@ -74,6 +94,14 @@ class OptimizedVacancyMatch(BaseModel):
     evidence_snippets: dict[str, RequirementEvidence] = Field(default_factory=dict)
     career_transition_detected: bool = False
     career_transition_note: str | None = None
+
+    @field_validator("top_strength", "main_concern", "ai_match_explanation")
+    @classmethod
+    def require_two_or_three_sentences(cls, value: str) -> str:
+        sentences = [sentence for sentence in re.split(r"(?<=[.!?])\s+", value.strip()) if sentence]
+        if not 2 <= len(sentences) <= 3 or sentences[-1][-1] not in ".!?":
+            raise ValueError("Decision narratives must contain two or three complete sentences.")
+        return value.strip()
 
 
 class OptimizedLLMMatchResponse(BaseModel):
@@ -123,6 +151,9 @@ class PipelineStageMetrics(BaseModel):
 
 class EnrichedJobMatchResult(JobMatchResult):
     llm_reason: str = Field(default="", description="Qwen's semantic explanation of the fit")
+    top_strength: str = Field(default="", description="Detailed strongest match supported by candidate and role evidence")
+    main_concern: str = Field(default="", description="Detailed primary gap or missing-information concern")
+    ai_match_explanation: str = Field(default="", description="Detailed explanation connecting the score to candidate and role evidence")
     inferred_skills: list[str] = Field(default_factory=list, description="Additional skills inferred by Qwen")
     calibrated_confidence: float | None = Field(default=None, ge=0.0, le=1.0, description="Evidence-derived confidence; shadow-only until calibrated")
     calibration_version: str | None = Field(default=None, description="Version of the offline confidence calibration artifact")

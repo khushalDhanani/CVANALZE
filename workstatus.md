@@ -1,6 +1,48 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Decision Narrative Validator Startup Fix**:
+    - Traced the API restart loop to an unterminated Python string in `OptimizedVacancyMatch.require_two_or_three_sentences`; the punctuation literal opened with an ASCII quote but ended with a typographic curly quote.
+    - Replaced the curly quote with the correct ASCII delimiter, restoring valid module syntax while preserving the intended `.`, `!`, and `?` sentence-ending validation.
+    - Files changed: `backend/app/schemas/analysis.py` and `workstatus.md`.
+    - Verification: inspected the corrected validator source and confirmed `git diff --check` passes. Builds, tests, and service restarts were not executed because repository instructions require explicit authorization.
+    - Pending work: rebuild and recreate the API, worker, auxiliary worker, and scheduler containers so they use the corrected schema module.
+    - Important decision: no validation behavior was relaxed; this is only a source-syntax correction.
+1. **2026-08-13 Migration 028 PostgreSQL Driver Compatibility Fix**:
+    - Traced `immutabledict is not a sequence` to the literal percent sign in the migration's `82%` AI-explanation example, which psycopg interpreted as parameter syntax when the complete SQL file was submitted through `exec_driver_sql()`.
+    - Replaced `82%` with the equivalent recruiter-facing wording `82 percent`, preserving the prompt meaning and response contract.
+    - Files changed: `backend/scripts/migrations/postgres/028_detailed_candidate_decision_narratives.sql` and `workstatus.md`.
+    - Verification: migration 028 up/down now contain no percent characters; `git diff --check` passed.
+    - Pending work: rebuild the `migrate-postgres` image and rerun migration 028. No migration, build, or service restart was executed by this task.
+    - Important decision: the failed transaction was not recorded as applied, so no rollback, migration-table deletion, or checksum repair is required.
+1. **2026-08-13 Docker Migration and Update Command Guidance**:
+    - Confirmed the repository migration service is `migrate-postgres`, running `python scripts/run_migrations.py` under the `tools` profile after PostgreSQL becomes healthy.
+    - Confirmed application code updates require rebuilding and recreating `api`, `worker`, `auxiliary-worker`, and `scheduler`; the Apple Silicon setup layers `docker-compose.local.yml` over the base Compose file.
+    - Files changed: `workstatus.md` only.
+    - Verification: compared the commands against `docker-compose.yml`, `docker-compose.local.yml`, and the documented bootstrap sequence in `README.md`.
+    - Pending work: run the supplied Docker commands; no migration, build, or service restart was executed.
+    - Important decision: migration runs before application recreation so prompt version 3.8 is available when the updated API and workers start.
+1. **2026-08-13 Recruiter-Natural Decision Narrative Tone**:
+    - Reworded the optimized prompt's three decision sections to sound like concise HR assessment notes, with varied sentence openings and natural references to the candidate's background, experience, profile, resume, and position requirements.
+    - Explicitly prohibited repetitive `CV`, `the CV`, `CV evidence`, and `CV/JD comparison` phrasing while retaining concrete candidate/role evidence, missing-information disclosure, and the 2-3 sentence requirement.
+    - Replaced system-style legacy fallbacks such as `the CV/JD comparison confirms` and `no CV evidence` with human recruiter phrasing, so previously persisted analyses also improve without reprocessing.
+    - Updated the Ollama response-schema descriptions and prompt examples to reinforce the same tone without changing fields, validation, scoring, transport, caching, retry, timeout, or API behavior.
+    - Added a focused frontend assertion preventing repeated standalone `CV` references in each generated fallback section.
+    - Files changed: `backend/app/schemas/analysis.py`, `backend/scripts/migrations/postgres/028_detailed_candidate_decision_narratives.sql`, `frontend/src/utils/candidateDetail.ts`, `frontend/src/__tests__/candidateDetailEnrichment.test.ts`, and `workstatus.md`.
+    - Verification: production prompt/schema/fallback source was searched for the robotic phrases; only the explicit prohibition and the exact legacy text required by migration replacement remain. `git diff --check` passed. Tests, builds, services, and migrations were not run because repository instructions require explicit authorization.
+    - Pending work: apply migration 028 and reprocess candidates for newly generated recruiter-tone narratives; legacy candidate results use the revised frontend wording immediately.
+    - Important decision: tone was corrected at both generation and presentation fallback boundaries so old and new analyses remain consistent without changing the additive response contract.
+1. **2026-08-13 Detailed CV Decision Narratives**:
+    - Replaced the optimized match prompt's one-field recruiter explanation contract with three required per-vacancy narratives: `top_strength`, `main_concern`, and `ai_match_explanation`.
+    - Versioned the centralized PostgreSQL prompt from 3.7/schema v2 to 3.8/schema v3 and required every section to contain 2-3 complete sentences grounded in specific CV and vacancy evidence; missing evidence must be named instead of guessed.
+    - Added strict Pydantic requirements, 80-1200 character bounds, and 2-3 sentence validation for all three generated narratives while preserving `semantic_reason` and `llm_reason` for backward compatibility.
+    - Carried the new fields through the existing `OllamaLLMService`/`MatchService` result path without adding an Ollama client, transport, retry, timeout, cache, endpoint, or scoring implementation.
+    - Updated the candidate dashboard to show Top Strength, Main Concern, and AI Match Explanation as untruncated detailed sections. Existing persisted analyses receive two-sentence evidence-based fallbacks using matched/missing skills, vacancy title, score, and available CV evidence; missing source data is explicitly reported.
+    - Updated vacancy enrichment to prefer the detailed AI match explanation and added focused backend/frontend prompt, mapping, fallback-detail, priority, and rendering contracts.
+    - Files changed: `backend/app/core/config.py`, `backend/app/schemas/analysis.py`, `backend/app/services/prompt_service.py`, `backend/app/services/match_service.py`, migrations 028 up/down, affected optimized-response backend tests, `frontend/src/types/api.ts`, `frontend/src/utils/candidateDetail.ts`, `frontend/src/utils/vacancyEnrichment.ts`, `frontend/src/app/candidates/[id].tsx`, focused frontend tests, and `workstatus.md`.
+    - Verification: static Ollama integration audit confirmed all generation remains centralized through `OllamaLLMService` and `OllamaTransport`; `git diff --check` passed. Tests, builds, services, and migrations were not run because repository instructions require explicit authorization.
+    - Pending work: apply PostgreSQL migration 028, reprocess candidates to persist model-generated detailed narratives, and run the focused backend/frontend tests when explicitly authorized. Existing candidates render detailed deterministic fallbacks without reprocessing.
+    - Important decision: the three new fields are additive on persisted/API results, while legacy reason fields and existing scoring contracts remain intact; deterministic match scores remain authoritative and the narrative only explains them.
 1. **2026-08-13 Compact Candidate CV Intelligence Dashboard**:
     - Refactored the candidate detail route into the requested Candidate Summary → Tabs → Compact Sections flow, with a five-second summary for name/latest role, overall match, recommendation, experience, skills match, domain, top strength, and main concern.
     - Replaced the long overview/processing stack with seven always-visible horizontal tabs: Overview, Skills, Experience, Education, Matches, Risks, and CV. The tab bar remains outside the content scroller so it stays available while the selected section scrolls.

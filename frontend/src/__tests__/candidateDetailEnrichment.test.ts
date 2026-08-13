@@ -1,4 +1,4 @@
-import { buildCandidateDetailViewModel, buildCandidateFiveSecondSummary, humanizeRecruiterText, normalizeCandidateMatchAnalysis } from '../utils/candidateDetail';
+import { buildCandidateDecisionNarratives, buildCandidateDetailViewModel, buildCandidateFiveSecondSummary, humanizeRecruiterText, normalizeCandidateMatchAnalysis } from '../utils/candidateDetail';
 import { buildCandidateDecisionEvidence, buildCandidateSkillsSummaryPresentation, buildVacancyDecisionEvidence } from '../utils/candidateDecisionEvidence';
 import { getVacancyEnrichmentPresentation, RELATED_SKILLS_LABEL, VACANCY_AI_EXPLANATION_LABEL } from '../utils/vacancyEnrichment';
 import type { EnrichedJobEvaluation } from '../types/api';
@@ -22,6 +22,7 @@ const manualReviewOpening = {
   classification: 'MEDIUM',
   recommendation: 'Proceed with structured HR review.',
   llm_reason: 'Relevant skill overlap...',
+  ai_match_explanation: 'Their HPLC experience directly supports the vacancy requirement. The rating remains limited because the resume does not quantify laboratory ownership.',
   inferred_skills: ['HPLC'],
   calibrated_confidence: 0.72,
   calibration_version: 'calibration-2',
@@ -55,7 +56,7 @@ assertEquals(normalizedManualReview.calibrated_confidence, manualReviewOpening.c
 assertEquals(normalizedManualReview.llm_evidence_snippets, manualReviewOpening.llm_evidence_snippets);
 
 const cardPresentation = getVacancyEnrichmentPresentation(normalizedManualReview as Partial<EnrichedJobEvaluation>);
-assertEquals(cardPresentation.reasoning, manualReviewOpening.llm_reason);
+assertEquals(cardPresentation.reasoning, manualReviewOpening.ai_match_explanation);
 assertEquals(cardPresentation.recommendation, manualReviewOpening.recommendation);
 assertEquals(cardPresentation.inferredSkills, manualReviewOpening.inferred_skills);
 assertEquals(cardPresentation.evidence[0].evidence, manualReviewOpening.llm_evidence_snippets.chemistry);
@@ -115,6 +116,19 @@ assertEquals(summary.domain, 'Production Team');
 assertEquals(summary.matchConfidence, 35);
 assertEquals(summary.mainConcern, "Candidate's documented education does not satisfy vacancy requirement 'SSC'.");
 assertEquals(summary.totalExperience, undefined);
+
+const detailedNarratives = buildCandidateDecisionNarratives(
+  { scan_id: 'candidate-1', filename: 'candidate.pdf', parsed_at: '2026-08-13', markdown: '' },
+  { name: 'Divyesh Patel', experience: [], education: [], certifications: [], skills: ['Maintenance Work', 'SAP'], projects: [] },
+  summaryAnalysis,
+);
+assertEquals(detailedNarratives.topStrength.includes('Maintenance Work'), true);
+assertEquals(detailedNarratives.mainConcern.includes("vacancy requirement 'SSC'"), true);
+assertEquals(detailedNarratives.aiMatchExplanation.includes('50%'), true);
+Object.values(detailedNarratives).forEach((narrative) => {
+  assertEquals((narrative.match(/[.!?](?=\s|$)/g) || []).length >= 2, true);
+  assertEquals((narrative.match(/\bCV\b/g) || []).length <= 1, true);
+});
 
 const decisionEvidence = buildCandidateDecisionEvidence(
   { scan_id: 'candidate-1', filename: 'candidate.pdf', parsed_at: '2026-08-13', markdown: '' },
@@ -216,6 +230,7 @@ const semanticPotentialOpening = {
   vacancy_id: 12,
   job_id: '12',
   llm_reason: undefined,
+  ai_match_explanation: undefined,
   semantic_reason: 'Potential fit retained for manual review.',
   vacancy_match_status: 'POTENTIAL_MATCH',
 };
@@ -235,6 +250,7 @@ const explicitManualReviewOpening = {
   job_id: '13',
   vacancy_match_status: 'MANUAL_REVIEW',
   llm_reason: 'AI explanation retained for explicit manual review.',
+  ai_match_explanation: undefined,
 };
 const normalizedExplicitManualReview = normalizeCandidateMatchAnalysis({
   match_status: 'MANUAL_REVIEW',

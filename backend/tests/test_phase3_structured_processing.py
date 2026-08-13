@@ -160,6 +160,12 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
             OptimizedVacancyMatch(
                 vacancy_id="job-1",
                 semantic_reason="Python evidence supports the vacancy.",
+                top_strength="The CV explicitly lists Python, directly satisfying the vacancy's Python requirement. This is the strongest documented technical match for the role.",
+                main_concern="The supplied CV and vacancy do not provide enough evidence about production deployment experience. Recruiters should verify that requirement rather than infer it.",
+                ai_match_explanation=(
+                    "The score is supported by the direct Python evidence in both the CV and vacancy. "
+                    "Missing deployment evidence limits certainty about the remaining role requirements."
+                ),
                 semantic_fit_score=80.0,
                 classified_requirements=[
                     ClassifiedRequirementItem(requirement_id="python", description="Python", status="SATISFIED")

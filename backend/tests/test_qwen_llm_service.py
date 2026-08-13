@@ -195,6 +195,9 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch, caplog):
             {
                 "vacancy_id": 101,
                 "semantic_reason": "Direct experience with Python",
+                "top_strength": "The CV explicitly documents Python experience, directly matching the vacancy's Python requirement. This is the strongest role-specific evidence.",
+                "main_concern": "The CV does not describe the production scale expected by the vacancy. Recruiters should verify deployment ownership rather than infer it.",
+                "ai_match_explanation": "The high score reflects the direct Python overlap between the CV and vacancy. Missing production-scale evidence limits complete confidence.",
                 "semantic_fit_score": 90.0,
             }
         ],

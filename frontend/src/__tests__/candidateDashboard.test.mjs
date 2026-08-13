@@ -16,6 +16,12 @@ for (const summaryField of ['Overall Match', 'Recommendation', 'Experience', 'Sk
   assert.match(source, new RegExp(`>${summaryField}<`), `The five-second summary must include ${summaryField}.`);
 }
 
+assert.match(source, />AI Match Explanation</, 'The five-second summary must include the detailed AI Match Explanation section.');
+assert.match(source, /decisionNarratives\?\.topStrength/, 'Top Strength must use the detailed evidence narrative.');
+assert.match(source, /decisionNarratives\?\.mainConcern/, 'Main Concern must use the detailed evidence narrative.');
+assert.match(source, /decisionNarratives\?\.aiMatchExplanation/, 'AI Match Explanation must use the detailed score narrative.');
+assert.doesNotMatch(source, /numberOfLines=\{2\}[^>]*>\{decisionNarratives/, 'Decision narratives must not be truncated to single-line summaries.');
+
 for (const disclosure of ['View All Skills', 'View Full Timeline', 'View All Matches', 'View Full Reasoning', 'View Full CV']) {
   assert.match(source, new RegExp(disclosure), `Progressive disclosure must include ${disclosure}.`);
 }

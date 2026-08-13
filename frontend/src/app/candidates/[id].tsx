@@ -31,6 +31,7 @@ import { formatDateTime } from '@/utils/date';
 import { getCvQueueStateMeta, resolveCvQueueUiState } from '@/utils/cvQueueState';
 import {
   buildCandidateFiveSecondSummary,
+  buildCandidateDecisionNarratives,
   buildCandidateDetailViewModel,
   cleanCandidateText,
   cleanRecommendationText,
@@ -335,6 +336,10 @@ export default function CandidateDetailScreen() {
     () => data && candidateView ? buildCandidateFiveSecondSummary(data, candidateView, analysis, recommendations) : null,
     [analysis, candidateView, data, recommendations],
   );
+  const decisionNarratives = useMemo(
+    () => data && candidateView ? buildCandidateDecisionNarratives(data, candidateView, analysis, recommendations) : null,
+    [analysis, candidateView, data, recommendations],
+  );
   const decisionEvidence = useMemo(
     () => data && candidateView ? buildCandidateDecisionEvidence(data, candidateView, analysis, recommendations) : null,
     [analysis, candidateView, data, recommendations],
@@ -395,13 +400,13 @@ export default function CandidateDetailScreen() {
   const visibleMatches = showAllMatches ? vacancyMatches : vacancyMatches.slice(0, 3);
   const visibleConcerns = showAllRisks ? decisionEvidence?.concerns || [] : (decisionEvidence?.concerns || []).slice(0, 4);
   const visibleStrengths = showAllRisks ? decisionEvidence?.strengths || [] : (decisionEvidence?.strengths || []).slice(0, 4);
-  const reasoningMatches = vacancyMatches.filter((match: any) => cleanCandidateText(match.llm_reason || match.semantic_reason));
+  const reasoningMatches = vacancyMatches.slice(1).filter((match: any) => cleanCandidateText(match.ai_match_explanation || match.llm_reason || match.semantic_reason));
 
   const renderAiReasoning = () => (
     <Card className="gap-2.5 shadow-none border-info/30 bg-info/5 lg:flex-1">
       <View className="flex-row items-center gap-1.5 pb-2 border-b border-info/20">
         <Sparkles size={14} color={COLORS.info} />
-        <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">AI Match Explanation</Text>
+        <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Additional AI Context</Text>
       </View>
       <Text className="text-[11px] leading-4 text-text-muted">AI interpretation is not confirmed CV evidence. Verify it against the factual tabs.</Text>
       {analysis?.ai_career_summary ? (
@@ -977,19 +982,26 @@ export default function CandidateDetailScreen() {
               </View>
             </View>
 
-            <View className="flex-col gap-2 md:flex-row">
+            <View className="flex-col gap-2 lg:flex-row">
               <View className="flex-row items-start flex-1 gap-2 p-2 border rounded bg-success/5 border-success/20">
                 <CheckCircle size={15} color={COLORS.success} />
                 <View className="flex-1 gap-0.5">
                   <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-success">Top Strength</Text>
-                  <Text numberOfLines={2} className="text-xs leading-4 text-text-primary">{decisionEvidence?.strengths[0] || 'Not enough evidence to identify a top strength.'}</Text>
+                  <Text className="text-xs leading-5 text-text-primary">{decisionNarratives?.topStrength}</Text>
                 </View>
               </View>
               <View className="flex-row items-start flex-1 gap-2 p-2 border rounded bg-warning/10 border-warning/30">
                 <AlertTriangle size={15} color={COLORS.warning} />
                 <View className="flex-1 gap-0.5">
                   <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-warning">Main Concern</Text>
-                  <Text numberOfLines={2} className="text-xs leading-4 text-text-primary">{candidateSummary.mainConcern}</Text>
+                  <Text className="text-xs leading-5 text-text-primary">{decisionNarratives?.mainConcern}</Text>
+                </View>
+              </View>
+              <View className="flex-row items-start flex-1 gap-2 p-2 border rounded bg-info/5 border-info/20">
+                <Sparkles size={15} color={COLORS.info} />
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-info">AI Match Explanation</Text>
+                  <Text className="text-xs leading-5 text-text-primary">{decisionNarratives?.aiMatchExplanation}</Text>
                 </View>
               </View>
             </View>
