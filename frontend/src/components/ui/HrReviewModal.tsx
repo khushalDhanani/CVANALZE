@@ -109,7 +109,7 @@ export function HrReviewModal({
         <View
           className={`w-full bg-surface ${
             isDesktop ? 'max-w-lg rounded-lg shadow-xl' : 'rounded-t-lg'
-          } p-5 gap-3.5`}
+          } p-3 sm:p-4 gap-2.5`}
         >
           <View className="flex-row justify-between items-center pb-2.5 border-b border-border">
             <Text className="text-base font-sans-bold text-text-primary">
@@ -126,7 +126,7 @@ export function HrReviewModal({
             </Pressable>
           </View>
 
-          <ScrollView className="max-h-[80vh]" contentContainerStyle={{ gap: 14 }}>
+          <ScrollView className="max-h-[80vh]" contentContainerStyle={{ gap: 8 }}>
             <View className="bg-background p-2.5 rounded border border-border/70">
               <Text className="text-xs font-sans-medium text-text-muted">
                 Target Role: <Text className="font-sans-bold text-primary">{job.job_title}</Text>

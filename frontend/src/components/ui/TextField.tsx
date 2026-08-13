@@ -44,7 +44,7 @@ export function TextField({
           setIsFocused(false);
           onBlur?.(e);
         }}
-        className={`rounded-md border px-3 py-2 text-sm font-sans text-text-primary bg-surface min-h-[38px] ${
+        className={`rounded-md border px-3 py-2 text-sm font-sans text-text-primary bg-surface min-h-[44px] sm:min-h-[40px] ${
           error
             ? "border-danger ring-1 ring-danger/30"
             : isFocused

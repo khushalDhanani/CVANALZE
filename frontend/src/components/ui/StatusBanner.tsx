@@ -70,7 +70,7 @@ export function StatusBanner({
   return (
     <View
       testID={testID}
-      className={`rounded-md p-3 border flex-row items-start gap-2.5 ${config.bg} ${config.border} ${className}`}
+      className={`rounded-md p-2.5 border flex-row items-start gap-2 ${config.bg} ${config.border} ${className}`}
     >
       <View className="mt-0.5">{renderIcon()}</View>
       <View className="flex-1 gap-1">

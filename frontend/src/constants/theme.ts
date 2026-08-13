@@ -63,5 +63,19 @@ export const Spacing = {
   six: 64,
 } as const;
 
+export const Density = {
+  micro: 4,
+  inline: 6,
+  component: 8,
+  compactPadding: 10,
+  cardPadding: 12,
+  section: 12,
+  majorSection: 16,
+  desktopControlHeight: 36,
+  standardControlHeight: 40,
+  mobileTouchTarget: 44,
+  desktopSidebarWidth: 232,
+} as const;
+
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;

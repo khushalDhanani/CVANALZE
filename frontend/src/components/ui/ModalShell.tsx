@@ -56,7 +56,7 @@ export function ModalShell({
           <View
             className={`w-full bg-surface ${
               isDesktop ? 'rounded-lg shadow-xl' : 'rounded-t-lg'
-            } p-5 gap-3`}
+            } p-3 sm:p-4 gap-2.5`}
             style={isDesktop ? { maxWidth } : { maxHeight: height * 0.9 }}
           >
             {/* Header */}
@@ -86,7 +86,7 @@ export function ModalShell({
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ gap: 12, paddingBottom: 4 }}
+              contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
             >
               {children}
             </ScrollView>

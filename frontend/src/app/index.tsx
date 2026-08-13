@@ -75,10 +75,10 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[]} />
       <ScrollView className="flex-1 px-3" contentContainerStyle={{ paddingBottom: 32 }}>
-        <View className="gap-5 py-4">
+        <View className="gap-3 py-3">
 
           {/* Hero Section */}
-          <View className="bg-primary rounded-lg p-4 border border-primary shadow-sm" style={{ elevation: 1 }}>
+          <View className="bg-primary rounded-md p-3 border border-primary shadow-sm" style={{ elevation: 1 }}>
             <View className="flex-row items-center justify-between mb-2">
               <View className="flex-row items-center gap-2.5">
                 <View className="w-9 h-9 rounded-md bg-surface/20 items-center justify-center">
@@ -104,7 +104,7 @@ export default function HomeScreen() {
           </View>
 
           {/* Quick Stats Grid */}
-          <ResponsiveStatGrid minCardWidth={160} gap={12}>
+          <ResponsiveStatGrid minCardWidth={160}>
             <StatCard
               label="Active Vacancies"
               value={jobsLoading ? undefined : jobsError ? 'Unavailable' : jobs.length}
@@ -316,7 +316,7 @@ export default function HomeScreen() {
               Recent Activity
             </Text>
             {candidatesLoading ? (
-              <View className="py-6 items-center justify-center">
+              <View className="py-4 items-center justify-center">
                 <ActivityIndicator size="small" color={COLORS.primary} />
               </View>
             ) : candidatesError ? (
@@ -347,7 +347,7 @@ export default function HomeScreen() {
               Top Vacancies
             </Text>
             {jobsLoading ? (
-              <View className="py-6 items-center justify-center">
+              <View className="py-4 items-center justify-center">
                 <ActivityIndicator size="small" color={COLORS.primary} />
               </View>
             ) : jobsError ? (

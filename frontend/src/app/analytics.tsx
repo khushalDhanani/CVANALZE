@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { analyticsService, PerformanceMetricsResponse } from '@/services/analyticsService';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { CacheAnalyticsResponse } from '@/types/api';
-import { Card, Button, Badge, StatCard, DenseRow, Breadcrumbs } from '@/components/ui';
+import { Card, Button, Badge, StatCard, DenseRow, Breadcrumbs, PageHeader } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { PERFORMANCE_SLO } from '@/constants/slo';
 import { vectorDbService } from '@/services/vectorDbService';
@@ -144,18 +144,11 @@ export default function AnalyticsScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Analytics & Telemetry' }]} />
 
-      {/* Responsive Stacked Header */}
-      <View className="flex-col sm:flex-row items-start sm:items-center justify-between px-3 py-2.5 bg-surface border-b border-border gap-3">
-        <View className="flex-row items-center gap-2">
-          <BarChart3 size={18} color={COLORS.primary} />
-          <View>
-            <Text className="text-base font-sans-bold text-text-primary">Analytics & Telemetry</Text>
-            <Text className="text-[11px] font-sans text-text-muted">
-              Real-time Observability: L1/L2 Cache Ratios & Pipeline Stage Latencies
-            </Text>
-          </View>
-        </View>
-        <View className="flex-row items-center gap-2 self-stretch sm:self-auto justify-end">
+      <PageHeader
+        title="Analytics & Telemetry"
+        subtitle="Real-time Observability: L1/L2 Cache Ratios & Pipeline Stage Latencies"
+        leading={<BarChart3 size={18} color={COLORS.primary} />}
+        actions={<>
           <Button
             label="Purge All Cache"
             variant="destructive"
@@ -170,8 +163,8 @@ export default function AnalyticsScreen() {
             onPress={fetchTelemetry}
             disabled={loading}
           />
-        </View>
-      </View>
+        </>}
+      />
 
       {/* Purge Confirmation Modal */}
       <Modal
@@ -181,8 +174,8 @@ export default function AnalyticsScreen() {
         onRequestClose={() => setPurgeModalVisible(false)}
       >
         <View className="flex-1 bg-black/60 items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-surface p-5 border border-border gap-4 shadow-xl">
-            <View className="flex-row justify-between items-center border-b border-border pb-3">
+          <Card className="w-full max-w-md bg-surface border border-border gap-3 shadow-xl">
+            <View className="flex-row justify-between items-center border-b border-border pb-2">
               <View className="flex-row items-center gap-2">
                 <AlertCircle size={18} color={COLORS.danger} />
                 <Text className="text-base font-sans-bold text-text-primary">Confirm Cache Invalidation</Text>
@@ -225,7 +218,7 @@ export default function AnalyticsScreen() {
         </View>
       </Modal>
 
-      <ScrollView className="flex-1 px-3 py-4">
+      <ScrollView className="flex-1 px-3 py-3">
         {noticeMsg && (
           <Card
             className={`border flex-row items-center justify-center gap-1.5 mb-4 p-3 ${
@@ -248,21 +241,21 @@ export default function AnalyticsScreen() {
         )}
 
         {loading ? (
-          <View className="py-16 items-center">
+          <View className="py-8 items-center">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">
               Loading system telemetry & performance metrics...
             </Text>
           </View>
         ) : error ? (
-          <Card className="bg-danger/10 border-danger/30 p-4">
+          <Card className="bg-danger/10 border-danger/30">
             <Text className="text-xs font-sans-semibold text-danger">{error}</Text>
             <View className="mt-2 self-start">
               <Button label="Try Again" variant="ghost" onPress={fetchTelemetry} />
             </View>
           </Card>
         ) : (
-          <View className="gap-4 pb-8">
+          <View className="gap-3 pb-4">
             {/* Quick Metrics Grid */}
             <View className="flex-row flex-wrap gap-3">
               <StatCard

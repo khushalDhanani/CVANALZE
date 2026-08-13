@@ -15,7 +15,7 @@ export function HiringRisksCard({ risks = [], showEmpty = false }: HiringRisksCa
   if (!risks || risks.length === 0) {
     if (!showEmpty) return null;
     return (
-      <View className="gap-2 mt-3 p-3 border rounded-md bg-success/5 border-success/20">
+      <View className="gap-1.5 p-2.5 border rounded-md bg-success/5 border-success/20">
         <View className="flex-row items-center gap-1.5">
           <ShieldAlert size={16} color={COLORS.success} />
           <Text className="text-sm font-sans-bold text-text-primary">Hiring Risks & Concerns</Text>
@@ -28,7 +28,7 @@ export function HiringRisksCard({ risks = [], showEmpty = false }: HiringRisksCa
   }
 
   return (
-    <View className="gap-2 mt-3">
+    <View className="gap-2">
       <View className="flex-row items-center gap-1.5 mb-1">
         <ShieldAlert size={16} color={COLORS.danger} />
         <Text className="text-sm font-sans-bold text-text-primary">
@@ -86,7 +86,7 @@ export function HiringRisksCard({ risks = [], showEmpty = false }: HiringRisksCa
         }
 
         return (
-          <View key={`${presentation.key}-${idx}`} className={`border rounded-md p-3 gap-2 ${tone}`}>
+          <View key={`${presentation.key}-${idx}`} className={`border rounded-md p-2.5 gap-1.5 ${tone}`}>
             <View className="flex-row items-start justify-between">
               <View className="flex-row items-center gap-1.5 flex-1 pr-2">
                 {icon}

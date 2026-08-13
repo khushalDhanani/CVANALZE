@@ -38,7 +38,7 @@ export function Breadcrumbs({ items, showHome = true, maxVisibleItems }: Breadcr
   }
 
   return (
-    <View className="flex-row items-center flex-wrap gap-1 py-1.5 px-3 bg-surface/50 border-b border-border/50">
+    <View className="flex-row items-center flex-wrap gap-1 py-0.5 px-3 bg-surface/50 border-b border-border/50 min-h-[32px]">
       {displayItems.map((item, index) => {
         const isLast = index === displayItems.length - 1;
         const isEllipsis = item.label === '...';

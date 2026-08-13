@@ -231,7 +231,7 @@ export function VacancyFitScoreBreakdownCard({
   const isHierarchyUnknown = hierarchyState === 'UNAVAILABLE';
 
   return (
-    <Card className="p-3 border-border/80 bg-background/50 gap-2.5">
+    <Card className="p-2.5 border-border/80 bg-background/50 gap-2">
       <View className="flex-row items-center justify-between border-b border-border/60 pb-1.5">
         <View className="flex-row items-center gap-1.5">
           <Layers size={13} color={COLORS.primary} />

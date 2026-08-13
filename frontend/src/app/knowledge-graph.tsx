@@ -17,6 +17,7 @@ import {
   DenseRow,
   ErrorBanner,
   EmptyState,
+  PageHeader,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { GitBranch, UserCheck, Briefcase, Hash, Target, AlertCircle } from 'lucide-react-native';
@@ -121,37 +122,28 @@ export default function KnowledgeGraphScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Knowledge Graph' }]} />
 
-      {/* Responsive PageHeader */}
-      <View className="flex-col sm:flex-row items-start sm:items-center justify-between px-3 py-2.5 bg-surface border-b border-border gap-3">
-        <View className="flex-row items-center gap-2">
-          <GitBranch size={18} color={COLORS.primary} />
-          <View>
-            <Text className="text-base font-sans-bold text-text-primary">
-              Talent Knowledge & Relationship Explorer
-            </Text>
-            <Text className="text-[11px] font-sans text-text-muted">
-              Semantic entity network, taxonomy connections, and candidate-vacancy graph relationships
-            </Text>
-          </View>
-        </View>
-        <Button
+      <PageHeader
+        title="Talent Knowledge & Relationship Explorer"
+        subtitle="Semantic entity network, taxonomy connections, and candidate-vacancy graph relationships"
+        leading={<GitBranch size={18} color={COLORS.primary} />}
+        actions={<Button
           label="Refresh Analytics"
           variant="ghost"
           size="sm"
           onPress={fetchAnalytics}
           disabled={loadingAnalytics}
-        />
-      </View>
+        />}
+      />
 
-      <ScrollView className="flex-1 px-3 py-4">
+      <ScrollView className="flex-1 px-3 py-3">
         {/* Global Analytics Section */}
-        <Card className="gap-3 mb-4">
+        <Card className="gap-3 mb-3">
           <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider mb-1">
             Global Graph Analytics
           </Text>
 
           {loadingAnalytics ? (
-            <View className="py-8 items-center">
+            <View className="py-5 items-center">
               <ActivityIndicator size="small" color={COLORS.primary} />
               <Text className="text-xs font-sans text-text-muted mt-2">Loading graph analytics...</Text>
             </View>
@@ -163,8 +155,8 @@ export default function KnowledgeGraphScreen() {
               </View>
             </View>
           ) : analytics ? (
-            <View className="gap-4">
-              <View className="flex-row flex-wrap gap-3">
+            <View className="gap-3">
+              <View className="flex-row flex-wrap gap-2">
                 <StatCard
                   label="Total Nodes"
                   value={analytics.graph_summary.total_graph_nodes}
@@ -191,7 +183,7 @@ export default function KnowledgeGraphScreen() {
                 />
               </View>
 
-              <View className="flex-row flex-wrap gap-4">
+              <View className="flex-row flex-wrap gap-3">
                 <View className="flex-1 min-w-[280px]">
                   <Text className="text-xs font-sans-bold text-text-muted uppercase mb-2">Top Skills</Text>
                   <View className="gap-2">
@@ -234,7 +226,7 @@ export default function KnowledgeGraphScreen() {
         </Card>
 
         {/* Entity Search Section */}
-        <Card className="gap-3 mb-8">
+        <Card className="gap-3 mb-3">
           <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
             Entity Relationship Search
           </Text>
@@ -276,7 +268,7 @@ export default function KnowledgeGraphScreen() {
           {/* Graph Results Rendering */}
           {graphData && (
             <View className="mt-4 border-t border-border pt-4">
-              <View className="flex-row items-center gap-2 mb-4 flex-wrap">
+              <View className="flex-row items-center gap-2 mb-3 flex-wrap">
                 {getIconForType(searchType)}
                 <Text className="text-sm font-sans-bold text-text-primary">
                   {searchType === 'Candidate'

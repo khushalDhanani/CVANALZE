@@ -20,6 +20,7 @@ import {
   ExperienceTimelineCard,
   ErrorBanner,
   VacancyEnrichmentPanel,
+  PageHeader,
 } from '@/components/ui';
 import { VacancyMatchStatusBadge } from '@/components/ui/VacancyMatchStatusBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
@@ -406,7 +407,7 @@ export default function CandidateDetailScreen() {
   };
 
   const renderOverviewTab = () => (
-    <View className="w-full gap-4">
+    <View className="w-full gap-3">
       {/* 2. Skills Match */}
       {decisionEvidence ? (
         <Card className="gap-3 p-3 shadow-none border-border">
@@ -702,10 +703,10 @@ export default function CandidateDetailScreen() {
   );
 
   const renderProcessingTab = () => (
-    <View className="gap-4">
+    <View className="gap-3">
       {/* Active Processing Step Card */}
       {isReprocessing && (
-        <View className="mb-4">
+        <View>
           <StepProgressCard
             currentStepIndex={currentStepIndex}
             stepStates={stepStates}
@@ -773,22 +774,21 @@ export default function CandidateDetailScreen() {
           { label: candName || candidateCvId || 'Candidate Profile' },
         ]}
       />
-      {/* 1. Recruiter 5-second summary */}
-      <View className="z-10 px-4 py-3 border-b shadow-sm bg-surface border-border">
-        <View className="flex-row flex-wrap items-center justify-between gap-2">
-          <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={handleBack}
-              accessibilityRole="button"
-              accessibilityLabel="Back to Candidate Directory"
-              className="min-h-[44px] min-w-[44px] items-center justify-center -ml-2"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <ArrowLeft size={18} color={COLORS.textPrimary} />
-            </Pressable>
-            <Text className="text-xs font-sans-bold text-text-muted">Candidate Summary</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
+      <PageHeader
+        title="Candidate Summary"
+        leading={(
+          <Pressable
+            onPress={handleBack}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Candidate Directory"
+            className="min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] items-center justify-center"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <ArrowLeft size={18} color={COLORS.textPrimary} />
+          </Pressable>
+        )}
+        actions={(
+          <>
             <Button
               variant="secondary"
               size="sm"
@@ -805,18 +805,21 @@ export default function CandidateDetailScreen() {
               onPress={() => setReprocessModalVisible(true)}
               disabled={isReprocessing}
             />
-          </View>
-        </View>
+          </>
+        )}
+      />
 
+      {/* 1. Recruiter 5-second summary */}
+      <View className="z-10 px-3 py-2.5 border-b bg-surface border-border">
         {candidateSummary ? (
-          <View className="gap-3 pt-3 mt-3 border-t border-border">
-            <View className="flex-col justify-between gap-3 md:flex-row md:items-start">
-              <View className="flex-row items-center flex-1 min-w-0 gap-3">
-                <View className="items-center justify-center w-11 h-11 rounded-full bg-primary/10">
-                  <UserCheck size={20} color={COLORS.primary} />
+          <View className="gap-2.5">
+            <View className="flex-col justify-between gap-2 md:flex-row md:items-start">
+              <View className="flex-row items-center flex-1 min-w-0 gap-2">
+                <View className="items-center justify-center w-9 h-9 rounded-full bg-primary/10">
+                  <UserCheck size={18} color={COLORS.primary} />
                 </View>
                 <View className="flex-1 min-w-0">
-                  <Text numberOfLines={1} ellipsizeMode="tail" className="text-xl font-sans-bold text-text-primary">{candidateSummary.name}</Text>
+                  <Text numberOfLines={1} ellipsizeMode="tail" className="text-lg font-sans-bold text-text-primary">{candidateSummary.name}</Text>
                   <Text numberOfLines={1} ellipsizeMode="tail" className="text-sm font-sans-bold text-text-primary">
                     {candidateSummary.role || 'Latest role not identified from CV'}
                   </Text>
@@ -868,15 +871,19 @@ export default function CandidateDetailScreen() {
       </View>
 
       {/* 2. Tab Navigation */}
-      <View className="flex-row gap-4 px-4 overflow-x-auto border-b bg-surface border-border">
+      <View className="flex-row gap-2 px-3 overflow-x-auto border-b bg-surface border-border">
         {[
           { id: 'overview', label: 'Overview', icon: <Activity size={14} color={activeTab === 'overview' ? COLORS.primary : COLORS.textMuted} /> },
           { id: 'processing', label: 'Processing Details', icon: <Layers size={14} color={activeTab === 'processing' ? COLORS.primary : COLORS.textMuted} /> },
         ].map(tab => (
           <Pressable
             key={tab.id}
-            className={`py-3 border-b-2 flex-row items-center gap-1.5 ${activeTab === tab.id ? 'border-primary' : 'border-transparent'}`}
+            className={`py-2 min-h-[44px] sm:min-h-[36px] border-b-2 flex-row items-center gap-1.5 ${activeTab === tab.id ? 'border-primary' : 'border-transparent'}`}
             onPress={() => setActiveTab(tab.id as TabType)}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: activeTab === tab.id }}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             {tab.icon}
             <Text className={`text-xs font-sans-bold ${activeTab === tab.id ? 'text-primary' : 'text-text-muted'}`}>
@@ -887,10 +894,10 @@ export default function CandidateDetailScreen() {
       </View>
 
       {/* 3. Main Content Area */}
-      <ScrollView className="flex-1 px-4 py-4">
+      <ScrollView className="flex-1 px-3 py-3">
         {reanalyzeError ? <ErrorBanner title={reanalyzeError.title} message={reanalyzeError.message} /> : null}
         {loading && !isReprocessing ? (
-          <View className="items-center justify-center flex-1 py-16">
+          <View className="items-center justify-center flex-1 py-8">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="mt-2 font-sans text-xs text-text-muted">Loading profile dashboard...</Text>
           </View>
@@ -902,7 +909,7 @@ export default function CandidateDetailScreen() {
             </View>
           </View>
         ) : (
-          <View className="pb-8">
+          <View className="pb-4">
             {activeTab === 'overview' && renderOverviewTab()}
             {activeTab === 'processing' && renderProcessingTab()}
           </View>
@@ -926,7 +933,7 @@ export default function CandidateDetailScreen() {
       {/* Destructive Cache-Purge Confirmation Modal */}
       <Modal animationType="fade" transparent={true} visible={reprocessModalVisible} onRequestClose={() => setReprocessModalVisible(false)}>
         <View className="items-center justify-center flex-1 px-4 bg-black/60">
-          <Card className="w-full max-w-md gap-3 p-4 bg-surface border-border">
+          <Card className="w-full max-w-md gap-2.5 bg-surface border-border">
             <View className="flex-row items-center justify-between pb-2 border-b border-border">
               <View className="flex-row items-center gap-2">
                 <AlertTriangle size={16} color={COLORS.danger} />

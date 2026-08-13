@@ -9,7 +9,7 @@ import {
 } from 'lucide-react-native';
 import { jobsService } from '@/services/jobsService';
 import { JobOpening, VacancyRecommendationsResponse } from '@/types/api';
-import { Badge, Breadcrumbs, Button, Card, EmptyState, ErrorBanner } from '@/components/ui';
+import { Badge, Breadcrumbs, Button, Card, EmptyState, ErrorBanner, PageHeader } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { COLORS } from '@/constants/colors';
@@ -186,32 +186,21 @@ export default function VacancyDetailScreen() {
           { label: jobDetails?.title ? `#${id} - ${jobDetails.title}` : `#${id}` },
         ]}
       />
-      {/* Responsive Header Area */}
-      <View className="px-4 py-3.5 border-b bg-surface border-border">
-        {/* Row 1: Back Navigation, Title, ID, Status Badge & Primary Action */}
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="flex-row items-center flex-1 gap-2.5 pr-2">
-            <Pressable
-              onPress={handleBack}
-              className="w-8 h-8 items-center justify-center rounded border border-border/80 bg-background active:bg-surface-hover"
-              accessibilityRole="button"
-              accessibilityLabel="Back to Vacancies"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <ArrowLeft size={16} color={COLORS.textPrimary} />
-            </Pressable>
-
-            <View className="flex-row flex-wrap items-center gap-2 flex-1">
-              <Badge label={rawStatus.toUpperCase()} tone={statusTone} />
-              <View className="bg-background px-1.5 py-0.5 rounded border border-border/60">
-                <Text className="text-[11px] font-sans-bold text-text-muted">#{jobDetails.id}</Text>
-              </View>
-              <Text className="text-base sm:text-lg font-sans-bold text-text-primary leading-6" numberOfLines={1}>
-                {jobDetails.title}
-              </Text>
-            </View>
-          </View>
-
+      <PageHeader
+        title={jobDetails.title}
+        leading={(
+          <Pressable
+            onPress={handleBack}
+            className="w-9 h-9 items-center justify-center rounded border border-border/80 bg-background active:bg-surface-hover"
+            accessibilityRole="button"
+            accessibilityLabel="Back to Vacancies"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <ArrowLeft size={16} color={COLORS.textPrimary} />
+          </Pressable>
+        )}
+        badge={<Badge label={rawStatus.toUpperCase()} tone={statusTone} />}
+        actions={(
           <Button
             label="Match Candidates"
             variant="primary"
@@ -219,10 +208,11 @@ export default function VacancyDetailScreen() {
             icon={<Play size={12} color={COLORS.background} fill={COLORS.background} />}
             onPress={handleMatchCandidates}
           />
-        </View>
-
-        {/* Row 2: Metadata Chips */}
-        <View className="flex-row flex-wrap items-center gap-2 mt-2.5 ml-0 sm:ml-10">
+        )}
+        metadata={<View className="flex-row flex-wrap items-center gap-1.5 mt-1">
+          <View className="bg-background px-1.5 py-0.5 rounded border border-border/60">
+            <Text className="text-[11px] font-sans-bold text-text-muted">#{jobDetails.id}</Text>
+          </View>
           <View className="flex-row items-center gap-1.5 bg-background border border-border/60 px-2 py-1 rounded">
             <Building size={12} color={COLORS.textMuted} />
             <Text className="text-[11px] font-sans-medium text-text-muted">
@@ -253,19 +243,19 @@ export default function VacancyDetailScreen() {
             <IndianRupee size={12} color={COLORS.textMuted} />
             <Text className="text-[11px] font-sans-medium text-text-muted">{formatSalary(jobDetails)}</Text>
           </View>
-        </View>
-      </View>
+        </View>}
+      />
 
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
 
         {/* Dynamic Grid Layout */}
-        <View className="flex-col lg:flex-row gap-4">
+        <View className="flex-col lg:flex-row gap-3">
 
           {/* Left Column — Role Specifications */}
-          <View className="w-full lg:w-7/12 gap-3.5">
+          <View className="w-full lg:w-7/12 gap-3">
 
             {/* Organization Hierarchy Card */}
-            <Card className="gap-2.5 p-3.5 shadow-none border-border">
+            <Card className="gap-2.5 shadow-none border-border">
               <Text className="text-[11px] font-sans-bold text-primary uppercase tracking-wider">
                 Organization Hierarchy Placement
               </Text>
@@ -321,7 +311,7 @@ export default function VacancyDetailScreen() {
 
             {/* Responsibilities & Description with Show More/Less */}
             {(jobDetails.job_description || jobDetails.responsibilities) && (
-              <Card className="gap-2.5 p-3.5 shadow-none border-border">
+              <Card className="gap-2.5 shadow-none border-border">
                 <View className="flex-row items-center justify-between pb-2 border-b border-border/50">
                   <Text className="text-[11px] font-sans-bold text-text-muted uppercase tracking-wider">Role Details</Text>
                 </View>
@@ -354,12 +344,12 @@ export default function VacancyDetailScreen() {
             )}
 
             {/* Qualifications */}
-            <Card className="gap-3 p-3.5 shadow-none border-border">
+            <Card className="gap-3 shadow-none border-border">
               <View className="flex-row items-center justify-between pb-2 border-b border-border/50">
                 <Text className="text-[11px] font-sans-bold text-text-muted uppercase tracking-wider">Qualifications & Requirements</Text>
               </View>
 
-              <View className="flex-row flex-wrap gap-4">
+              <View className="flex-row flex-wrap gap-2">
                 {jobDetails.education && (
                   <View className="flex-1 min-w-[140px] bg-background p-2 rounded border border-border">
                     <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">Education</Text>
@@ -403,8 +393,8 @@ export default function VacancyDetailScreen() {
           </View>
 
           {/* Right Column — AI Insights & Talent Recommendations */}
-          <View className="w-full lg:w-5/12 gap-3.5">
-            <Card className={`gap-3 p-3.5 shadow-none ${isFocusedInsights ? 'border-primary shadow-sm bg-primary/5' : 'border-border'}`}>
+          <View className="w-full lg:w-5/12 gap-3">
+            <Card className={`gap-3 shadow-none ${isFocusedInsights ? 'border-primary shadow-sm bg-primary/5' : 'border-border'}`}>
               <View className="flex-row items-center justify-between border-b border-border/50 pb-2">
                 <View className="flex-row items-center gap-1.5">
                   <Sparkles size={14} color={isFocusedInsights ? COLORS.primary : COLORS.info} />
@@ -418,7 +408,7 @@ export default function VacancyDetailScreen() {
               </View>
 
               {loadingRec ? (
-                <View className="items-center justify-center py-8">
+                <View className="items-center justify-center py-5">
                   <ActivityIndicator size="small" color={COLORS.info} />
                   <Text className="text-xs font-sans text-text-muted mt-2">Loading match insights...</Text>
                 </View>

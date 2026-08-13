@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMatchConfig } from '@/hooks/useMatchConfig';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { HiringRiskPolicy, HiringRiskSeverity, MatchComponentWeights } from '@/types/api';
-import { Card, Button, TextField, WeightControlRow, Breadcrumbs, Badge } from '@/components/ui';
+import { Card, Button, TextField, WeightControlRow, Breadcrumbs, Badge, PageHeader } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
 const formatRuleLabel = (value: string): string => {
@@ -202,44 +202,33 @@ export default function ConfigScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Engine Configuration' }]} />
 
-      {/* Sticky Header */}
-      <View className="flex-col sm:flex-row items-start sm:items-center justify-between px-3 py-2.5 bg-surface border-b border-border gap-2">
-        <View className="flex-row items-center gap-2">
-          <View>
-            <View className="flex-row items-center gap-2">
-              <Text className="text-base font-sans-bold text-text-primary">Engine Configuration</Text>
-              <Badge
-                label={configurationMissing ? 'Configuration Required' : isDirty ? 'Unsaved Changes' : 'Synced with Server'}
-                tone={configurationMissing || isDirty ? 'warning' : 'neutral'}
-              />
-            </View>
-            <Text className="text-[11px] font-sans text-text-muted">
-              Customize scoring, deterministic hiring-risk policies, and review controls
-            </Text>
-          </View>
-        </View>
-        <View className="flex-row items-center gap-2 self-stretch sm:self-auto justify-end">
-          <Button
+      <PageHeader
+        title="Engine Configuration"
+        subtitle="Customize scoring, deterministic hiring-risk policies, and review controls"
+        badge={<Badge
+          label={configurationMissing ? 'Configuration Required' : isDirty ? 'Unsaved Changes' : 'Synced with Server'}
+          tone={configurationMissing || isDirty ? 'warning' : 'neutral'}
+        />}
+        actions={<Button
             label={isDirty ? 'Discard Changes' : 'Reload Config'}
             variant="ghost"
             size="sm"
             onPress={refreshConfig}
             loading={refreshing}
             disabled={loading || refreshing}
-          />
-        </View>
-      </View>
+          />}
+      />
 
-      <ScrollView className="flex-1 px-3 pt-4">
+      <ScrollView className="flex-1 px-3 pt-3">
         {loading ? (
-          <View className="py-16 items-center">
+          <View className="py-8 items-center">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">
               Loading matching engine configuration...
             </Text>
           </View>
         ) : (
-          <View className="gap-4 mb-8">
+          <View className="gap-3 pb-4">
             {successMsg && (
               <Card className="bg-success/10 border-success/30 flex-row items-center justify-center gap-1.5 p-3">
                 <CheckCircle2 size={14} color={COLORS.success} />
@@ -273,7 +262,7 @@ export default function ConfigScreen() {
             )}
 
             {/* SECTION 1: Match Thresholds */}
-            <Card className="p-3.5 gap-3.5 shadow-none border-border">
+            <Card className="gap-3 shadow-none border-border">
               <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
                 1. Match Classification Thresholds
               </Text>
@@ -303,7 +292,7 @@ export default function ConfigScreen() {
             </Card>
 
             {/* SECTION 2: LLM & Penalty Settings */}
-            <Card className="p-3.5 gap-3.5 shadow-none border-border">
+            <Card className="gap-3 shadow-none border-border">
               <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
                 2. LLM Weights & Penalties
               </Text>
@@ -343,7 +332,7 @@ export default function ConfigScreen() {
             </Card>
 
             {/* SECTION 3: Component Weights */}
-            <Card className="p-3.5 gap-3.5 shadow-none border-border">
+            <Card className="gap-3 shadow-none border-border">
               <View className="flex-row justify-between items-center mb-1">
                 <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
                   3. Component Score Weights
@@ -371,7 +360,7 @@ export default function ConfigScreen() {
             </Card>
 
             {/* SECTION 4: Hiring Risk Policies */}
-            <Card className="p-3.5 gap-3.5 shadow-none border-border">
+            <Card className="gap-3 shadow-none border-border">
               <View className="gap-1">
                 <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
                   4. Hiring Risk Policies
@@ -399,7 +388,7 @@ export default function ConfigScreen() {
                     </Pressable>
                   </View>
 
-                  <View className="flex-row flex-wrap gap-4">
+                  <View className="flex-row flex-wrap gap-3">
                     <Pressable
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: policy.enabled }}
@@ -494,7 +483,7 @@ export default function ConfigScreen() {
             </Card>
 
             {ruleInventory && (
-              <Card className="p-3.5 gap-3.5 shadow-none border-border">
+              <Card className="gap-3 shadow-none border-border">
                 <View className="flex-row items-center justify-between gap-2">
                   <View className="flex-row items-center gap-2">
                     <ListChecks size={16} color={COLORS.primary} />

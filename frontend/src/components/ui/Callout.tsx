@@ -71,7 +71,7 @@ export function Callout({
   return (
     <View
       testID={testID}
-      className={`rounded-md p-3 border ${styles.bg} ${styles.border} gap-1.5 ${className}`}
+      className={`rounded-md p-2.5 border ${styles.bg} ${styles.border} gap-1.5 ${className}`}
     >
       <View className="flex-row items-center gap-2">
         {renderedIcon}

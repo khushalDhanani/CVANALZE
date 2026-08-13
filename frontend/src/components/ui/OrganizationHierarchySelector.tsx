@@ -312,7 +312,7 @@ export function OrganizationHierarchySelector({
   );
 
   return (
-    <View className="bg-surface border border-border rounded-lg p-3">
+    <View className="bg-surface border border-border rounded-md p-3">
       <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider mb-2">
         Organization Hierarchy
       </Text>

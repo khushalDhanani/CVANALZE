@@ -26,6 +26,7 @@ import {
   OrganizationHierarchySelector,
   ErrorBanner,
   StatusBanner,
+  PageHeader,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { formatSalary, formatExperience } from '@/utils/salary';
@@ -142,9 +143,9 @@ export default function VacanciesScreen() {
 
     return (
       <View className="flex-1" style={numColumns > 1 ? { maxWidth: `${100 / numColumns}%` } : {}}>
-        <Card className="flex-1 mb-3 mx-1 p-3.5 bg-surface border-border">
+        <Card className="flex-1 mx-1 bg-surface border-border">
           {/* Header */}
-          <View className="mb-2.5">
+          <View className="mb-2">
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-[11px] font-sans-bold text-primary uppercase tracking-wider">
                 {vacancyId ? `ID #${vacancyId}` : 'Active'}
@@ -164,7 +165,7 @@ export default function VacanciesScreen() {
           </View>
 
           {/* Metrics */}
-          <View className="flex-row gap-2.5 mb-2.5">
+          <View className="flex-row gap-2 mb-2">
             <View className="flex-1 bg-background border border-border rounded p-1.5">
               <Text className="text-[11px] font-sans-bold text-text-muted uppercase tracking-wider mb-0.5">Exp</Text>
               <Text className="text-[11px] font-sans-medium text-text-primary" numberOfLines={1}>{expText}</Text>
@@ -177,7 +178,7 @@ export default function VacanciesScreen() {
 
           {/* Required Skills */}
           {displayedSkills.length > 0 && (
-            <View className="mb-3">
+            <View className="mb-2">
               <View className="flex-row flex-wrap gap-1">
                 {displayedSkills.map((skill, idx) => (
                   <View key={idx} className="bg-background border border-border px-1.5 py-0.5 rounded">
@@ -197,10 +198,10 @@ export default function VacanciesScreen() {
           <View className="flex-1" />
 
           {/* Footer Actions with 44px touch targets */}
-          <View className="flex-row gap-2 pt-2.5 border-t border-border">
+          <View className="flex-row gap-2 pt-2 border-t border-border">
             <Pressable
               onPress={() => handleOpenDetails(item.id)}
-              className="flex-1 bg-surface border border-border min-h-[44px] rounded items-center justify-center active:bg-background"
+              className="flex-1 bg-surface border border-border min-h-[44px] sm:min-h-[38px] rounded items-center justify-center active:bg-background"
               accessibilityRole="button"
               accessibilityLabel="View Vacancy Details"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -209,7 +210,7 @@ export default function VacanciesScreen() {
             </Pressable>
             <Pressable
               onPress={() => handleOpenRecommendations(vacancyId)}
-              className="flex-1 flex-row bg-primary/10 border border-primary/20 min-h-[44px] rounded items-center justify-center gap-1 active:bg-primary/20"
+              className="flex-1 flex-row bg-primary/10 border border-primary/20 min-h-[44px] sm:min-h-[38px] rounded items-center justify-center gap-1 active:bg-primary/20"
               accessibilityRole="button"
               accessibilityLabel="View AI Recommendations & Match Insights"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -226,15 +227,10 @@ export default function VacanciesScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Job Vacancies' }]} />
-      {/* Responsive Header */}
-      <View className="flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 bg-surface border-b border-border gap-2">
-        <View>
-          <Text className="text-base font-sans-bold text-text-primary">Active Job Vacancies</Text>
-          <Text className="text-[11px] font-sans text-text-muted">
-            {filteredJobs.length} active vacancies {jobs.length > 0 && `(${jobs.length} total catalogued)`}
-          </Text>
-        </View>
-        <View className="flex-row items-center gap-2 self-end sm:self-auto">
+      <PageHeader
+        title="Active Job Vacancies"
+        subtitle={`${filteredJobs.length} active vacancies${jobs.length > 0 ? ` (${jobs.length} total catalogued)` : ''}`}
+        actions={<>
           <Button
             label="Refresh"
             variant="ghost"
@@ -251,10 +247,10 @@ export default function VacanciesScreen() {
             loading={clearingCache}
             disabled={clearingCache}
           />
-        </View>
-      </View>
+        </>}
+      />
 
-      <View className="flex-1 px-4 pt-3">
+      <View className="flex-1 px-3 pt-3">
         {cacheSuccess && (
           <Card className="bg-success/10 border-success/30 flex-row items-center gap-2 mb-3 p-3">
             <CheckCircle size={14} color={COLORS.success} />
@@ -284,7 +280,7 @@ export default function VacanciesScreen() {
         )}
 
         {/* Search & Filters Panel */}
-        <Card className="mb-4 gap-3 bg-surface border-border">
+        <Card className="mb-3 gap-2 bg-surface border-border">
           <TextField
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -324,7 +320,7 @@ export default function VacanciesScreen() {
 
         {/* Loading state */}
         {loading ? (
-          <View className="flex-1 justify-center items-center py-16">
+          <View className="flex-1 justify-center items-center py-8">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">Fetching job openings from backend...</Text>
           </View>
@@ -343,6 +339,7 @@ export default function VacanciesScreen() {
             data={filteredJobs}
             keyExtractor={(item, index) => (item?.id ? String(item.id) : `job-${index}`)}
             renderItem={renderJobCard}
+            ItemSeparatorComponent={() => <View className="h-2" />}
             contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: numColumns > 1 ? 4 : 0 }}
             onRefresh={refreshJobs}
             refreshing={loading}
@@ -359,7 +356,7 @@ export default function VacanciesScreen() {
       {/* Destructive Cache Purge Modal */}
       <Modal animationType="fade" transparent={true} visible={confirmPurgeModalVisible} onRequestClose={() => setConfirmPurgeModalVisible(false)}>
         <View className="items-center justify-center flex-1 px-4 bg-black/60">
-          <Card className="w-full max-w-md gap-3 p-4 bg-surface border-border">
+          <Card className="w-full max-w-md gap-2.5 bg-surface border-border">
             <View className="flex-row items-center justify-between pb-2 border-b border-border">
               <View className="flex-row items-center gap-2">
                 <AlertTriangle size={16} color={COLORS.danger} />

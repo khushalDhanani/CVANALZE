@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { AlertCircle, Check, Plus, RotateCcw, Trash2 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Breadcrumbs, Button, Card } from '@/components/ui';
+import { Breadcrumbs, Button, Card, PageHeader } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { ApiError } from '@/services/apiClient';
@@ -87,7 +87,7 @@ function FieldEditor({ name, schema, root, value, required = false, depth = 0, o
       );
       if (depth === 0) {
         return (
-          <Card className="p-4 gap-3">
+          <Card className="gap-2.5">
             <Text className="text-sm font-sans-bold text-text-primary">{label}{required ? ' *' : ''}</Text>
             {resolved.description && <Text className="text-xs font-sans text-text-muted">{resolved.description}</Text>}
             {content}
@@ -263,10 +263,10 @@ export default function ConfigSetupScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Engine Configuration', href: '/config' }, { label: 'Initial Setup' }]} />
-      <ScrollView className="flex-1 px-3" contentContainerStyle={{ paddingBottom: 32 }}>
-        <View className="gap-4 py-4">
-          <Card className="p-4 gap-2">
-            <Text className="text-base font-sans-bold text-text-primary">Initial Configuration Setup</Text>
+      <PageHeader title="Initial Configuration Setup" subtitle="Validate and activate the backend-provided system configuration." />
+      <ScrollView className="flex-1 px-3" contentContainerStyle={{ paddingBottom: 16 }}>
+        <View className="gap-3 py-3">
+          <Card className="gap-2">
             <Text className="text-xs font-sans text-text-muted leading-5">
               Review the validated system baseline below. Controls are generated from the backend schema and no bundled JSON profile or test fixture is loaded.
             </Text>

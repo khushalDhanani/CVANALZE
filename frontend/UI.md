@@ -83,9 +83,11 @@ module.exports = {
 
 ### Spacing (compact)
 - Screen horizontal padding: `px-3` (mobile default), `px-5` on tablets
-- Vertical rhythm between sections: `gap-4` (not `gap-6` — keep sections close)
+- Vertical rhythm between related sections: `gap-3`; use `gap-4` only between major page regions
 - Card internal padding: `p-3`
 - Row / list item padding: `px-3 py-2`
+- Nested analytical panel padding: `p-2` or `p-2.5`
+- Desktop control and row height: `36–40px`; mobile controls retain a 44px interaction area
 - Minimum touch target: **44x44 — hard floor, never reduced.** Compactness
   applies to visuals, not to tap area. Use `hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}`
   on any element whose visual bounds are smaller than 44x44.
@@ -357,7 +359,7 @@ export function EmptyState({ title, subtitle }: { title: string; subtitle?: stri
   `Alert.alert` or bottom sheet before firing — never a single-tap
   destructive button.
 - Compact ≠ crowded: keep `gap-2`/`gap-1.5` between related elements inside a
-  component, but never remove the `gap-4` rhythm *between* distinct sections
+  component, use `gap-3` between related sections, and keep `gap-4` *between* major regions
   — density comes from trimming padding, not from deleting whitespace that
   separates unrelated content.
 
@@ -428,7 +430,7 @@ components/
 
 - [ ] Uses only tokens from Section 1 — no raw hex/px values
 - [ ] Built from `components/ui/*` primitives, not bespoke one-off styling
-- [ ] Follows compact spacing (`px-3`, `p-3`, `gap-4` between sections) —
+- [ ] Follows compact spacing (`px-3`, `p-3`, `gap-3` between related sections) —
       not the old spacious defaults (`px-4`, `p-4`, `gap-6`)
 - [ ] Has a loading state, an empty state, and an error state (all three)
 - [ ] Every tappable element has visible pressed feedback + `accessibilityLabel`

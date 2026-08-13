@@ -11,7 +11,7 @@ import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { useBatchProgress } from '@/hooks/useBatchProgress';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { BatchCandidateResult } from '@/types/api';
-import { Card, Button, SegmentedControl, EmptyState, Badge, Breadcrumbs, ErrorBanner } from '@/components/ui';
+import { Card, Button, SegmentedControl, EmptyState, Badge, Breadcrumbs, ErrorBanner, PageHeader } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { BATCH_CANDIDATE_LIMITS } from '@/constants/limits';
 import { resolveVacancyFitScore } from '@/utils/candidateDetail';
@@ -180,13 +180,10 @@ export default function BatchScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Batch Processing' }]} />
 
-      {/* Sticky PageHeader */}
-      <View className="px-3 py-2.5 bg-surface border-b border-border">
-        <Text className="text-base font-sans-bold text-text-primary">Batch Candidate Matching</Text>
-        <Text className="text-[11px] font-sans text-text-muted">
-          Queue active candidate CVs through the standard parser and matching pipeline with persistent job progress.
-        </Text>
-      </View>
+      <PageHeader
+        title="Batch Candidate Matching"
+        subtitle="Queue active candidate CVs through the standard parser and matching pipeline with persistent job progress."
+      />
 
       {/* Primary FlatList Scroller */}
       <FlatList
@@ -213,7 +210,7 @@ export default function BatchScreen() {
             </View>
           ) : null
         }
-        contentContainerStyle={{ padding: 12, gap: 10 }}
+        contentContainerStyle={{ padding: 12, gap: 8 }}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>

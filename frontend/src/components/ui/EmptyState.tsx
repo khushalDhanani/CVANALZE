@@ -69,7 +69,7 @@ export function EmptyState({
 
   if (isList) {
     return (
-      <View className={`items-center justify-center py-8 px-4 gap-2 bg-surface/50 border border-dashed border-border rounded-lg ${className}`}>
+      <View className={`items-center justify-center py-5 px-3 gap-2 bg-surface/50 border border-dashed border-border rounded-md ${className}`}>
         {icon}
         <Text className="text-sm font-sans-semibold text-text-primary text-center">{title}</Text>
         {subtitle && <Text className="text-xs font-sans text-text-muted text-center max-w-sm leading-5">{subtitle}</Text>}
@@ -100,7 +100,7 @@ export function EmptyState({
   }
 
   return (
-    <View className={`flex-1 items-center justify-center px-6 py-12 gap-2 ${className}`}>
+    <View className={`flex-1 items-center justify-center px-4 py-8 gap-2 ${className}`}>
       {icon}
       <Text className="text-base font-sans-bold text-text-primary text-center">{title}</Text>
       {subtitle && <Text className="text-xs font-sans text-text-muted text-center max-w-md leading-5">{subtitle}</Text>}

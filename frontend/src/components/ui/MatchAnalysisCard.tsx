@@ -36,7 +36,7 @@ export function MatchAnalysisCard({
 }: MatchAnalysisCardProps) {
   if (!bestMatch) {
     return (
-      <Card testID={testID} className={`p-5 items-center justify-center gap-2 border-border/80 ${className}`}>
+      <Card testID={testID} className={`py-5 items-center justify-center gap-2 border-border/80 ${className}`}>
         <AlertCircle size={22} color={COLORS.textMuted} />
         <Text className="text-sm font-sans-bold text-text-primary">No Suitable Vacancy Match Found</Text>
         <Text className="text-xs font-sans text-text-muted text-center max-w-sm">
@@ -59,7 +59,7 @@ export function MatchAnalysisCard({
   const fitScore = resolveVacancyFitScore(bestMatch);
 
   return (
-    <Card testID={testID} className={`border-primary/40 shadow-sm gap-3.5 ${className}`}>
+    <Card testID={testID} className={`border-primary/40 shadow-sm gap-3 ${className}`}>
       {!!resolvedName && (
         <View className="flex-row items-center gap-2 pb-2 border-b border-border/50">
           <View className="w-6 h-6 rounded-full bg-primary/10 items-center justify-center">
@@ -114,7 +114,7 @@ export function MatchAnalysisCard({
 
       {/* Cross-Domain Guard Explainability Banner */}
       {isDomainCapped && !bestMatch.score_breakdown && (
-        <View className="bg-warning/10 border border-warning/30 rounded-md p-3 gap-1">
+        <View className="bg-warning/10 border border-warning/30 rounded-md p-2.5 gap-1">
           <View className="flex-row items-center gap-1.5">
             <AlertTriangle size={14} color={COLORS.warning} />
             <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
@@ -138,7 +138,7 @@ export function MatchAnalysisCard({
 
       {/* LLM Reason if available */}
       {!!bestMatch.llm_reason && (
-        <View className="bg-info/10 border border-info/30 rounded-md p-3">
+        <View className="bg-info/10 border border-info/30 rounded-md p-2.5">
           <View className="flex-row items-center gap-1.5 mb-1">
             <Sparkles size={14} color={COLORS.info} />
             <Text className="text-xs font-sans-bold text-info">
@@ -181,7 +181,7 @@ export function MatchAnalysisCard({
         if (failureList.length === 0) return null;
 
         return (
-          <View className="bg-danger/10 border border-danger/30 rounded-md p-3 gap-1.5">
+          <View className="bg-danger/10 border border-danger/30 rounded-md p-2.5 gap-1.5">
             <View className="flex-row items-center gap-1.5 mb-1">
               <CpuIcon size={14} color={COLORS.danger} />
               <Text className="text-xs font-sans-bold text-danger">

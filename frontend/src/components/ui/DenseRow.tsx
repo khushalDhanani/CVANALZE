@@ -54,7 +54,7 @@ export function DenseRow({
     </>
   );
 
-  const containerClasses = `flex-row items-center justify-between px-3 py-2 bg-surface rounded-md border border-border min-h-[44px] min-w-[280px] ${className}`;
+  const containerClasses = `flex-row items-center justify-between px-3 py-1.5 bg-surface rounded-md border border-border min-h-[44px] sm:min-h-[38px] min-w-[280px] ${className}`;
 
   if (onPress) {
     return (

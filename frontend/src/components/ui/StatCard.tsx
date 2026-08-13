@@ -41,7 +41,7 @@ export function StatCard({
   testID,
 }: StatCardProps) {
   return (
-    <Card testID={testID} className={`flex-1 min-w-[140px] md:min-w-[180px] p-3.5 gap-1 ${TONE_CONTAINERS[tone]} ${className}`}>
+    <Card testID={testID} className={`flex-1 min-w-[140px] md:min-w-[180px] gap-1 ${TONE_CONTAINERS[tone]} ${className}`}>
       <Text className="text-xs font-sans-medium text-text-muted mb-0.5" numberOfLines={1}>
         {label}
       </Text>
@@ -52,7 +52,7 @@ export function StatCard({
       ) : typeof value === "string" || typeof value === "number" ? (
         <Text
           numberOfLines={1}
-          className={`text-xl sm:text-2xl font-sans-bold leading-7 ${TONE_TEXT[tone]}`}
+          className={`text-lg sm:text-xl font-sans-bold leading-6 ${TONE_TEXT[tone]}`}
         >
           {value}
         </Text>

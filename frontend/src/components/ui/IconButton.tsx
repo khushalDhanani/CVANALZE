@@ -15,7 +15,7 @@ const VARIANT_CONTAINERS: Record<IconButtonVariant, string> = {
 
 const SIZE_CONTAINERS: Record<IconButtonSize, { size: string; iconSize: number }> = {
   sm: { size: 'w-8 h-8 min-w-[32px] min-h-[32px]', iconSize: 14 },
-  md: { size: 'w-10 h-10 min-w-[40px] min-h-[40px]', iconSize: 18 },
+  md: { size: 'w-11 h-11 sm:w-10 sm:h-10 min-w-[40px] min-h-[40px]', iconSize: 18 },
   lg: { size: 'w-12 h-12 min-w-[44px] min-h-[44px]', iconSize: 22 },
 };
 

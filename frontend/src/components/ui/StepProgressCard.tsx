@@ -73,9 +73,9 @@ export function StepProgressCard({
   }
 
   return (
-    <View className={`bg-surface border border-border rounded-lg p-4 shadow-sm ${className}`}>
+    <View className={`bg-surface border border-border rounded-md p-3 shadow-sm ${className}`}>
       {/* Header Row: Title, Status Badge, Elapsed Time */}
-      <View className="flex-row items-center justify-between mb-3 border-b border-border/60 pb-3">
+      <View className="flex-row items-center justify-between mb-2.5 border-b border-border/60 pb-2">
         <View className="flex-row items-center gap-2">
           {isProcessing ? (
             <View className="w-2.5 h-2.5 rounded-full bg-primary" />
@@ -107,7 +107,7 @@ export function StepProgressCard({
       </View>
 
       {/* Progress Bar Container */}
-      <View className="mb-4">
+      <View className="mb-3">
         <View className="flex-row justify-between items-center mb-1.5">
           <Text className="text-[11px] font-sans-medium text-text-muted">
             {isComplete
@@ -142,7 +142,7 @@ export function StepProgressCard({
 
       {/* Error Message with Retry Option */}
       {!!error && (
-        <View className="bg-danger/10 border border-danger/30 rounded-md p-3 mb-3 gap-2">
+        <View className="bg-danger/10 border border-danger/30 rounded-md p-2.5 mb-2.5 gap-2">
           <View className="flex-row items-center gap-2">
             <AlertTriangle size={16} color={COLORS.danger} />
             <Text className="text-xs font-sans-bold text-danger flex-1">
@@ -180,7 +180,7 @@ export function StepProgressCard({
           return (
             <View
               key={step.id}
-              className={`flex-row items-center gap-3 p-2.5 rounded-md border ${
+              className={`flex-row items-center gap-2 p-2 rounded-md border ${
                 isCurrent
                   ? 'bg-primary/5 border-primary/40'
                   : state === 'completed'

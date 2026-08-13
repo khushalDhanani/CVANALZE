@@ -146,7 +146,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   };
 
   const renderChildAssignment = (asg: ChildAssignmentItem, idx?: number) => (
-    <View key={asg.assignment_id || `asg-${idx}`} className="p-2 bg-background/80 border border-border/60 rounded my-1 pl-3 border-l-2 border-l-info">
+    <View key={asg.assignment_id || `asg-${idx}`} className="p-2 bg-background/80 border border-border/60 rounded pl-2.5 border-l-2 border-l-info">
       <View className="flex-row justify-between items-center mb-1">
         <View className="flex-row items-center gap-1 flex-1 pr-2">
           <GitCommit size={11} color={COLORS.info} />
@@ -219,7 +219,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   };
 
   const renderCanonicalJob = (cj: CanonicalJobItem, idx?: number) => (
-    <View key={cj.job_id || `cj-${idx}`} className="p-2.5 bg-background border border-border rounded my-1.5">
+    <View key={cj.job_id || `cj-${idx}`} className="p-2 bg-background border border-border rounded">
       <View className="flex-row justify-between items-center mb-1">
         <View className="flex-row items-center gap-1.5 flex-1 pr-2">
           <Briefcase size={12} color={COLORS.info} />
@@ -339,7 +339,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
               if (evt.event_type === 'CONCURRENT_CLUSTER' && evt.cluster) {
                 const cluster = evt.cluster;
                 return (
-                  <View key={evt.event_id} className="p-3 bg-info/5 border border-info/30 rounded my-1.5 gap-1.5">
+                  <View key={evt.event_id} className="p-2.5 bg-info/5 border border-info/30 rounded gap-1.5">
                     <View className="flex-row justify-between items-center pb-1.5 border-b border-info/20">
                       <View className="flex-row items-center gap-1.5">
                         <Layers size={13} color={COLORS.info} />
@@ -367,7 +367,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
                 const style = getGapStyling(gap);
 
                 return (
-                  <View key={evt.event_id} className={`p-3 rounded my-2 ${style.cardClass}`}>
+                  <View key={evt.event_id} className={`p-2.5 rounded ${style.cardClass}`}>
                     <View className="flex-row justify-between items-center mb-1">
                       <View className="flex-row items-center gap-1.5">
                         <Calendar size={14} color={style.iconColor} />
