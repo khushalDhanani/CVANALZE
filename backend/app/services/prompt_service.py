@@ -38,6 +38,32 @@ class PromptService:
         "ai_career_summary",
         "matched_vacancies",
     }
+    HIRING_RISK_PROMPT_NAME = "hiring_risk_explanation"
+    HIRING_RISK_DEFAULT_VERSION = "default-1.0.0"
+    HIRING_RISK_DEFAULT_TEMPLATE = """You explain deterministic hiring risks to recruiters.
+
+INPUT:
+{prompt_payload}
+
+Return only the structured JSON required by the response schema.
+You may write only title and explanation text for the supplied risk_code values.
+Do not add risks or change risk codes, categories, severity, evidence, source, scores, match status, or manual-review decisions.
+Use only the supplied evidence. Do not infer personal or protected attributes.
+"""
+
+    @classmethod
+    def _get_default_prompt(cls, prompt_name: str) -> ResolvedPrompt | None:
+        if prompt_name != cls.HIRING_RISK_PROMPT_NAME:
+            return None
+        return ResolvedPrompt(prompt=cls.HIRING_RISK_DEFAULT_TEMPLATE, version_tag=cls.HIRING_RISK_DEFAULT_VERSION)
+
+    @classmethod
+    def _get_default_prompt_identity(cls, prompt_name: str) -> str | None:
+        default_prompt = cls._get_default_prompt(prompt_name)
+        if default_prompt is None:
+            return None
+        prompt_hash = hashlib.sha256(default_prompt.prompt.encode("utf-8")).hexdigest()
+        return f"{default_prompt.version_tag}:{prompt_hash}"
 
     @classmethod
     def get_prompt(
@@ -68,11 +94,21 @@ class PromptService:
         template = config_cache_manager.get(cache_key)
         
         if not template:
-            template = cls._fetch_prompt_from_db(
-                prompt_name, tenant_id, model, target_schema, language, environment
-            )
+            try:
+                template = cls._fetch_prompt_from_db(
+                    prompt_name, tenant_id, model, target_schema, language, environment
+                )
+            except Exception as exc:
+                logger.warning("Failed to resolve prompt '%s' from DB; checking built-in default: %s", prompt_name, type(exc).__name__)
+                template = None
             if template:
                 config_cache_manager.set(cache_key, template)
+
+        if not template:
+            default_prompt = cls._get_default_prompt(prompt_name)
+            template = default_prompt.prompt if default_prompt is not None else None
+            if template:
+                logger.warning("Using built-in default prompt for '%s'.", prompt_name)
                 
         if not template:
             logger.error(f"Prompt template '{prompt_name}' not found in DB.")
@@ -101,12 +137,22 @@ class PromptService:
             template = str(cached["template"])
             version_tag = str(cached["version_tag"])
         else:
-            record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
+            try:
+                record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
+            except Exception as exc:
+                logger.warning("Failed to resolve prompt '%s' from DB; checking built-in default: %s", prompt_name, type(exc).__name__)
+                record = None
             if record is None:
-                logger.error(f"Prompt template '{prompt_name}' not found in DB.")
-                raise PromptError("PROMPT_UNAVAILABLE")
-            template = record.system_instruction
-            version_tag = record.version_tag
+                default_prompt = cls._get_default_prompt(prompt_name)
+                if default_prompt is None:
+                    logger.error(f"Prompt template '{prompt_name}' not found in DB.")
+                    raise PromptError("PROMPT_UNAVAILABLE")
+                template = default_prompt.prompt
+                version_tag = default_prompt.version_tag
+                logger.warning("Using built-in default prompt for '%s'.", prompt_name)
+            else:
+                template = record.system_instruction
+                version_tag = record.version_tag
             config_cache_manager.set(cache_key, {"template": template, "version_tag": version_tag})
         try:
             return ResolvedPrompt(prompt=template.format(**placeholders), version_tag=version_tag)
@@ -127,13 +173,15 @@ class PromptService:
         cache_key = f"prompt_version:{prompt_name}:{tenant_id or 'none'}:{model or 'none'}:{target_schema or 'none'}:{language}:{environment}"
         cached = config_cache_manager.get(cache_key)
         if isinstance(cached, str) and cached:
-            return None if cached == "__MISSING__" else cached
+            if cached != "__MISSING__":
+                return cached
         try:
             record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
         except Exception as exc:
             logger.warning(f"Failed to resolve active prompt version for '{prompt_name}': {exc}")
             record = None
-        version_tag = record.version_tag if record is not None else None
+        default_prompt = cls._get_default_prompt(prompt_name)
+        version_tag = record.version_tag if record is not None else (default_prompt.version_tag if default_prompt is not None else None)
         config_cache_manager.set(cache_key, version_tag or "__MISSING__")
         return version_tag
 
@@ -150,7 +198,8 @@ class PromptService:
         cache_key = f"prompt_identity:{prompt_name}:{tenant_id or 'none'}:{model or 'none'}:{target_schema or 'none'}:{language}:{environment}"
         cached = config_cache_manager.get(cache_key)
         if isinstance(cached, str) and cached:
-            return None if cached == "__MISSING__" else cached
+            if cached != "__MISSING__":
+                return cached
         try:
             record = cls._fetch_prompt_record_from_db(prompt_name, tenant_id, model, target_schema, language, environment)
         except Exception as exc:
@@ -160,6 +209,8 @@ class PromptService:
         if record is not None:
             prompt_hash = hashlib.sha256(record.system_instruction.encode("utf-8")).hexdigest()
             identity = f"{record.version_tag}:{prompt_hash}"
+        else:
+            identity = cls._get_default_prompt_identity(prompt_name)
         config_cache_manager.set(cache_key, identity or "__MISSING__")
         return identity
 

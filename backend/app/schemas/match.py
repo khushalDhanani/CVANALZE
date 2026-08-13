@@ -43,6 +43,31 @@ class MandatoryFailureDetails(BaseModel):
     reason: str = Field(..., description="Explicit reason why mandatory requirement was not satisfied")
     score_impact: float = Field(default=0.0, description="Deduction or penalty applied to final score")
 
+    @model_validator(mode="before")
+    @classmethod
+    def hydrate_legacy_failure_code(cls, value: Any) -> Any:
+        """Restore stable identities on failures persisted before failure_code was introduced."""
+        if not isinstance(value, dict) or str(value.get("failure_code") or "").strip():
+            return value
+
+        hydrated = dict(value)
+        requirement_id = str(hydrated.get("requirement_id") or "").strip().lower()
+        reason = str(hydrated.get("reason") or "").strip().lower()
+        if requirement_id.startswith("req_skill_"):
+            failure_code = "MISSING_MANDATORY_SKILL"
+        elif requirement_id in {"req_min_experience", "req_exp"}:
+            failure_code = "EXPERIENCE_UNKNOWN" if "unknown" in reason or "unparseable" in reason else "MIN_EXPERIENCE_FAILED"
+        elif requirement_id == "req_certification":
+            failure_code = "MISSING_CERTIFICATION"
+        elif requirement_id == "req_max_ctc":
+            failure_code = "CTC_MISMATCH"
+        elif requirement_id == "req_domain_mismatch":
+            failure_code = "DOMAIN_MISMATCH"
+        else:
+            failure_code = "LEGACY_MANDATORY_FAILURE"
+        hydrated["failure_code"] = failure_code
+        return hydrated
+
 
 class VacancyFitScoreBreakdown(BaseModel):
     """Detailed score breakdown for structured hierarchy + semantic vacancy fit evaluation."""

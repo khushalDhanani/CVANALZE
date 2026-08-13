@@ -1,6 +1,37 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Legacy Mandatory-Failure Response Compatibility Fix**:
+    - Traced the `POST /api/match/upload` 500 to completed cached analysis records created before `MandatoryFailureDetails.failure_code` became required.
+    - Added centralized schema hydration that preserves current explicit codes and derives the current evaluator code for legacy skill, experience, certification, CTC, and domain failures.
+    - Assigned unknown historical requirement types the neutral `LEGACY_MANDATORY_FAILURE` identity instead of rejecting the entire completed response or inventing a specific risk category.
+    - Added focused regression coverage for the logged minimum-experience payload, nested best/unsuitable openings, current-code preservation, every supported legacy mapping, and the neutral fallback.
+    - Per repository instructions, did not run backend tests, builds, migrations, or services.
+1. **2026-08-13 Default Hiring Risk Prompt and Identity**:
+    - Added a centralized built-in `hiring_risk_explanation` prompt fallback in `PromptService`, using version `default-1.0.0` and a stable SHA-256 content identity.
+    - Kept active PostgreSQL prompt records authoritative; the built-in default is used only when no compatible active record exists or database prompt lookup is unavailable.
+    - Updated unversioned and versioned prompt resolution plus provenance lookup so runtime generation, CV persistence, match-cache identities, and candidate detail metadata all resolve the same default.
+    - Made stale cached `__MISSING__` version/identity markers resolve to the built-in default instead of continuing to emit `missing` until cache expiry.
+    - Reused the centralized default template from the maintained prompt seeder and aligned `HiringRiskAnalyzer.PROMPT_NAME` with the same centralized constant.
+    - Replaced literal `missing` values on legacy candidate-detail provenance with honest default-availability messages; the UI directs reprocessing before claiming the default version or identity was historically recorded.
+    - Added focused regression coverage for default prompt content, version, identity, cached-missing recovery, and analyzer prompt-name alignment.
+    - Per repository instructions, did not run backend tests, builds, migrations, or services.
+1. **2026-08-13 Candidate Detail Card Visibility Fix**:
+    - Traced invisible candidate-detail cards to conditional rendering that omitted Hiring Risks for empty arrays, omitted processing provenance for legacy records, and provided no explanation when canonical fit metadata was absent.
+    - Made the top vacancy's Hiring Risks card visible with an explicit no-active-risk state when no deterministic policy fires, while preserving omission for non-top matches without risks.
+    - Made Processing Provenance visible on both the default Overview tab and Processing Pipeline tab; legacy results now show every version field as `Not recorded` with a reprocessing explanation.
+    - Added a canonical-fit unavailable state for stored results that predate hierarchy score-breakdown metadata.
+    - Extracted processing provenance normalization into a reusable utility and added regression coverage for legacy and current result payloads.
+    - Per repository instructions, did not run frontend tests, lint, type-check, build, or services.
+1. **2026-08-13 Frontend Parity for Today's Backend Implementations**:
+    - Added explicit frontend contracts for versioned hiring-risk policies and backend processing provenance.
+    - Extended the active Engine Configuration screen to create, edit, enable/disable, classify, require manual review for, and remove hiring-risk policies through the existing full-profile version creation and activation workflow.
+    - Expanded Hiring Risks cards with severity, category, stable risk code, deterministic source, deduplicated evidence, and complete styling for `LOW` and `UNKNOWN` severities.
+    - Added a distinct informational state for unavailable hierarchy validation while preserving the backend rule that only an explicit mismatch rejects or penalizes a match.
+    - Added an administrator-facing Processing Provenance card for matching, rule configuration, hiring-risk policy/prompt, optimized prompt, and LLM model versions.
+    - Added focused source-level regression tests for policy preservation, risk evidence presentation, and all hierarchy-validation states.
+    - Reviewed the Expo SDK 57 reference before implementation; no new SDK dependency or platform API was required.
+    - Per repository instructions, did not run frontend tests, lint, type-check, build, or services.
 1. **2026-08-13 Frontend Gap Audit for Today's Backend Implementations**:
     - Compared today's hiring-risk policy, hierarchy tri-state, recommendation, optimized-match, Ollama transport, migration, and worker-identity changes with the frontend types, services, configuration screens, candidate detail views, and focused frontend tests.
     - Confirmed the recommendation nullability fix, optimized-match budget/telemetry, Ollama response handling, migration execution, and RQ worker identity changes do not require frontend contract changes.
@@ -174,10 +205,9 @@
     - Verified all edge-cases via a robust test suite (`tests/test_hiring_risk_analyzer.py`), confirming that score and match states remain entirely immutable during this phase.
 
 ## Pending Work / Side Effects Found
-- Add an active-profile hiring-risk policy editor covering `enabled`, `severity`, `manual_review`, `category`, `title`, and `source`, backed by full version creation and activation.
-- Render structured Hiring Risk evidence, category, source, and stable risk code where recruiter explainability requires them; add focused component tests for deterministic fallback and manual-review states.
-- Show `is_hierarchy_valid=null` as "validation unavailable" rather than silently treating it as visually indistinguishable from a confirmed valid hierarchy, while preserving backend eligibility behavior.
-- Add frontend types and an optional processing-metadata view for rule, prompt, model, optimized-prompt, and matching versions if operational provenance is intended for administrators.
+- Run the focused legacy mandatory-failure compatibility regression test and rebuild/recreate the API container when execution is explicitly authorized.
+- Rebuild/recreate the API and worker containers, then reprocess legacy candidates whose stored provenance still contains literal `missing`; new processing will persist `default-1.0.0` and its content identity automatically.
+- Run the focused frontend regression tests, TypeScript check, and lint when execution is explicitly authorized.
 - Recreate the API and worker containers so `OLLAMA_MODEL=llama3.2:3b` becomes active, then verify startup model discovery.
 - Rebuild/recreate the API container so nullable canonical experience is handled by the recommendations endpoint, then reload `/cv_1764311881`.
 - Rebuild/recreate the API and worker containers so the optimized-match token budget takes effect, then reprocess the affected CV and confirm `done_reason=stop` in runtime logs.
@@ -194,6 +224,15 @@
 - *Side Effect Found* -> Legacy Tests expecting old keyword structures -> *Required Adjustment*: Update mocks in `test_classification_normalization.py`, `test_department_domain_repository.py`, and other taxonomy tests.
 
 ## Important Decisions
+- Kept `failure_code` required in the canonical schema and restored only missing legacy values at validation time, preserving the current response contract and producer discipline.
+- Used exact current evaluator identities for recognized historical requirement IDs and a neutral fallback for unknown legacy types to avoid inventing a specific hiring-risk classification.
+- Used a code-level built-in hiring-risk prompt only as a database-unavailable fallback; active database prompt customization remains authoritative and no duplicate Ollama client or generation path was introduced.
+- Derived the default prompt identity from the exact centralized template content so cache invalidation occurs automatically if that maintained fallback changes.
+- Replaced silent conditional omission with explicit empty or legacy states on candidate detail; absence of risks or version metadata is now visible and distinguishable from a rendering failure.
+- Kept empty Hiring Risks feedback limited to the top vacancy match so multi-match pages do not repeat a success card for every evaluated opening.
+- Reused the existing full-profile configuration version workflow so hiring-risk edits remain atomic with scoring rules and activate through the backend's established audit path.
+- Kept deterministic evidence separate from the recruiter-facing explanation in the UI so LLM-enhanced copy never obscures the backend facts that produced a risk.
+- Exposed processing provenance only in the existing Processing Pipeline tab, keeping operational identifiers out of the primary recruiter overview.
 - Classified today's frontend work as targeted parity work rather than a broad endpoint rewrite; backend-only reliability and deployment changes need no UI implementation.
 - Preserved `is_hierarchy_valid=null` as eligible for normal deterministic matching while requiring distinct informational UI copy from both confirmed valid and confirmed invalid hierarchy states.
 - Retained the repository-root `.env` as Docker's only Ollama model value source; Compose validates and passes it through without its own model fallback.
@@ -230,6 +269,33 @@
 - The `HiringRiskAnalyzer` relies strictly on deterministic `match_result` failures; Gemma acts purely as an explanation generator, preserving full explainability and pipeline integrity.
 
 ## Files Changed
+- `backend/app/schemas/match.py`
+- `backend/tests/test_legacy_mandatory_failure_compatibility.py`
+- `workstatus.md` (legacy mandatory-failure response compatibility fix recorded)
+- `backend/app/services/prompt_service.py`
+- `backend/app/services/hiring_risk_analyzer.py`
+- `backend/scripts/seed_prompts.py`
+- `backend/tests/test_prompt_service.py`
+- `backend/tests/test_hiring_risk_analyzer.py`
+- `frontend/src/utils/processingProvenance.ts`
+- `frontend/src/__tests__/backendParity.test.ts`
+- `workstatus.md` (default hiring-risk prompt and identity recorded)
+- `frontend/src/app/candidates/[id].tsx` (candidate-detail empty and legacy card states)
+- `frontend/src/components/ui/HiringRisksCard.tsx` (explicit no-active-risk state)
+- `frontend/src/utils/processingProvenance.ts`
+- `frontend/src/__tests__/backendParity.test.ts` (processing-provenance regression coverage)
+- `workstatus.md` (candidate detail visibility fix recorded)
+- `frontend/src/types/api.ts`
+- `frontend/src/services/configService.ts`
+- `frontend/src/app/config.tsx`
+- `frontend/src/app/candidates/[id].tsx`
+- `frontend/src/components/ui/HiringRisksCard.tsx`
+- `frontend/src/components/ui/VacancyMatchStatusBadge.tsx`
+- `frontend/src/utils/hiringRisk.ts`
+- `frontend/src/utils/hierarchyValidation.ts`
+- `frontend/src/__tests__/backendParity.test.ts`
+- `frontend/src/__tests__/hiringRiskConfig.test.ts`
+- `workstatus.md` (frontend parity implementation recorded)
 - `workstatus.md` (frontend gap audit for today's backend implementations recorded)
 - `.env`
 - `workstatus.md` (Docker Ollama model alignment to `llama3.2:3b` recorded)

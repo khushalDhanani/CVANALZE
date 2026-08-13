@@ -116,6 +116,29 @@ def test_prompt_resolution_returns_active_database_version(db_session):
     assert PromptService.get_active_prompt_version("hiring_risk_explanation") == "7.2.1"
     assert PromptService.get_active_prompt_identity("hiring_risk_explanation").startswith("7.2.1:")
 
+
+def test_hiring_risk_prompt_uses_stable_builtin_default_when_database_record_is_missing(monkeypatch):
+    monkeypatch.setattr(PromptService, "_fetch_prompt_record_from_db", classmethod(lambda cls, *args, **kwargs: None))
+
+    resolved = PromptService.get_prompt_with_version("hiring_risk_explanation", {"prompt_payload": "[]"})
+    version = PromptService.get_active_prompt_version("hiring_risk_explanation")
+    identity = PromptService.get_active_prompt_identity("hiring_risk_explanation")
+
+    assert "INPUT:\n[]" in resolved.prompt
+    assert resolved.version_tag == PromptService.HIRING_RISK_DEFAULT_VERSION
+    assert version == PromptService.HIRING_RISK_DEFAULT_VERSION
+    assert identity == PromptService._get_default_prompt_identity("hiring_risk_explanation")
+    assert identity.startswith(f"{PromptService.HIRING_RISK_DEFAULT_VERSION}:")
+
+
+def test_cached_missing_hiring_risk_metadata_resolves_to_builtin_default(monkeypatch):
+    from app.core.cache import config_cache_manager
+
+    monkeypatch.setattr(config_cache_manager, "get", MagicMock(return_value="__MISSING__"))
+
+    assert PromptService.get_active_prompt_version("hiring_risk_explanation") == PromptService.HIRING_RISK_DEFAULT_VERSION
+    assert PromptService.get_active_prompt_identity("hiring_risk_explanation") == PromptService._get_default_prompt_identity("hiring_risk_explanation")
+
 def test_missing_placeholder(db_session):
     p = PromptTemplateMaster(
         prompt_name="test_prompt",

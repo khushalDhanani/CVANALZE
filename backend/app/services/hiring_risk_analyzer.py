@@ -34,7 +34,7 @@ class HiringRiskExplanationsOutput(BaseModel):
 
 
 class HiringRiskAnalyzer:
-    PROMPT_NAME = "hiring_risk_explanation"
+    PROMPT_NAME = PromptService.HIRING_RISK_PROMPT_NAME
     DEFERRED_INTEGRITY_DOMAIN = "education"
 
     @classmethod

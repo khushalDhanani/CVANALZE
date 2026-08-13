@@ -9,7 +9,7 @@ from app.core.rule_config_manager import HiringRiskPolicy
 from app.repositories.result import ResultRepository
 from app.schemas.match import JobMatchResult, MandatoryFailureDetails, RiskSeverity
 from app.services.hiring_risk_analyzer import HiringRiskAnalyzer, HiringRiskExplanationsOutput
-from app.services.prompt_service import ResolvedPrompt
+from app.services.prompt_service import PromptService, ResolvedPrompt
 from app.services.system_rule_config_factory import SystemRuleConfigFactory
 
 
@@ -59,6 +59,10 @@ def test_mandatory_experience_failure_uses_structured_code():
     assert risk.risk_code == "MIN_EXPERIENCE_FAILED"
     assert risk.category == "Experience"
     assert risk.severity == RiskSeverity.CRITICAL
+
+
+def test_hiring_risk_analyzer_uses_central_prompt_name():
+    assert HiringRiskAnalyzer.PROMPT_NAME == PromptService.HIRING_RISK_PROMPT_NAME
 
 
 def test_new_configured_failure_code_requires_no_analyzer_branch(risk_dependencies):
