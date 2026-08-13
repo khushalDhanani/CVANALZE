@@ -251,21 +251,28 @@ class OllamaTransport:
 
     @classmethod
     @contextmanager
-    def _operation_scope(cls, operation: str, models: tuple[str, ...] = ()) -> Iterator[None]:
+    def _operation_scope(cls, operation: str, models: tuple[str, ...] = (), *, deadline: float | None = None) -> Iterator[None]:
         started = time.perf_counter()
-        lock_timeout = max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS)
+        operation_deadline = deadline if deadline is not None else started + cls._operation_timeout(operation)
+        lock_timeout = min(max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS), max(0.0, operation_deadline - started))
         acquired = cls._operation_lock.acquire(timeout=lock_timeout)
         if not acquired:
             raise OllamaConcurrencyError(
-                "Timed out waiting for the local Ollama operation lock.",
+                "Ollama operation deadline expired while waiting for the local operation lock.",
                 operation=operation,
             )
 
         file_lock: FileLock | None = None
         try:
+            remaining = max(0.0, operation_deadline - time.perf_counter())
+            if remaining <= 0:
+                raise OllamaConcurrencyError(
+                    "Ollama operation deadline expired before acquiring the shared operation lock.",
+                    operation=operation,
+                )
             lock_path = Path(settings.OLLAMA_LOCK_FILE)
             lock_path.parent.mkdir(parents=True, exist_ok=True)
-            file_lock = FileLock(str(lock_path), timeout=lock_timeout)
+            file_lock = FileLock(str(lock_path), timeout=min(max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS), remaining))
             file_lock.acquire()
             lock_wait_ms = round((time.perf_counter() - started) * 1000.0, 2)
             cls._record_lock_wait(lock_wait_ms)
@@ -273,7 +280,7 @@ class OllamaTransport:
             yield
         except FileLockTimeout as exc:
             raise OllamaConcurrencyError(
-                "Timed out waiting for the shared Ollama operation lock.",
+                "Ollama operation deadline expired while waiting for the shared operation lock.",
                 operation=operation,
             ) from exc
         finally:
@@ -293,7 +300,8 @@ class OllamaTransport:
     ) -> OllamaTransportResult[T]:
         """Compatibility entry point for one non-model or explicitly managed request."""
         model = str((payload or {}).get("model") or "").strip()
-        with cls._operation_scope(operation, (model,) if model else ()):
+        deadline = time.perf_counter() + cls._operation_timeout(operation)
+        with cls._operation_scope(operation, (model,) if model else (), deadline=deadline):
             try:
                 return cls._execute_request(
                     operation=operation,
@@ -301,6 +309,7 @@ class OllamaTransport:
                     path=path,
                     payload=payload,
                     parser=parser,
+                    deadline=deadline,
                 )
             finally:
                 if model and operation != "unload":
@@ -575,7 +584,8 @@ class OllamaTransport:
                 )
             return parser(data)
 
-        with cls._operation_scope(operation, (model,)):
+        deadline = time.perf_counter() + cls._operation_timeout(operation)
+        with cls._operation_scope(operation, (model,), deadline=deadline):
             try:
                 return cls._execute_request(
                     operation=operation,
@@ -583,6 +593,7 @@ class OllamaTransport:
                     path="/api/generate",
                     payload=payload,
                     parser=validated_parser,
+                    deadline=deadline,
                 )
             finally:
                 cls._unload_safely(model, parent_operation=operation)
@@ -611,7 +622,7 @@ class OllamaTransport:
         attempts = 0
         deadline = time.perf_counter() + cls._operation_timeout("embed")
 
-        with cls._operation_scope("embed", (normalized_model,)):
+        with cls._operation_scope("embed", (normalized_model,), deadline=deadline):
             try:
                 for offset in range(0, len(unique_inputs), batch_size):
                     batch = unique_inputs[offset : offset + batch_size]
@@ -675,9 +686,10 @@ class OllamaTransport:
         normalized_model = model.strip()
         if not normalized_model:
             raise OllamaInvalidResponseError("An Ollama model is required for unload.", operation="unload", retryable=False)
-        with cls._operation_scope("unload"):
+        deadline = time.perf_counter() + cls._operation_timeout("unload")
+        with cls._operation_scope("unload", deadline=deadline):
             try:
-                result = cls._unload_request(normalized_model)
+                result = cls._unload_request(normalized_model, deadline=deadline)
                 with cls._metrics_lock:
                     cls._metrics["unloads"] += 1
                 return result
@@ -687,7 +699,7 @@ class OllamaTransport:
                 raise
 
     @classmethod
-    def _unload_request(cls, model: str) -> OllamaTransportResult[bool]:
+    def _unload_request(cls, model: str, *, deadline: float | None = None) -> OllamaTransportResult[bool]:
         def parse(data: dict[str, Any]) -> bool:
             envelope = OllamaUnloadEnvelope.model_validate(data)
             cls._validate_returned_model(model, envelope.model, operation="unload")
@@ -700,6 +712,7 @@ class OllamaTransport:
             payload=cls.build_unload_payload(model),
             parser=parse,
             max_retries=0,
+            deadline=deadline,
         )
 
     @classmethod

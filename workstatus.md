@@ -1,6 +1,27 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Ollama Health Backpressure Fix**:
+    - Made the centralized Ollama operation deadline include both the in-process lock and cross-process file-lock wait, so a 3-second tags/health budget can no longer wait up to the independent 65-second lock timeout before starting.
+    - Propagated the same absolute deadline through tags, generation, embedding, and explicit unload requests while retaining the existing centralized client, endpoint selection, retry loop, circuit breaker, and response schemas.
+    - Moved root dependency-health checks to parallel worker threads so synchronous Redis, database, prompt, rules, or Ollama probes cannot block the FastAPI event loop and stall candidate status/API requests.
+    - Moved the administrator Ollama health probe off the event loop without changing its response contract.
+    - Added focused regressions for lock-inclusive tags deadlines and non-blocking root/admin health probes.
+    - Per repository instructions, did not run tests/builds, restart containers, or mutate live services/data; static `git diff --check` passed.
+1. **2026-08-13 API Runtime Trace Audit (No Fix Applied)**:
+    - Reviewed the complete 1,999-line API trace for candidate `cv_1761664401_CandidateCVFileName_13680` and separated candidate-contract behavior from dependency-health failures.
+    - Confirmed canonical persistence changed in PostgreSQL, stale Redis content was detected by checksum and rehydrated, and `GET /api/v1/candidates/{id}` returned the RQ-derived `analysis_run_id` and result version `cvjob_e983567ad39b44d3924de9aaff727defb9968171b5b89c2de492d6af5d603d5e-1`.
+    - Confirmed `analysis_run_id=not_available candidate=not_available` occurs on `/api/tags` health probes, which have no candidate analysis context, and on legacy candidate records that predate persisted run IDs.
+    - Identified a separate runtime incident: Redis health timed out, an Ollama health probe waited 36.2 seconds for the shared transport lock, Docker health took 49.4 seconds, Ollama later became network-unreachable, and the tags circuit opened, producing `/health` 503 responses.
+    - Observed 38 status polls (76 access/request log lines), including a 95.2-second request that released into a burst after the dependency stall; this is consistent with contention/backpressure rather than failed canonical persistence.
+    - No application code, configuration, build, service, database, cache, or tests were changed or executed; the supplied trace does not contain worker-side generation logs needed to attribute the original stall more narrowly.
+1. **2026-08-13 Unscoped Ollama Tags Telemetry Diagnosis (No Fix Applied)**:
+    - Confirmed the supplied `operation=tags path=/api/tags` entry comes from `OllamaLLMService.get_status()` during health/model discovery, outside any candidate analysis execution context.
+    - Confirmed `analysis_run_id=not_available`, `candidate=not_available`, and `model='not_applicable'` are therefore accurate: tags discovery has no candidate, analysis run, prompt, or requested model.
+    - Confirmed the three-second attempt/total deadline and zero retries reflect the dedicated tags policy and do not describe generation timeout behavior.
+    - Files changed: `workstatus.md` only.
+    - Pending work: inspect the following tags `SUCCESS`, `MODEL_MISSING`, or failure entry only if health readiness is in question.
+    - Important decision: no synthetic candidate correlation should be attached to global health checks, and no Ollama transport change is warranted from this informational configuration line.
 1. **2026-08-13 End-to-End Re-analysis Contract, Failure Semantics, and Correlation**:
     - Added an end-to-end re-analysis regression that supplies deterministic transport-shaped Ollama output, maps semantic reasoning and inferred skills into the enriched vacancy, atomically updates the canonical candidate, and verifies the re-analysis response, resolver, and candidate-detail GET all return the exact new reasoning.
     - Preserved historical `_enriched`, `_reprocessed`, and `_latest` artifacts as non-canonical records and retained explicit regression coverage that canonical resolution never depends on selecting an enriched filename.
@@ -407,6 +428,11 @@
     - Verified all edge-cases via a robust test suite (`tests/test_hiring_risk_analyzer.py`), confirming that score and match states remain entirely immutable during this phase.
 
 ## Pending Work / Side Effects Found
+- Rebuild/recreate the API and worker containers to activate the lock-inclusive Ollama deadlines and non-blocking health handlers, then verify `/health` returns within the configured tags deadline during a long generation.
+- Run `backend/tests/test_phase5_ollama_standardization.py` and `backend/tests/test_phase6_api_reliability.py` when test execution is explicitly authorized.
+- Capture the matching RQ worker and Ollama container logs for analysis run `cvjob_e983567ad39b44d3924de9aaff727defb9968171b5b89c2de492d6af5d603d5e-1` before changing timeout or health-check behavior; the supplied attachment contains only API-container logs.
+- Investigate why Docker lost API-to-Ollama network reachability around 16:01:35 and why Redis ping timed out at 15:59:15; these are the direct dependency failures in the trace.
+- Consider a separately scoped readiness/liveness design so `/health` does not queue behind long Ollama generation work, and review frontend status-poll deduplication/backoff to prevent a post-stall request burst.
 - Run the focused legacy mandatory-failure compatibility regression test and rebuild/recreate the API container when execution is explicitly authorized.
 - Rebuild/recreate the API and worker containers, then reprocess legacy candidates whose stored provenance still contains literal `missing`; new processing will persist `default-1.0.0` and its content identity automatically.
 - Run the focused frontend regression tests, TypeScript check, and lint when execution is explicitly authorized.
@@ -426,6 +452,12 @@
 - *Side Effect Found* -> Legacy Tests expecting old keyword structures -> *Required Adjustment*: Update mocks in `test_classification_normalization.py`, `test_department_domain_repository.py`, and other taxonomy tests.
 
 ## Important Decisions
+- Counted Ollama lock acquisition against each operation's existing total timeout instead of adding a second health client or bypassing the centralized transport.
+- Preserved `/health` dependency fields and 200/503 readiness semantics; only execution scheduling changed, with independent synchronous probes now running concurrently off the event loop.
+- Applied the absolute-deadline contract consistently to tags, generation, embeddings, and explicit unload operations so timeout meaning does not vary by operation.
+- Treated the attached trace as diagnostic evidence only: it proves the canonical candidate response contract succeeded and does not justify changing re-analysis persistence or correlation propagation.
+- Did not interpret context-free `/api/tags` probes as missing correlation; candidate/run identifiers are correctly unavailable for health checks.
+- Kept the Ollama transport, health endpoint, and polling behavior unchanged until worker/Ollama logs establish whether the long shared-lock hold is expected inference time or a transport defect.
 - Kept `failure_code` required in the canonical schema and restored only missing legacy values at validation time, preserving the current response contract and producer discipline.
 - Used exact current evaluator identities for recognized historical requirement IDs and a neutral fallback for unknown legacy types to avoid inventing a specific hiring-risk classification.
 - Used a code-level built-in hiring-risk prompt only as a database-unavailable fallback; active database prompt customization remains authoritative and no duplicate Ollama client or generation path was introduced.
@@ -471,6 +503,13 @@
 - The `HiringRiskAnalyzer` relies strictly on deterministic `match_result` failures; Gemma acts purely as an explanation generator, preserving full explainability and pipeline integrity.
 
 ## Files Changed
+- `backend/app/services/ollama_transport.py`
+- `backend/app/main.py`
+- `backend/app/api/analysis.py`
+- `backend/tests/test_phase5_ollama_standardization.py`
+- `backend/tests/test_phase6_api_reliability.py`
+- `workstatus.md` (Ollama health backpressure fix recorded)
+- `workstatus.md` (API runtime trace audit recorded; no production code changed)
 - `backend/app/schemas/match.py`
 - `backend/tests/test_legacy_mandatory_failure_compatibility.py`
 - `workstatus.md` (legacy mandatory-failure response compatibility fix recorded)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from datetime import timezone, datetime
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -37,7 +38,7 @@ async def check_llm_health():
     from app.services.llm_service import OllamaLLMService
 
     try:
-        is_ready, model_names = OllamaLLMService.get_status()
+        is_ready, model_names = await asyncio.to_thread(OllamaLLMService.get_status)
         generation_available = OllamaLLMService.is_model_available(settings.OLLAMA_MODEL, model_names)
         embedding_available = not settings.EMBEDDING_ENABLED or OllamaLLMService.is_model_available(settings.EMBEDDING_MODEL, model_names)
         if is_ready:

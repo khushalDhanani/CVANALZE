@@ -1,4 +1,6 @@
+import asyncio
 import json
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -147,6 +149,27 @@ async def test_health_reports_prompt_not_ready(monkeypatch):
 
     assert response.status_code == 503
     assert payload["prompt_configuration"] == "PROMPT_NOT_READY"
+
+
+@pytest.mark.asyncio
+async def test_health_dependency_checks_do_not_block_event_loop(monkeypatch):
+    def slow_redis_health():
+        time.sleep(0.1)
+        return "online"
+
+    monkeypatch.setattr(main_module, "_database_health", lambda _engine, _label: "online")
+    monkeypatch.setattr(main_module, "_redis_health", slow_redis_health)
+    monkeypatch.setattr(main_module, "_rule_config_health", lambda: "online")
+    monkeypatch.setattr(main_module, "_prompt_health", lambda: "online")
+    monkeypatch.setattr(settings, "LLM_ENABLED", False)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+
+    health_task = asyncio.create_task(main_module.health())
+    await asyncio.sleep(0.01)
+
+    assert not health_task.done()
+    response = await health_task
+    assert response.status_code == 200
 
 
 def test_redis_health_distinguishes_disabled_and_unavailable(monkeypatch):

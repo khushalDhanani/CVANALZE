@@ -1,3 +1,4 @@
+import asyncio
 import json
 import threading
 import time
@@ -19,6 +20,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import OllamaLLMService
 from app.services.ollama_transport import (
     OllamaCircuitOpenError,
+    OllamaConcurrencyError,
     OllamaError,
     OllamaHTTPError,
     OllamaInvalidResponseError,
@@ -189,6 +191,22 @@ async def test_llm_health_reports_reachable_configuration_error_for_missing_mode
     assert payload["available_models"] == ["embedding-model:latest"]
 
 
+@pytest.mark.asyncio
+async def test_llm_health_probe_does_not_block_event_loop(monkeypatch):
+    def slow_status(_cls):
+        time.sleep(0.1)
+        return True, [settings.OLLAMA_MODEL, settings.EMBEDDING_MODEL]
+
+    monkeypatch.setattr(OllamaLLMService, "get_status", classmethod(slow_status))
+
+    health_task = asyncio.create_task(check_llm_health())
+    await asyncio.sleep(0.01)
+
+    assert not health_task.done()
+    payload = await health_task
+    assert payload["status"] == "online"
+
+
 def test_production_startup_rejects_unavailable_configured_model(monkeypatch):
     monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
     monkeypatch.setattr(settings, "LLM_ENABLED", True)
@@ -256,6 +274,31 @@ def test_tags_log_identifies_model_as_not_applicable(monkeypatch, caplog):
     assert "operation=tags" in caplog.text
     assert "model='not_applicable'" in caplog.text
     assert "model='none'" not in caplog.text
+
+
+def test_tags_total_deadline_includes_operation_lock_wait(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_TAGS_TIMEOUT_SECONDS", 0.02)
+    monkeypatch.setattr(settings, "OLLAMA_LOCK_TIMEOUT_SECONDS", 1.0)
+    lock_acquired = threading.Event()
+    release_lock = threading.Event()
+
+    def hold_operation_lock():
+        with OllamaTransport._operation_lock:
+            lock_acquired.set()
+            release_lock.wait(timeout=1.0)
+
+    holder = threading.Thread(target=hold_operation_lock)
+    holder.start()
+    assert lock_acquired.wait(timeout=1.0)
+    started = time.perf_counter()
+    try:
+        with pytest.raises(OllamaConcurrencyError):
+            OllamaTransport.get_tags()
+    finally:
+        release_lock.set()
+        holder.join(timeout=1.0)
+
+    assert time.perf_counter() - started < 0.2
 
 
 def test_transport_logs_analysis_run_id(monkeypatch, caplog):
