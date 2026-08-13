@@ -18,6 +18,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import OllamaLLMService
 from app.services.ollama_transport import (
     OllamaCircuitOpenError,
+    OllamaError,
     OllamaHTTPError,
     OllamaInvalidResponseError,
     OllamaModelUnavailableError,

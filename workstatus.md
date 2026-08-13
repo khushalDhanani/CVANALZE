@@ -1,6 +1,17 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Existing Ollama Remediation Verification**:
+    - Re-audited every application Ollama HTTP path and confirmed generation, tags, embeddings, and unload remain centralized in `OllamaTransport`, with callers routed through `OllamaLLMService` or `EmbeddingService`.
+    - Confirmed model-unavailable, timeout, service-unavailable, and retryable HTTP generation failures propagate to the API's `503`/`504` handling; disabled generation and non-operational response failures retain their intended deterministic fallback behavior.
+    - Confirmed optimized matching uses the dedicated `OLLAMA_OPTIMIZED_NUM_CTX=8192` and `OLLAMA_OPTIMIZED_NUM_PREDICT=3072` limits.
+    - Confirmed `llama3.2:3b` is aligned across the application default, example environment, and README, while base Compose enables LLM generation by default and local Compose does not override it.
+    - Ran an AST audit over 34 application-side Ollama error constructions; every construction supplies the required `operation` keyword.
+    - Corrected stale Llama test expectations so non-thinking models omit the unsupported `think` payload field, retained Qwen native-thinking coverage, renamed the stale default-model test, and added the missing `OllamaError` import required by the work-experience error-contract test.
+    - Ran the complete maintained Ollama standardization, payload, and Compose configuration test files: 53 tests passed with 2 unrelated Redis `setex` deprecation warnings.
+    - Files changed: `backend/tests/test_qwen_llm_service.py`, `backend/tests/test_phase5_ollama_standardization.py`, `workstatus.md`.
+    - Pending work: none; no application, API, schema, caching, retry, embedding, Compose, or runtime configuration change was required.
+    - Important decision: the reported findings refer to an older revision; verification preserves the existing centralized architecture and only repairs the stale test contract.
 1. **2026-08-13 Nullable Primary Department Response Compatibility Fix**:
     - Traced `GET /api/cv/status/{cv_key}` failures to completed results containing the valid no-department state `match_analysis.primary_department=null` while the nested response schema required a string.
     - Aligned `CandidateMatchAnalysis.primary_department` with `EnrichedCandidateAnalysis` and the no-active-vacancy producer by making the field nullable with a `None` default.
