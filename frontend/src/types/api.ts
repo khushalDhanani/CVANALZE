@@ -174,6 +174,21 @@ export interface HiringRisk {
   requires_manual_review: boolean;
 }
 
+export type HiringRiskSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+
+export interface HiringRiskPolicy {
+  enabled: boolean;
+  severity: HiringRiskSeverity;
+  manual_review: boolean;
+  category: string;
+  title?: string | null;
+  source?: string | null;
+}
+
+export interface HiringRiskConfig {
+  policies: Record<string, HiringRiskPolicy>;
+}
+
 export interface RequirementEvaluation {
   requirement_id?: string;
   description?: string;
@@ -420,6 +435,13 @@ export interface CVUploadResponse {
   ocr_applied?: boolean | null;
   scanned_at?: string | null;
   created_at?: string | null;
+  matching_version?: string | null;
+  rule_config_version?: string | null;
+  hiring_risk_policy_version?: string | null;
+  hiring_risk_prompt_version?: string | null;
+  hiring_risk_prompt_identity?: string | null;
+  optimized_prompt_version?: string | null;
+  llm_model_version?: string | null;
   experience_years?: number | null;
   seniority?: string | null;
   work_experience?: Record<string, unknown>[] | null;
@@ -479,6 +501,7 @@ export interface MatchEngineConfigResponse {
   LLM_SEMANTIC_WEIGHT: number;
   MAX_LLM_BOOST: number;
   MATCH_COMPONENT_WEIGHTS: MatchComponentWeights;
+  HIRING_RISK_POLICIES: Record<string, HiringRiskPolicy>;
 }
 
 export interface MatchEngineConfigUpdate {
@@ -489,6 +512,7 @@ export interface MatchEngineConfigUpdate {
   LLM_SEMANTIC_WEIGHT?: number;
   MAX_LLM_BOOST?: number;
   MATCH_COMPONENT_WEIGHTS?: Partial<MatchComponentWeights>;
+  HIRING_RISK_POLICIES?: Record<string, HiringRiskPolicy>;
 }
 
 export interface UnifiedMatchScoringParameters {
@@ -525,6 +549,7 @@ export interface UnifiedRuleConfig {
     domain_embedding: Record<string, unknown>;
   };
   workflow: Record<string, unknown>;
+  hiring_risks: HiringRiskConfig;
 }
 
 export interface ConfigVersionCreatedResponse {

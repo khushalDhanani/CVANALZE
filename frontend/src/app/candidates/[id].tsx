@@ -46,6 +46,7 @@ import {
   normalizeCandidateRouteId,
   responseMatchesCandidateId,
 } from '@/utils/candidateDetail';
+import { getProcessingProvenanceRows } from '@/utils/processingProvenance';
 
 type TabType = 'overview' | 'processing';
 
@@ -301,6 +302,34 @@ export default function CandidateDetailScreen() {
   // TAB RENDERERS
   // -------------------------------------------------------------
 
+  const renderProcessingProvenance = () => {
+    if (!data) return null;
+    const provenanceRows = getProcessingProvenanceRows(data);
+    const hasRecordedVersion = provenanceRows.some(({ recorded }) => recorded);
+    return (
+      <Card className="p-3 shadow-none border-border">
+        <Text className="mb-1 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Processing Provenance</Text>
+        <Text className="mb-3 text-[11px] font-sans text-text-muted">
+          {hasRecordedVersion
+            ? 'Versions used to produce this stored result. These identifiers help administrators verify cache freshness and reproduce decisions.'
+            : 'This legacy result does not contain version provenance. Reprocess the candidate to record the current rule, prompt, and model versions.'}
+        </Text>
+        <View className="gap-2">
+          {provenanceRows.map(({ key, label, value }) => {
+            return (
+              <View key={key} className="flex-row items-start justify-between gap-3">
+                <Text className="text-xs text-text-muted">{label}:</Text>
+                <Text selectable={Boolean(value)} className={`max-w-[65%] font-mono text-xs text-right ${value ? 'text-text-primary' : 'text-text-faint'}`}>
+                  {value || 'Not recorded'}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </Card>
+    );
+  };
+
   const renderOverviewTab = () => (
     <View className="flex-col gap-4 lg:flex-row lg:items-start">
       {/* Left Column (Candidate Data) */}
@@ -330,6 +359,13 @@ export default function CandidateDetailScreen() {
               penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
               rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
             />
+          ) : bestMatch ? (
+            <View className="gap-1 p-2 border rounded bg-info/10 border-info/30">
+              <Text className="text-[10px] font-sans-bold text-info uppercase tracking-wider">Canonical Fit Breakdown Unavailable</Text>
+              <Text className="text-[11px] font-sans text-info leading-4">
+                This stored candidate result predates the current hierarchy breakdown. Reprocess the candidate to generate the latest fit metadata.
+              </Text>
+            </View>
           ) : null}
         </Card>
         ) : null}
@@ -550,9 +586,7 @@ export default function CandidateDetailScreen() {
                   </View>
                 ) : null}
 
-                {!!match.hiring_risks && match.hiring_risks.length > 0 && (
-                  <HiringRisksCard risks={match.hiring_risks} />
-                )}
+                <HiringRisksCard risks={match.hiring_risks} showEmpty={idx === 0} />
 
                 <View className="flex-row justify-end mt-2">
                   <Button
@@ -602,9 +636,7 @@ export default function CandidateDetailScreen() {
               </View>
             ) : null}
 
-            {!!bestMatch.hiring_risks && bestMatch.hiring_risks.length > 0 && (
-              <HiringRisksCard risks={bestMatch.hiring_risks} />
-            )}
+            <HiringRisksCard risks={bestMatch.hiring_risks} showEmpty />
 
             <View className="flex-row justify-end mt-2">
               <Button
@@ -675,6 +707,8 @@ export default function CandidateDetailScreen() {
           </View>
         </Card>
         ) : null}
+
+        {renderProcessingProvenance()}
 
       </View>
 
@@ -865,6 +899,8 @@ export default function CandidateDetailScreen() {
           ) : null}
         </View>
       </Card> : null}
+
+      {renderProcessingProvenance()}
     </View>
   );
 

@@ -15,6 +15,7 @@ import {
 import { Badge, Tone } from './Badge';
 import { Card } from './Card';
 import { COLORS } from '@/constants/colors';
+import { getHierarchyValidationState } from '@/utils/hierarchyValidation';
 import { CanonicalVacancyMatchStatus, VacancyFitScoreBreakdown } from '@/types/api';
 export { resolveVacancyFitScore } from '@/utils/candidateDetail';
 
@@ -225,7 +226,9 @@ export function VacancyFitScoreBreakdownCard({
   if (!breakdown) return null;
 
   const penaltyVal = penalty || breakdown.hierarchy_mismatch_penalty || 0;
-  const isValidHierarchy = breakdown.is_hierarchy_valid !== false;
+  const hierarchyState = getHierarchyValidationState(breakdown.is_hierarchy_valid);
+  const isHierarchyInvalid = hierarchyState === 'INVALID';
+  const isHierarchyUnknown = hierarchyState === 'UNAVAILABLE';
 
   return (
     <Card className="p-3 border-border/80 bg-background/50 gap-2.5">
@@ -271,8 +274,22 @@ export function VacancyFitScoreBreakdownCard({
         </View>
       </View>
 
+      {isHierarchyUnknown ? (
+        <View className="gap-1 p-2 mt-1 border rounded bg-info/10 border-info/30">
+          <View className="flex-row items-center gap-1.5">
+            <AlertTriangle size={12} color={COLORS.info} />
+            <Text className="text-[10px] font-sans-bold text-info uppercase tracking-wider">
+              Hierarchy Validation Unavailable
+            </Text>
+          </View>
+          <Text className="text-[11px] font-sans text-info leading-4">
+            Organizational hierarchy could not be verified. No mismatch penalty was applied; review the hierarchy manually if it affects the hiring decision.
+          </Text>
+        </View>
+      ) : null}
+
       {/* Hierarchy Mismatch & Rejection Penalty Warning */}
-      {(!isValidHierarchy || penaltyVal > 0) && (
+      {(isHierarchyInvalid || penaltyVal > 0) && (
         <View className="gap-1 p-2 mt-1 border rounded bg-danger/10 border-danger/30">
           <View className="flex-row items-center gap-1.5">
             <ShieldAlert size={12} color={COLORS.danger} />

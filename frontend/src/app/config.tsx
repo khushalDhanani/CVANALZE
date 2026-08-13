@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   Text,
   View,
 } from 'react-native';
-import { CheckCircle2, AlertTriangle, AlertCircle, ListChecks } from 'lucide-react-native';
+import { Check, CheckCircle2, AlertTriangle, AlertCircle, ListChecks, Plus, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMatchConfig } from '@/hooks/useMatchConfig';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { MatchComponentWeights } from '@/types/api';
+import { HiringRiskPolicy, HiringRiskSeverity, MatchComponentWeights } from '@/types/api';
 import { Card, Button, TextField, WeightControlRow, Breadcrumbs, Badge } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 
@@ -23,6 +24,17 @@ const formatRuleValue = (value: string | number | null, conditionCount: number):
   if (conditionCount > 0) return `${conditionCount} condition${conditionCount === 1 ? '' : 's'}`;
   return 'Configured';
 };
+
+const RISK_SEVERITIES: HiringRiskSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'];
+
+const createDefaultRiskPolicy = (): HiringRiskPolicy => ({
+  enabled: true,
+  severity: 'MEDIUM',
+  manual_review: true,
+  category: 'Requirements',
+  title: null,
+  source: null,
+});
 
 export default function ConfigScreen() {
   usePageTitle('Engine Configuration | AIRIS');
@@ -56,6 +68,8 @@ export default function ConfigScreen() {
     certification: 0.05,
     responsibilities: 0.05,
   });
+  const [hiringRiskPolicies, setHiringRiskPolicies] = useState<Record<string, HiringRiskPolicy>>({});
+  const [newRiskCode, setNewRiskCode] = useState<string>('');
 
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -69,6 +83,7 @@ export default function ConfigScreen() {
       if (config.MATCH_COMPONENT_WEIGHTS) {
         setWeights(config.MATCH_COMPONENT_WEIGHTS);
       }
+      setHiringRiskPolicies(config.HIRING_RISK_POLICIES || {});
     }
   }, [config]);
 
@@ -85,7 +100,8 @@ export default function ConfigScreen() {
       llmWeight !== String(config.LLM_SEMANTIC_WEIGHT) ||
       maxLlmBoost !== String(config.MAX_LLM_BOOST) ||
       mandatoryPenalty !== String(config.MANDATORY_FAILURE_PENALTY_PER_ITEM) ||
-      JSON.stringify(weights) !== JSON.stringify(config.MATCH_COMPONENT_WEIGHTS || {})
+      JSON.stringify(weights) !== JSON.stringify(config.MATCH_COMPONENT_WEIGHTS || {}) ||
+      JSON.stringify(hiringRiskPolicies) !== JSON.stringify(config.HIRING_RISK_POLICIES || {})
     )
   );
 
@@ -125,6 +141,10 @@ export default function ConfigScreen() {
       ? 'Must be a non-negative number'
       : undefined;
 
+  const policyError = Object.entries(hiringRiskPolicies).some(([riskCode, policy]) => !riskCode.trim() || !policy.category.trim())
+    ? 'Every hiring-risk policy requires a stable risk code and category.'
+    : undefined;
+
   // Single shared weight sum validity predicate (<0.001 delta)
   const totalWeight = Object.values(weights).reduce((a, b) => a + (isNaN(b) ? 0 : b), 0);
   const isWeightValid = Math.abs(totalWeight - 1.0) < 0.001;
@@ -135,7 +155,26 @@ export default function ConfigScreen() {
     !medError &&
     !llmWeightError &&
     !maxBoostError &&
-    !penaltyError;
+    !penaltyError &&
+    !policyError;
+
+  const updateHiringRiskPolicy = (riskCode: string, update: Partial<HiringRiskPolicy>) => {
+    setHiringRiskPolicies((current) => ({
+      ...current,
+      [riskCode]: { ...current[riskCode], ...update },
+    }));
+  };
+
+  const addHiringRiskPolicy = () => {
+    const riskCode = newRiskCode.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!riskCode || hiringRiskPolicies[riskCode]) return;
+    setHiringRiskPolicies((current) => ({ ...current, [riskCode]: createDefaultRiskPolicy() }));
+    setNewRiskCode('');
+  };
+
+  const removeHiringRiskPolicy = (riskCode: string) => {
+    setHiringRiskPolicies((current) => Object.fromEntries(Object.entries(current).filter(([code]) => code !== riskCode)));
+  };
 
   const handleSave = async () => {
     setSuccessMsg(null);
@@ -150,6 +189,7 @@ export default function ConfigScreen() {
         MAX_LLM_BOOST: maxBoostNum,
         MANDATORY_FAILURE_PENALTY_PER_ITEM: penaltyNum,
         MATCH_COMPONENT_WEIGHTS: weights,
+        HIRING_RISK_POLICIES: hiringRiskPolicies,
       });
       setSuccessMsg('Matching Engine Configuration saved successfully!');
       setTimeout(() => setSuccessMsg(null), 3500);
@@ -174,7 +214,7 @@ export default function ConfigScreen() {
               />
             </View>
             <Text className="text-[11px] font-sans text-text-muted">
-              Customize component weights, LLM boost, and failure penalties
+              Customize scoring, deterministic hiring-risk policies, and review controls
             </Text>
           </View>
         </View>
@@ -330,13 +370,136 @@ export default function ConfigScreen() {
               })}
             </Card>
 
+            {/* SECTION 4: Hiring Risk Policies */}
+            <Card className="p-3.5 gap-3.5 shadow-none border-border">
+              <View className="gap-1">
+                <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
+                  4. Hiring Risk Policies
+                </Text>
+                <Text className="text-[11px] font-sans text-text-muted">
+                  Configure deterministic risk visibility, severity, recruiter copy, evidence category, and mandatory-review behavior.
+                </Text>
+              </View>
+
+              {Object.entries(hiringRiskPolicies).map(([riskCode, policy]) => (
+                <View key={riskCode} className="gap-3 p-3 border rounded-md border-border bg-background">
+                  <View className="flex-row flex-wrap items-center justify-between gap-2">
+                    <View className="flex-row flex-wrap items-center gap-2">
+                      <Text className="font-mono text-xs font-sans-bold text-primary">{riskCode}</Text>
+                      <Badge label={policy.enabled ? 'Enabled' : 'Disabled'} tone={policy.enabled ? 'success' : 'neutral'} />
+                      {policy.manual_review ? <Badge label="Manual Review" tone="warning" /> : null}
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${riskCode} hiring-risk policy`}
+                      onPress={() => removeHiringRiskPolicy(riskCode)}
+                      className="items-center justify-center min-w-[36px] min-h-[36px] rounded-md border border-danger/30 bg-danger/5"
+                    >
+                      <Trash2 size={14} color={COLORS.danger} />
+                    </Pressable>
+                  </View>
+
+                  <View className="flex-row flex-wrap gap-4">
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: policy.enabled }}
+                      onPress={() => updateHiringRiskPolicy(riskCode, { enabled: !policy.enabled })}
+                      className="flex-row items-center gap-2 min-h-[36px]"
+                    >
+                      <View className={`w-5 h-5 rounded border items-center justify-center ${policy.enabled ? 'bg-primary border-primary' : 'bg-surface border-border'}`}>
+                        {policy.enabled ? <Check size={13} color={COLORS.textInverse} /> : null}
+                      </View>
+                      <Text className="text-xs font-sans-medium text-text-primary">Policy enabled</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: policy.manual_review }}
+                      onPress={() => updateHiringRiskPolicy(riskCode, { manual_review: !policy.manual_review })}
+                      className="flex-row items-center gap-2 min-h-[36px]"
+                    >
+                      <View className={`w-5 h-5 rounded border items-center justify-center ${policy.manual_review ? 'bg-primary border-primary' : 'bg-surface border-border'}`}>
+                        {policy.manual_review ? <Check size={13} color={COLORS.textInverse} /> : null}
+                      </View>
+                      <Text className="text-xs font-sans-medium text-text-primary">Require manual review</Text>
+                    </Pressable>
+                  </View>
+
+                  <View className="gap-1.5">
+                    <Text className="text-xs font-sans-medium text-text-primary">Severity</Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {RISK_SEVERITIES.map((severity) => {
+                        const selected = policy.severity === severity;
+                        return (
+                          <Pressable
+                            key={severity}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected }}
+                            onPress={() => updateHiringRiskPolicy(riskCode, { severity })}
+                            className={`rounded-md border px-2.5 py-2 ${selected ? 'border-primary bg-primary/10' : 'border-border bg-surface'}`}
+                          >
+                            <Text className={`text-[11px] font-sans-semibold ${selected ? 'text-primary' : 'text-text-muted'}`}>{severity}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  <View className="flex-col gap-3 sm:flex-row">
+                    <TextField
+                      label="Category"
+                      value={policy.category}
+                      onChangeText={(category) => updateHiringRiskPolicy(riskCode, { category })}
+                      error={!policy.category.trim() ? 'Category is required' : undefined}
+                      containerClassName="flex-1"
+                    />
+                    <TextField
+                      label="Recruiter-facing title (optional)"
+                      value={policy.title || ''}
+                      onChangeText={(title) => updateHiringRiskPolicy(riskCode, { title: title.trim() ? title : null })}
+                      containerClassName="flex-1"
+                    />
+                    <TextField
+                      label="Source override (optional)"
+                      value={policy.source || ''}
+                      onChangeText={(source) => updateHiringRiskPolicy(riskCode, { source: source.trim() ? source : null })}
+                      containerClassName="flex-1"
+                    />
+                  </View>
+                </View>
+              ))}
+
+              {Object.keys(hiringRiskPolicies).length === 0 ? (
+                <Text className="text-xs font-sans text-warning">No hiring-risk policies are configured. Deterministic risk events will be suppressed.</Text>
+              ) : null}
+
+              <View className="flex-col gap-2 sm:flex-row sm:items-end">
+                <TextField
+                  label="New stable risk code"
+                  value={newRiskCode}
+                  onChangeText={setNewRiskCode}
+                  placeholder="EXAMPLE_RISK_CODE"
+                  autoCapitalize="characters"
+                  containerClassName="flex-1"
+                  error={newRiskCode.trim() && hiringRiskPolicies[newRiskCode.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_')] ? 'Risk code already exists' : undefined}
+                />
+                <Button
+                  label="Add Policy"
+                  variant="outline"
+                  icon={<Plus size={14} color={COLORS.primary} />}
+                  onPress={addHiringRiskPolicy}
+                  disabled={!newRiskCode.trim()}
+                />
+              </View>
+              {policyError ? <Text className="text-[11px] font-sans text-danger">{policyError}</Text> : null}
+            </Card>
+
             {ruleInventory && (
               <Card className="p-3.5 gap-3.5 shadow-none border-border">
                 <View className="flex-row items-center justify-between gap-2">
                   <View className="flex-row items-center gap-2">
                     <ListChecks size={16} color={COLORS.primary} />
                     <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
-                      4. Active Rule List
+                      5. Active Rule List
                     </Text>
                   </View>
                   <Badge label={`${ruleInventory.total_rules} Rules`} tone="neutral" />
