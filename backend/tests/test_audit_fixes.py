@@ -111,6 +111,8 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
                 semantic_fit_score=90.0,
             )
         ],
+        active_vacancy_summary="Python vacancy evaluated.",
+        ai_career_summary="Backend engineering profile.",
     )
 
     entry = LLMCacheEntry(
@@ -157,6 +159,8 @@ def test_llm_cache_entry_backward_compatible():
                 semantic_fit_score=90.0,
             )
         ],
+        active_vacancy_summary="Python vacancy evaluated.",
+        ai_career_summary="Backend engineering profile.",
     )
 
     key = LLMCacheRepository.compute_composite_hash(

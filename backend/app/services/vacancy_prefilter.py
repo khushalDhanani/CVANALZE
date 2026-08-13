@@ -38,6 +38,9 @@ class CandidateSearchContext:
     cv_embedding: list[float] | None = None
     cand_domain: str = ""
     cand_families: list[str] = field(default_factory=list)
+    taxonomy_confidence: float = 1.0
+    taxonomy_match_status: str = "DB_MATCH"
+    taxonomy_match_source: str | None = None
     resume_json: dict[str, Any] | None = None
 
     @classmethod
@@ -67,9 +70,15 @@ class CandidateSearchContext:
         if analysis_context is not None:
             cand_domain = analysis_context.cand_tax_domain
             cand_families = list(analysis_context.cand_families)
+            taxonomy_confidence = analysis_context.taxonomy_confidence
+            taxonomy_match_status = analysis_context.taxonomy_match_status
+            taxonomy_match_source = analysis_context.taxonomy_match_source
             candidate_experience = analysis_context.candidate_experience
         else:
-            cand_domain, cand_families = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
+            cand_domain, cand_families, taxonomy_confidence, taxonomy_status, taxonomy_match_source = (
+                TaxonomyClassifier.classify_candidate_with_confidence(cv_text, resume_json=resume_json)
+            )
+            taxonomy_match_status = taxonomy_status.value
 
         return cls(
             cv_text=cv_text,
@@ -79,6 +88,9 @@ class CandidateSearchContext:
             cv_embedding=cv_embedding,
             cand_domain=cand_domain,
             cand_families=cand_families,
+            taxonomy_confidence=taxonomy_confidence,
+            taxonomy_match_status=taxonomy_match_status,
+            taxonomy_match_source=taxonomy_match_source,
             resume_json=resume_json,
         )
 
@@ -222,14 +234,21 @@ class VacancyPreFilter:
             raise AnalysisUnavailableError("Taxonomy/configuration is unavailable")
 
         default_family = taxonomy_rules.default_family
-        candidate_taxonomy_known = bool(
+        candidate_taxonomy_resolved = bool(
             cand_ctx.cand_domain not in (None, "", "Unknown", "Not Configured")
             and cand_ctx.cand_families
             and cand_ctx.cand_families not in ([default_family], ["Unknown"], ["Not Configured"])
         )
+        candidate_taxonomy_confident = candidate_taxonomy_resolved and cand_ctx.taxonomy_confidence >= taxonomy_rules.semantic_match_threshold
 
-        if candidate_taxonomy_known:
-            # 2. Known Candidate Domain
+        top_n = getattr(settings, "SEMANTIC_RETRIEVAL_TOP_N", 50)
+        vector_results_tuple: tuple[tuple[str, int, float], ...] = ()
+        if cand_ctx.cv_embedding and settings.EMBEDDING_ENABLED:
+            vector_results_tuple = PgVectorQueryCache.query_pgvector_cached(tuple(cand_ctx.cv_embedding), top_limit=max(top_n, 200))
+        semantic_top_ids = {vid for vid, _rank, _dist in vector_results_tuple[:top_n]}
+
+        if candidate_taxonomy_confident:
+            # 2. High-confidence candidate taxonomy can safely constrain the search space.
             stage0_jobs = [
                 j for j in job_contexts 
                 if j.vac_tax_domain in ("Unknown", "Not Configured") 
@@ -237,17 +256,29 @@ class VacancyPreFilter:
                 or TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, j.vac_family) 
                 or j.vac_tax_domain == cand_ctx.cand_domain
             ]
-            if not stage0_jobs:
-                return []
         else:
-            # 3. Unknown Candidate Domain
-            raise InsufficientEvidenceError("Candidate domain cannot be resolved with sufficient evidence")
+            # 3. Low-confidence or unresolved taxonomy remains a ranking signal, never a permanent exclusion.
+            stage0_jobs = job_contexts
+
+        stage0_ids = {job.job_id for job in stage0_jobs}
+        for job in job_contexts:
+            if job.job_id in stage0_ids:
+                continue
+            semantic_contradiction = job.job_id in semantic_top_ids
+            logger.info(
+                f"[PREFILTER_EXCLUSION] vacancy_id={job.job_id} stage=0 reason=HIGH_CONFIDENCE_TAXONOMY_MISMATCH "
+                f"candidate_domain='{cand_ctx.cand_domain}' candidate_families={cand_ctx.cand_families} "
+                f"taxonomy_confidence={cand_ctx.taxonomy_confidence:.4f} taxonomy_source='{cand_ctx.taxonomy_match_source or 'unknown'}' "
+                f"vacancy_domain='{job.vac_tax_domain}' vacancy_family='{job.vac_family}' "
+                f"semantic_top_n_contradiction={semantic_contradiction}"
+            )
 
         t_stage0_ms = round((time.perf_counter() - t0) * 1000.0, 2)
         logger.info(
             f"[PREFILTER_STAGE_0] Candidate Domain='{cand_ctx.cand_domain}', Families={cand_ctx.cand_families}. "
             f"Filtered {len(job_contexts)} initial openings down to {len(stage0_jobs)} retrieval candidates "
-            f"(candidate_taxonomy_known={candidate_taxonomy_known}) in {t_stage0_ms} ms."
+            f"(candidate_taxonomy_resolved={candidate_taxonomy_resolved}, candidate_taxonomy_confident={candidate_taxonomy_confident}, "
+            f"taxonomy_confidence={cand_ctx.taxonomy_confidence:.4f}) in {t_stage0_ms} ms."
         )
 
         # Adaptive Retrieval Guard: Skip Stage 1 & 2 if Stage 0 count <= limit
@@ -261,8 +292,9 @@ class VacancyPreFilter:
                 job_dict["_rrf_details"] = {
                     "rrf_score": 1.0,
                     "prefilter_rank": rank,
-                    "stage0_compatible": candidate_taxonomy_known,
-                    "retrieval_path": "taxonomy" if candidate_taxonomy_known else "unclassified_retrieval",
+                    "stage0_compatible": candidate_taxonomy_confident,
+                    "retrieval_path": "taxonomy" if candidate_taxonomy_confident else "confidence_fallback",
+                    "taxonomy_confidence": cand_ctx.taxonomy_confidence,
                 }
                 j.raw_job = job_dict
                 res_jobs.append(job_dict)
@@ -278,27 +310,20 @@ class VacancyPreFilter:
         # STAGE 1: Semantic Vector Retrieval (Single pgvector Query Reuse)
         t1 = time.perf_counter()
         stage1_jobs = stage0_jobs
-        vector_results_tuple: tuple[tuple[str, int, float], ...] = ()
-
-        if cand_ctx.cv_embedding and settings.EMBEDDING_ENABLED:
-            top_n = getattr(settings, "SEMANTIC_RETRIEVAL_TOP_N", 50)
-            vector_results_tuple = PgVectorQueryCache.query_pgvector_cached(tuple(cand_ctx.cv_embedding), top_limit=max(top_n, 200))
-
-            if vector_results_tuple:
-                top_n_vids = {vid for vid, rank, dist in vector_results_tuple[:top_n]}
-                semantic_candidates = [j for j in stage0_jobs if j.job_id in top_n_vids]
-                if semantic_candidates:
-                    stage1_jobs = semantic_candidates
+        semantic_candidate_count = sum(job.job_id in semantic_top_ids for job in stage0_jobs)
 
         t_stage1_ms = round((time.perf_counter() - t1) * 1000.0, 2)
-        logger.info(f"[PREFILTER_STAGE_1] Semantic Retrieval selected {len(stage1_jobs)} candidate vacancies out of {len(stage0_jobs)} Stage 0 openings in {t_stage1_ms} ms.")
+        logger.info(
+            f"[PREFILTER_STAGE_1] Semantic Retrieval ranked {semantic_candidate_count} of {len(stage0_jobs)} Stage 0 openings; "
+            f"all Stage 0 openings remain eligible for lexical+vector fusion in {t_stage1_ms} ms."
+        )
 
         # STAGE 2: Deterministic VacancyPreFilter (Fast Token-Set Lexical + RRF fusion)
         t2 = time.perf_counter()
 
         # Extract precompiled vector ranks dict from the single query result
-        vec_ranks = {vid: rank for vid, rank, dist in vector_results_tuple} if vector_results_tuple else {}
-        vec_distances = {vid: dist for vid, rank, dist in vector_results_tuple} if vector_results_tuple else {}
+        vec_ranks = {vid: rank for vid, rank, _dist in vector_results_tuple[:top_n]} if vector_results_tuple else {}
+        vec_distances = {vid: dist for vid, _rank, dist in vector_results_tuple[:top_n]} if vector_results_tuple else {}
 
         # Compute Lexical Scores using Fast Token Set Intersections
         lexical_scored: list[tuple[float, JobEvaluationContext]] = []
@@ -350,7 +375,7 @@ class VacancyPreFilter:
 
         # Sort descending to establish 1-indexed lexical ranks
         lexical_scored.sort(key=lambda item: (-item[0], item[1].job_id))
-        lex_ranks = {job.job_id: rank for rank, (s, job) in enumerate(lexical_scored, 1)}
+        lex_ranks = {job.job_id: rank for rank, (score, job) in enumerate(lexical_scored, 1) if score > 0.0}
 
         t_lexical_ms = round((time.perf_counter() - t2) * 1000.0, 2)
 
@@ -373,10 +398,11 @@ class VacancyPreFilter:
             rrf_details["prefilter_rank"] = len(selected_contexts) + 1
             rrf_details["rrf_score"] = fused_score
             rrf_details["vector_distance"] = vec_distances.get(job.job_id)
-            rrf_details["stage0_compatible"] = candidate_taxonomy_known and (
+            rrf_details["stage0_compatible"] = candidate_taxonomy_confident and (
                 TaxonomyClassifier.are_families_compatible(cand_ctx.cand_families, job.vac_family)
                 or job.vac_tax_domain == cand_ctx.cand_domain
             )
+            rrf_details["taxonomy_confidence"] = cand_ctx.taxonomy_confidence
             has_l = rrf_details.get("lexical_rank") is not None
             has_v = rrf_details.get("vector_rank") is not None
             if has_l and has_v:
@@ -402,6 +428,15 @@ class VacancyPreFilter:
             f"Composition: Both={both}, Keyword-Only={keyword_only}, Vector-Only={vector_only} | "
             f"Timings: Stage0={t_stage0_ms}ms, Stage1={t_stage1_ms}ms, Lexical={t_lexical_ms}ms, RRF={t_rrf_ms}ms"
         )
+        selected_ids = {job.job_id for job in selected_contexts}
+        for job in stage0_jobs:
+            if job.job_id in selected_ids:
+                continue
+            logger.info(
+                f"[PREFILTER_EXCLUSION] vacancy_id={job.job_id} stage=2 reason=RRF_TOP_K "
+                f"taxonomy_confidence={cand_ctx.taxonomy_confidence:.4f} lexical_rank={lex_ranks.get(job.job_id)} "
+                f"vector_rank={vec_ranks.get(job.job_id)} semantic_top_n={job.job_id in semantic_top_ids}"
+            )
         QualityMetrics.record(
             "retrieval",
             openings=len(job_contexts),

@@ -203,6 +203,9 @@ class MatchService:
             "PASSED" if candidate_context.cand_tax_domain not in ("", "Unknown") else "INSUFFICIENT_EVIDENCE",
             domain=candidate_context.cand_tax_domain or "Unknown",
             families=candidate_context.cand_families,
+            confidence=round(candidate_context.taxonomy_confidence, 4),
+            match_status=candidate_context.taxonomy_match_status,
+            source=candidate_context.taxonomy_match_source,
         )
         from app.services.vacancy_prefilter import InsufficientEvidenceError, AnalysisUnavailableError
         # 5. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
@@ -285,6 +288,8 @@ class MatchService:
         optimized_profile = None
         llm_matches_map = {}
         grounding_report = GroundingReport()
+        raw_llm_lineage: dict[str, dict[str, int]] = {}
+        grounded_llm_lineage: dict[str, dict[str, int]] = {}
 
         if not llm_skipped:
             # 4. Reduce LLM input to Top-N by deterministic score (full scoring already computed above).
@@ -306,6 +311,15 @@ class MatchService:
                     reverse=True,
                 )[:llm_top_n]
             llm_vacancy_dicts = [jc.raw_job for jc in llm_vacancies]
+            llm_vacancy_ids = {jc.job_id for jc in llm_vacancies}
+            pre_llm_score_by_id = {match.job_id: match.score for match in pre_llm_matches}
+            for job_context in filtered_job_contexts:
+                if job_context.job_id not in llm_vacancy_ids:
+                    logger.info(
+                        f"[PREFILTER_EXCLUSION] vacancy_id={job_context.job_id} stage=llm_selection "
+                        f"reason=DETERMINISTIC_LLM_TOP_N deterministic_score={pre_llm_score_by_id.get(job_context.job_id)} "
+                        f"llm_top_n={llm_top_n}"
+                    )
 
             # 5. Prompt Construction & Token Count
             with profiler.time_stage("prompt_construction"):
@@ -350,10 +364,34 @@ class MatchService:
             )
 
             if optimized_response:
+                raw_llm_lineage = {
+                    str(match.vacancy_id): {
+                        "matched_skills": len(match.matched_skills),
+                        "inferred_skills": len(match.inferred_skills),
+                        "requirements": len(match.classified_requirements),
+                        "evidence": len(match.evidence_snippets),
+                    }
+                    for match in optimized_response.matched_vacancies
+                }
                 optimized_response, grounding_report = LLMGroundingService.validate_optimized_response(
                     optimized_response,
                     cv_text=cv_text,
                     vacancies=llm_vacancy_dicts,
+                )
+                grounded_llm_lineage = {
+                    str(match.vacancy_id): {
+                        "matched_skills": len(match.matched_skills),
+                        "inferred_skills": len(match.inferred_skills),
+                        "requirements": len(match.classified_requirements),
+                        "evidence": len(match.evidence_snippets),
+                    }
+                    for match in optimized_response.matched_vacancies
+                }
+                logger.debug(
+                    f"[LLM_LINEAGE] raw_vacancies={len(raw_llm_lineage)} grounded_vacancies={len(grounded_llm_lineage)} "
+                    f"invalid_vacancy_ids={len(grounding_report.invalid_vacancy_ids)} "
+                    f"missing_vacancy_ids={len(grounding_report.missing_vacancy_ids)} "
+                    f"unsupported_claims={len(grounding_report.unsupported_claims)}"
                 )
                 OllamaLLMService.record_quality_trace(
                     operation="optimized_match_grounding",
@@ -365,6 +403,7 @@ class MatchService:
                         "assertions": grounding_report.assertions,
                         "grounded_assertions": grounding_report.grounded_assertions,
                         "invalid_vacancy_ids": len(grounding_report.invalid_vacancy_ids),
+                        "missing_vacancy_ids": len(grounding_report.missing_vacancy_ids),
                         "unsupported_claims": len(grounding_report.unsupported_claims),
                     },
                 )
@@ -414,7 +453,7 @@ class MatchService:
                         evidence_coverage=job_match.coverage,
                         grounding_ratio=grounding_report.ratio,
                         rule_llm_agreement=agreement,
-                        validation_passed=llm_skipped or optimized_response is not None,
+                        validation_passed=llm_skipped or (optimized_response is not None and llm_match is not None),
                     )
                     retrieval_provenance = dict(job.get("_rrf_details") or {})
                     has_lexical = retrieval_provenance.get("lexical_rank") is not None
@@ -425,6 +464,8 @@ class MatchService:
                         quality_flags.append("LOW_CALIBRATED_CONFIDENCE")
                     if grounding_report.unsupported_claims:
                         quality_flags.append("UNSUPPORTED_LLM_CLAIMS_REMOVED")
+                    if optimized_response is not None and llm_match is None:
+                        quality_flags.append("LLM_VACANCY_EVALUATION_MISSING")
 
                     enriched_match = EnrichedJobMatchResult(
                         job_id=job_match.job_id,
@@ -480,8 +521,17 @@ class MatchService:
                         calibration_version=calibration.calibration_version,
                         quality_flags=quality_flags,
                         retrieval_provenance=retrieval_provenance,
+                        llm_classified_requirements=llm_match.classified_requirements if llm_match else [],
+                        llm_evidence_snippets=llm_match.evidence_snippets if llm_match else {},
                     )
                     evaluated_matches.append(enriched_match)
+                    raw_counts = raw_llm_lineage.get(vac_id_str, {})
+                    grounded_counts = grounded_llm_lineage.get(vac_id_str, {})
+                    logger.debug(
+                        f"[LLM_POST_PROCESS] vacancy_id={vac_id_str} raw_counts={raw_counts} grounded_counts={grounded_counts} "
+                        f"deterministic_evidence={len(job_match.evidence)} mandatory_failures={len(job_match.mandatory_failures)} "
+                        f"final_score={job_match.vacancy_fit_score}"
+                    )
                 except OllamaError:
                     raise
                 except Exception as e:
@@ -747,6 +797,7 @@ class MatchService:
                 "grounded_assertions": grounding_report.grounded_assertions,
                 "grounding_assertions": grounding_report.assertions,
                 "invalid_vacancy_ids_removed": len(grounding_report.invalid_vacancy_ids),
+                "missing_llm_vacancy_ids": len(grounding_report.missing_vacancy_ids),
                 "unsupported_claims_removed": len(grounding_report.unsupported_claims),
                 "quality_shadow_mode": settings.LLM_SHADOW_QUALITY_ENABLED,
                 "quality_gate": quality_gate.as_dict(),
@@ -755,6 +806,14 @@ class MatchService:
                 "hiring_risk_prompt_version": hiring_risk_prompt_version,
                 "hiring_risk_prompt_identity": hiring_risk_prompt_identity,
                 "hiring_risk_policy_version": hiring_risk_policy_version,
+                "llm_lineage": {
+                    "raw_vacancy_count": len(raw_llm_lineage),
+                    "grounded_vacancy_count": len(grounded_llm_lineage),
+                    "raw_requirement_count": sum(item.get("requirements", 0) for item in raw_llm_lineage.values()),
+                    "grounded_requirement_count": sum(item.get("requirements", 0) for item in grounded_llm_lineage.values()),
+                    "raw_evidence_count": sum(item.get("evidence", 0) for item in raw_llm_lineage.values()),
+                    "grounded_evidence_count": sum(item.get("evidence", 0) for item in grounded_llm_lineage.values()),
+                },
             },
         )
 

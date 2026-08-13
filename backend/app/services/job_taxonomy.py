@@ -184,6 +184,8 @@ class TaxonomyClassification(BaseModel):
     matched_rule: str | None = None
     matched_branch: int | None = None
     matched_keywords: tuple[str, ...] = ()
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    match_status: MatchStatus = MatchStatus.INSUFFICIENT_EVIDENCE
 
 
 class classproperty:
@@ -276,6 +278,8 @@ class TaxonomyClassifier:
                 matched_rule=f"dynamic:{dyn_res.match_source}",
                 matched_branch=0,
                 matched_keywords=(matched_kw,) if matched_kw else (),
+                confidence=dyn_res.confidence,
+                match_status=dyn_res.match_status,
             )
 
         from app.repositories.department_domain import department_domain_repository
@@ -298,6 +302,8 @@ class TaxonomyClassifier:
                 matched_rule="domain_repository_keyword_fallback",
                 matched_branch=0,
                 matched_keywords=(),
+                confidence=1.0,
+                match_status=MatchStatus.DB_MATCH,
             )
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -309,6 +315,8 @@ class TaxonomyClassifier:
             matched_rule=dyn_res.match_status.value if hasattr(dyn_res.match_status, "value") else str(dyn_res.match_status),
             matched_branch=0,
             matched_keywords=(),
+            confidence=0.0,
+            match_status=dyn_res.match_status,
         )
 
     @classmethod
@@ -346,6 +354,8 @@ class TaxonomyClassifier:
                     job_family=family,
                     compatible_families=(family,),
                     matched_rule=f"dynamic:{dyn_res.match_source}",
+                    confidence=dyn_res.confidence,
+                    match_status=dyn_res.match_status,
                 )
 
         from app.repositories.department_domain import department_domain_repository
@@ -398,7 +408,9 @@ class TaxonomyClassifier:
                 dept_scores.append((score, matcher.domain))
 
         if dept_scores:
-            best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+            best_score, best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))
+            evidence_weight_total = w_exp + w_skills + tax_rules.evidence_weight_responsibilities + w_summary
+            confidence = min(1.0, best_score / evidence_weight_total) if evidence_weight_total > 0 else 0.0
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             TaxonomyMetrics.record_hit(cache_hit=False, duration_ms=elapsed_ms)
             return TaxonomyClassification(
@@ -406,6 +418,8 @@ class TaxonomyClassifier:
                 job_family=best_domain.department_name,
                 compatible_families=(best_domain.department_name,),
                 matched_rule="domain_repository_keyword_fallback",
+                confidence=confidence,
+                match_status=MatchStatus.DB_MATCH,
             )
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -415,6 +429,25 @@ class TaxonomyClassifier:
             job_family="Unknown",
             compatible_families=("Unknown",),
             matched_rule=dyn_res.match_status.value if hasattr(dyn_res.match_status, "value") else str(dyn_res.match_status),
+            confidence=0.0,
+            match_status=dyn_res.match_status,
+        )
+
+    @classmethod
+    def classify_candidate_with_confidence(
+        cls,
+        cv_text: str,
+        resume_json: dict[str, Any] | None = None,
+    ) -> tuple[str, list[str], float, MatchStatus, str | None]:
+        """Classify a candidate while preserving the confidence needed by retrieval guards."""
+        dto = CandidateResumeDTO.from_resume(cv_text, resume_json=resume_json)
+        classification = cls.classify_candidate_dto(dto)
+        return (
+            classification.domain,
+            list(classification.compatible_families),
+            classification.confidence,
+            classification.match_status,
+            classification.matched_rule,
         )
 
     @classmethod
@@ -424,9 +457,8 @@ class TaxonomyClassifier:
         Cached once per candidate_full_text string.
         Preserves 100% backward compatibility.
         """
-        dto = CandidateResumeDTO.from_resume(cv_text, resume_json=resume_json)
-        classification = cls.classify_candidate_dto(dto)
-        return (classification.domain, list(classification.compatible_families))
+        domain, families, _confidence, _status, _source = cls.classify_candidate_with_confidence(cv_text, resume_json=resume_json)
+        return domain, families
 
     @classmethod
     def are_families_compatible(cls, candidate_families: list[str], job_family: str) -> bool:

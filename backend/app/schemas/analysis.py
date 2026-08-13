@@ -65,11 +65,11 @@ class OptimizedCandidateProfile(BaseModel):
 
 class OptimizedVacancyMatch(BaseModel):
     vacancy_id: int | str
-    semantic_reason: str = ""
+    semantic_reason: str = Field(..., min_length=1)
     inferred_skills: list[str] = Field(default_factory=list)
     matched_skills: list[str] = Field(default_factory=list)
     missing_critical: list[str] = Field(default_factory=list)
-    semantic_fit_score: float = Field(default=0.0, ge=0.0, le=100.0)
+    semantic_fit_score: float = Field(..., ge=0.0, le=100.0)
     classified_requirements: list[ClassifiedRequirementItem] = Field(default_factory=list)
     evidence_snippets: dict[str, RequirementEvidence] = Field(default_factory=dict)
     career_transition_detected: bool = False
@@ -77,10 +77,10 @@ class OptimizedVacancyMatch(BaseModel):
 
 
 class OptimizedLLMMatchResponse(BaseModel):
-    candidate_profile: OptimizedCandidateProfile = Field(default_factory=OptimizedCandidateProfile)
-    matched_vacancies: list[OptimizedVacancyMatch] = Field(default_factory=list)
-    active_vacancy_summary: str = Field(default="No suitable active vacancy found.")
-    ai_career_summary: str = Field(default="")
+    candidate_profile: OptimizedCandidateProfile
+    matched_vacancies: list[OptimizedVacancyMatch]
+    active_vacancy_summary: str
+    ai_career_summary: str
 
 
 class PipelineStageMetrics(BaseModel):
@@ -128,6 +128,14 @@ class EnrichedJobMatchResult(JobMatchResult):
     calibration_version: str | None = Field(default=None, description="Version of the offline confidence calibration artifact")
     quality_flags: list[str] = Field(default_factory=list, description="Non-decisional quality and review signals")
     retrieval_provenance: dict[str, Any] = Field(default_factory=dict, description="Ranks and scores that caused retrieval of this vacancy")
+    llm_classified_requirements: list[ClassifiedRequirementItem] = Field(
+        default_factory=list,
+        description="Grounded LLM requirement classifications retained as non-authoritative lineage",
+    )
+    llm_evidence_snippets: dict[str, RequirementEvidence] = Field(
+        default_factory=dict,
+        description="Grounded LLM dual evidence retained separately from deterministic scoring evidence",
+    )
 
 
 class EnrichedCandidateAnalysis(BaseModel):

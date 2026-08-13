@@ -35,6 +35,9 @@ class CandidateAnalysisContext:
     cand_tax_domain: str = ""
     cand_families: list[str] = field(default_factory=list)
     cand_primary_family: str | None = None
+    taxonomy_confidence: float = 1.0
+    taxonomy_match_status: str = "DB_MATCH"
+    taxonomy_match_source: str | None = None
     professional_skills: list[str] = field(default_factory=list)
     experience_titles: list[str] = field(default_factory=list)
     education_evidence: list[str] = field(default_factory=list)
@@ -131,7 +134,9 @@ class CandidateAnalysisContext:
 
         # 2. Taxonomy Classification (cached)
         resume_evidence = CandidateResumeDTO.from_resume(cv_text, resume_json=resume_json)
-        cand_tax_domain, cand_families_list = TaxonomyClassifier.classify_candidate(cv_text, resume_json=resume_json)
+        cand_tax_domain, cand_families_list, taxonomy_confidence, taxonomy_status, taxonomy_source = (
+            TaxonomyClassifier.classify_candidate_with_confidence(cv_text, resume_json=resume_json)
+        )
         cand_families = list(cand_families_list)
 
         # Taxonomy overrides using LLM domain are no longer permitted.
@@ -158,11 +163,18 @@ class CandidateAnalysisContext:
         )
         profile_domain = str(cand_domain_profile.get("professional_domain") or "").strip()
         profile_department = str(cand_domain_profile.get("recommended_department") or "").strip()
-        if profile_domain:
-            cand_tax_domain = profile_domain
-        if profile_department:
-            cand_families = [profile_department]
-            cand_primary_family = profile_department
+        profile_taxonomy_confidence = float(cand_domain_profile.get("taxonomy_confidence") or 0.0)
+        use_profile_taxonomy = bool(profile_domain or profile_department) and profile_taxonomy_confidence >= taxonomy_confidence
+        if use_profile_taxonomy:
+            if profile_domain:
+                cand_tax_domain = profile_domain
+            if profile_department:
+                cand_families = [profile_department]
+                cand_primary_family = profile_department
+            taxonomy_confidence = profile_taxonomy_confidence
+            current_taxonomy_status = taxonomy_status.value if hasattr(taxonomy_status, "value") else str(taxonomy_status)
+            taxonomy_status = str(cand_domain_profile.get("taxonomy_match_status") or current_taxonomy_status)
+            taxonomy_source = str(cand_domain_profile.get("taxonomy_match_source") or taxonomy_source or "") or None
 
         cand_domain = cand_domain_profile.get("professional_domain", "")
 
@@ -195,6 +207,9 @@ class CandidateAnalysisContext:
             cand_tax_domain=cand_tax_domain,
             cand_families=cand_families,
             cand_primary_family=cand_primary_family,
+            taxonomy_confidence=taxonomy_confidence,
+            taxonomy_match_status=taxonomy_status.value if hasattr(taxonomy_status, "value") else str(taxonomy_status),
+            taxonomy_match_source=taxonomy_source,
             professional_skills=resume_evidence.skills,
             experience_titles=resume_evidence.experience_titles,
             education_evidence=resume_evidence.education,
@@ -240,7 +255,6 @@ class CandidateAnalysisContext:
         profile_parts = [
             self.cv_text,
             *optimized_profile.core_skills,
-            *optimized_profile.inferred_skills,
             *optimized_profile.professional_domains,
             optimized_profile.current_role or "",
             *optimized_profile.education_domains,
@@ -248,6 +262,8 @@ class CandidateAnalysisContext:
         ]
         self.norm_text = re.sub(r"[^a-zA-Z0-9\s#+./-]", " ", " ".join(filter(None, profile_parts))).lower()
         self.norm_text = re.sub(r"\s+", " ", self.norm_text).strip()
+        self.llm_core_skills = list(optimized_profile.core_skills)
+        self.llm_inferred_skills = list(optimized_profile.inferred_skills)
 
         # Taxonomy overrides using LLM domain are no longer permitted.
         if optimized_profile.professional_domains and self.cand_tax_domain in ("", "Unknown"):

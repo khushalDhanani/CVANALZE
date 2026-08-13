@@ -1,6 +1,36 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Docker Desktop Duplicate Log Display Diagnosis**:
+    - Compared the Docker Desktop unified Logs view with the raw `docker logs` streams for both `cv_analyzer_api` and `cv_analyzer_worker`.
+    - Confirmed raw container output records each API request, health check, Ollama operation, and worker pipeline event only once; the application and worker are not executing those operations twice.
+    - Identified the duplicate rows as a Docker Desktop unified Logs view/display issue rather than duplicate Python handlers, duplicate Compose services, or duplicate job execution.
+    - Files changed: `workstatus.md` only.
+    - Pending work: use `docker compose logs`/`docker logs` for authoritative output, or restart/update Docker Desktop if the unified view continues duplicating rows.
+    - Important decision: no application logging or Compose change is warranted based on the raw container evidence.
+1. **2026-08-13 Migration 027 PostgreSQL Driver Compatibility Fix**:
+    - Traced migration 027's `immutabledict is not a sequence` failure to the psycopg driver interpreting the `%` characters in `LIKE '%VACANCY COVERAGE:%'` as parameter markers when the complete trusted SQL file is passed through `exec_driver_sql()`.
+    - Replaced the percent-based `LIKE` assertion with the equivalent PostgreSQL `strpos(system_instruction, 'VACANCY COVERAGE:') > 0` predicate.
+    - Preserved the prompt-content validation and migration behavior without changing the shared migration runner or previously issued migrations.
+    - Files changed: `backend/scripts/migrations/postgres/027_confidence_aware_matching_prompt.sql`, `workstatus.md`.
+    - Pending work: rebuild the `migrate-postgres` image, rerun migration 027, and recreate the application containers. These commands were not executed because repository instructions require explicit authorization.
+    - Important decision: the failed migration transaction was not recorded as applied, so the corrected version can run normally without checksum repair or rollback.
+1. **2026-08-13 Confidence-Aware CV Matching Pipeline Remediation**:
+    - Propagated candidate taxonomy confidence, status, and source from dynamic classification/profile resolution into candidate and retrieval contexts.
+    - Changed Stage 0 so only high-confidence taxonomy can strictly exclude incompatible vacancies; low-confidence, ambiguous, and unresolved taxonomy now use broad retrieval instead of producing a terminal no-analysis result.
+    - Changed semantic Stage 1 from an exclusive Top-N gate into an RRF rank signal, preserving lexical candidates until final Top-K fusion, and stopped zero-score lexical candidates from receiving artificial lexical rank credit.
+    - Added privacy-safe exclusion telemetry for Stage 0 taxonomy decisions, Stage 2 RRF Top-K decisions, and deterministic LLM Top-N selection, including taxonomy confidence and semantic contradiction indicators.
+    - Gated taxonomy-derived cross-domain caps on the same configured confidence threshold while preserving independently configured software/non-IT evidence guards.
+    - Prevented LLM-inferred skills from entering deterministic candidate text, restored dedicated LLM skill provenance, and retained grounded LLM requirements/evidence in separate non-authoritative API lineage fields.
+    - Added raw-to-grounded-to-final count telemetry, missing per-vacancy LLM evaluation flags, and reduced calibration confidence when a supplied vacancy is omitted by the model.
+    - Added omitted vacancy requirements to the compact optimized prompt input: maximum experience, maximum CTC, mandatory-skill policy, technologies, responsibilities, and description.
+    - Tightened the optimized response model and DB readiness schema so core top-level fields plus per-vacancy reason and fit score are required.
+    - Added versioned prompt migration 027 for optimized prompt `3.7` / response schema v2 with exact per-vacancy coverage instructions and a reversible down migration.
+    - Aligned the structured-generation deadline to 360 seconds and retries to zero across current local runtime files, Settings, the example environment, README, and Compose forwarding.
+    - Added/updated focused tests for high- vs low-confidence prefiltering, ambiguous cross-family survival, non-exclusive vector retrieval, confidence-aware cross-domain guards, LLM provenance, evidence preservation, missing vacancy coverage, strict response validation, prompt completeness/readiness, and configuration parity.
+    - Files changed: `README.md`, `backend/.env.example`, local `.env` files, matching/taxonomy/prompt/schema services, migrations 027 up/down, and focused backend tests; `workstatus.md` updated here.
+    - Pending work: migration 027 must be applied before processing so prompt 3.7 becomes active. Tests, migrations, builds, and services were not executed because repository instructions prohibit them unless explicitly requested.
+    - Important decision: deterministic evaluators remain authoritative; grounded LLM requirement/evidence output is retained as separate lineage and semantic enrichment, never used to override mandatory deterministic failures.
 1. **2026-08-13 Existing Ollama Remediation Verification**:
     - Re-audited every application Ollama HTTP path and confirmed generation, tags, embeddings, and unload remain centralized in `OllamaTransport`, with callers routed through `OllamaLLMService` or `EmbeddingService`.
     - Confirmed model-unavailable, timeout, service-unavailable, and retryable HTTP generation failures propagate to the API's `503`/`504` handling; disabled generation and non-operational response failures retain their intended deterministic fallback behavior.

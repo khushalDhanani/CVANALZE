@@ -61,12 +61,15 @@ def test_grounding_removes_unknown_ids_and_unsupported_claims(monkeypatch):
         matched_vacancies=[
             OptimizedVacancyMatch(
                 vacancy_id=1,
+                semantic_reason="Python evidence supports this vacancy.",
+                semantic_fit_score=80.0,
                 matched_skills=["Python", "Kubernetes"],
                 inferred_skills=["FastAPI"],
                 evidence_snippets={"skill-python": RequirementEvidence(cv_evidence="Python", vacancy_evidence="Python")},
             ),
-            OptimizedVacancyMatch(vacancy_id=999, matched_skills=["Python"]),
+            OptimizedVacancyMatch(vacancy_id=999, semantic_reason="Unknown vacancy.", semantic_fit_score=10.0, matched_skills=["Python"]),
         ],
+        active_vacancy_summary="Python vacancy evaluated.",
         ai_career_summary="Invented summary",
     )
     cv = "Backend Engineer with Python and FastAPI experience."
@@ -79,6 +82,7 @@ def test_grounding_removes_unknown_ids_and_unsupported_claims(monkeypatch):
     assert validated.matched_vacancies[0].inferred_skills == ["FastAPI"]
     assert validated.candidate_profile.core_skills == ["Python"]
     assert report.invalid_vacancy_ids == ["999"]
+    assert report.missing_vacancy_ids == []
     assert any("Kubernetes" in claim for claim in report.unsupported_claims)
 
 

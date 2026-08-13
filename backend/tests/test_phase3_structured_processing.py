@@ -3,7 +3,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.core.config import settings
-from app.schemas.analysis import OptimizedCandidateProfile, OptimizedLLMMatchResponse
+from app.schemas.analysis import (
+    ClassifiedRequirementItem,
+    OptimizedCandidateProfile,
+    OptimizedLLMMatchResponse,
+    OptimizedVacancyMatch,
+    RequirementEvidence,
+)
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.normalized_resume import NormalizedResume
@@ -148,7 +154,24 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
         "app.services.match_service.ConfigRepository.get_setting",
         lambda key, default=None: default,
     )
-    llm_response = OptimizedLLMMatchResponse(candidate_profile=OptimizedCandidateProfile(relevant_experience_years=12.0))
+    llm_response = OptimizedLLMMatchResponse(
+        candidate_profile=OptimizedCandidateProfile(relevant_experience_years=12.0),
+        matched_vacancies=[
+            OptimizedVacancyMatch(
+                vacancy_id="job-1",
+                semantic_reason="Python evidence supports the vacancy.",
+                semantic_fit_score=80.0,
+                classified_requirements=[
+                    ClassifiedRequirementItem(requirement_id="python", description="Python", status="SATISFIED")
+                ],
+                evidence_snippets={
+                    "python": RequirementEvidence(cv_evidence="Python", vacancy_evidence="Python Developer")
+                },
+            )
+        ],
+        active_vacancy_summary="Python vacancy evaluated.",
+        ai_career_summary="Software delivery profile.",
+    )
     monkeypatch.setattr(
         "app.services.match_service.OllamaLLMService.run_optimized_match",
         MagicMock(return_value=llm_response),
@@ -174,6 +197,12 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
     assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[0])) == 2
     assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[1])) == 2
     assert {experience for _, _, experience in scoring_calls} == {2.0}
+    enriched_job = next(match for match in result.unsuitable_openings if match.job_id == "job-1")
+    missing_llm_job = next(match for match in result.unsuitable_openings if match.job_id == "job-2")
+    assert [item.requirement_id for item in enriched_job.llm_classified_requirements] == ["python"]
+    assert enriched_job.llm_evidence_snippets["python"].cv_evidence == "Python"
+    assert "LLM_VACANCY_EVALUATION_MISSING" in missing_llm_job.quality_flags
+    assert result.quality_metadata["missing_llm_vacancy_ids"] == 1
 
 
 @pytest.mark.asyncio

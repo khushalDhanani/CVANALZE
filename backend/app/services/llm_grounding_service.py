@@ -18,6 +18,7 @@ class GroundingReport:
     assertions: int = 0
     grounded_assertions: int = 0
     invalid_vacancy_ids: list[str] = field(default_factory=list)
+    missing_vacancy_ids: list[str] = field(default_factory=list)
     unsupported_claims: list[str] = field(default_factory=list)
 
     @property
@@ -51,6 +52,13 @@ class LLMGroundingService:
         cv_text: str,
         vacancies: list[dict[str, Any]],
     ) -> tuple[OptimizedLLMMatchResponse, GroundingReport]:
+        expected_vacancy_ids = {
+            str(vacancy.get("vacancy_id") or vacancy.get("id"))
+            for vacancy in vacancies
+            if vacancy.get("vacancy_id") is not None or vacancy.get("id") is not None
+        }
+        response_vacancy_ids = {str(match.vacancy_id) for match in response.matched_vacancies}
+        missing_ids = sorted(expected_vacancy_ids - response_vacancy_ids)
         if not settings.LLM_GROUNDING_ENABLED:
             profile = CandidateDomainService.validate_optimized_profile(response.candidate_profile, cv_text)
             matches = [
@@ -64,7 +72,7 @@ class LLMGroundingService:
                 )
                 for match in response.matched_vacancies
             ]
-            return response.model_copy(update={"candidate_profile": profile, "matched_vacancies": matches}), GroundingReport()
+            return response.model_copy(update={"candidate_profile": profile, "matched_vacancies": matches}), GroundingReport(missing_vacancy_ids=missing_ids)
 
         vacancy_sources = {
             str(vacancy.get("vacancy_id") or vacancy.get("id")): json.dumps(vacancy, sort_keys=True, default=str)
@@ -154,6 +162,7 @@ class LLMGroundingService:
             assertions=assertions,
             grounded_assertions=grounded,
             invalid_vacancy_ids=invalid_ids,
+            missing_vacancy_ids=missing_ids,
             unsupported_claims=unsupported[:100],
         )
         validated_profile = profile.model_copy(
@@ -181,6 +190,7 @@ class LLMGroundingService:
             assertions=assertions,
             grounded_assertions=grounded,
             invalid_vacancy_ids=len(invalid_ids),
+            missing_vacancy_ids=len(missing_ids),
             unsupported_claims=len(unsupported),
         )
         return validated, report

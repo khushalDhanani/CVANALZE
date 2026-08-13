@@ -7,6 +7,7 @@ import pytest
 
 from app.core.profiler import PipelineProfiler
 from app.schemas.candidate_context import CandidateAnalysisContext
+from app.schemas.classification_types import MatchStatus
 from app.schemas.job_context import JobEvaluationContext
 from app.services.job_taxonomy import TaxonomyClassifier
 from app.services.scoring_engine import ScoringEngine
@@ -85,7 +86,11 @@ def test_scale_benchmark_throughput_and_memory(vacancy_count: int, monkeypatch):
         return "Unknown", "Unknown"
         
     monkeypatch.setattr(TaxonomyClassifier, "classify_vacancy", mock_classify_vacancy)
-    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("IT", ["Software Engineering"]))
+    monkeypatch.setattr(
+        TaxonomyClassifier,
+        "classify_candidate_with_confidence",
+        lambda *args, **kwargs: ("IT", ["Software Engineering"], 1.0, MatchStatus.DB_MATCH, "test"),
+    )
 
     # 2. Vacancy Pre-processing (JobEvaluationContext)
     t0 = time.perf_counter()

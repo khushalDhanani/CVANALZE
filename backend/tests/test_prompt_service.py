@@ -83,7 +83,7 @@ def test_optimized_prompt_cache_key_includes_required_version(monkeypatch):
     from app.core.config import settings
     from app.services.prompt_service import PromptReadiness
 
-    monkeypatch.setattr(settings, "OPTIMIZED_PROMPT_VERSION", "3.6")
+    monkeypatch.setattr(settings, "OPTIMIZED_PROMPT_VERSION", "3.7")
     monkeypatch.setattr(PromptService, "check_required_optimized_match_prompt", classmethod(lambda cls: PromptReadiness(True, "READY")))
     monkeypatch.setattr(PromptService, "_fetch_prompt_from_db", classmethod(lambda cls, *args, **kwargs: "Prompt: {input_json}"))
     cache_get = MagicMock(return_value=None)
@@ -96,7 +96,7 @@ def test_optimized_prompt_cache_key_includes_required_version(monkeypatch):
     )
 
     assert result == "Prompt: {}"
-    assert ":3.6:" in cache_get.call_args.args[0]
+    assert ":3.7:" in cache_get.call_args.args[0]
 
 
 def test_prompt_resolution_returns_active_database_version(db_session):
@@ -174,19 +174,33 @@ def test_activation_validation(db_session):
 def test_required_optimized_match_prompt_validates_version_placeholders_and_schema(db_session, monkeypatch):
     from app.core.config import settings
 
-    monkeypatch.setattr(settings, "OPTIMIZED_PROMPT_VERSION", "3.6")
+    monkeypatch.setattr(settings, "OPTIMIZED_PROMPT_VERSION", "3.7")
     assert PromptService.check_required_optimized_match_prompt().ready is False
 
     prompt = PromptTemplateMaster(
         prompt_name="optimized_match",
-        version_tag="3.6",
-        system_instruction="{input_json} {domain_list_str} {dept_list_str}",
+        version_tag="3.7",
+        system_instruction="VACANCY COVERAGE: evaluate every supplied vacancy. {input_json} {domain_list_str} {dept_list_str}",
         expected_schema_json=json.dumps(
             {
                 "$id": PromptService.OPTIMIZED_MATCH_SCHEMA_ID,
                 "type": "object",
                 "required": sorted(PromptService.OPTIMIZED_MATCH_SCHEMA_FIELDS),
-                "properties": {field: {} for field in PromptService.OPTIMIZED_MATCH_SCHEMA_FIELDS},
+                "properties": {
+                    "candidate_profile": {"type": "object"},
+                    "active_vacancy_summary": {"type": "string"},
+                    "ai_career_summary": {"type": "string"},
+                    "matched_vacancies": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": sorted(PromptService.OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS),
+                            "properties": {
+                                field: {} for field in PromptService.OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS
+                            },
+                        },
+                    },
+                },
             }
         ),
         is_active=True,
@@ -195,10 +209,10 @@ def test_required_optimized_match_prompt_validates_version_placeholders_and_sche
     db_session.commit()
 
     assert PromptService.check_required_optimized_match_prompt().ready is True
-    prompt.system_instruction = "/think\n{input_json} {domain_list_str} {dept_list_str}"
+    prompt.system_instruction = "/think\nVACANCY COVERAGE: evaluate every supplied vacancy. {input_json} {domain_list_str} {dept_list_str}"
     db_session.commit()
     assert PromptService.check_required_optimized_match_prompt().ready is False
-    prompt.system_instruction = "{input_json} {domain_list_str} {dept_list_str}"
+    prompt.system_instruction = "VACANCY COVERAGE: evaluate every supplied vacancy. {input_json} {domain_list_str} {dept_list_str}"
     prompt.expected_schema_json = "{}"
     db_session.commit()
     assert PromptService.check_required_optimized_match_prompt().ready is False

@@ -127,7 +127,7 @@ class Settings(BaseSettings):
     OLLAMA_REQUEST_TIMEOUT: float = 90.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0
-    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 90.0
+    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 360.0
     OLLAMA_EMBED_TIMEOUT_SECONDS: float = 30.0
     OLLAMA_UNLOAD_TIMEOUT_SECONDS: float = 10.0
     OLLAMA_MAX_RETRIES: int = 0
@@ -166,7 +166,7 @@ class Settings(BaseSettings):
     LLM_TRACE_RETENTION_DAYS: int = 30
     LLM_SHADOW_QUALITY_ENABLED: bool = True
     LLM_CONFIDENCE_CALIBRATION_PATH: Path = Path("app/data/evaluations/confidence_calibration.json")
-    OPTIMIZED_PROMPT_VERSION: str = "3.6"
+    OPTIMIZED_PROMPT_VERSION: str = "3.7"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 
     # LLM Bypass Configuration

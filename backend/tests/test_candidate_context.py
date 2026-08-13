@@ -1,5 +1,6 @@
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.analysis import OptimizedCandidateProfile
+from app.schemas.classification_types import MatchStatus
 from app.schemas.normalized_resume import NormalizedExperienceSummary, NormalizedResume
 from app.services.job_taxonomy import TaxonomyClassifier
 from app.services.match_evaluators import (
@@ -8,11 +9,16 @@ from app.services.match_evaluators import (
     RequirementEvaluator,
 )
 from app.services.scoring_engine import ScoringEngine
+from app.services.candidate_domain_service import CandidateDomainService
 
 
 def test_candidate_analysis_context_creation(monkeypatch):
     from app.services.job_taxonomy import TaxonomyClassifier
-    monkeypatch.setattr(TaxonomyClassifier, 'classify_candidate', lambda *args, **kwargs: ('IT & Software Services', ('Software Engineering',)))
+    monkeypatch.setattr(
+        TaxonomyClassifier,
+        "classify_candidate_with_confidence",
+        lambda *args, **kwargs: ("IT & Software Services", ["Software Engineering"], 1.0, MatchStatus.DB_MATCH, "test"),
+    )
     cv_text = """
     John Doe
     Email: john@example.com
@@ -34,7 +40,11 @@ def test_candidate_analysis_context_creation(monkeypatch):
 
 
 def test_deterministic_experience_remains_authoritative_over_llm_value(monkeypatch):
-    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("Operations", ("Operations",)))
+    monkeypatch.setattr(
+        TaxonomyClassifier,
+        "classify_candidate_with_confidence",
+        lambda *args, **kwargs: ("Operations", ["Operations"], 1.0, MatchStatus.DB_MATCH, "test"),
+    )
     normalized_resume = NormalizedResume(
         experience=NormalizedExperienceSummary(
             deterministic_years=7.8,
@@ -132,3 +142,30 @@ def test_match_evaluators_direct():
     )
     assert rec_results.classification == "HIGH"
     assert "Strong candidate" in rec_results.recommendation
+
+
+def test_llm_inferred_skill_does_not_become_deterministic_mandatory_evidence(monkeypatch):
+    context = CandidateAnalysisContext(
+        cv_text="Python developer",
+        norm_text="python developer",
+        cand_domain="Technology",
+        cand_tax_domain="Technology",
+        cand_families=["Engineering"],
+        cand_primary_family="Engineering",
+    )
+    profile = OptimizedCandidateProfile(inferred_skills=["Kubernetes"])
+    monkeypatch.setattr(CandidateDomainService, "validate_optimized_profile", classmethod(lambda cls, *args, **kwargs: profile))
+    monkeypatch.setattr(CandidateDomainService, "extract_candidate_domain_profile", classmethod(lambda cls, **kwargs: {}))
+    monkeypatch.setattr(CandidateDomainService, "build_domain_candidate_text", classmethod(lambda cls, **kwargs: "python developer"))
+
+    context.apply_optimized_profile(profile)
+    result = RequirementEvaluator.evaluate(
+        context=context,
+        job={"title": "Platform Engineer", "required_skills": ["Kubernetes"]},
+        extract_term_matches_fn=ScoringEngine._extract_term_matches,
+    )
+
+    assert "kubernetes" not in context.norm_text
+    assert context.llm_inferred_skills == ["Kubernetes"]
+    assert result.matched_skills == []
+    assert [failure.failure_code for failure in result.mandatory_failures] == ["MISSING_MANDATORY_SKILL"]

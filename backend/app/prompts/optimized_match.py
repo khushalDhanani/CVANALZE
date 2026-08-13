@@ -51,12 +51,27 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
             item["preferred_keywords"] = sanitize_string_list(vac.get("preferred_keywords"))
         if vac.get("min_experience_years") is not None:
             item["min_exp"] = vac.get("min_experience_years")
+        if vac.get("max_experience_years") is not None:
+            item["max_exp"] = vac.get("max_experience_years")
+        if vac.get("max_ctc") is not None:
+            item["max_ctc"] = vac.get("max_ctc")
+        item["required_skills_are_mandatory"] = bool(vac.get("required_skills_are_mandatory", True))
         education_requirement = vac.get("education_requirements") or vac.get("required_education") or vac.get("education")
         if education_requirement:
             education_values = education_requirement if isinstance(education_requirement, (list, tuple, set)) else [education_requirement]
             item["education_req"] = sanitize_string_list(education_values)
         if vac.get("certifications"):
-            item["certifications"] = sanitize_string_list(vac.get("certifications"))
+            certification_values = vac["certifications"] if isinstance(vac["certifications"], (list, tuple, set)) else [vac["certifications"]]
+            item["certifications"] = sanitize_string_list(certification_values)
+        if vac.get("technologies"):
+            item["technologies"] = sanitize_string_list(vac.get("technologies"))
+        responsibility_values = vac.get("responsibilities") or []
+        if responsibility_values:
+            responsibility_values = responsibility_values if isinstance(responsibility_values, (list, tuple, set)) else [responsibility_values]
+            item["responsibilities"] = sanitize_string_list(responsibility_values)
+        vacancy_description = vac.get("job_description") or vac.get("description")
+        if vacancy_description:
+            item["description"] = sanitize_untrusted_text(str(vacancy_description)).text
 
         compact_vacancies.append(item)
 

@@ -1,6 +1,7 @@
 import pytest
 
 from app.schemas.analysis import EnrichedCandidateAnalysis
+from app.schemas.classification_types import MatchStatus
 from app.services.match_service import MatchService
 from app.services.scoring_engine import ScoringEngine
 
@@ -42,7 +43,11 @@ def test_extract_candidate_domain_profile_finance():
 def test_domain_mismatch_penalty_software_vs_plant(monkeypatch):
     from app.services.job_taxonomy import TaxonomyClassifier
     monkeypatch.setattr(TaxonomyClassifier, "classify_vacancy", lambda *args, **kwargs: ("Engineering", "Mechanical"))
-    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("IT", ("Software Engineering",)))
+    monkeypatch.setattr(
+        TaxonomyClassifier,
+        "classify_candidate_with_confidence",
+        lambda *args, **kwargs: ("IT", ["Software Engineering"], 1.0, MatchStatus.DB_MATCH, "test"),
+    )
     cv_text = """
     Alex Engineer
     Senior Software & Mobile Developer
@@ -148,6 +153,43 @@ def test_cross_domain_guard_does_not_cap_software_vacancy():
     )
 
     assert result.is_domain_capped is False
+
+
+def test_cross_domain_guard_does_not_cap_on_low_confidence_taxonomy_alone():
+    from app.schemas.candidate_context import CandidateAnalysisContext
+    from app.schemas.job_context import JobEvaluationContext
+    from app.services.match_evaluators import CrossDomainGuardEvaluator
+
+    context = CandidateAnalysisContext(
+        cv_text="Ambiguous engineering profile",
+        norm_text="ambiguous engineering profile",
+        cand_tax_domain="Plant Operations",
+        cand_families=["General Engineering"],
+        cand_primary_family="General Engineering",
+        cand_domain="Plant Operations",
+        taxonomy_confidence=0.3,
+    )
+    vacancy = JobEvaluationContext.create(
+        {
+            "id": "finance-1",
+            "title": "Financial Systems Analyst",
+            "department": "Finance",
+            "_precomputed_domain": "Finance",
+            "_precomputed_job_family": "Finance",
+        }
+    )
+
+    result = CrossDomainGuardEvaluator.evaluate(
+        context,
+        vacancy,
+        initial_score=70.0,
+        initial_domain_score=50.0,
+        reason_str="",
+        mandatory_failures=[],
+    )
+
+    assert result.is_domain_capped is False
+    assert result.final_score == 70.0
     assert result.final_score == 90.0
 
 

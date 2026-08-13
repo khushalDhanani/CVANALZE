@@ -132,6 +132,9 @@ class CandidateDomainService:
             recommended_dept = industry_dept or prof_domain
             resolved_role = dyn_res.industry_designation or dyn_res.db_designation_name
             suitable_roles = [resolved_role] if resolved_role else []
+            taxonomy_confidence = dyn_res.confidence
+            taxonomy_match_status = dyn_res.match_status.value
+            taxonomy_match_source = dyn_res.match_source
         else:
             tax_rules = RuleConfigManager.get_taxonomy_rules()
             w_exp = tax_rules.evidence_weight_experience
@@ -167,14 +170,21 @@ class CandidateDomainService:
                     dept_scores.append((score, matcher.domain))
 
             if dept_scores:
-                best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+                best_score, best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))
                 recommended_dept = best_domain.department_name
                 prof_domain = best_domain.domain_name
                 suitable_roles = best_domain.default_roles
+                evidence_weight_total = w_exp + w_resp + w_skills
+                taxonomy_confidence = min(1.0, best_score / evidence_weight_total) if evidence_weight_total > 0 else 0.0
+                taxonomy_match_status = MatchStatus.DB_MATCH.value
+                taxonomy_match_source = "DepartmentDomainMaster"
             else:
                 recommended_dept = ""
                 prof_domain = ""
                 suitable_roles = []
+                taxonomy_confidence = 0.0
+                taxonomy_match_status = dyn_res.match_status.value
+                taxonomy_match_source = dyn_res.match_source
 
         # Build custom roles from structured profile roles first
         custom_roles: list[str] = []
@@ -206,6 +216,9 @@ class CandidateDomainService:
             "professional_domain": prof_domain,
             "strengths": strengths,
             "suitable_job_roles": custom_roles[:4],
+            "taxonomy_confidence": taxonomy_confidence,
+            "taxonomy_match_status": taxonomy_match_status,
+            "taxonomy_match_source": taxonomy_match_source,
         }
 
     @classmethod
@@ -653,7 +666,6 @@ class CandidateDomainService:
                 [
                     optimized_profile.current_role or "",
                     *optimized_profile.core_skills,
-                    *optimized_profile.inferred_skills,
                     *optimized_profile.professional_domains,
                 ]
             )

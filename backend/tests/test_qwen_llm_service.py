@@ -198,6 +198,8 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch, caplog):
                 "semantic_fit_score": 90.0,
             }
         ],
+        "active_vacancy_summary": "Python vacancy evaluated.",
+        "ai_career_summary": "Backend engineering profile.",
     }
     client = _mock_transport_client(
         monkeypatch,

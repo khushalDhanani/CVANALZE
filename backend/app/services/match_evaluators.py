@@ -958,14 +958,15 @@ class CrossDomainGuardEvaluator:
 
         is_tax_compat = TaxonomyClassifier.are_families_compatible(context.cand_families, vac_family)
 
-        cand_domain = context.cand_domain or context.cand_tax_domain
+        cand_domain = context.cand_tax_domain or context.cand_domain
+        taxonomy_confident = context.taxonomy_confidence >= RuleConfigManager.get_taxonomy_rules().semantic_match_threshold
         is_same_canonical_domain = False
         if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
             if cand_domain.strip().lower() == vac_tax_domain.strip().lower():
                 is_same_canonical_domain = True
 
         domain_mismatch = False
-        if not is_same_canonical_domain and vac_family not in (None, "Unknown") and context.cand_primary_family not in (None, "Unknown"):
+        if taxonomy_confident and not is_same_canonical_domain and vac_family not in (None, "Unknown") and context.cand_primary_family not in (None, "Unknown"):
             if not is_tax_compat:
                 # Don't cap sub-families of the same root department
                 if not cls._share_root_family(context.cand_primary_family, vac_family):
@@ -976,7 +977,7 @@ class CrossDomainGuardEvaluator:
                 if (not is_compat or (score is not None and score < compatibility_threshold)) and not cls._share_root_family(context.cand_primary_family, vac_family):
                     domain_mismatch = True
 
-        if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
+        if taxonomy_confident and cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
             cand_d_norm = cand_domain.strip().lower()
             vac_d_norm = vac_tax_domain.strip().lower()
             if not is_same_canonical_domain:

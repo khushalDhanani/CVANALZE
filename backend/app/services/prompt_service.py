@@ -30,7 +30,7 @@ class PromptService:
     OPTIMIZED_MATCH_PROMPT_NAME = "optimized_match"
     OPTIMIZED_MATCH_LANGUAGE = "en"
     OPTIMIZED_MATCH_ENVIRONMENT = "production"
-    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v1"
+    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v2"
     OPTIMIZED_MATCH_PLACEHOLDERS = {"input_json", "domain_list_str", "dept_list_str"}
     OPTIMIZED_MATCH_SCHEMA_FIELDS = {
         "candidate_profile",
@@ -38,6 +38,8 @@ class PromptService:
         "ai_career_summary",
         "matched_vacancies",
     }
+    OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS = {"vacancy_id", "semantic_reason", "semantic_fit_score"}
+    OPTIMIZED_MATCH_REQUIRED_INSTRUCTION = "VACANCY COVERAGE:"
     HIRING_RISK_PROMPT_NAME = "hiring_risk_explanation"
     HIRING_RISK_DEFAULT_VERSION = "default-1.0.0"
     HIRING_RISK_DEFAULT_TEMPLATE = """You explain deterministic hiring risks to recruiters.
@@ -308,6 +310,8 @@ Use only the supplied evidence. Do not infer personal or protected attributes.
             prompt_lines = prompt.system_instruction.lstrip().splitlines()
             if prompt_lines and prompt_lines[0].strip().lower() in {"/think", "/no_think"}:
                 return PromptReadiness(False, "Required prompt contains a model-specific thinking directive.")
+            if cls.OPTIMIZED_MATCH_REQUIRED_INSTRUCTION not in prompt.system_instruction:
+                return PromptReadiness(False, "Required prompt does not enforce complete per-vacancy coverage.")
             missing_placeholders = cls.OPTIMIZED_MATCH_PLACEHOLDERS - cls.get_placeholders(prompt.system_instruction)
             if missing_placeholders:
                 return PromptReadiness(False, "Required prompt placeholders are invalid.")
@@ -318,12 +322,18 @@ Use only the supplied evidence. Do not infer personal or protected attributes.
                 return PromptReadiness(False, "Required prompt response schema is invalid.")
             required_fields = set(schema.get("required") or []) if isinstance(schema, dict) else set()
             schema_fields = set(schema.get("properties") or {}) if isinstance(schema, dict) else set()
+            matched_vacancies_schema = schema.get("properties", {}).get("matched_vacancies", {}) if isinstance(schema, dict) else {}
+            matched_vacancy_item_schema = matched_vacancies_schema.get("items", {}) if isinstance(matched_vacancies_schema, dict) else {}
+            matched_vacancy_required = set(matched_vacancy_item_schema.get("required") or {}) if isinstance(matched_vacancy_item_schema, dict) else set()
             if (
                 not isinstance(schema, dict)
                 or schema.get("$id") != cls.OPTIMIZED_MATCH_SCHEMA_ID
                 or schema.get("type") != "object"
                 or not cls.OPTIMIZED_MATCH_SCHEMA_FIELDS.issubset(required_fields)
                 or not cls.OPTIMIZED_MATCH_SCHEMA_FIELDS.issubset(schema_fields)
+                or matched_vacancies_schema.get("type") != "array"
+                or matched_vacancy_item_schema.get("type") != "object"
+                or not cls.OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS.issubset(matched_vacancy_required)
             ):
                 return PromptReadiness(False, "Required prompt response schema is incompatible.")
             return PromptReadiness(True, "READY")

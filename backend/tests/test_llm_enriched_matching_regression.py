@@ -51,6 +51,7 @@ def sample_llm_match():
         gap_analysis="Candidate satisfies all primary technical requirements.",
         career_transition_note="Direct domain alignment in mobile engineering.",
         semantic_reason="Candidate has 5+ years building production mobile apps in Flutter/Dart.",
+        semantic_fit_score=90.0,
     )
 
 
@@ -153,6 +154,7 @@ def test_2_multiple_vacancies_score_independently(sample_candidate_context):
             inferred_skills=["Flutter", "Dart"],
             gap_analysis="Strong fit",
             semantic_reason="Mobile app experience",
+            semantic_fit_score=90.0,
         ),
         "201": OptimizedVacancyMatch(
             vacancy_id=201,
@@ -162,6 +164,7 @@ def test_2_multiple_vacancies_score_independently(sample_candidate_context):
             inferred_skills=[],
             gap_analysis="Domain mismatch",
             semantic_reason="Candidate is in software, not plant operations",
+            semantic_fit_score=10.0,
         ),
     }
 
@@ -247,8 +250,11 @@ async def test_3_faulty_vacancy_does_not_destroy_other_matches():
                 inferred_skills=["Flutter", "Dart"],
                 gap_analysis="Strong fit",
                 semantic_reason="Direct Flutter match",
+                semantic_fit_score=90.0,
             )
         ],
+        active_vacancy_summary="Flutter vacancy evaluated.",
+        ai_career_summary="Mobile engineering profile.",
     )
 
     with patch("app.services.llm_service.OllamaLLMService.run_optimized_match", return_value=mock_llm_response), \

@@ -77,7 +77,11 @@ def test_regression_cv_software_family_outranks_unrelated_family(fixture):
 def test_missing_mandatory_skill_and_cross_domain_match_cannot_be_strong(monkeypatch):
     from app.services.job_taxonomy import TaxonomyClassifier
 
-    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("IT", ("Software Engineering",)))
+    monkeypatch.setattr(
+        TaxonomyClassifier,
+        "classify_candidate_with_confidence",
+        lambda *args, **kwargs: ("IT", ["Software Engineering"], 1.0, MatchStatus.DB_MATCH, "test"),
+    )
     monkeypatch.setattr(TaxonomyClassifier, "classify_vacancy", lambda job: ("Operations", "Plant Maintenance"))
     result = ScoringEngine.evaluate_job_match(
         "Flutter Developer. Skills: Flutter, Dart, Firebase. Experience: 6 years.",
@@ -101,7 +105,11 @@ def test_missing_mandatory_skill_and_cross_domain_match_cannot_be_strong(monkeyp
 def test_semantic_similarity_cannot_manufacture_skill_evidence(monkeypatch):
     from app.services.job_taxonomy import TaxonomyClassifier
 
-    monkeypatch.setattr(TaxonomyClassifier, "classify_candidate", lambda *args, **kwargs: ("IT", ("Software Engineering",)))
+    monkeypatch.setattr(
+        TaxonomyClassifier,
+        "classify_candidate_with_confidence",
+        lambda *args, **kwargs: ("IT", ["Software Engineering"], 1.0, MatchStatus.DB_MATCH, "test"),
+    )
     monkeypatch.setattr(TaxonomyClassifier, "classify_vacancy", lambda job: ("IT", "Software Engineering"))
     result = ScoringEngine.evaluate_job_match(
         "Front-end Developer. Skills: React, JavaScript, TypeScript.",
