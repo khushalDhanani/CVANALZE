@@ -294,6 +294,33 @@ Run the explicit migration for the PostgreSQL database:
 uv run python scripts/run_migrations.py
 ```
 
+### Explicit bootstrap and maintenance commands
+
+Database migrations create schemas and tables but do not populate every governed runtime dataset. For a fresh environment, install the active rule profile and
+seed the required PostgreSQL-backed assets explicitly from `backend/`:
+
+```bash
+uv run python scripts/install_matching_quality_rule_profile.py
+uv run python scripts/seed_department_domains.py
+uv run python scripts/seed_geo_and_headings.py
+uv run python scripts/seed_scoring_profiles_and_stopwords.py
+uv run python scripts/seed_prompts.py
+uv run python scripts/seed_taxonomy_from_json.py
+```
+
+`seed_department_domains.py` consumes `app/data/department_domains_seed.json`; the file remains the maintained bootstrap source even though runtime taxonomy reads
+from PostgreSQL. `seed_taxonomy_from_json.py` retains its historical name but reads the active PostgreSQL rule configuration and builds taxonomy/vector records.
+
+The following commands are manual evaluation or reprocessing operations and are not application startup steps:
+
+```bash
+uv run python scripts/reprocess_all_cvs.py
+uv run python scripts/reprocess_matching_quality_fixtures.py
+uv run python scripts/run_llm_reliability_evaluations.py
+```
+
+Run reprocessing only during an approved maintenance window because it queues or recomputes persisted candidate results.
+
 Start the API and worker in separate terminals from `backend/` so they share the same configured paths:
 
 ```bash
