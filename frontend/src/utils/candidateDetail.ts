@@ -1,4 +1,4 @@
-import type { CVUploadResponse } from '@/types/api';
+import type { CandidateRecommendationsResponse, CVUploadResponse } from '@/types/api';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -42,6 +42,26 @@ export interface CandidateDetailViewModel {
   projects: CandidateProjectView[];
 }
 
+export type CandidateSummaryRecommendation = 'STRONG MATCH' | 'POTENTIAL MATCH' | 'MANUAL REVIEW' | 'NO STRONG MATCH';
+
+export interface CandidateFiveSecondSummary {
+  name: string;
+  role?: string;
+  company?: string;
+  totalExperience?: string;
+  relevantExperience?: string;
+  overallFit?: number;
+  skillsFit?: number;
+  matchedSkillsCount?: number;
+  requiredSkillsCount?: number;
+  domain?: string;
+  department?: string;
+  matchConfidence?: number;
+  recommendation: CandidateSummaryRecommendation;
+  mainConcern: string;
+  matchRationale?: string;
+}
+
 const isRecord = (value: unknown): value is UnknownRecord => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 interface MatchScoreSource {
@@ -79,6 +99,150 @@ export const normalizeCandidateMatchAnalysis = (value: unknown): UnknownRecord |
     suitable_openings: suitableOpenings,
     unsuitable_openings: unsuitableOpenings,
     has_genuine_match: typeof value.has_genuine_match === 'boolean' ? value.has_genuine_match : suitableOpenings.length > 0,
+  };
+};
+
+const asFiniteNumber = (value: unknown): number | undefined => {
+  if (value == null || value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const asPercent = (value: unknown): number | undefined => {
+  const parsed = asFiniteNumber(value);
+  if (parsed == null) return undefined;
+  return Math.max(0, Math.min(100, parsed <= 1 ? parsed * 100 : parsed));
+};
+
+const formatYears = (value: unknown): string | undefined => {
+  const years = asFiniteNumber(value);
+  if (years == null) return undefined;
+  return `${Math.round(years * 10) / 10} ${Math.abs(years - 1) < 0.001 ? 'Year' : 'Years'}`;
+};
+
+const normalizeRecommendation = (rawStatus: unknown, requiresReview: boolean): CandidateSummaryRecommendation => {
+  const status = cleanCandidateText(rawStatus)?.toUpperCase().replaceAll('_', ' ');
+  if (status && ['MATCHED', 'HIGH', 'STRONG', 'STRONG MATCH', 'HIGHLY RECOMMENDED', 'HIRE', 'DB MATCH'].includes(status)) return 'STRONG MATCH';
+  if (status && ['POTENTIAL MATCH', 'PARTIAL MATCH', 'MEDIUM', 'POTENTIAL FIT', 'RECOMMENDED', 'CONSIDER'].includes(status)) return 'POTENTIAL MATCH';
+  if (status && ['MANUAL REVIEW', 'NEEDS FURTHER REVIEW', 'HR REVIEW REQUIRED'].includes(status)) return 'MANUAL REVIEW';
+  if (!status && requiresReview) return 'MANUAL REVIEW';
+  return 'NO STRONG MATCH';
+};
+
+const collectRequirementSkills = (match: UnknownRecord, status: 'matched' | 'missing'): string[] => {
+  const expectedStatuses = status === 'matched' ? new Set(['SATISFIED']) : new Set(['FAILED', 'PARTIALLY_SATISFIED', 'UNVERIFIED']);
+  return ['mandatory_requirements', 'preferred_requirements', 'optional_requirements'].flatMap((key) => {
+    const requirements = Array.isArray(match[key]) ? match[key] : [];
+    return requirements.filter(isRecord).flatMap((requirement) => {
+      const requirementId = cleanCandidateText(requirement.requirement_id)?.toLowerCase() || '';
+      const requirementStatus = cleanCandidateText(requirement.status)?.toUpperCase() || '';
+      if (!requirementId.includes('skill') || !expectedStatuses.has(requirementStatus)) return [];
+      const description = cleanCandidateText(requirement.description)?.replace(/^skill\s*:\s*/i, '');
+      return description ? [description] : [];
+    });
+  });
+};
+
+const uniqueText = (values: unknown[]): string[] => {
+  const seen = new Set<string>();
+  return values.map(cleanCandidateText).filter((value): value is string => {
+    if (!value) return false;
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const findFailedRequirementConcern = (match: UnknownRecord): string | undefined => {
+  for (const key of ['mandatory_requirements', 'preferred_requirements', 'optional_requirements']) {
+    const requirements = Array.isArray(match[key]) ? match[key] : [];
+    const failed = requirements.filter(isRecord).find((requirement) => ['FAILED', 'PARTIALLY_SATISFIED'].includes(cleanCandidateText(requirement.status)?.toUpperCase() || ''));
+    if (!failed) continue;
+    return cleanRecommendationText(failed.failure_reason) || cleanRecommendationText(failed.description);
+  }
+  return undefined;
+};
+
+const findMainConcern = (data: CVUploadResponse, analysis: UnknownRecord, match: UnknownRecord, recommendations?: CandidateRecommendationsResponse | null): string => {
+  const mandatoryFailures = Array.isArray(match.mandatory_failures) ? match.mandatory_failures.filter(isRecord) : [];
+  const mandatoryConcern = mandatoryFailures
+    .map((failure) => cleanRecommendationText(failure.reason) || cleanRecommendationText(failure.description))
+    .find(Boolean);
+  if (mandatoryConcern) return mandatoryConcern;
+
+  const failedRequirementConcern = findFailedRequirementConcern(match);
+  if (failedRequirementConcern) return failedRequirementConcern;
+
+  const severityRank: Record<string, number> = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, UNKNOWN: 1 };
+  const hiringRisks = (Array.isArray(match.hiring_risks) ? match.hiring_risks.filter(isRecord) : [])
+    .sort((left, right) => (severityRank[cleanCandidateText(right.severity)?.toUpperCase() || 'UNKNOWN'] || 0) - (severityRank[cleanCandidateText(left.severity)?.toUpperCase() || 'UNKNOWN'] || 0));
+  const topRisk = hiringRisks[0];
+  if (topRisk) {
+    const riskConcern = cleanRecommendationText(topRisk.explanation) || cleanRecommendationText(topRisk.title);
+    if (riskConcern) return riskConcern;
+  }
+
+  const missingQualification = recommendations?.missing_qualifications?.[0];
+  if (missingQualification) return cleanRecommendationText(missingQualification.requirement) || cleanRecommendationText(missingQualification.impact) || 'A qualification requires recruiter review.';
+
+  const recommendationRisk = recommendations?.risk_flags?.map(cleanRecommendationText).find(Boolean);
+  if (recommendationRisk) return recommendationRisk;
+
+  const domainConcern = cleanRecommendationText(match.domain_mismatch_reason);
+  if (domainConcern) return domainConcern;
+
+  const gapAnalysis = isRecord(data.experience_gap_analysis) ? data.experience_gap_analysis : isRecord(analysis.experience_gap_analysis) ? analysis.experience_gap_analysis : {};
+  const gapIndicators = Array.isArray(gapAnalysis.hr_review_indicators) ? gapAnalysis.hr_review_indicators : [];
+  const gapConcern = gapIndicators.map(cleanRecommendationText).find(Boolean);
+  if (gapConcern) return gapConcern;
+
+  const missingSkills = uniqueText(Array.isArray(match.missing_skills) ? match.missing_skills : []);
+  if (missingSkills.length) return `Missing required skills: ${missingSkills.slice(0, 3).join(', ')}${missingSkills.length > 3 ? ` and ${missingSkills.length - 3} more` : ''}.`;
+
+  const qualityFlags = Array.isArray(match.quality_flags) ? match.quality_flags.map(cleanCandidateText) : [];
+  if (qualityFlags.includes('LOW_CALIBRATED_CONFIDENCE')) return 'Match evidence has low confidence and needs recruiter review.';
+
+  if (Object.keys(match).length === 0) return 'Match analysis is not available for this candidate.';
+
+  return 'No major concern identified in the current analysis.';
+};
+
+export const buildCandidateFiveSecondSummary = (
+  data: CVUploadResponse,
+  candidate: CandidateDetailViewModel,
+  rawAnalysis: unknown,
+  recommendations?: CandidateRecommendationsResponse | null,
+): CandidateFiveSecondSummary => {
+  const analysis = isRecord(rawAnalysis) ? rawAnalysis : {};
+  const match = isRecord(analysis.best_match) ? analysis.best_match : {};
+  const dynamicProfile = isRecord(data.dynamic_profile) ? data.dynamic_profile : {};
+  const classification = isRecord(analysis.classification) ? analysis.classification : {};
+  const scoreBreakdown = isRecord(match.score_breakdown) ? match.score_breakdown : {};
+  const matchedSkills = uniqueText([...(Array.isArray(match.matched_skills) ? match.matched_skills : []), ...collectRequirementSkills(match, 'matched')]);
+  const missingSkills = uniqueText([...(Array.isArray(match.missing_skills) ? match.missing_skills : []), ...collectRequirementSkills(match, 'missing')]);
+  const requiredSkills = uniqueText([...matchedSkills, ...missingSkills]);
+  const totalExperience = cleanCandidateText(data.gross_display) || formatYears(data.total_experience_years ?? data.experience_years);
+  const relevantExperience = formatYears(dynamicProfile.relevant_experience_years);
+  const requiresReview = Boolean(match.hr_review_required) || (Array.isArray(match.mandatory_failures) && match.mandatory_failures.length > 0);
+  const rawRecommendation = recommendations?.hiring_recommendation || match.vacancy_match_status || match.match_status || analysis.match_status;
+
+  return {
+    name: candidate.name || 'Candidate Profile',
+    role: candidate.jobTitle || cleanCandidateText(dynamicProfile.current_role),
+    company: candidate.company,
+    totalExperience,
+    relevantExperience,
+    overallFit: asPercent(resolveVacancyFitScore(match)),
+    skillsFit: asPercent(match.skills_score ?? scoreBreakdown.skills_score),
+    matchedSkillsCount: requiredSkills.length ? matchedSkills.length : undefined,
+    requiredSkillsCount: requiredSkills.length || undefined,
+    domain: firstCandidateText(analysis.professional_domain, classification.industry_domain, match.candidate_job_family),
+    department: firstCandidateText(analysis.recommended_department, analysis.primary_department, recommendations?.primary_department),
+    matchConfidence: asPercent(match.calibrated_confidence ?? match.confidence),
+    recommendation: normalizeRecommendation(rawRecommendation, requiresReview),
+    mainConcern: findMainConcern(data, analysis, match, recommendations),
+    matchRationale: cleanRecommendationText(match.llm_reason) || cleanRecommendationText(match.semantic_reason) || cleanRecommendationText(match.reason),
   };
 };
 

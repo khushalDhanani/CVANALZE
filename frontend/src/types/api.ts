@@ -477,7 +477,20 @@ export interface CVUploadResponse {
   optimized_prompt_version?: string | null;
   llm_model_version?: string | null;
   experience_years?: number | null;
+  total_experience_years?: number | null;
+  total_experience_months?: number | null;
+  gross_display?: string | null;
   seniority?: string | null;
+  dynamic_profile?: {
+    current_role?: string | null;
+    current_domain?: string | null;
+    relevant_experience_years?: number | null;
+    professional_domains?: string[] | null;
+    confidence?: string | null;
+    evidence_notes?: string | null;
+  } | null;
+  experience_gap_analysis?: Record<string, unknown> | null;
+  experience_summary?: Record<string, unknown> | null;
   work_experience?: Record<string, unknown>[] | null;
   education?: Array<string | Record<string, unknown>> | null;
   skills?: string[] | { all_skills?: string[]; skills?: string[]; categorized?: Record<string, string[]> } | null;

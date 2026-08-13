@@ -17,7 +17,7 @@ export function VacancyEnrichmentPanel({ match }: VacancyEnrichmentPanelProps) {
     <View className="gap-2 mt-1">
       {reasoning ? (
         <View className="p-2 border rounded bg-primary/5 border-primary/10">
-          <Text className="mb-1 text-xs leading-4 text-text-primary font-sans-bold">AI Reasoning</Text>
+          <Text className="mb-1 text-xs leading-4 text-text-primary font-sans-bold">AI Match Rationale</Text>
           <Text className="text-xs leading-4 text-text-primary">{reasoning}</Text>
         </View>
       ) : null}
@@ -29,7 +29,7 @@ export function VacancyEnrichmentPanel({ match }: VacancyEnrichmentPanelProps) {
       ) : null}
       {inferredSkills.length > 0 ? (
         <View className="gap-1">
-          <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Grounded Inferred Skills</Text>
+          <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Additional Skills Identified</Text>
           <View className="flex-row flex-wrap gap-1">{inferredSkills.map((skill, index) => <Badge key={`${skill}-${index}`} label={skill} tone="info" />)}</View>
         </View>
       ) : null}
@@ -40,9 +40,9 @@ export function VacancyEnrichmentPanel({ match }: VacancyEnrichmentPanelProps) {
       {evidence.length > 0 ? (
         <View className="gap-1 p-2 border rounded bg-background border-border">
           <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Grounded Evidence</Text>
-          {evidence.slice(0, 5).map(({ requirementId, evidence: item }) => (
-            <View key={requirementId} className="gap-0.5">
-              <Text className="text-[11px] font-sans-bold text-text-primary">{requirementId}</Text>
+          {evidence.slice(0, 5).map(({ label, evidence: item }, index) => (
+            <View key={`${label}-${index}`} className="gap-0.5">
+              <Text className="text-[11px] font-sans-bold text-text-primary">{label}</Text>
               {item.cv_evidence ? <Text className="text-[11px] leading-4 text-text-primary">CV: {item.cv_evidence}</Text> : null}
               {item.vacancy_evidence ? <Text className="text-[11px] leading-4 text-text-muted">Vacancy: {item.vacancy_evidence}</Text> : null}
             </View>

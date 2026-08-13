@@ -3,10 +3,9 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'rea
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3,
-  RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target,
-  CheckCircle2, Sparkles, AlertTriangle, Users, MapPin, Building,
-  Activity, Search, BookOpen, Layers, Link, Code2
+  ArrowLeft, Award, FileText, CheckCircle, CpuIcon, Edit3,
+  RefreshCw, X, Mail, Phone, UserCheck, Target, Sparkles,
+  AlertTriangle, Users, MapPin, Activity, Search, Layers, Link, Code2
 } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
@@ -29,8 +28,6 @@ import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import {
   VacancyMatchStatusBadge,
   VacancyFitScoreBreakdownCard,
-  getCanonicalMatchStatusMeta,
-  normalizeCanonicalMatchStatus,
   resolveVacancyFitScore,
 } from '@/components/ui/VacancyMatchStatusBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
@@ -40,6 +37,7 @@ import { COLORS } from '@/constants/colors';
 import { formatDateTime } from '@/utils/date';
 import { getCvQueueStateMeta, resolveCvQueueUiState } from '@/utils/cvQueueState';
 import {
+  buildCandidateFiveSecondSummary,
   buildCandidateDetailViewModel,
   cleanCandidateText,
   cleanRecommendationText,
@@ -295,6 +293,10 @@ export default function CandidateDetailScreen() {
   const rawAnalysis = data?.enriched_match_analysis || data?.match_analysis;
   const analysis: any = useMemo(() => normalizeCandidateMatchAnalysis(rawAnalysis), [rawAnalysis]);
   const bestMatch = analysis?.best_match;
+  const candidateSummary = useMemo(
+    () => data && candidateView ? buildCandidateFiveSecondSummary(data, candidateView, analysis, recommendations) : null,
+    [analysis, candidateView, data, recommendations],
+  );
   const scanId = data?.scan_id || data?.id || candidateCvId || '';
 
   const rawTimestamp = data?.parsed_at || data?.scanned_at || data?.created_at;
@@ -308,6 +310,21 @@ export default function CandidateDetailScreen() {
     if (s === 'FAILED' || s === 'TIMED_OUT' || s === 'CONNECTION_LOST') return 'danger';
     return 'neutral';
   };
+
+  const recommendationTone = candidateSummary?.recommendation === 'STRONG MATCH'
+    ? 'success'
+    : candidateSummary?.recommendation === 'POTENTIAL MATCH'
+      ? 'warning'
+      : candidateSummary?.recommendation === 'MANUAL REVIEW'
+        ? 'info'
+        : 'neutral';
+  const recommendationAction = candidateSummary?.recommendation === 'STRONG MATCH'
+    ? 'Continue to the next screening step.'
+    : candidateSummary?.recommendation === 'POTENTIAL MATCH'
+      ? 'Continue with a focused review.'
+      : candidateSummary?.recommendation === 'MANUAL REVIEW'
+        ? 'Continue after completing the highlighted checks.'
+        : 'Review only if broader role alignment is relevant.';
 
   // -------------------------------------------------------------
   // TAB RENDERERS
@@ -708,8 +725,6 @@ export default function CandidateDetailScreen() {
         </Card>
         ) : null}
 
-        {renderProcessingProvenance()}
-
       </View>
 
       {/* Right Column (Hiring Intelligence & Matches) */}
@@ -916,12 +931,10 @@ export default function CandidateDetailScreen() {
           { label: candName || candidateCvId || 'Candidate Profile' },
         ]}
       />
-      {/* 1. Header Area (Responsive & Tokenized) */}
+      {/* 1. Recruiter 5-second summary */}
       <View className="z-10 px-4 py-3 border-b shadow-sm bg-surface border-border">
-        <View className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-
-          {/* Left Side: Back Button & High-Level Identity */}
-          <View className="flex-row items-center flex-1 gap-2">
+        <View className="flex-row flex-wrap items-center justify-between gap-2">
+          <View className="flex-row items-center gap-2">
             <Pressable
               onPress={handleBack}
               accessibilityRole="button"
@@ -931,67 +944,88 @@ export default function CandidateDetailScreen() {
             >
               <ArrowLeft size={18} color={COLORS.textPrimary} />
             </Pressable>
-            <View className="flex-row items-center flex-1 gap-3 pr-2">
-              <View className="items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                <UserCheck size={18} color={COLORS.primary} />
-              </View>
-              <View className="flex-1">
-                <Text numberOfLines={1} ellipsizeMode="tail" className="text-sm font-sans-bold text-text-primary">
-                  {candidateView?.name || 'Candidate Profile'}
-                </Text>
-                {candidateView?.jobTitle || candidateView?.company ? (
-                <Text numberOfLines={1} ellipsizeMode="tail" className="text-[11px] font-sans-medium text-text-muted">
-                  {[candidateView.jobTitle, candidateView.company].filter(Boolean).join(' • ')}
-                </Text>
-                ) : null}
-              </View>
-            </View>
+            <Text className="text-xs font-sans-bold text-text-muted">Candidate Summary</Text>
           </View>
-
-          {/* Right Side: Primary Metric & Actions */}
-          <View className="flex-row flex-wrap items-center self-end gap-2 sm:self-auto">
-            {/* Hiring Recommendation Badge */}
-            {recommendations && !recommendationsLoading && recommendations.hiring_recommendation ? (
-              <View className="hidden md:flex">
-                <VacancyMatchStatusBadge
-                  status={recommendations.hiring_recommendation}
-                  score={recommendations.overall_match_confidence}
-                />
-              </View>
-            ) : null}
-            {data?.experience_years != null ? (
-              <View className="items-center px-2.5 py-1 border rounded bg-background border-border">
-                <Text className="text-[11px] text-text-muted uppercase font-sans-bold">Experience</Text>
-                <Text className="text-xs font-sans-bold text-text-primary">{data.experience_years} Yrs{cleanCandidateText(data.seniority) ? ` • ${data.seniority}` : ''}</Text>
-              </View>
-            ) : null}
-            {resolveVacancyFitScore(bestMatch) != null ? (
-              <View className="items-center px-2.5 py-1 border rounded bg-background border-border">
-                <Text className="text-[11px] text-text-muted uppercase font-sans-bold">Fit Score</Text>
-                <Text className="text-xs font-sans-bold text-primary">{Math.round(resolveVacancyFitScore(bestMatch) ?? 0)}%</Text>
-              </View>
-            ) : null}
-            <View className="flex-row items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                label={isReanalyzing ? 'Matching...' : 'Re-run Matching'}
-                icon={!isReanalyzing ? <Sparkles size={14} color={COLORS.primary} /> : undefined}
-                onPress={handleReanalyze}
-                disabled={isReanalyzing || isReprocessing}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                label="Reprocess"
-                icon={<RefreshCw size={14} color={COLORS.textMuted} />}
-                onPress={() => setReprocessModalVisible(true)}
-                disabled={isReprocessing}
-              />
-            </View>
+          <View className="flex-row items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              label={isReanalyzing ? 'Matching...' : 'Re-run Matching'}
+              icon={!isReanalyzing ? <Sparkles size={14} color={COLORS.primary} /> : undefined}
+              onPress={handleReanalyze}
+              disabled={isReanalyzing || isReprocessing}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              label="Reprocess"
+              icon={<RefreshCw size={14} color={COLORS.textMuted} />}
+              onPress={() => setReprocessModalVisible(true)}
+              disabled={isReprocessing}
+            />
           </View>
-
         </View>
+
+        {candidateSummary ? (
+          <View className="gap-3 pt-3 mt-3 border-t border-border">
+            <View className="flex-col justify-between gap-3 md:flex-row md:items-start">
+              <View className="flex-row items-center flex-1 min-w-0 gap-3">
+                <View className="items-center justify-center w-11 h-11 rounded-full bg-primary/10">
+                  <UserCheck size={20} color={COLORS.primary} />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text numberOfLines={1} ellipsizeMode="tail" className="text-xl font-sans-bold text-text-primary">{candidateSummary.name}</Text>
+                  <Text numberOfLines={1} ellipsizeMode="tail" className="text-sm font-sans-bold text-text-primary">
+                    {candidateSummary.role || 'Latest role not available'}
+                  </Text>
+                  {candidateSummary.company ? <Text numberOfLines={1} ellipsizeMode="tail" className="text-xs text-text-muted">{candidateSummary.company}</Text> : null}
+                </View>
+              </View>
+              <View className="items-start gap-1 md:items-end">
+                <Badge label={candidateSummary.recommendation} tone={recommendationTone} />
+                <Text className="text-[11px] font-sans-medium text-text-muted">{recommendationAction}</Text>
+              </View>
+            </View>
+
+            <View className="flex-row flex-wrap gap-2">
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Overall Match</Text>
+                <Text className="text-base font-sans-bold text-primary">{candidateSummary.overallFit != null ? `${Math.round(candidateSummary.overallFit)}%` : 'Not available'}</Text>
+                {candidateSummary.matchConfidence != null ? <Text className="text-[10px] text-text-muted">Match Confidence {Math.round(candidateSummary.matchConfidence)}%</Text> : null}
+              </View>
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Experience</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.totalExperience || 'Not available'}</Text>
+                <Text className="text-[10px] text-text-muted">Relevant: {candidateSummary.relevantExperience || 'Not available'}</Text>
+              </View>
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Skills Match</Text>
+                <Text className="text-base font-sans-bold text-text-primary">{candidateSummary.skillsFit != null ? `${Math.round(candidateSummary.skillsFit)}%` : 'Not available'}</Text>
+                <Text className="text-[10px] text-text-muted">
+                  {candidateSummary.requiredSkillsCount != null ? `${candidateSummary.matchedSkillsCount} / ${candidateSummary.requiredSkillsCount} required skills matched` : 'Required-skill count not available'}
+                </Text>
+              </View>
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Candidate Domain</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.domain || 'Not available'}</Text>
+                {candidateSummary.department ? <Text className="text-[10px] text-text-muted">Department: {candidateSummary.department}</Text> : null}
+              </View>
+            </View>
+
+            <View className="flex-row items-start gap-2 p-2 border rounded bg-warning/10 border-warning/30">
+              <AlertTriangle size={15} color={COLORS.warning} />
+              <View className="flex-1 gap-0.5">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-warning">Main Concern</Text>
+                <Text className="text-xs leading-4 text-text-primary">{candidateSummary.mainConcern}</Text>
+              </View>
+            </View>
+            {candidateSummary.matchRationale ? (
+              <Text numberOfLines={2} ellipsizeMode="tail" className="text-[11px] leading-4 text-text-muted">
+                <Text className="font-sans-bold text-text-primary">Match rationale: </Text>{candidateSummary.matchRationale}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       {/* 2. Tab Navigation */}
