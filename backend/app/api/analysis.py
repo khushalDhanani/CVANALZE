@@ -17,6 +17,7 @@ from app.schemas.analysis import (
 )
 from app.schemas.cv import CVMatchRequest, CVProcessingResponse
 from app.services.match_service import MatchService
+from app.services.ollama_transport import OllamaError, OllamaModelUnavailableError, OllamaTimeoutError
 from app.services.processing_queue import (
     ProcessingQueueService,
     ProcessingQueueUnavailableError,
@@ -28,19 +29,39 @@ router = APIRouter(prefix="/match", tags=["Matching"])
 
 @router.get("/health")
 async def check_llm_health():
-    """Check if the local Ollama instance is reachable."""
+    """Check whether Ollama is reachable and every enabled configured model is installed."""
     if not settings.LLM_ENABLED:
         return {"status": "disabled", "message": "LLM matching is disabled in config."}
 
     from app.services.llm_service import OllamaLLMService
 
     try:
-        is_healthy, model_names = OllamaLLMService.get_status()
-        if is_healthy:
+        is_ready, model_names = OllamaLLMService.get_status()
+        generation_available = OllamaLLMService.is_model_available(settings.OLLAMA_MODEL, model_names)
+        embedding_available = not settings.EMBEDDING_ENABLED or OllamaLLMService.is_model_available(settings.EMBEDDING_MODEL, model_names)
+        if is_ready:
             return {
                 "status": "online",
                 "model_configured": settings.OLLAMA_MODEL,
-                "model_available": any(settings.OLLAMA_MODEL in name for name in model_names),
+                "model_available": generation_available,
+                "embedding_model_configured": settings.EMBEDDING_MODEL if settings.EMBEDDING_ENABLED else None,
+                "embedding_model_available": embedding_available,
+                "available_models": model_names,
+            }
+        if model_names:
+            missing_models = []
+            if not generation_available:
+                missing_models.append(settings.OLLAMA_MODEL)
+            if not embedding_available:
+                missing_models.append(settings.EMBEDDING_MODEL)
+            return {
+                "status": "configuration_error",
+                "error": "Configured Ollama model is unavailable.",
+                "model_configured": settings.OLLAMA_MODEL,
+                "model_available": generation_available,
+                "embedding_model_configured": settings.EMBEDDING_MODEL if settings.EMBEDDING_ENABLED else None,
+                "embedding_model_available": embedding_available,
+                "missing_models": missing_models,
                 "available_models": model_names,
             }
         return {"status": "offline", "error": "Ollama server unreachable"}
@@ -57,6 +78,24 @@ async def analyze_cv_text(payload: CVMatchRequest):
 
     try:
         return await MatchService.analyze_single_cv(payload.cv_text)
+    except OllamaTimeoutError as exc:
+        logger.error(
+            f"[OLLAMA] operation=analyze_cv_text status=TIMEOUT status_code={exc.status_code or 'none'} "
+            f"retryable={exc.retryable} detail={exc}"
+        )
+        raise HTTPException(status_code=504, detail="LLM generation timed out.") from exc
+    except OllamaModelUnavailableError as exc:
+        logger.error(
+            f"[OLLAMA] operation=analyze_cv_text model='{exc.model}' status=UNAVAILABLE "
+            f"status_code={exc.status_code} retryable={exc.retryable} detail={exc}"
+        )
+        raise HTTPException(status_code=503, detail=f"Configured LLM model '{exc.model}' is unavailable.") from exc
+    except OllamaError as exc:
+        logger.error(
+            f"[OLLAMA] operation=analyze_cv_text status=UNAVAILABLE status_code={exc.status_code or 'none'} "
+            f"retryable={exc.retryable} detail={exc}"
+        )
+        raise HTTPException(status_code=503, detail="LLM service is unavailable.") from exc
     except VacancySourceUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:

@@ -3,13 +3,17 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from unittest.mock import MagicMock, call
+from unittest.mock import AsyncMock, MagicMock, call
 
 import httpx
 import pytest
+from fastapi import HTTPException
 
-from app.core.config import settings
+from app.api.analysis import analyze_cv_text, check_llm_health
+from app.core import lifecycle
+from app.core.config import Settings, settings
 from app.repositories.llm_cache import LLMCacheEntry
+from app.schemas.cv import CVMatchRequest
 from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import OllamaLLMService
 from app.services.ollama_transport import (
@@ -113,6 +117,87 @@ def test_transport_reuses_one_pooled_client(monkeypatch):
     assert timeout.read == settings.OLLAMA_REQUEST_TIMEOUT
 
 
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"OLLAMA_BASE_URL": "localhost:11434"}, "OLLAMA_BASE_URL"),
+        ({"OLLAMA_MODEL": ""}, "OLLAMA_MODEL"),
+        ({"OLLAMA_GENERATE_TIMEOUT_SECONDS": 0}, "timeouts must be greater than zero"),
+        ({"OLLAMA_MAX_RETRIES": -1}, "retry count"),
+        ({"OLLAMA_GENERATION_NUM_PREDICT": 4096}, "OLLAMA_GENERATION_NUM_PREDICT"),
+    ],
+)
+def test_settings_reject_invalid_ollama_configuration(overrides, message):
+    with pytest.raises(ValueError, match=message):
+        Settings(_env_file=None, **{"OLLAMA_BASE_URL": "http://localhost:11434", **overrides})
+
+
+def test_model_availability_uses_exact_canonical_names():
+    assert OllamaTransport.is_model_available("nomic-embed-text", ["nomic-embed-text:latest"])
+    assert OllamaTransport.is_model_available("LLAMA3.2:3B", ["llama3.2:3b"])
+    assert not OllamaTransport.is_model_available("llama3.2:3b", ["llama3.2:3b-instruct"])
+
+
+def test_status_requires_every_enabled_configured_model(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "generation-model")
+    monkeypatch.setattr(settings, "EMBEDDING_MODEL", "embedding-model")
+    _install_client(
+        monkeypatch,
+        _response({"models": [{"name": "generation-model"}, {"name": "embedding-model:latest"}]}),
+    )
+
+    is_ready, model_names = OllamaLLMService.get_status()
+
+    assert is_ready is True
+    assert model_names == ["generation-model", "embedding-model:latest"]
+
+
+def test_status_is_not_ready_when_generation_model_is_missing(monkeypatch, caplog):
+    caplog.set_level("ERROR", logger="cv_analyzer")
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "missing-generation-model")
+    monkeypatch.setattr(settings, "EMBEDDING_MODEL", "embedding-model")
+    _install_client(monkeypatch, _response({"models": [{"name": "embedding-model:latest"}]}))
+
+    is_ready, model_names = OllamaLLMService.get_status()
+
+    assert is_ready is False
+    assert model_names == ["embedding-model:latest"]
+    assert "status=MODEL_MISSING" in caplog.text
+    assert "missing-generation-model" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_llm_health_reports_reachable_configuration_error_for_missing_model(monkeypatch):
+    monkeypatch.setattr(settings, "LLM_ENABLED", True)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", True)
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "missing-generation-model")
+    monkeypatch.setattr(settings, "EMBEDDING_MODEL", "embedding-model")
+    monkeypatch.setattr(
+        OllamaLLMService,
+        "get_status",
+        classmethod(lambda cls: (False, ["embedding-model:latest"])),
+    )
+
+    payload = await check_llm_health()
+
+    assert payload["status"] == "configuration_error"
+    assert payload["model_available"] is False
+    assert payload["embedding_model_available"] is True
+    assert payload["missing_models"] == ["missing-generation-model"]
+    assert payload["available_models"] == ["embedding-model:latest"]
+
+
+def test_production_startup_rejects_unavailable_configured_model(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "LLM_ENABLED", True)
+    monkeypatch.setattr(settings, "EMBEDDING_ENABLED", False)
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "llama3.2:3b")
+    monkeypatch.setattr(OllamaLLMService, "get_available_models", classmethod(lambda cls: ["llama3.2:3b-instruct"]))
+
+    with pytest.raises(RuntimeError, match="llama3.2:3b.*unavailable"):
+        lifecycle.verify_ollama_models()
+
+
 def test_generation_cache_hit_skips_transport(monkeypatch):
     cached = LLMCacheEntry(
         prompt="cached prompt",
@@ -187,9 +272,13 @@ def test_transport_applies_uniform_timeout_retries(monkeypatch):
         httpx.ReadTimeout("slow", request=request),
     )
 
-    with pytest.raises(OllamaTimeoutError):
+    with pytest.raises(OllamaTimeoutError) as exc_info:
         OllamaTransport.get_tags()
 
+    assert exc_info.value.operation == "tags"
+    assert exc_info.value.retryable is True
+    assert exc_info.value.status_code is None
+    assert exc_info.value.detail == "slow"
     metrics = OllamaTransport.get_metrics()
     assert client.stream.call_count == 2
     assert metrics["retries"] == 1
@@ -247,6 +336,87 @@ def test_length_terminated_generation_is_never_accepted(monkeypatch, caplog):
     assert f"num_predict={settings.OLLAMA_GENERATION_NUM_PREDICT}" in caplog.text
 
 
+def test_generation_rejects_unload_completion_reason_before_parser(monkeypatch):
+    client = _install_client(
+        monkeypatch,
+        _response({"model": settings.OLLAMA_MODEL, "response": "{}", "done": True, "done_reason": "unload"}),
+    )
+    parser = MagicMock(return_value={})
+    payload = OllamaTransport.build_generation_payload(
+        model=settings.OLLAMA_MODEL,
+        prompt="analyze",
+        response_schema={"type": "object"},
+        think=None,
+        options={},
+    )
+
+    with pytest.raises(OllamaSchemaValidationError, match="invalid completion reason") as exc_info:
+        OllamaTransport.generate(operation="test_generation", payload=payload, parser=parser)
+
+    assert exc_info.value.retryable is False
+    assert exc_info.value.detail == "unload"
+    parser.assert_not_called()
+    assert client.stream.call_count == 2
+
+
+def test_generation_uses_prompt_oriented_generate_endpoint_and_payload(monkeypatch):
+    client = _install_client(monkeypatch, _response({"response": "{}"}))
+    response_schema = {"type": "object", "properties": {"result": {"type": "string"}}}
+    options = {"temperature": 0.0, "num_ctx": 4096}
+    payload = OllamaTransport.build_generation_payload(
+        model=settings.OLLAMA_MODEL,
+        prompt="Analyze this CV",
+        response_schema=response_schema,
+        think=True,
+        options=options,
+    )
+
+    result = OllamaTransport.generate(
+        operation="test_generation_contract",
+        payload=payload,
+        parser=lambda data: data["response"],
+    )
+
+    generation_request = client.stream.call_args_list[0]
+    assert generation_request.args == ("POST", "/api/generate")
+    assert "/api/chat" not in [request.args[1] for request in client.stream.call_args_list]
+    assert generation_request.kwargs["json"] == {
+        "model": settings.OLLAMA_MODEL,
+        "prompt": "Analyze this CV",
+        "format": response_schema,
+        "stream": False,
+        "keep_alive": settings.OLLAMA_KEEP_ALIVE,
+        "options": options,
+        "think": True,
+    }
+    assert result.value == "{}"
+
+
+def test_non_streaming_response_is_joined_before_single_json_decode(monkeypatch):
+    response = MagicMock()
+    response.status_code = 200
+    response.headers = {}
+    response.iter_bytes.return_value = iter(
+        [
+            b'{"models":[',
+            b'{"name":"llama3.2:3b",',
+            b'"digest":"sha256:test"}',
+            b']}',
+        ]
+    )
+    context = MagicMock()
+    context.__enter__.return_value = response
+    context.__exit__.return_value = False
+    client = _install_client(monkeypatch, context)
+
+    result = OllamaTransport.get_tags()
+
+    assert [model.name for model in result.value.models] == ["llama3.2:3b"]
+    assert result.value.models[0].digest == "sha256:test"
+    assert client.stream.call_args.args == ("GET", "/api/tags")
+    response.iter_bytes.assert_called_once_with()
+
+
 def test_residency_policy_keeps_model_loaded(monkeypatch):
     monkeypatch.setattr(settings, "OLLAMA_RESIDENCY_ENABLED", True)
     monkeypatch.setattr(settings, "OLLAMA_EMBEDDING_EXPECTED_DIMENSION", 0)
@@ -290,6 +460,90 @@ def test_unavailable_model_is_mapped_without_retry(monkeypatch):
     assert client.stream.call_count == 2
     assert client.stream.call_args_list[-1].kwargs["json"]["keep_alive"] == 0
     assert OllamaTransport.get_metrics()["retries"] == 0
+
+
+def test_generation_model_unavailable_propagates_instead_of_returning_fallback(monkeypatch, caplog):
+    caplog.set_level("ERROR", logger="cv_analyzer")
+    _disable_cache(monkeypatch)
+    error = OllamaModelUnavailableError(settings.OLLAMA_MODEL, operation="qwen_analysis", detail="model not found")
+    generate = MagicMock(side_effect=error)
+    trace = MagicMock()
+    monkeypatch.setattr(OllamaTransport, "generate", generate)
+    monkeypatch.setattr(OllamaLLMService, "_trace", trace)
+
+    with pytest.raises(OllamaModelUnavailableError) as exc_info:
+        OllamaLLMService.call_qwen("analyze", "phase5", "missing-model")
+
+    assert exc_info.value is error
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.retryable is False
+    assert exc_info.value.detail == "model not found"
+    assert "status=PROPAGATED" in caplog.text
+    assert "status=FALLBACK" not in caplog.text
+    assert trace.call_args.kwargs["fallback_used"] is False
+    assert trace.call_args.kwargs["error_class"] == "OllamaModelUnavailableError"
+    generate.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        OllamaTimeoutError("request timed out", operation="qwen_analysis", detail="read deadline exceeded"),
+        OllamaUnavailableError("service unavailable", operation="qwen_analysis", detail="connection refused"),
+        OllamaHTTPError("server unavailable", operation="qwen_analysis", status_code=503, retryable=True, detail="overloaded"),
+    ],
+)
+def test_generation_operational_failures_propagate_instead_of_returning_fallback(monkeypatch, caplog, error):
+    caplog.set_level("ERROR", logger="cv_analyzer")
+    _disable_cache(monkeypatch)
+    generate = MagicMock(side_effect=error)
+    trace = MagicMock()
+    monkeypatch.setattr(OllamaTransport, "generate", generate)
+    monkeypatch.setattr(OllamaLLMService, "_trace", trace)
+
+    with pytest.raises(type(error)) as exc_info:
+        OllamaLLMService.call_qwen("analyze", "phase5", "infrastructure-failure")
+
+    assert exc_info.value is error
+    assert "status=PROPAGATED" in caplog.text
+    assert "status=FALLBACK" not in caplog.text
+    assert trace.call_args.kwargs["fallback_used"] is False
+    assert trace.call_args.kwargs["error_class"] == type(error).__name__
+    generate.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_analyze_api_maps_generation_model_unavailable_to_503(monkeypatch):
+    error = OllamaModelUnavailableError(settings.OLLAMA_MODEL, operation="optimized_match", detail="model not found")
+    analyze = AsyncMock(side_effect=error)
+    monkeypatch.setattr("app.api.analysis.MatchService.analyze_single_cv", analyze)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await analyze_cv_text(CVMatchRequest(cv_text="Senior Python developer"))
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == f"Configured LLM model '{settings.OLLAMA_MODEL}' is unavailable."
+    analyze.assert_awaited_once_with("Senior Python developer")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("error", "expected_status", "expected_detail"),
+    [
+        (OllamaTimeoutError("request timed out", operation="optimized_match"), 504, "LLM generation timed out."),
+        (OllamaUnavailableError("connection refused", operation="optimized_match"), 503, "LLM service is unavailable."),
+        (OllamaHTTPError("server unavailable", operation="optimized_match", status_code=503, retryable=True), 503, "LLM service is unavailable."),
+    ],
+)
+async def test_analyze_api_maps_operational_failures(monkeypatch, error, expected_status, expected_detail):
+    analyze = AsyncMock(side_effect=error)
+    monkeypatch.setattr("app.api.analysis.MatchService.analyze_single_cv", analyze)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await analyze_cv_text(CVMatchRequest(cv_text="Senior Python developer"))
+
+    assert exc_info.value.status_code == expected_status
+    assert exc_info.value.detail == expected_detail
 
 
 def test_http_error_preserves_bounded_sanitized_ollama_detail(monkeypatch):
@@ -374,6 +628,19 @@ def test_disabled_llm_returns_fallback_without_transport(monkeypatch):
 
     assert result is None
     execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_empty_work_experience_result_raises_typed_ollama_error(monkeypatch):
+    execute = MagicMock(return_value=None)
+    monkeypatch.setattr(OllamaLLMService, "_execute_structured_generation", execute)
+
+    with pytest.raises(OllamaError, match="Failed to generate work experience extraction") as exc_info:
+        await OllamaLLMService.extract_work_experience("extract employment", "1.0", "work-experience-cache")
+
+    assert exc_info.value.operation == "work_experience_extraction"
+    assert exc_info.value.retryable is True
+    execute.assert_called_once()
 
 
 def test_transport_serializes_parallel_ollama_calls(monkeypatch):

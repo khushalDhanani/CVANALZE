@@ -71,6 +71,7 @@ def test_production_rejects_disabled_mssql_enforcement():
             MSSQL_READ_ONLY_URL="mssql+pyodbc://readonly:secret@sql.example/enterprise",
             POSTGRES_APP_URL="postgresql://app:secret@postgres.example/app",
             REDIS_URL="redis://redis.example/0",
+            OLLAMA_BASE_URL="http://ollama.example:11434",
         )
 
 

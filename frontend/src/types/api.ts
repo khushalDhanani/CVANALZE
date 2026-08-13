@@ -652,6 +652,9 @@ export interface LlmHealthResponse {
   status: string;
   model_configured?: string;
   model_available?: boolean;
+  embedding_model_configured?: string | null;
+  embedding_model_available?: boolean;
+  missing_models?: string[];
   available_models?: string[];
   message?: string;
   error?: string;

@@ -24,8 +24,12 @@ from app.schemas.work_experience_llm import LLMWorkExperienceExtraction
 from app.services.ollama_transport import (
     OllamaError,
     OllamaGenerateEnvelope,
+    OllamaHTTPError,
     OllamaInvalidResponseError,
+    OllamaModelUnavailableError,
+    OllamaTimeoutError,
     OllamaTransport,
+    OllamaUnavailableError,
 )
 from app.schemas.llm_trace import LLMExecutionTrace
 
@@ -120,14 +124,39 @@ class OllamaLLMService:
 
     @classmethod
     def get_status(cls) -> tuple[bool, list[str]]:
-        """Return Ollama reachability and normalized models from one tags request."""
+        """Return configured-model readiness and installed models from one tags request."""
         try:
             result = OllamaTransport.get_tags()
             cls._model_digests = {model.name: model.digest for model in result.value.models if model.digest}
-            return True, [model.name for model in result.value.models]
+            model_names = [model.name for model in result.value.models]
+            missing_models: list[str] = []
+            if settings.LLM_ENABLED and not cls.is_model_available(settings.OLLAMA_MODEL, model_names):
+                missing_models.append(settings.OLLAMA_MODEL)
+            if settings.EMBEDDING_ENABLED and not cls.is_model_available(settings.EMBEDDING_MODEL, model_names):
+                missing_models.append(settings.EMBEDDING_MODEL)
+            if missing_models:
+                logger.error(
+                    f"[OLLAMA] operation=tags status=MODEL_MISSING missing_models={','.join(missing_models)} "
+                    f"available_model_count={len(model_names)}"
+                )
+            return not missing_models, model_names
         except OllamaError as exc:
-            logger.warning(f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__}")
+            logger.warning(
+                f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__} "
+                f"status_code={exc.status_code if exc.status_code is not None else 'none'} retryable={exc.retryable} detail={exc}"
+            )
             return False, []
+
+    @staticmethod
+    def is_model_available(configured_model: str, available_models: list[str]) -> bool:
+        return OllamaTransport.is_model_available(configured_model, available_models)
+
+    @staticmethod
+    def is_operational_failure(exc: OllamaError) -> bool:
+        return (
+            isinstance(exc, (OllamaModelUnavailableError, OllamaTimeoutError, OllamaUnavailableError))
+            or isinstance(exc, OllamaHTTPError) and exc.retryable
+        )
 
     @classmethod
     def record_quality_trace(
@@ -271,7 +300,10 @@ class OllamaLLMService:
             },
         )
         if result is None:
-            raise OllamaError("Failed to generate work experience extraction")
+            raise OllamaError(
+                "Failed to generate work experience extraction",
+                operation="work_experience_extraction",
+            )
         return result
 
     @classmethod
@@ -429,8 +461,9 @@ class OllamaLLMService:
             )
         except OllamaError as exc:
             duration_ms = round((time.perf_counter() - llm_started) * 1000.0, 2)
+            propagate_failure = cls.is_operational_failure(exc)
             logger.error(
-                f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK "
+                f"[OLLAMA] operation={operation} model='{model}' status={'PROPAGATED' if propagate_failure else 'FALLBACK'} "
                 f"error={type(exc).__name__} status_code={getattr(exc, 'status_code', 'none')} "
                 f"retryable={exc.retryable} duration_ms={duration_ms} prompt_chars={prompt_chars} detail={exc}"
             )
@@ -444,11 +477,13 @@ class OllamaLLMService:
                 source_hash=resolved_cache_key,
                 cache_status="MISS",
                 validation_status="INVALID" if "InvalidResponse" in type(exc).__name__ or "Schema" in type(exc).__name__ else "NOT_RUN",
-                fallback_used=True,
+                fallback_used=not propagate_failure,
                 duration_ms=duration_ms,
                 input_tokens=max(1, prompt_chars // 4),
                 error_class=type(exc).__name__,
             )
+            if propagate_failure:
+                raise
             return None
 
         generation = transport_result.value

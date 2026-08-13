@@ -1,8 +1,9 @@
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Optional, Set
+from urllib.parse import urlsplit
 
-from typing import List, Set, Dict, Optional
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -121,8 +122,8 @@ class Settings(BaseSettings):
 
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True
-    OLLAMA_BASE_URL: str = ""
-    OLLAMA_MODEL: str = "llama3.2:3b"  # or qwen2.5:3b etc based on what's available
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2:3b"
     OLLAMA_REQUEST_TIMEOUT: float = 90.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0
@@ -230,8 +231,42 @@ class Settings(BaseSettings):
             raise ValueError("CV_QUEUE_MAX_SIZE must be at least 1.")
         if self.RULE_CONFIG_RETRY_INTERVAL_SECONDS <= 0:
             raise ValueError("RULE_CONFIG_RETRY_INTERVAL_SECONDS must be greater than zero.")
+        if self.LLM_ENABLED or self.EMBEDDING_ENABLED:
+            parsed_ollama_url = urlsplit(self.OLLAMA_BASE_URL.strip())
+            if parsed_ollama_url.scheme not in {"http", "https"} or not parsed_ollama_url.netloc:
+                raise ValueError("OLLAMA_BASE_URL must be an absolute HTTP or HTTPS URL when Ollama features are enabled.")
+        if self.LLM_ENABLED and not self.OLLAMA_MODEL.strip():
+            raise ValueError("OLLAMA_MODEL must be configured when LLM generation is enabled.")
+        if self.EMBEDDING_ENABLED and not self.EMBEDDING_MODEL.strip():
+            raise ValueError("EMBEDDING_MODEL must be configured when embeddings are enabled.")
+        ollama_timeouts = (
+            self.OLLAMA_REQUEST_TIMEOUT,
+            self.OLLAMA_CONNECT_TIMEOUT_SECONDS,
+            self.OLLAMA_TAGS_TIMEOUT_SECONDS,
+            self.OLLAMA_GENERATE_TIMEOUT_SECONDS,
+            self.OLLAMA_EMBED_TIMEOUT_SECONDS,
+            self.OLLAMA_UNLOAD_TIMEOUT_SECONDS,
+            self.OLLAMA_LOCK_TIMEOUT_SECONDS,
+            self.OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS,
+        )
+        if min(ollama_timeouts) <= 0:
+            raise ValueError("Ollama request, operation, lock, and circuit-breaker timeouts must be greater than zero.")
+        if self.OLLAMA_MAX_RETRIES < 0 or self.OLLAMA_RETRY_BACKOFF_SECONDS < 0 or self.OLLAMA_RETRY_JITTER_SECONDS < 0:
+            raise ValueError("Ollama retry count, backoff, and jitter must not be negative.")
+        if min(self.OLLAMA_MAX_CONNECTIONS, self.OLLAMA_MAX_KEEPALIVE_CONNECTIONS, self.OLLAMA_MAX_RESPONSE_BYTES) <= 0:
+            raise ValueError("Ollama connection limits and maximum response size must be greater than zero.")
+        if self.OLLAMA_MAX_KEEPALIVE_CONNECTIONS > self.OLLAMA_MAX_CONNECTIONS:
+            raise ValueError("OLLAMA_MAX_KEEPALIVE_CONNECTIONS must not exceed OLLAMA_MAX_CONNECTIONS.")
+        if min(self.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD, self.OLLAMA_EMBED_BATCH_SIZE, self.OLLAMA_EMBED_MIN_SPLIT_SIZE) <= 0:
+            raise ValueError("Ollama circuit-breaker threshold and embedding batch limits must be greater than zero.")
+        if self.OLLAMA_EMBEDDING_EXPECTED_DIMENSION < 0 or self.OLLAMA_EMBEDDING_MAX_DIMENSION <= 0:
+            raise ValueError("Ollama embedding dimensions must use a non-negative expected value and a positive maximum.")
+        if self.OLLAMA_EMBEDDING_EXPECTED_DIMENSION > self.OLLAMA_EMBEDDING_MAX_DIMENSION:
+            raise ValueError("OLLAMA_EMBEDDING_EXPECTED_DIMENSION must not exceed OLLAMA_EMBEDDING_MAX_DIMENSION.")
         if min(self.OLLAMA_GENERATION_NUM_CTX, self.OLLAMA_GENERATION_NUM_PREDICT, self.OLLAMA_OPTIMIZED_NUM_CTX, self.OLLAMA_OPTIMIZED_NUM_PREDICT) <= 0:
             raise ValueError("Ollama generation context and output limits must be greater than zero.")
+        if self.OLLAMA_GENERATION_NUM_PREDICT >= self.OLLAMA_GENERATION_NUM_CTX:
+            raise ValueError("OLLAMA_GENERATION_NUM_PREDICT must be smaller than OLLAMA_GENERATION_NUM_CTX.")
         if self.OLLAMA_OPTIMIZED_NUM_PREDICT >= self.OLLAMA_OPTIMIZED_NUM_CTX:
             raise ValueError("OLLAMA_OPTIMIZED_NUM_PREDICT must be smaller than OLLAMA_OPTIMIZED_NUM_CTX.")
         if self.EXTRACTION_TIMEOUT_SECONDS <= 0 or self.SCANNED_EXTRACTION_TIMEOUT_SECONDS <= 0:

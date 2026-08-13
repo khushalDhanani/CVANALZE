@@ -22,10 +22,12 @@ T = TypeVar("T")
 
 
 class OllamaError(RuntimeError):
-    def __init__(self, message: str, *, operation: str, retryable: bool = True):
+    def __init__(self, message: str, *, operation: str, retryable: bool = True, detail: str = "", status_code: int | None = None):
         super().__init__(message)
         self.operation = operation
         self.retryable = retryable
+        self.detail = detail
+        self.status_code = status_code
 
 
 class OllamaUnavailableError(OllamaError):
@@ -50,9 +52,7 @@ class OllamaLiveAccessDisabledError(OllamaError):
 
 class OllamaHTTPError(OllamaError):
     def __init__(self, message: str, *, operation: str, status_code: int, retryable: bool, detail: str = ""):
-        super().__init__(message, operation=operation, retryable=retryable)
-        self.status_code = status_code
-        self.detail = detail
+        super().__init__(message, operation=operation, retryable=retryable, detail=detail, status_code=status_code)
 
 
 class OllamaModelUnavailableError(OllamaHTTPError):
@@ -325,11 +325,13 @@ class OllamaTransport:
         last_error: OllamaError | None = None
         cls._circuit_before_request(operation)
 
+        requested_model = str((payload or {}).get("model") or "none").strip()
         generation_options = (payload or {}).get("options", {})
         num_ctx = generation_options.get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
         num_predict = generation_options.get("num_predict", "default") if operation not in ("tags", "embed", "unload") else None
         logger.info(
-            f"[OLLAMA] operation={operation} config: max_retries={retries} total_attempts={total_attempts} "
+            f"[OLLAMA] operation={operation} path={path} model='{requested_model}' "
+            f"config: max_retries={retries} total_attempts={total_attempts} "
             f"timeout_s={timeout_seconds}"
             + (f" num_ctx={num_ctx}" if num_ctx is not None else "")
             + (f" num_predict={num_predict}" if num_predict is not None else "")
@@ -376,33 +378,33 @@ class OllamaTransport:
                 cls._record_timeout()
                 detail = cls._sanitize_error_detail(exc)
                 message = "Ollama request timed out." + (f" Detail: {detail}" if detail else "")
-                last_error = OllamaTimeoutError(message, operation=operation)
+                last_error = OllamaTimeoutError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except (httpx.ConnectError, httpx.NetworkError, httpx.RequestError) as exc:
                 detail = cls._sanitize_error_detail(exc)
                 message = "Ollama is unavailable." + (f" Detail: {detail}" if detail else "")
-                last_error = OllamaUnavailableError(message, operation=operation)
+                last_error = OllamaUnavailableError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except json.JSONDecodeError as exc:
                 detail = cls._sanitize_error_detail(exc)
                 message = "Ollama returned invalid JSON." + (f" Detail: {detail}" if detail else "")
-                last_error = OllamaInvalidResponseError(message, operation=operation)
+                last_error = OllamaInvalidResponseError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except ValidationError as exc:
                 detail = cls._validation_error_detail(exc)
                 message = "Ollama response failed schema validation." + (f" Detail: {detail}" if detail else "")
-                last_error = OllamaSchemaValidationError(message, operation=operation)
+                last_error = OllamaSchemaValidationError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except (TypeError, ValueError) as exc:
                 detail = cls._sanitize_error_detail(exc)
                 message = "Ollama response could not be normalized." + (f" Detail: {detail}" if detail else "")
-                last_error = OllamaInvalidResponseError(message, operation=operation)
+                last_error = OllamaInvalidResponseError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
 
             assert last_error is not None
             should_retry = last_error.retryable and attempt < total_attempts
             logger.warning(
-                f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} "
+                f"[OLLAMA] operation={operation} path={path} model='{requested_model}' attempt={attempt}/{total_attempts} "
                 f"status={'RETRY' if should_retry else 'FAILED'} error={type(last_error).__name__} "
                 f"status_code={getattr(last_error, 'status_code', 'none')} retryable={last_error.retryable} detail={last_error}"
             )
@@ -430,7 +432,8 @@ class OllamaTransport:
         if last_error.retryable and isinstance(last_error, (OllamaUnavailableError, OllamaTimeoutError, OllamaHTTPError)):
             cls._circuit_failure(operation)
         logger.error(
-            f"[OLLAMA] operation={operation} status=FAILED duration_ms={duration_ms} error={type(last_error).__name__} "
+            f"[OLLAMA] operation={operation} path={path} model='{requested_model}' status=FAILED "
+            f"duration_ms={duration_ms} error={type(last_error).__name__} "
             f"status_code={getattr(last_error, 'status_code', 'none')} retryable={last_error.retryable} detail={last_error}"
         )
         raise last_error
@@ -507,6 +510,13 @@ class OllamaTransport:
         def validated_parser(data: dict[str, Any]) -> T:
             envelope = OllamaGenerateEnvelope.model_validate(data)
             cls._validate_returned_model(model, envelope.model, operation=operation)
+            if envelope.done_reason.lower() not in {"stop", "length"}:
+                raise OllamaSchemaValidationError(
+                    "Ollama generation returned an invalid completion reason.",
+                    operation=operation,
+                    retryable=False,
+                    detail=envelope.done_reason,
+                )
             return parser(data)
 
         with cls._operation_scope(operation, (model,)):
@@ -824,11 +834,21 @@ class OllamaTransport:
         return model
 
     @staticmethod
+    def normalize_model_name(model: str) -> str:
+        normalized = model.strip().lower()
+        return normalized.removesuffix(":latest")
+
+    @classmethod
+    def is_model_available(cls, configured_model: str, available_models: list[str]) -> bool:
+        configured = cls.normalize_model_name(configured_model)
+        return bool(configured) and any(cls.normalize_model_name(available) == configured for available in available_models)
+
+    @staticmethod
     def _validate_error_field(data: dict[str, Any], *, operation: str) -> None:
         if data.get("error"):
             detail = OllamaTransport._sanitize_error_detail(data.get("error"))
             message = "Ollama returned an error response." + (f" Detail: {detail}" if detail else "")
-            raise OllamaInvalidResponseError(message, operation=operation, retryable=False)
+            raise OllamaInvalidResponseError(message, operation=operation, retryable=False, detail=detail)
 
     @staticmethod
     def _sanitize_error_detail(value: Any) -> str:
@@ -864,15 +884,15 @@ class OllamaTransport:
 
     @staticmethod
     def _validate_returned_model(requested: str, returned: str, *, operation: str) -> None:
-        requested_name = requested.strip()
-        returned_name = returned.strip()
-        requested_canonical = requested_name.removesuffix(":latest")
-        returned_canonical = returned_name.removesuffix(":latest")
-        if not returned_name or returned_canonical != requested_canonical:
+        requested_canonical = OllamaTransport.normalize_model_name(requested)
+        returned_canonical = OllamaTransport.normalize_model_name(returned)
+        if not returned_canonical or returned_canonical != requested_canonical:
+            detail = f"requested={requested.strip()} returned={returned.strip() or 'missing'}"
             raise OllamaSchemaValidationError(
                 "Ollama returned a response for a different model.",
                 operation=operation,
                 retryable=False,
+                detail=detail,
             )
 
     @classmethod

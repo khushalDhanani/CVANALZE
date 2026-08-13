@@ -68,7 +68,7 @@ def _generation_payload(client: MagicMock) -> dict:
     raise AssertionError("No generation request was recorded.")
 
 
-def test_ollama_default_model_is_gemma3_1b():
+def test_ollama_default_model_is_qwen3_4b():
     assert settings.OLLAMA_MODEL == "llama3.2:3b"
 
 
@@ -106,7 +106,7 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
     payload = _generation_payload(client)
     assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Extract candidate CV details"
-    assert "think" not in payload
+    assert payload["think"] is False
     assert payload["format"] == DynamicCandidateProfile.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
     assert payload["keep_alive"] == settings.OLLAMA_KEEP_ALIVE
@@ -139,7 +139,7 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
     payload = _generation_payload(client)
     assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Score CV fit for Python Developer"
-    assert "think" not in payload
+    assert payload["think"] is True
     assert payload["format"] == QwenCVAnalysis.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
 
@@ -174,7 +174,7 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
     payload = _generation_payload(client)
     assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Score candidate dynamic mapping"
-    assert "think" not in payload
+    assert payload["think"] is True
     assert payload["format"] == DynamicMappingResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
 
@@ -218,7 +218,7 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch, caplog):
     payload = _generation_payload(client)
     assert payload["model"] == "llama3.2:3b"
     assert payload["prompt"] == "Perform optimized match evaluation"
-    assert "think" not in payload
+    assert payload["think"] is True
     assert payload["format"] == OptimizedLLMMatchResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
     assert payload["options"]["num_ctx"] == 8192
@@ -270,7 +270,7 @@ def test_legacy_thinking_directive_is_removed_before_generation(monkeypatch):
     assert isinstance(result, QwenCVAnalysis)
     payload = _generation_payload(client)
     assert payload["prompt"] == "Score CV fit"
-    assert "think" not in payload
+    assert payload["think"] is True
 
 
 def test_ollama_unload_model_sends_keep_alive_zero(monkeypatch):

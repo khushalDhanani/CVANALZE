@@ -14,6 +14,7 @@ from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.match import HiringRisk, JobMatchResult, RiskEvidenceEvent
 from app.services.llm_service import OllamaLLMService
+from app.services.ollama_transport import OllamaError
 from app.services.prompt_service import PromptService
 
 logger = logging.getLogger("cv_analyzer")
@@ -79,6 +80,8 @@ class HiringRiskAnalyzer:
             match_result.hiring_risks = risks
             if risks:
                 cls._generate_explanations(risks, match_result, cls.get_policy_version(config), context)
+        except OllamaError:
+            raise
         except Exception as exc:
             logger.error(f"[HIRING_RISKS] Failed to generate risks: {exc}", exc_info=True)
 
@@ -215,8 +218,10 @@ class HiringRiskAnalyzer:
                 if explanation is not None:
                     risk.title = explanation.title
                     risk.explanation = explanation.explanation
+        except OllamaError:
+            raise
         except Exception as exc:
-            logger.warning(f"[HIRING_RISKS] Gemma explanation generation failed, using deterministic fallbacks: {exc}")
+            logger.warning(f"[HIRING_RISKS] Explanation generation failed, using deterministic fallbacks: {exc}")
 
     @staticmethod
     def _sanitize_prompt_text(value: str, context: CandidateAnalysisContext | None) -> str:

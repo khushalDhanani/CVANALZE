@@ -389,19 +389,14 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector 
 ```
 
 The override limits the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.
-It disables startup warmup, LLM generation, embeddings, Torch compilation, and Docling's table-structure model by default. Text-rich PDFs and DOCX files use the
+It disables startup warmup, embeddings, Torch compilation, and Docling's table-structure model by default. Text-rich PDFs and DOCX files use the
 existing native extractors without loading Torch; sparse/scanned PDFs still fall through to Docling/OCR. The profile also caps Docling, OpenMP, BLAS, and LLM
 concurrency; recycles the RQ worker after ten jobs; persists downloaded Docling models in a named cache volume; and omits the unused MSSQL ODBC driver. The Linux
 image resolves Torch and torchvision from PyTorch's CPU-only index, so it does not download CUDA libraries. Ollama calls are serialized across the API and worker,
 responses are bounded and validated, and every generation or embedding batch unloads its model and closes the HTTP client in `finally`.
 
-Deterministic extraction and scoring remain available. To opt into host Ollama features, start with one feature and a small installed model:
-
-```bash
-LLM_ENABLED=true docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker scheduler
-```
-
-Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. The local profile inherits `OLLAMA_MODEL` from the base Compose environment, keeps
+LLM generation inherits the base Compose default and is enabled unless `LLM_ENABLED=false` is explicitly supplied. Set `EMBEDDING_ENABLED=true` separately when
+semantic retrieval is needed. The local profile inherits `OLLAMA_MODEL` from the base Compose environment, keeps
 `nomic-embed-text` for the existing 768-dimensional
 vector contract, and never pulls models automatically. Configure the host Ollama process with `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, and a zero or short
 server keep-alive. Restart Ollama after changing its host environment. Local AI consumes unified memory outside Docker limits, but application serialization prevents

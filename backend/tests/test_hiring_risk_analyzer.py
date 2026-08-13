@@ -9,6 +9,7 @@ from app.core.rule_config_manager import HiringRiskPolicy
 from app.repositories.result import ResultRepository
 from app.schemas.match import JobMatchResult, MandatoryFailureDetails, RiskSeverity
 from app.services.hiring_risk_analyzer import HiringRiskAnalyzer, HiringRiskExplanationsOutput
+from app.services.ollama_transport import OllamaModelUnavailableError, OllamaTimeoutError
 from app.services.prompt_service import PromptService, ResolvedPrompt
 from app.services.system_rule_config_factory import SystemRuleConfigFactory
 
@@ -116,13 +117,38 @@ def test_education_risk_is_deferred_even_when_enabled(risk_dependencies):
 
 
 @patch("app.services.hiring_risk_analyzer.OllamaLLMService.generate_structured_json")
-def test_gemma_unavailable_keeps_deterministic_risk(mock_generate):
+def test_recoverable_generation_failure_keeps_deterministic_risk(mock_generate):
     mock_generate.side_effect = RuntimeError("Ollama down")
     match_result = build_result(missing_skills=["Python"])
 
     HiringRiskAnalyzer.generate_risks(match_result, None, None)
 
     assert match_result.hiring_risks[0].title == "Detected MISSING_MANDATORY_SKILL"
+
+
+@patch("app.services.hiring_risk_analyzer.OllamaLLMService.generate_structured_json")
+def test_model_unavailable_is_not_swallowed_by_hiring_risk_fallback(mock_generate):
+    error = OllamaModelUnavailableError(settings.OLLAMA_MODEL, operation="hiring_risks_explanation", detail="model not found")
+    mock_generate.side_effect = error
+    match_result = build_result(missing_skills=["Python"])
+
+    with pytest.raises(OllamaModelUnavailableError) as exc_info:
+        HiringRiskAnalyzer.generate_risks(match_result, None, None)
+
+    assert exc_info.value is error
+    assert match_result.hiring_risks[0].title == "Detected MISSING_MANDATORY_SKILL"
+
+
+@patch("app.services.hiring_risk_analyzer.OllamaLLMService.generate_structured_json")
+def test_timeout_is_not_swallowed_by_hiring_risk_fallback(mock_generate):
+    error = OllamaTimeoutError("request timed out", operation="hiring_risks_explanation", detail="read deadline exceeded")
+    mock_generate.side_effect = error
+    match_result = build_result(missing_skills=["Python"])
+
+    with pytest.raises(OllamaTimeoutError) as exc_info:
+        HiringRiskAnalyzer.generate_risks(match_result, None, None)
+
+    assert exc_info.value is error
 
 
 def test_prompt_unavailable_keeps_deterministic_risk():

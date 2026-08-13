@@ -28,6 +28,7 @@ from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
 from app.services.llm_grounding_service import GroundingReport, LLMGroundingService
 from app.services.llm_service import OllamaLLMService
 from app.services.matching_quality_gate import MatchingQualityGate, MatchingReadiness
+from app.services.ollama_transport import OllamaError
 from app.services.prompt_service import PromptService
 from app.services.resume_normalizer import ResumeNormalizer
 from app.services.scoring_engine import ScoringEngine
@@ -266,6 +267,8 @@ class MatchService:
                         cand_hierarchy=candidate_context.cand_hierarchy,
                     )
                     pre_llm_matches.append(pre_llm_match)
+                except OllamaError:
+                    raise
                 except Exception as e:
                     logger.error(f"Error in rule-based matching for job {job_context.job_id}: {e}", exc_info=True)
 
@@ -479,6 +482,8 @@ class MatchService:
                         retrieval_provenance=retrieval_provenance,
                     )
                     evaluated_matches.append(enriched_match)
+                except OllamaError:
+                    raise
                 except Exception as e:
                     logger.error(f"Error in LLM-enriched matching for job {job_context.job_id}: {e}", exc_info=True)
 

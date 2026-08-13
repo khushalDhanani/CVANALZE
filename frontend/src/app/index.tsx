@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { BRAND } from '@/constants/brand';
+import { getAvailableOllamaModelsLabel, getLlmHealthPresentation } from '@/utils/llmHealth';
 
 export default function HomeScreen() {
   usePageTitle('Dashboard | AIRIS');
@@ -57,6 +58,8 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchHealth();
   }, []);
+
+  const llmHealthPresentation = getLlmHealthPresentation(llmHealth);
 
   // Deduplicate by stable ID rather than title alone
   const uniqueJobs = Array.from(
@@ -114,30 +117,18 @@ export default function HomeScreen() {
               value={
                 healthLoading
                   ? undefined
-                  : llmHealth?.status === 'online'
-                  ? 'ONLINE'
-                  : llmHealth?.status === 'disabled'
-                  ? 'DISABLED'
-                  : 'OFFLINE'
+                  : llmHealthPresentation.value
               }
               sublabel={
                 healthLoading
                   ? 'Checking engine...'
-                  : llmHealth?.status === 'online'
-                  ? llmHealth.model_configured || 'Connected'
-                  : llmHealth?.status === 'disabled'
-                  ? 'LLM Reasoning Disabled'
-                  : 'Backend Unreachable'
+                  : llmHealthPresentation.detail
               }
               loading={healthLoading}
               tone={
                 healthLoading
                   ? 'neutral'
-                  : llmHealth?.status === 'online'
-                  ? 'success'
-                  : llmHealth?.status === 'disabled'
-                  ? 'info'
-                  : 'danger'
+                  : llmHealthPresentation.tone
               }
             />
             <StatCard
@@ -505,22 +496,31 @@ export default function HomeScreen() {
                 }
               />
               <DenseRow
-                title="Ollama LLM Model"
+                title="Ollama Generation Model"
+                subtitle={
+                  healthLoading
+                    ? 'Validating configured generation model...'
+                    : llmHealth?.status === 'configuration_error' && llmHealth.model_available === false
+                    ? 'Configured model is not installed in Ollama'
+                    : undefined
+                }
                 trailing={
                   <Badge
                     label={
                       healthLoading
                         ? 'Checking...'
-                        : llmHealth?.status === 'online'
+                        : llmHealth?.status === 'online' || llmHealth?.model_available
                         ? llmHealth.model_configured || 'Connected'
                         : llmHealth?.status === 'disabled'
                         ? 'Disabled (Confidence Gated)'
+                        : llmHealth?.status === 'configuration_error'
+                        ? `Missing: ${llmHealth.model_configured || 'configured model'}`
                         : 'Offline'
                     }
                     tone={
                       healthLoading
                         ? 'neutral'
-                        : llmHealth?.status === 'online'
+                        : llmHealth?.status === 'online' || llmHealth?.model_available
                         ? 'success'
                         : llmHealth?.status === 'disabled'
                         ? 'info'
@@ -529,16 +529,24 @@ export default function HomeScreen() {
                   />
                 }
               />
+              {llmHealth?.embedding_model_configured ? (
+                <DenseRow
+                  title="Ollama Embedding Model"
+                  subtitle={llmHealth.embedding_model_available === false ? 'Configured embedding model is not installed in Ollama' : undefined}
+                  trailing={
+                    <Badge
+                      label={llmHealth.embedding_model_available !== false ? llmHealth.embedding_model_configured : `Missing: ${llmHealth.embedding_model_configured}`}
+                      tone={llmHealth.embedding_model_available !== false ? 'success' : 'warning'}
+                    />
+                  }
+                />
+              ) : null}
               <DenseRow
-                title="Available LLMs"
+                title="Installed Ollama Models"
                 subtitle={
                   healthLoading
                     ? 'Probing Ollama engine...'
-                    : llmHealth?.status === 'online'
-                    ? llmHealth.available_models?.join(', ') || 'None found'
-                    : llmHealth?.status === 'disabled'
-                    ? 'Bypass (Fast-Track Rule Engine)'
-                    : 'Ollama Unreachable'
+                    : getAvailableOllamaModelsLabel(llmHealth)
                 }
               />
             </ResponsiveFieldGrid>

@@ -1,6 +1,86 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-13 Active Ollama Model Configuration Realignment**:
+    - Traced the dashboard `CONFIG ERROR — Missing: qwen3:4b` to repository-root and backend-local environment overrides that disagreed with the centralized `llama3.2:3b` default.
+    - Confirmed the live Ollama inventory contains `llama3.2:3b`, `gemma3:1b`, and `nomic-embed-text:latest`, but not `qwen3:4b`.
+    - Aligned `.env` and `backend/.env` to the installed generation model `llama3.2:3b`; the example environment and Python default were already correct.
+    - Pending work: running API and worker processes were not restarted because repository instructions prohibit running services unless explicitly requested.
+    - Important decision: configuration was aligned to the existing installed model; no model download, hardcoded service override, or frontend suppression was introduced.
+1. **2026-08-13 Frontend Ollama Health Diagnostics Parity**:
+    - Updated the dashboard to present reachable Ollama configuration failures separately from server/network outages instead of collapsing both into an offline state.
+    - Added explicit configured generation and optional embedding model availability, missing-model guidance, and the installed model inventory returned by the centralized health endpoint.
+    - Centralized frontend Ollama health presentation in a small pure utility and added focused regression coverage for configuration-error, offline, and disabled states.
+    - Confirmed direct text analysis and queued CV processing already surface backend failure messages through their existing error paths, so no duplicate Ollama-specific frontend client was introduced.
+    - Pending work: frontend tests, lint, type-check, build, and services were not executed because repository instructions prohibit them unless explicitly requested.
+    - Important decision: a reachable but misconfigured Ollama instance is displayed as `CONFIG ERROR`, while `OFFLINE` is reserved for an unreachable health endpoint.
+1. **2026-08-13 Ollama Configured-Model Health Readiness Fix**:
+    - Changed `OllamaLLMService.get_status()` readiness from simple `/api/tags` reachability to validation of every enabled configured generation and embedding model.
+    - Reused centralized exact canonical model matching, including `:latest` equivalence, without adding another discovery request or health client.
+    - Made the LLM health endpoint distinguish a reachable but misconfigured Ollama instance from an unreachable server and report missing model names plus per-model availability.
+    - Extended the frontend health response type with optional embedding and missing-model diagnostics while preserving existing fields.
+    - Preserved the existing `(ready, installed_models)` service contract so startup verification and model inventory continue using the same centralized tags result.
+    - Added focused regression coverage for full readiness, missing generation models, canonical embedding aliases, diagnostic logging, and health response classification.
+    - Pending work: focused tests were not executed because repository instructions prohibit running tests unless explicitly requested.
+    - Important decision: a reachable Ollama server is not considered application-ready unless every enabled configured model is installed.
+1. **2026-08-13 Work Experience Ollama Error Construction Fix**:
+    - Fixed the empty work-experience generation path to construct `OllamaError` with the required `operation="work_experience_extraction"` context.
+    - Prevented the intended typed service failure from being replaced by a keyword-argument `TypeError`.
+    - Added focused asynchronous regression coverage for the exception type, message, operation, and retryability contract.
+    - Pending work: the focused test was not executed because repository instructions prohibit running tests unless explicitly requested.
+    - Important decision: the existing public service contract and retryable default were preserved; only the defective exception construction changed.
+1. **2026-08-13 Ollama Infrastructure Error Propagation Fix**:
+    - Centralized the higher-level operational-failure policy for timeouts, connection/unavailability errors, circuit/concurrency failures through their typed parents, missing models, and retry-exhausted retryable HTTP responses.
+    - Changed structured generation to trace and re-raise those failures instead of returning `None`, while retaining deterministic fallback for malformed JSON and schema-invalid response content.
+    - Allowed propagated `OllamaError` failures through Hiring Risk and preliminary/enriched matching catches so infrastructure outages cannot become partial analysis.
+    - Mapped timeout/concurrency failures to HTTP 504 and other operational Ollama failures to HTTP 503 at the synchronous analysis boundary.
+    - Added focused regression coverage for timeout, connection, retryable HTTP, Hiring Risk, trace classification, and API status mapping behavior.
+    - Pending work: focused tests were not executed because repository instructions prohibit running tests unless explicitly requested.
+    - Important decision: transport handling and retry behavior remain unchanged; only post-transport propagation was corrected.
+1. **2026-08-13 Local Compose LLM Enablement Fix**:
+    - Removed the local Compose `LLM_ENABLED=false` fallback so the Apple Silicon profile inherits the base Compose default of enabled generation.
+    - Preserved `EMBEDDING_ENABLED=false` in the constrained local profile because vector generation is an independent opt-in feature.
+    - Updated local-profile documentation to state that generation is enabled by default and can still be explicitly disabled with `LLM_ENABLED=false`.
+    - Added focused regression coverage requiring the base enabled default, absence of a local `LLM_ENABLED` override, and preservation of the local embedding default.
+    - Pending work: Compose rendering, tests, builds, and container recreation were not executed because repository instructions prohibit those actions unless explicitly requested.
+    - Important decision: the local profile now inherits the base generation switch instead of maintaining a competing default.
+1. **2026-08-13 Ollama Missing-Model Error Propagation Fix**:
+    - Changed structured generation so `OllamaModelUnavailableError` is logged with complete typed context, traced as a propagated failure, and re-raised instead of being converted to `None`.
+    - Preserved the existing deterministic `None` fallback for other recoverable Ollama, invalid JSON, and schema failures.
+    - Prevented Hiring Risk enrichment and both preliminary and enriched per-vacancy matching loops from catching and suppressing the propagated missing-model configuration error.
+    - Mapped the propagated error to an explicit HTTP 503 on synchronous CV analysis instead of a generic 500 or partial response.
+    - Added focused regression coverage proving missing generation models retain their 404, retryability, detail, trace, and exception identity through higher-level services and become a safe API-level 503.
+    - Pending work: focused tests were not executed because repository instructions prohibit running tests unless explicitly requested.
+    - Important decision: only the typed missing-model failure is fail-fast; existing recoverable fallback contracts remain unchanged.
+1. **2026-08-13 Ollama Generation Model Alignment to Qwen 3 4B**:
+    - Audited all generation model sources and found the Python default, checked-in backend environment template, repository-root Docker environment, backend-local environment, documentation, and payload expectations were not aligned with the installed `llama3.2:3b` model.
+    - Set `llama3.2:3b` in the centralized `Settings.OLLAMA_MODEL` default, `backend/.env.example`, repository-root `.env`, and backend-local `.env`.
+    - Kept `docker-compose.yml` unchanged so Compose continues requiring and forwarding the repository-root `OLLAMA_MODEL` value without another fallback.
+    - Updated maintained documentation and default-model payload expectations, including native Qwen 3 `think` behavior for thinking and non-thinking operations.
+    - Pending work: running API and worker containers were not recreated, and tests were not executed because repository instructions prohibit those actions unless explicitly requested.
+    - Important decision: no model name was added outside configuration surfaces or tests; application services continue reading `settings.OLLAMA_MODEL`.
+1. **2026-08-13 Ollama Non-Streaming Response Contract Lock**:
+    - Confirmed every maintained generation payload sets `stream=false` and the synchronous transport uses `response.iter_bytes()` only to bound and accumulate the HTTP body.
+    - Added regression coverage in which one valid Ollama JSON envelope is fragmented across four HTTP chunks and successfully decoded only after the full body is joined.
+    - Preserved single-object `json.loads()` parsing; no NDJSON, line-by-line parsing, or token-streaming path was introduced.
+    - Changed only the focused Ollama transport test and this work-status record; production response parsing was already correct.
+    - Pending work: the regression test was not executed because repository instructions prohibit running tests unless explicitly requested.
+1. **2026-08-13 Ollama Generate Endpoint Contract Lock**:
+    - Confirmed prompt-oriented generation remains centralized on `POST /api/generate`; no `/api/chat` path exists in backend application code.
+    - Added focused regression coverage for the exact HTTP method and endpoint plus the `model`, `prompt`, `format`, `stream`, `think`, `keep_alive`, and `options` payload contract.
+    - Changed only the focused Ollama transport test and this work-status record; production behavior required no change because it was already correct.
+    - Pending work: the regression test was not executed because repository instructions prohibit running tests unless explicitly requested.
+    - Important decision: `/api/chat` is not appropriate for the repository's prompt-oriented generation flow and was not introduced.
+1. **2026-08-13 Surgical Ollama Transport Hardening**:
+    - Preserved the single `OllamaTransport` integration for `/api/generate`, `/api/embed`, `/api/tags`, payload construction, pooled HTTP access, retries, and timeouts.
+    - Added fail-fast validation for the Ollama base URL, enabled model names, timeout/retry bounds, connection/response limits, circuit-breaker and embedding limits, and generation token budgets.
+    - Standardized operation, retryability, status code, and sanitized detail fields across transport exceptions, and added endpoint/model context to transport failure logs.
+    - Centralized exact canonical model-name matching, including `:latest` equivalence, and reused it in startup verification and the health response instead of substring matching.
+    - Fixed production startup verification so an unavailable configured model raises instead of being caught and downgraded to a warning.
+    - Defensively rejected unload or other non-generation completion reasons before a generation response reaches higher-level parsing.
+    - Added focused regression coverage for invalid configuration, canonical model matching, production model availability, typed timeout context, and invalid generation completion reasons.
+    - Pending work: focused tests were added but not executed because repository instructions prohibit running tests unless explicitly requested.
+    - Important decision: no new Ollama client, SDK, endpoint wrapper, payload builder, model source, or embedding path was introduced.
 1. **2026-08-13 Legacy Mandatory-Failure Response Compatibility Fix**:
     - Traced the `POST /api/match/upload` 500 to completed cached analysis records created before `MandatoryFailureDetails.failure_code` became required.
     - Added centralized schema hydration that preserves current explicit codes and derives the current evaluator code for legacy skill, experience, certification, CTC, and domain failures.
