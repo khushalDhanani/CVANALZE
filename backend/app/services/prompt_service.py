@@ -30,7 +30,7 @@ class PromptService:
     OPTIMIZED_MATCH_PROMPT_NAME = "optimized_match"
     OPTIMIZED_MATCH_LANGUAGE = "en"
     OPTIMIZED_MATCH_ENVIRONMENT = "production"
-    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v4"
+    OPTIMIZED_MATCH_SCHEMA_ID = "cvai://prompts/optimized_match/response-schema/v5"
     OPTIMIZED_MATCH_PLACEHOLDERS = {"input_json", "domain_list_str", "dept_list_str"}
     OPTIMIZED_MATCH_SCHEMA_FIELDS = {
         "candidate_profile",
@@ -52,10 +52,11 @@ class PromptService:
         "requirement",
         "category",
         "mandatory",
-        "cv_evidence",
         "jd_evidence",
-        "rationale",
+        "cv_evidence",
         "match_type",
+        "conclusion",
+        "rationale",
         "confidence",
         "impact",
     }

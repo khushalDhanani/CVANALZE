@@ -31,8 +31,11 @@ Expected JSON Schema:
 MATCH_ANALYSIS = """{input_json}
 
 Assess every supplied requirement separately. Use only exact facts from the CV and JD.
+For each requirement, follow this evidence chain: jd_evidence → cv_evidence → match_type → conclusion → rationale → impact.
 For DIRECT, INFERRED, or PARTIAL matches, cv_evidence must cite the explicit CV fact supporting the classification.
 For MISSING or NOT_ASSESSABLE, use an empty cv_evidence string instead of inventing evidence.
+conclusion must be one recruiter-facing verdict sentence, e.g. "Python is directly met by the candidate." or "Kubernetes cannot be confirmed from the CV."
+rationale explains the evidence and reasoning behind the match_type classification.
 Confidence is certainty in the evidence classification, not a match score. Impact is the recruiting consequence; a missing mandatory requirement is CRITICAL.
 Return exactly one requirement_assessments item for every supplied requirement_id and do not add requirements.
 
@@ -53,10 +56,11 @@ Expected JSON Schema:
       "requirement": "Python",
       "category": "SKILL",
       "mandatory": true,
-      "cv_evidence": "Built Python APIs using FastAPI",
       "jd_evidence": "Python",
-      "rationale": "The resume explicitly demonstrates the required technology in delivered API work.",
+      "cv_evidence": "Built Python APIs using FastAPI",
       "match_type": "DIRECT",
+      "conclusion": "Python is directly met by the candidate.",
+      "rationale": "The resume explicitly demonstrates the required technology in delivered API work.",
       "confidence": 0.98,
       "impact": "LOW"
     }}

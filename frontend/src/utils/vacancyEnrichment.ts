@@ -8,6 +8,7 @@ export interface VacancyEvidencePresentation {
   label: string;
   evidence: DualEvidence;
   assessment?: LlmRequirementAssessment;
+  conclusion?: string;
 }
 
 export interface VacancyEnrichmentPresentation {
@@ -39,6 +40,7 @@ export function getVacancyEnrichmentPresentation(match: Partial<EnrichedJobEvalu
         label: cleanText(assessment.requirement) || assessment.requirement_id,
         evidence: { cv_evidence: cleanText(assessment.cv_evidence), vacancy_evidence: cleanText(assessment.jd_evidence) },
         assessment,
+        conclusion: cleanText(assessment.conclusion) || cleanText(assessment.rationale) || undefined,
       }))
     : Object.entries(match.llm_evidence_snippets || {})
         .filter(([, item]) => item?.cv_evidence || item?.vacancy_evidence)
@@ -64,3 +66,4 @@ export function getVacancyEnrichmentPresentation(match: Partial<EnrichedJobEvalu
     metadata,
   };
 }
+

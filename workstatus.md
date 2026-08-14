@@ -1,6 +1,29 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-14 PROMPT_NOT_READY fix (match_analysis 030 follow-up)**:
+    - `prompt_service.py`: `OPTIMIZED_MATCH_SCHEMA_ID` updated from `response-schema/v4` to `response-schema/v5` (migration 030 installed v5); `conclusion` added to `OPTIMIZED_MATCH_ASSESSMENT_SCHEMA_FIELDS`; `jd_evidence` reordered before `cv_evidence` to reflect new field ordering.
+    - `config.py`: `OPTIMIZED_PROMPT_VERSION` bumped from `"3.9"` to `"4.0"` so `_fetch_prompt_record_from_db` resolves the active v4.0 row.
+    - All four containers rebuilt and recreated: `cv_analyzer_api`, `cv_analyzer_worker`, `cv_analyzer_auxiliary_worker`, `cv_analyzer_scheduler`.
+1. **2026-08-14 match_analysis Per-Requirement Evidence Chain Schema Upgrade**:
+    - Replaced the flat `RequirementAssessment` field ordering with a named, sequenced evidence chain: `requirement → jd_evidence → cv_evidence → match_type → conclusion → rationale → impact`.
+    - Added required `conclusion` field (min_length=1): a single recruiter-facing verdict sentence (e.g. "Python is directly met by the candidate."), positioned after `match_type` and before `rationale` to separate the verdict from the reasoning.
+    - Reordered existing fields so `jd_evidence` precedes `cv_evidence` in both the schema and prompt examples, making the "what the JD requires → what the CV provides" chain visually explicit.
+    - Updated `LLMGroundingService._not_assessable()` to auto-generate a deterministic `conclusion` for grounding fallbacks (e.g. "Mandatory requirement 'Python' could not be assessed from the available CV text.").
+    - Updated `LLMGroundingService._ground_requirement_assessments()` to preserve the LLM-supplied `conclusion` during `model_copy` canonicalization; only JD-sourced fields are overwritten.
+    - Bumped `match_analysis` PROMPT_VERSION to `"1.2"` in `match_analysis.py`.
+    - Updated `MATCH_ANALYSIS` prompt constant in `seed_prompts.py` to include the evidence chain instruction, the `conclusion` example, and field ordering aligned with the schema.
+    - Created migration `030_match_analysis_per_requirement_evidence.sql` (up): requires v1.1.0 and v3.9, inserts `match_analysis` v1.2.0 and `optimized_match` v4.0 with updated instructions and JSON schemas (response-schema/v3 and response-schema/v5), verifies installation, and activates both new versions.
+    - Created migration `030_match_analysis_per_requirement_evidence_down.sql` (down): deactivates v1.2.0 and v4.0, reactivates v1.1.0 and v3.9 without deleting rows.
+    - Added `conclusion?: string` to `LlmRequirementAssessment` in `frontend/src/types/api.ts`, with `jd_evidence` reordered before `cv_evidence` to match the schema chain.
+    - Updated `VacancyEvidencePresentation` in `vacancyEnrichment.ts` to carry `conclusion`; derived as `assessment.conclusion ?? assessment.rationale` for backward-compat with legacy persisted assessments.
+    - Updated `VacancyEnrichmentPanel.tsx` evidence rows: "JD:" prefix now appears above "CV:", followed by the `conclusion` verdict sentence (bold), then `rationale` (dimmed, only shown if `conclusion` is also present to avoid duplication for legacy assessments).
+    - Updated `test_requirement_level_match_analysis.py`: added `_base_assessment()` helper, added two new tests (`test_requirement_assessment_schema_requires_conclusion_field`, `test_requirement_assessment_schema_rejects_empty_conclusion`), updated grounding test to assert `_not_assessable()` populates non-empty `conclusion`, added migration 030 coverage test, preserved migration 029 sanity test.
+    - Updated `test_phase3_structured_processing.py`: added `conclusion` to the `RequirementAssessment` fixture to satisfy the new required field.
+    - Files changed: `backend/app/schemas/analysis.py`, `backend/app/services/llm_grounding_service.py`, `backend/app/prompts/match_analysis.py`, `backend/scripts/seed_prompts.py`, migrations 030 up/down, `frontend/src/types/api.ts`, `frontend/src/utils/vacancyEnrichment.ts`, `frontend/src/components/ui/VacancyEnrichmentPanel.tsx`, `backend/tests/test_requirement_level_match_analysis.py`, `backend/tests/test_phase3_structured_processing.py`, and `workstatus.md`.
+    - Verification: Static source audit confirmed `conclusion` is present in all `RequirementAssessment` instantiations across services and tests; `_not_assessable()` deterministically populates `conclusion`; `jd_evidence` precedes `cv_evidence` in schema, prompt, and type file; migration 030 SQL contains correct version tags, schema IDs, and instruction strings; frontend renders conclusion above rationale with fallback for legacy assessments. Builds, tests, migrations, and service restarts were not executed because repository instructions require explicit authorization.
+    - Pending work: apply migration 030 up, rebuild/recreate API and worker containers, reprocess candidates to generate assessments with the `conclusion` field; legacy candidates display the `rationale` fallback through the frontend immediately without reprocessing.
+    - Important decision: `conclusion` is additive — `rationale` is retained alongside it. The frontend only shows rationale as a secondary dimmed row when `conclusion` is also present, so legacy assessments without `conclusion` display rationale as the primary text without any visual demotion.
 1. **2026-08-13 Requirement-Level CV/JD Match Analysis**:
     - Added stable requirement normalization for required skills, preferred keywords, minimum/maximum experience, education, certifications, technologies, responsibilities, and vacancy descriptions, including explicit-only mandatory flags.
     - Upgraded the legacy `match_analysis` contract and live optimized matching contract with required per-requirement CV evidence, JD evidence, rationale, match type, 0-1 confidence, and recruiter impact fields while preserving summary and legacy lineage fields.

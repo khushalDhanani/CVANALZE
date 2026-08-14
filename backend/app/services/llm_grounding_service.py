@@ -253,13 +253,14 @@ class LLMGroundingService:
                 unsupported.append(f"cv:{requirement_id}")
                 assessment = cls._not_assessable(source_item, "The model's positive match did not include CV-grounded evidence.")
             else:
+                # Canonicalize JD-sourced fields; preserve the LLM-supplied conclusion and rationale
                 assessment = assessment.model_copy(
                     update={
                         "requirement": source_item["requirement"],
                         "category": source_item["category"],
                         "mandatory": source_item["mandatory"],
-                        "cv_evidence": assessment.cv_evidence if positive_match else "",
                         "jd_evidence": source_item["jd_evidence"],
+                        "cv_evidence": assessment.cv_evidence if positive_match else "",
                         "impact": "CRITICAL" if source_item["mandatory"] and assessment.match_type == "MISSING" else assessment.impact,
                     }
                 )
@@ -270,15 +271,18 @@ class LLMGroundingService:
 
     @staticmethod
     def _not_assessable(source_item: dict[str, Any], rationale: str) -> RequirementAssessment:
+        req_text = source_item["requirement"]
+        mandatory_label = "Mandatory requirement" if source_item["mandatory"] else "Requirement"
         return RequirementAssessment(
             requirement_id=source_item["requirement_id"],
             requirement=source_item["requirement"],
             category=source_item["category"],
             mandatory=source_item["mandatory"],
-            cv_evidence="",
             jd_evidence=source_item["jd_evidence"],
-            rationale=rationale,
+            cv_evidence="",
             match_type="NOT_ASSESSABLE",
+            conclusion=f"{mandatory_label} '{req_text}' could not be assessed from the available CV text.",
+            rationale=rationale,
             confidence=0.0,
             impact="CRITICAL" if source_item["mandatory"] else "HIGH",
         )

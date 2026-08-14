@@ -218,10 +218,11 @@ export interface LlmRequirementAssessment {
   requirement: string;
   category: string;
   mandatory: boolean;
-  cv_evidence: string;
   jd_evidence: string;
-  rationale: string;
+  cv_evidence: string;
   match_type: 'DIRECT' | 'INFERRED' | 'PARTIAL' | 'MISSING' | 'NOT_ASSESSABLE';
+  conclusion?: string;
+  rationale: string;
   confidence: number;
   impact: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 }

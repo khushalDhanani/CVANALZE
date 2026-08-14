@@ -43,7 +43,7 @@ export function VacancyEnrichmentPanel({ match, showDecisionMetadata = true }: V
       {evidence.length > 0 ? (
         <View className="gap-1 p-2 border rounded bg-background border-border">
           <Text className="text-[11px] font-sans-bold text-text-muted uppercase">Supporting Evidence</Text>
-          {evidence.map(({ label, evidence: item, assessment }, index) => (
+          {evidence.map(({ label, evidence: item, assessment, conclusion }, index) => (
             <View key={`${label}-${index}`} className="gap-0.5">
               <Text className="text-[11px] font-sans-bold text-text-primary">{label}</Text>
               {assessment ? (
@@ -54,10 +54,11 @@ export function VacancyEnrichmentPanel({ match, showDecisionMetadata = true }: V
                   <Badge label={`${assessment.impact} impact`} tone={assessment.impact === 'CRITICAL' || assessment.impact === 'HIGH' ? 'warning' : 'neutral'} />
                 </View>
               ) : null}
+              {item.vacancy_evidence ? <Text className="text-[11px] leading-4 text-text-muted">JD: {item.vacancy_evidence}</Text> : null}
               {item.cv_evidence ? <Text className="text-[11px] leading-4 text-text-primary">CV: {item.cv_evidence}</Text> : null}
               {assessment && !item.cv_evidence ? <Text className="text-[11px] leading-4 text-text-muted">CV: No supporting evidence found</Text> : null}
-              {item.vacancy_evidence ? <Text className="text-[11px] leading-4 text-text-muted">Vacancy: {item.vacancy_evidence}</Text> : null}
-              {assessment?.rationale ? <Text className="text-[11px] leading-4 text-text-primary">Rationale: {assessment.rationale}</Text> : null}
+              {conclusion ? <Text className="text-[11px] leading-4 text-text-primary font-sans-medium">{conclusion}</Text> : null}
+              {assessment?.rationale && assessment.conclusion ? <Text className="text-[11px] leading-4 text-text-muted">{assessment.rationale}</Text> : null}
             </View>
           ))}
         </View>
@@ -65,3 +66,4 @@ export function VacancyEnrichmentPanel({ match, showDecisionMetadata = true }: V
     </View>
   );
 }
+

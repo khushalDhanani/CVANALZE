@@ -45,14 +45,24 @@ class RequirementEvidence(BaseModel):
 
 
 class RequirementAssessment(BaseModel):
+    # Evidence chain: requirement → jd_evidence → cv_evidence → match_type → conclusion → rationale → impact
     requirement_id: str = Field(..., min_length=1, description="Stable identifier supplied with the JD requirement")
-    requirement: str = Field(..., min_length=1, description="Normalized requirement text")
+    requirement: str = Field(..., min_length=1, description="Normalized requirement text from the JD")
     category: str = Field(..., min_length=1, description="Requirement category such as SKILL, EXPERIENCE, or EDUCATION")
     mandatory: bool = Field(..., description="Whether the supplied JD explicitly marks the requirement as mandatory")
-    cv_evidence: str = Field(..., description="Exact CV evidence, or an empty string when no supporting evidence exists")
-    jd_evidence: str = Field(..., min_length=1, description="Exact supplied JD evidence for the requirement")
-    rationale: str = Field(..., min_length=1, description="Requirement-level reasoning grounded in the two evidence fields")
+    jd_evidence: str = Field(..., min_length=1, description="Exact supplied JD text for this requirement")
+    cv_evidence: str = Field(..., description="Exact CV quote or fact supporting the classification; empty string when no evidence exists")
     match_type: Literal["DIRECT", "INFERRED", "PARTIAL", "MISSING", "NOT_ASSESSABLE"]
+    conclusion: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "One recruiter-facing verdict sentence stating the assessment result, "
+            "e.g. 'Python is directly met by the candidate.' or "
+            "'Kubernetes cannot be confirmed from the available CV text.'"
+        ),
+    )
+    rationale: str = Field(..., min_length=1, description="Evidence-grounded reasoning explaining why the match_type was assigned")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in the evidence classification, not the match score")
     impact: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
 

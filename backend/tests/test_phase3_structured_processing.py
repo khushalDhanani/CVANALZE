@@ -174,10 +174,11 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
                         requirement="Python",
                         category="SKILL",
                         mandatory=True,
-                        cv_evidence="Python",
                         jd_evidence="Python",
-                        rationale="The CV explicitly lists the required skill.",
+                        cv_evidence="Python",
                         match_type="DIRECT",
+                        conclusion="Python is directly met by the candidate.",
+                        rationale="The CV explicitly lists the required skill.",
                         confidence=0.98,
                         impact="LOW",
                     )

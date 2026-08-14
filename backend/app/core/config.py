@@ -166,7 +166,7 @@ class Settings(BaseSettings):
     LLM_TRACE_RETENTION_DAYS: int = 30
     LLM_SHADOW_QUALITY_ENABLED: bool = True
     LLM_CONFIDENCE_CALIBRATION_PATH: Path = Path("app/data/evaluations/confidence_calibration.json")
-    OPTIMIZED_PROMPT_VERSION: str = "3.9"
+    OPTIMIZED_PROMPT_VERSION: str = "4.0"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 
     # LLM Bypass Configuration

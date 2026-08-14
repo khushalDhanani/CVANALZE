@@ -41,6 +41,25 @@ def _narratives() -> dict[str, str]:
     }
 
 
+def _base_assessment(overrides: dict | None = None) -> dict:
+    base = {
+        "requirement_id": "skill_1",
+        "requirement": "Python",
+        "category": "SKILL",
+        "mandatory": True,
+        "jd_evidence": "Python",
+        "cv_evidence": "Python APIs",
+        "match_type": "DIRECT",
+        "conclusion": "Python is directly met by the candidate.",
+        "rationale": "The CV directly supports the requirement.",
+        "confidence": 0.95,
+        "impact": "LOW",
+    }
+    if overrides:
+        base.update(overrides)
+    return base
+
+
 def test_requirement_builder_covers_all_supported_jd_categories_and_explicit_mandatory_flags():
     requirements = build_job_requirements(_job())
 
@@ -78,25 +97,18 @@ def test_both_prompt_builders_receive_normalized_requirement_records():
 
 
 def test_requirement_assessment_schema_enforces_enums_confidence_evidence_and_critical_mandatory_gap():
-    base = {
-        "requirement_id": "skill_1",
-        "requirement": "Python",
-        "category": "SKILL",
-        "mandatory": True,
-        "cv_evidence": "Python APIs",
-        "jd_evidence": "Python",
-        "rationale": "The CV directly supports the requirement.",
-        "match_type": "DIRECT",
-        "confidence": 0.95,
-        "impact": "LOW",
-    }
+    base = _base_assessment()
     assert RequirementAssessment.model_validate(base).confidence == 0.95
     for match_type in ("INFERRED", "PARTIAL"):
         assert RequirementAssessment.model_validate({**base, "match_type": match_type}).match_type == match_type
-    missing = RequirementAssessment.model_validate({**base, "match_type": "MISSING", "cv_evidence": "", "impact": "CRITICAL"})
+    missing = RequirementAssessment.model_validate(
+        {**base, "match_type": "MISSING", "cv_evidence": "", "impact": "CRITICAL",
+         "conclusion": "Python is not evidenced in the CV."}
+    )
     assert missing.cv_evidence == ""
     not_assessable = RequirementAssessment.model_validate(
-        {**base, "mandatory": False, "match_type": "NOT_ASSESSABLE", "cv_evidence": "", "confidence": 0.0, "impact": "HIGH"}
+        {**base, "mandatory": False, "match_type": "NOT_ASSESSABLE", "cv_evidence": "", "confidence": 0.0, "impact": "HIGH",
+         "conclusion": "Python could not be assessed from the available CV text."}
     )
     assert not_assessable.match_type == "NOT_ASSESSABLE"
 
@@ -104,10 +116,26 @@ def test_requirement_assessment_schema_enforces_enums_confidence_evidence_and_cr
         {"match_type": "RELATED"},
         {"confidence": 1.1},
         {"cv_evidence": ""},
-        {"match_type": "MISSING", "cv_evidence": "", "impact": "HIGH"},
+        {"match_type": "MISSING", "cv_evidence": "", "impact": "HIGH",
+         "conclusion": "Python is not evidenced in the CV."},
     ):
         with pytest.raises(ValidationError):
             RequirementAssessment.model_validate({**base, **update})
+
+
+def test_requirement_assessment_schema_requires_conclusion_field():
+    """Omitting conclusion must raise a ValidationError."""
+    base = _base_assessment()
+    del base["conclusion"]
+    with pytest.raises(ValidationError):
+        RequirementAssessment.model_validate(base)
+
+
+def test_requirement_assessment_schema_rejects_empty_conclusion():
+    """An empty conclusion string must raise a ValidationError."""
+    base = _base_assessment({"conclusion": ""})
+    with pytest.raises(ValidationError):
+        RequirementAssessment.model_validate(base)
 
 
 def test_grounding_canonicalizes_evidence_downgrades_unsupported_claims_and_fills_omissions(monkeypatch):
@@ -132,10 +160,11 @@ def test_grounding_canonicalizes_evidence_downgrades_unsupported_claims_and_fill
                         requirement="Changed model wording",
                         category="OTHER",
                         mandatory=False,
-                        cv_evidence="Python APIs",
                         jd_evidence="Python",
-                        rationale="Python is explicitly documented.",
+                        cv_evidence="Python APIs",
                         match_type="DIRECT",
+                        conclusion="Python is directly met by the candidate.",
+                        rationale="Python is explicitly documented.",
                         confidence=0.95,
                         impact="LOW",
                     ),
@@ -144,10 +173,11 @@ def test_grounding_canonicalizes_evidence_downgrades_unsupported_claims_and_fill
                         requirement="Kubernetes",
                         category="SKILL",
                         mandatory=True,
-                        cv_evidence="Kubernetes administration",
                         jd_evidence="Kubernetes",
-                        rationale="The model claimed direct Kubernetes evidence.",
+                        cv_evidence="Kubernetes administration",
                         match_type="DIRECT",
+                        conclusion="Kubernetes is met by the candidate.",
+                        rationale="The model claimed direct Kubernetes evidence.",
                         confidence=0.9,
                         impact="LOW",
                     ),
@@ -173,13 +203,35 @@ def test_grounding_canonicalizes_evidence_downgrades_unsupported_claims_and_fill
     assert assessments[1].match_type == "NOT_ASSESSABLE"
     assert assessments[1].confidence == 0.0
     assert assessments[2].match_type == "NOT_ASSESSABLE"
+    # Grounding fallback must populate a non-empty conclusion for NOT_ASSESSABLE items
+    assert assessments[1].conclusion and len(assessments[1].conclusion) > 0
+    assert assessments[2].conclusion and len(assessments[2].conclusion) > 0
     assert validated.matched_vacancies[0].classified_requirements[0].requirement_id == "skill_1"
     assert validated.matched_vacancies[0].evidence_snippets["skill_1"].cv_evidence == "Python APIs"
     assert any(claim.endswith("cv:skill_2") for claim in report.unsupported_claims)
     assert any(claim.endswith("omitted:preferred_keyword_1") for claim in report.unsupported_claims)
 
 
-def test_migration_versions_both_prompts_and_restores_optimized_38_on_rollback():
+def test_migration_versions_both_prompts_and_restores_prior_versions_on_rollback():
+    migrations = Path(__file__).parents[1] / "scripts" / "migrations" / "postgres"
+    up = (migrations / "030_match_analysis_per_requirement_evidence.sql").read_text(encoding="utf-8")
+    down = (migrations / "030_match_analysis_per_requirement_evidence_down.sql").read_text(encoding="utf-8")
+
+    assert "version_tag = '1.1.0'" in up
+    assert "'1.2.0'" in up
+    assert "response-schema/v3" in up
+    assert "conclusion" in up
+    assert "conclusion must be one recruiter-facing verdict sentence" in up
+    assert "'4.0'" in up
+    assert "response-schema/v5" in up
+    assert "version_tag = '1.2.0'" in down
+    assert "version_tag = '1.1.0'" in down
+    assert "'4.0'" in down
+    assert "'3.9'" in down
+
+
+def test_migration_029_versions_still_intact():
+    """Sanity check: migration 029 is not modified by 030."""
     migrations = Path(__file__).parents[1] / "scripts" / "migrations" / "postgres"
     up = (migrations / "029_requirement_level_match_analysis.sql").read_text(encoding="utf-8")
     down = (migrations / "029_requirement_level_match_analysis_down.sql").read_text(encoding="utf-8")
@@ -191,3 +243,4 @@ def test_migration_versions_both_prompts_and_restores_optimized_38_on_rollback()
     assert "'1.1.0'" in up
     assert "version_tag = '3.8'" in down
     assert "version_tag = '3.9'" in down
+

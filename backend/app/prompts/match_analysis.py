@@ -4,7 +4,7 @@ from typing import Any
 from app.services.context_packer import pack_cv_context
 from app.services.llm_input_security import harden_prompt, sanitize_string_list, sanitize_untrusted_text
 
-PROMPT_VERSION = "1.1"
+PROMPT_VERSION = "1.2"
 
 _MANDATORY_TERMS = ("must", "required", "mandatory", "essential")
 
