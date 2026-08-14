@@ -72,7 +72,9 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
             item["responsibilities"] = sanitize_string_list(responsibility_values)
         vacancy_description = vac.get("job_description") or vac.get("description")
         if vacancy_description:
-            item["description"] = sanitize_untrusted_text(str(vacancy_description)).text
+            sanitized_desc = sanitize_untrusted_text(str(vacancy_description)).text.strip()
+            if sanitized_desc:
+                item["description"] = sanitized_desc[:400].rstrip() if len(sanitized_desc) > 400 else sanitized_desc
         item["requirements"] = build_job_requirements(vac)
 
         compact_vacancies.append(item)

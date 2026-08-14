@@ -1,6 +1,18 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-14 LLM Generation Timeout & Background Queue Progress Synchronization Fix**:
+    - Traced the `LLM_TIMEOUT` failure on `1761368806_.pdf` (`cvjob_806247a88032746cf7ed2b538666b887b7c4edc3f87bd9607b58542292143d76`) to a combination of 90s attempt timeout, 11k prompt token overflow from 12 unbound vacancies exceeding `OLLAMA_OPTIMIZED_NUM_CTX = 8192`, and large constrained JSON schema output load.
+    - Updated `OLLAMA_REQUEST_TIMEOUT` default from `90.0s` to `180.0s` across `config.py`, `.env.example`, `docker-compose.yml`, and `README.md` while preserving `OLLAMA_GENERATE_TIMEOUT_SECONDS = 360.0s` as the total operation budget.
+    - Tuned `LLM_TOP_N` from `12` to `6` in `config.py`, focusing deep LLM qualitative evaluation on the highest deterministic matches and reducing prompt/output token volume by 50%.
+    - Bounded vacancy description requirements in `match_analysis.py` and `optimized_match.py` to prevent multi-thousand character wall-of-text prompts.
+    - Synchronized background queue stage progress in `cv_service.py` (`_save_interim_status`) to transition `ProcessingJobRepository` across 15% (validation), 30% (parsing), 45% (extraction), 60% (ai_analysis), 75% (matching), and 90% (finalizing) so background jobs and UI pollers accurately reflect real-time pipeline progress and failure points.
+    - Updated `processing_queue.py` (`_process_source`) to propagate `record.job_id` into `process_cv_file`.
+    - Added unit test `test_job_progress_and_timeout.py` covering settings alignment, prompt token bounding, and stage progress transitions.
+    - Files changed: `backend/app/core/config.py`, `backend/.env.example`, `docker-compose.yml`, `README.md`, `backend/app/prompts/match_analysis.py`, `backend/app/prompts/optimized_match.py`, `backend/app/services/cv_service.py`, `backend/app/services/processing_queue.py`, `backend/tests/test_job_progress_and_timeout.py`, and `workstatus.md`.
+    - Verification: `git diff --check` passed cleanly across all tracked changes; static code audit confirmed standard Ollama architecture adherence, no breaking API contracts, and correct propagation of job IDs. Tests, builds, migrations, and service restarts were not executed per repository guidelines.
+    - Pending work: rebuild/recreate API and worker containers (`cv_analyzer_api`, `cv_analyzer_worker`, `cv_analyzer_auxiliary_worker`, `cv_analyzer_scheduler`) so updated configuration and progress synchronization take effect.
+    - Important decision: `OLLAMA_REQUEST_TIMEOUT` is updated to 180s to provide adequate headroom for Apple Silicon/Docker execution without relaxing total budget or schema validation contracts; `LLM_TOP_N = 6` balances comprehensive recruiter qualitative insights with reliable generation latency.
 1. **2026-08-14 PROMPT_NOT_READY fix (match_analysis 030 follow-up)**:
     - `prompt_service.py`: `OPTIMIZED_MATCH_SCHEMA_ID` updated from `response-schema/v4` to `response-schema/v5` (migration 030 installed v5); `conclusion` added to `OPTIMIZED_MATCH_ASSESSMENT_SCHEMA_FIELDS`; `jd_evidence` reordered before `cv_evidence` to reflect new field ordering.
     - `config.py`: `OPTIMIZED_PROMPT_VERSION` bumped from `"3.9"` to `"4.0"` so `_fetch_prompt_record_from_db` resolves the active v4.0 row.

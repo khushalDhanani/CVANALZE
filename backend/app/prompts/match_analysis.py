@@ -61,8 +61,10 @@ def build_job_requirements(job: dict[str, Any]) -> list[dict[str, Any]]:
 
     description = job.get("job_description") or job.get("description")
     if description:
-        sanitized_description = sanitize_untrusted_text(str(description)).text
-        add("DESCRIPTION", sanitized_description, prefix="description")
+        sanitized_description = sanitize_untrusted_text(str(description)).text.strip()
+        if sanitized_description:
+            bounded_description = sanitized_description[:500].rstrip() if len(sanitized_description) > 500 else sanitized_description
+            add("DESCRIPTION", bounded_description, prefix="description")
     return requirements
 
 

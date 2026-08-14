@@ -124,7 +124,7 @@ class Settings(BaseSettings):
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:3b"
-    OLLAMA_REQUEST_TIMEOUT: float = 90.0
+    OLLAMA_REQUEST_TIMEOUT: float = 180.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0
     OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 360.0
@@ -153,7 +153,7 @@ class Settings(BaseSettings):
     OLLAMA_OPTIMIZED_NUM_CTX: int = 8192
     OLLAMA_OPTIMIZED_NUM_PREDICT: int = 3072
     PREFILTER_TOP_K: int = 60
-    LLM_TOP_N: int = 12
+    LLM_TOP_N: int = 6
     LLM_CV_MAX_CHARS: int = 4000          # Deprecated compatibility setting; token budgets are authoritative
     LLM_PROFILE_MAX_CHARS: int = 7500     # Deprecated compatibility setting; token budgets are authoritative
     LLM_CONTEXT_CV_TOKEN_BUDGET: int = 1200

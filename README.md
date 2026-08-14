@@ -250,7 +250,7 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint; Compose defaults to `host.docker.internal`. |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Generation model. Required in the repository-root `.env` for Compose. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model. |
-| `OLLAMA_REQUEST_TIMEOUT` | `90` | Compatibility timeout used by the shared client. Required in the repository-root `.env` for Compose. |
+| `OLLAMA_REQUEST_TIMEOUT` | `180` | Compatibility timeout used by the shared client. Required in the repository-root `.env` for Compose. |
 | `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout for every Ollama operation. |
 | `OLLAMA_TAGS_TIMEOUT_SECONDS` | `3` | Total tags/health deadline. |
 | `OLLAMA_GENERATE_TIMEOUT_SECONDS` | `360` | Total structured-generation deadline. Required in the repository-root `.env` for Compose. |

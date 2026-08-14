@@ -697,6 +697,7 @@ async def _process_source(
             force_reprocess=record.force_reprocess,
             storage_filename=storage_filename,
             analysis_run_id=analysis_run_id,
+            job_id=record.job_id,
         )
 
 

@@ -12,7 +12,9 @@ from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, normalize_source_candidate_id, resolve_cv_identity
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
+from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
+from app.schemas.contracts import JobState
 from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import (
     MarkdownGenerator,
@@ -95,6 +97,7 @@ async def process_cv_file(
     force_reprocess: bool = False,
     storage_filename: str | None = None,
     analysis_run_id: str | None = None,
+    job_id: str | None = None,
 ) -> dict[str, Any]:
     identity = resolve_cv_identity(filename, candidate_id, cv_id)
     cv_key = identity.canonical_key
@@ -267,6 +270,19 @@ async def process_cv_file(
                     )
                 except Exception as e:
                     logger.warning(f"Failed to save interim status for '{cv_key}': {e}")
+
+                if job_id:
+                    try:
+                        await asyncio.to_thread(
+                            ProcessingJobRepository.transition,
+                            job_id,
+                            JobState.PROCESSING,
+                            progress=progress,
+                            stage=stage,
+                            message=f"{progress}% - CV processing at stage {stage}.",
+                        )
+                    except Exception as e:
+                        logger.debug(f"Failed to update processing job progress for '{job_id}': {e}")
 
             await _save_interim_status(15, current_stage)
             stage_durations_ms["validation_ms"] = round((asyncio.get_event_loop().time() - t_stage_start) * 1000.0, 2)
