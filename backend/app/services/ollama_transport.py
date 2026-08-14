@@ -270,10 +270,11 @@ class OllamaTransport:
                     "Ollama operation deadline expired before acquiring the shared operation lock.",
                     operation=operation,
                 )
-            lock_path = Path(settings.OLLAMA_LOCK_FILE)
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
-            file_lock = FileLock(str(lock_path), timeout=min(max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS), remaining))
-            file_lock.acquire()
+            if operation != "tags":
+                lock_path = Path(settings.OLLAMA_LOCK_FILE)
+                lock_path.parent.mkdir(parents=True, exist_ok=True)
+                file_lock = FileLock(str(lock_path), timeout=min(max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS), remaining))
+                file_lock.acquire()
             lock_wait_ms = round((time.perf_counter() - started) * 1000.0, 2)
             cls._record_lock_wait(lock_wait_ms)
             logger.info(f"[OLLAMA] operation={operation} status=LOCKED wait_ms={lock_wait_ms}")

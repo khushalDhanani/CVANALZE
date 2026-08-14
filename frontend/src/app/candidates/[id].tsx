@@ -717,10 +717,16 @@ export default function CandidateDetailScreen() {
         </Pressable>
         {technicalDetailsExpanded ? (
           <View className="gap-2 p-3 border-t border-border">
-            {cleanCandidateText(data.filename || data.id) ? (
+            {cleanCandidateText(data.display_filename || data.original_filename || data.filename || data.id) ? (
               <View className="flex-row justify-between gap-3">
                 <Text className="text-xs text-text-muted">Filename</Text>
-                <Text selectable className="max-w-[65%] font-mono text-xs text-right text-text-primary">{data.filename || data.id}</Text>
+                <Text selectable className="max-w-[65%] font-mono text-xs text-right text-text-primary">{data.display_filename || data.original_filename || data.filename || data.id}</Text>
+              </View>
+            ) : null}
+            {data.storage_filename && data.storage_filename !== (data.display_filename || data.filename) ? (
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-xs text-text-muted">Storage Key</Text>
+                <Text selectable className="max-w-[65%] font-mono text-xs text-right text-text-muted">{data.storage_filename}</Text>
               </View>
             ) : null}
             {rawTimestamp ? (
@@ -1109,7 +1115,7 @@ export default function CandidateDetailScreen() {
               </Pressable>
             </View>
             <Text className="font-sans text-xs leading-5 text-text-primary">
-              Are you sure you want to completely reprocess <Text className="font-sans-bold">{data?.filename || scanId}</Text>?
+              Are you sure you want to completely reprocess <Text className="font-sans-bold">{data?.display_filename || data?.original_filename || data?.filename || scanId}</Text>?
             </Text>
             <View className="bg-danger/10 p-2.5 rounded-md border border-danger/30">
               <Text className="text-[11px] font-sans text-danger leading-4">

@@ -1069,14 +1069,34 @@ class ResumeFieldExtractor:
         local_part = re.sub(r"\d+", "", email.split("@", 1)[0].lower())
         return [token for token in re.split(r"[._\-\s]+", local_part) if len(token) >= 2]
 
-    @staticmethod
-    def _name_from_filename(filename: str | None) -> str | None:
+    _SYNTHETIC_NAME_DENYLIST: frozenset[str] = frozenset({
+        "candidatecvfilename", "candidatephotofilename", "candidatecv", "cv", "resume",
+        "document", "upload", "attachment", "file", "unknown candidate", "profile",
+        "candidatename", "filename", "candidate", "applicant",
+    })
+
+    @classmethod
+    def _name_from_filename(cls, filename: str | None) -> str | None:
         if not filename:
             return None
-        clean_name = re.sub(r"\.(pdf|docx)$", "", filename, flags=re.IGNORECASE)
+        clean_name = re.sub(r"\.(pdf|docx)$", "", str(filename).strip(), flags=re.IGNORECASE)
+        # Strip synthetic timestamp/ID patterns like 1761533883_CandidateCVFileName_13672 or cv_...
+        clean_name = re.sub(r"^cv_", "", clean_name, flags=re.IGNORECASE)
+        clean_name = re.sub(r"^\d{8,12}_", "", clean_name)
+        clean_name = re.sub(r"_\d+$", "", clean_name)
+
+        # Check against technical denylist
+        normalized_token = re.sub(r"[^a-zA-Z]", "", clean_name).lower()
+        if not normalized_token or normalized_token in cls._SYNTHETIC_NAME_DENYLIST:
+            return None
+
         clean_name = re.sub(r"[-_](cv|resume|updated|\d+)", "", clean_name, flags=re.IGNORECASE)
         clean_name = re.sub(r"[-_]+", " ", clean_name).strip()
-        return " ".join(word.capitalize() for word in clean_name.split()) or None
+        result = " ".join(word.capitalize() for word in clean_name.split())
+        final_token = re.sub(r"[^a-zA-Z]", "", result).lower()
+        if not result or final_token in cls._SYNTHETIC_NAME_DENYLIST:
+            return None
+        return result
 
     @staticmethod
     def _first_match(pattern: str, text: str) -> str | None:

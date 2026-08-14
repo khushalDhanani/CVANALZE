@@ -129,6 +129,9 @@ export interface CVProcessingJobSummary {
   job_id: string;
   cv_key: string;
   filename: string;
+  original_filename?: string | null;
+  display_filename?: string | null;
+  storage_filename?: string | null;
   job_state: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED';
   progress: number;
   stage: string;
@@ -454,6 +457,9 @@ export interface CandidateResumeJson {
 export interface CVUploadResponse {
   scan_id: string;
   filename: string;
+  original_filename?: string | null;
+  display_filename?: string | null;
+  storage_filename?: string | null;
   parsed_at: string;
   markdown: string;
   full_name?: string | null;

@@ -206,10 +206,14 @@ async def reprocess_candidate(candidate_id: str):
             logger.warning(f"Could not remove old result file '{disk_path}': {e}")
 
     # Save active processing marker
+    original_fn = retained_upload.original_filename or existing_result.get("original_filename") or filename
+    display_fn = retained_upload.display_filename or existing_result.get("display_filename") or filename
     processing_marker = {
         "id": cv_key,
         "scan_id": cv_key,
         "filename": filename,
+        "original_filename": original_fn,
+        "display_filename": display_fn,
         "storage_filename": retained_upload.storage_filename,
         "candidate_id": existing_result.get("candidate_id"),
         "source_candidate_id": existing_result.get("source_candidate_id"),
@@ -230,6 +234,8 @@ async def reprocess_candidate(candidate_id: str):
             cv_key=cv_key,
             content_hash=hashlib.sha256(raw_bytes).hexdigest(),
             filename=filename,
+            original_filename=original_fn,
+            display_filename=display_fn,
             content_type=content_type,
             force_reprocess=True,
             candidate_id=existing_result.get("candidate_id"),

@@ -131,6 +131,8 @@ async def upload_and_analyze(
                 cv_key=cv_key,
                 content_hash=accepted.content_hash,
                 filename=accepted.safe_filename,
+                original_filename=accepted.original_filename,
+                display_filename=accepted.display_filename,
                 content_type=accepted.detected_content_type,
                 storage_filename=accepted.storage_filename,
             )

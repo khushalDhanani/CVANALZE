@@ -96,6 +96,8 @@ async def process_cv_file(
     cv_id: str | int | None = None,
     force_reprocess: bool = False,
     storage_filename: str | None = None,
+    original_filename: str | None = None,
+    display_filename: str | None = None,
     analysis_run_id: str | None = None,
     job_id: str | None = None,
 ) -> dict[str, Any]:
@@ -178,6 +180,8 @@ async def process_cv_file(
                     existing_data["stage"] = "complete"
                     existing_data["is_complete"] = True
                     existing_data["storage_filename"] = storage_filename or existing_data.get("storage_filename")
+                    existing_data["original_filename"] = original_filename or existing_data.get("original_filename") or existing_data.get("filename")
+                    existing_data["display_filename"] = display_filename or existing_data.get("display_filename") or existing_data.get("filename")
                     existing_data["identity"] = identity_metadata
                     existing_data["source_candidate_id"] = source_candidate_id
                     existing_data["legacy_cv_keys"] = legacy_cv_keys
@@ -456,6 +460,8 @@ async def process_cv_file(
                 "source_candidate_id": source_candidate_id,
                 "cv_id": identity.cv_id,
                 "filename": filename,
+                "original_filename": original_filename or filename,
+                "display_filename": display_filename or filename,
                 "storage_filename": storage_filename,
                 "content_type": content_type,
                 "cv_hash": cv_hash,

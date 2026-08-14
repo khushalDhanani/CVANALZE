@@ -42,6 +42,9 @@ class CVProcessingJobSummary(BaseModel):
     job_id: str
     cv_key: str
     filename: str
+    original_filename: str | None = None
+    display_filename: str | None = None
+    storage_filename: str | None = None
     job_state: str
     progress: int
     stage: str
@@ -66,6 +69,9 @@ class CVUploadResponse(BaseModel):
     scan_id: str = Field(..., description="Unique scan execution ID (alias for id)")
     parsed_at: str | None = Field(None, description="ISO timestamp of parsing (alias for scanned_at)")
     filename: str = Field(..., description="Uploaded CV filename")
+    original_filename: str | None = Field(None, description="Original user/client uploaded filename")
+    display_filename: str | None = Field(None, description="Recruiter-facing display filename")
+    storage_filename: str | None = Field(None, description="Durable physical storage filename")
     content_type: str | None = Field(None, description="MIME content type")
     characters: int = Field(..., description="Total character count of extracted Markdown text")
     page_count: int = Field(..., description="Total number of pages in the document")

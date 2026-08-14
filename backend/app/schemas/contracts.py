@@ -196,6 +196,8 @@ class ProcessingJobRecord(BaseModel):
     content_hash: str
     filename: str
     storage_filename: str
+    original_filename: str | None = None
+    display_filename: str | None = None
     content_type: str | None = None
     candidate_id: str | None = None
     source_candidate_id: int | None = None

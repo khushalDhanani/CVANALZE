@@ -470,7 +470,7 @@ class ResultRepository:
         stem = filename.removesuffix(".json")
 
         direct_res = cls.read_result_by_filename(filename)
-        if direct_res and direct_res.get("status") not in ("processing", None):
+        if direct_res:
             return direct_res
 
         stems_to_try = [stem]
@@ -480,16 +480,6 @@ class ResultRepository:
         else:
             stems_to_try.append(f"cv_{stem}")
 
-        for s in list(stems_to_try):
-            if not s.startswith("cv_document_"):
-                stems_to_try.append(f"cv_document_{s}")
-                if s.startswith("cv_"):
-                    stems_to_try.append(f"cv_document_{s[3:]}")
-            if not s.startswith("cv_candidate_"):
-                stems_to_try.append(f"cv_candidate_{s}")
-                if s.startswith("cv_"):
-                    stems_to_try.append(f"cv_candidate_{s[3:]}")
-
         seen: set[str] = set()
         for s in stems_to_try:
             if s in seen:
@@ -497,18 +487,8 @@ class ResultRepository:
             seen.add(s)
             fn = f"{s}.json"
             alt_res = cls.read_result_by_filename(fn)
-            if alt_res and alt_res.get("status") not in ("processing", None):
+            if alt_res:
                 return alt_res
-
-        matches = cls.find_results_by_scan_id(stem)
-        if matches:
-            for match in matches:
-                try:
-                    alt_res = cls.read_result(match)
-                    if alt_res and alt_res.get("status") not in ("processing", None):
-                        return alt_res
-                except Exception as exc:
-                    logger.warning(f"Failed loading matched result for stem {stem}: {exc}")
 
         alias_matches = cls._find_results_by_legacy_alias(stem)
         if len(alias_matches) == 1:
@@ -516,9 +496,6 @@ class ResultRepository:
         if len(alias_matches) > 1:
             logger.warning(f"Legacy CV key '{stem}' is ambiguous across {len(alias_matches)} canonical identities.")
             return None
-
-        if direct_res:
-            return direct_res
 
         return None
 

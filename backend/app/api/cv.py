@@ -30,6 +30,9 @@ async def list_processing_jobs():
             job_id=record.job_id,
             cv_key=record.cv_key,
             filename=record.filename,
+            original_filename=record.original_filename or record.filename,
+            display_filename=record.display_filename or record.filename,
+            storage_filename=record.storage_filename,
             job_state=record.state,
             progress=record.progress,
             stage=record.stage,
@@ -69,6 +72,8 @@ async def upload_cv(
                 cv_key=cv_key,
                 content_hash=accepted.content_hash,
                 filename=accepted.safe_filename,
+                original_filename=accepted.original_filename,
+                display_filename=accepted.display_filename,
                 content_type=accepted.detected_content_type,
                 candidate_id=candidate_id,
                 source_candidate_id=identity.source_candidate_id,
@@ -144,7 +149,13 @@ async def match_cv_text(payload: CVMatchRequest):
 async def get_cv_status(cv_key: str):
     """Get the status or result of a background CV processing job."""
     result = ResultRepository.resolve_result(cv_key)
-    job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    try:
+        job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    except ProcessingJobPersistenceError as exc:
+        if result is None:
+            raise
+        logger.warning(f"Failed fetching job record for cv_key={cv_key} during status query; proceeding with cached result: {exc}")
+        job = None
     if job:
         job = ProcessingQueueService.reconcile_job(job)
     job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None

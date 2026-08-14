@@ -4,6 +4,8 @@ import re
 from typing import Any
 
 from app.core.config import settings
+from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
 from app.prompts.match_analysis import build_job_requirements
 from app.services.context_packer import estimate_tokens, pack_cv_context
 from app.services.llm_input_security import harden_prompt, sanitize_string_list, sanitize_untrusted_text
@@ -79,13 +81,29 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
 
         compact_vacancies.append(item)
 
+    # Dynamic admission control: ensure prompt token budget never exceeds model context window headroom
+    max_prompt_token_budget = max(1000, settings.OLLAMA_OPTIMIZED_NUM_CTX - settings.OLLAMA_OPTIMIZED_NUM_PREDICT)
+    while len(compact_vacancies) > 1:
+        trial_input = {
+            "task": "Extract candidate profile, classify vacancy requirements, extract dual evidence, and analyze semantic fit.",
+            "candidate_cv_text": cleaned_cv,
+            "candidate_vacancies": compact_vacancies,
+        }
+        trial_json = json.dumps(trial_input, separators=(",", ":"), ensure_ascii=False)
+        trial_tokens = estimate_tokens(trial_json) + 600
+        if trial_tokens <= max_prompt_token_budget:
+            break
+        pruned = compact_vacancies.pop()
+        logger.info(
+            f"[ADMISSION_CONTROL] Pruned vacancy {pruned.get('vacancy_id')} to respect token budget "
+            f"(estimated_tokens={trial_tokens} budget={max_prompt_token_budget})."
+        )
+
     structured_input = {
         "task": "Extract candidate profile, classify vacancy requirements, extract dual evidence, and analyze semantic fit.",
         "candidate_cv_text": cleaned_cv,
         "candidate_vacancies": compact_vacancies,
     }
-
-    from app.core.rule_config_manager import RuleConfigManager
 
     taxonomy = RuleConfigManager.get_taxonomy_rules()
     canonical_domains = taxonomy.canonical_domains

@@ -131,10 +131,23 @@ class OptimizedVacancyMatch(BaseModel):
     @field_validator("top_strength", "main_concern", "ai_match_explanation")
     @classmethod
     def require_two_or_three_sentences(cls, value: str) -> str:
-        sentences = [sentence for sentence in re.split(r"(?<=[.!?])\s+", value.strip()) if sentence]
-        if not 2 <= len(sentences) <= 3 or sentences[-1][-1] not in ".!?":
-            raise ValueError("Decision narratives must contain two or three complete sentences.")
-        return value.strip()
+        cleaned = " ".join(value.strip().split())
+        if not cleaned:
+            raise ValueError("Decision narratives must not be empty.")
+        if cleaned[-1] not in ".!?":
+            cleaned = cleaned + "."
+        # Protect single-letter initials and common abbreviations from splitting
+        protected = re.sub(r"\b([A-Za-z])\.", r"\1<DOT>", cleaned)
+        protected = re.sub(
+            r"\b(e\.g|i\.e|etc|vs|inc|ltd|co|corp|dept|dr|mr|mrs|ms|prof|sr|jr|bsc|msc|phd|btech|mtech|b\.s|m\.s|b\.a|m\.a|b\.e|m\.e|u\.s|u\.k)\.",
+            r"\1<DOT>",
+            protected,
+            flags=re.IGNORECASE,
+        )
+        sentences = [sentence.replace("<DOT>", ".").strip() for sentence in re.split(r"(?<=[.!?])\s+", protected) if sentence.strip()]
+        if not 1 <= len(sentences) <= 4:
+            raise ValueError("Decision narratives must contain one to four complete sentences.")
+        return cleaned
 
 
 class OptimizedLLMMatchResponse(BaseModel):
