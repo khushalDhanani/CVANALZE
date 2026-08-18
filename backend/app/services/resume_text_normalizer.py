@@ -1,4 +1,5 @@
 from __future__ import annotations
+import html
 import re
 
 from app.core.rule_config_manager import RuleConfigManager
@@ -10,7 +11,8 @@ class ResumeTextNormalizer:
         if not raw_text:
             return ""
 
-        text = re.sub(r"<!--\s*image\s*-->", "", raw_text)
+        text = html.unescape(raw_text)
+        text = re.sub(r"<!--\s*image\s*-->", "", text)
         text = re.sub(r"<!--\s*.*?\s*-->", "", text, flags=re.DOTALL)
         text = re.sub(r"-\s*\[[x\s]\]\s*", "", text, flags=re.IGNORECASE)
 

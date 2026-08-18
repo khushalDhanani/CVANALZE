@@ -783,7 +783,7 @@ export default function CandidateDetailScreen() {
   };
 
   const renderCvTab = () => {
-    const projectItems = showAllCvDetails ? candidateView?.projects || [] : (candidateView?.projects || []).slice(0, 2);
+    const projectItems = candidateView?.projects || [];
     const focusItems = showAllCvDetails ? interviewFocusAreas : interviewFocusAreas.slice(0, 3);
     const similarItems = showAllCvDetails ? data?.similar_candidates || [] : (data?.similar_candidates || []).slice(0, 3);
     return (
@@ -818,12 +818,19 @@ export default function CandidateDetailScreen() {
             ) : null}
           </Card>
           <Card className="gap-2.5 shadow-none border-border lg:flex-1">
-            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Projects & Interview Focus</Text>
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Projects ({projectItems.length}) & Interview Focus</Text>
             {projectItems.length ? projectItems.map((project, index) => (
-              <View key={`${project.name || 'project'}-${index}`} className="gap-0.5">
+              <View key={`${project.name || 'project'}-${index}`} className="gap-1 py-1 border-b border-border/40 last:border-b-0">
                 <Text className="text-xs font-sans-bold text-text-primary">{project.name || `Project ${index + 1}`}</Text>
                 {project.description ? (
-                  <Text numberOfLines={showAllCvDetails ? undefined : 2} className="text-[11px] leading-4 text-text-primary">{project.description}</Text>
+                  <Text className="text-[11px] leading-4 text-text-primary">{project.description}</Text>
+                ) : null}
+                {project.technologies?.length ? (
+                  <View className="flex-row flex-wrap gap-1 mt-0.5">
+                    {project.technologies.map((tech) => (
+                      <Badge key={tech} label={tech} tone="neutral" />
+                    ))}
+                  </View>
                 ) : null}
               </View>
             )) : <Text className="text-xs text-text-muted">No projects were identified.</Text>}

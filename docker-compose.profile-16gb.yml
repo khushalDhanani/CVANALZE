@@ -1,0 +1,59 @@
+# Docker Compose Performance Profile Override: 16 GB Unified Memory / Medium VRAM (Default)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.profile-16gb.yml up -d
+
+services:
+  api:
+    environment:
+      CV_PROCESSING_CONCURRENCY: '2'
+      MAX_CONCURRENT_LLM_WORKERS: '2'
+      DOCUMENT_PARSER_WORKERS: '2'
+      OLLAMA_RESIDENCY_ENABLED: 'true'
+      OLLAMA_KEEP_ALIVE: '30m'
+      OLLAMA_GENERATION_NUM_CTX: '8192'
+      OLLAMA_GENERATION_NUM_PREDICT: '1536'
+      OLLAMA_OPTIMIZED_NUM_CTX: '16384'
+      OLLAMA_OPTIMIZED_NUM_PREDICT: '3072'
+      DOCLING_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    mem_limit: 1.5g
+    cpus: 1.5
+
+  worker:
+    environment:
+      CV_PROCESSING_CONCURRENCY: '2'
+      MAX_CONCURRENT_LLM_WORKERS: '2'
+      DOCUMENT_PARSER_WORKERS: '2'
+      OLLAMA_RESIDENCY_ENABLED: 'true'
+      OLLAMA_KEEP_ALIVE: '30m'
+      OLLAMA_GENERATION_NUM_CTX: '8192'
+      OLLAMA_GENERATION_NUM_PREDICT: '1536'
+      OLLAMA_OPTIMIZED_NUM_CTX: '16384'
+      OLLAMA_OPTIMIZED_NUM_PREDICT: '3072'
+      DOCLING_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    mem_limit: 4g
+    cpus: 2.5
+
+  auxiliary-worker:
+    environment:
+      CV_PROCESSING_CONCURRENCY: '2'
+      MAX_CONCURRENT_LLM_WORKERS: '2'
+      DOCUMENT_PARSER_WORKERS: '2'
+      DOCLING_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    mem_limit: 1g
+    cpus: 1.0
+
+  scheduler:
+    mem_limit: 512m
+    cpus: 0.5
+
+  pgvector:
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "work_mem=8MB", "-c", "maintenance_work_mem=128MB", "-c", "max_connections=50"]
+    mem_limit: 1g
+    cpus: 1.0
+
+  redis:
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "yes", "--appendfsync", "always"]
+    mem_limit: 256m
+    cpus: 0.5

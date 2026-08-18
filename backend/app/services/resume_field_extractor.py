@@ -36,7 +36,7 @@ class classproperty:
 
 class ResumeFieldExtractor:
     _SECTION_HEADING = re.compile(
-        r"^(?:#+|\*\*|[-•*]|\d+\.?)?\s*(SUMMARY|PROFILE\s+SUMMARY|PROFESSIONAL\s+SUMMARY|EXECUTIVE\s+SUMMARY|CAREER\s+OBJECTIVE|OBJECTIVE|PROFILE|WORK\s+EXPERIENCE|WORKING\s+EXPERIENCE|PROFESSIONAL\s+EXPERIENCE|PRACTICAL\s+EXPOSURE|EXPERIENCE\s+SUMMARY|EMPLOYMENT\s+HISTORY|CAREER\s+HISTORY|WORK\s+HISTORY|PROFESSIONAL\s+BACKGROUND|EXPERIENCE\s+HIGHLIGHTS|RELEVANT\s+EXPERIENCE|PROJECTS?\s*&\s*EXPERIENCE|EXPERIENCE|EMPLOYMENT|EDUCATION|ACADEMIC\s+BACKGROUND|ACADEMICS|SKILLS|TECHNICAL\s+SKILLS|CORE\s+COMPETENCIES|KEY\s+SKILLS|PROJECTS|PROJECT\s+WORK|CERTIFICATIONS|CERTIFICATES|LANGUAGES|HOBBIES|CONTACT|PERSONAL\s+DETAILS)\b",
+        r"^(?:#+|\*\*|[-•*]|\d+\.?)?\s*(SUMMARY|PROFILE\s+SUMMARY|PROFESSIONAL\s+SUMMARY|EXECUTIVE\s+SUMMARY|CAREER\s+OBJECTIVE|OBJECTIVE|PROFILE|KEY\s+PROJECT\s+EXPERIENCE|KEY\s+PROJECTS?|PROJECTS?\s*&\s*EXPERIENCE|PROJECTS?\s+EXPERIENCE|WORK\s+EXPERIENCE|WORKING\s+EXPERIENCE|PROFESSIONAL\s+EXPERIENCE|PRACTICAL\s+EXPOSURE|EXPERIENCE\s+SUMMARY|EMPLOYMENT\s+HISTORY|CAREER\s+HISTORY|WORK\s+HISTORY|PROFESSIONAL\s+BACKGROUND|EXPERIENCE\s+HIGHLIGHTS|RELEVANT\s+EXPERIENCE|EXPERIENCE|EMPLOYMENT|EDUCATION|ACADEMIC\s+BACKGROUND|ACADEMICS|SKILLS|TECHNICAL\s+SKILLS|CORE\s+COMPETENCIES|KEY\s+SKILLS|PROJECTS|PROJECT\s+WORK|CERTIFICATIONS|CERTIFICATES|LANGUAGES|HOBBIES|CONTACT|PERSONAL\s+DETAILS)\b",
         re.IGNORECASE,
     )
     _DATE_PART = (
@@ -361,9 +361,19 @@ class ResumeFieldExtractor:
 
     @classmethod
     def is_valid_company_name(cls, candidate: str) -> bool:
+        if not candidate:
+            return False
         max_chars = RuleConfigManager.get_field_config("company_name").downstream_gates.max_char_length or 70
-        clean_candidate = candidate.lower().strip(" #*-:•") if candidate else ""
-        return 2 <= len(candidate or "") <= max_chars and clean_candidate not in cls.GENERIC_SECTION_HEADERS
+        clean_candidate = candidate.lower().strip(" #*-:•")
+        if len(candidate) < 2 or len(candidate) > max_chars:
+            return False
+        if clean_candidate in cls.GENERIC_SECTION_HEADERS:
+            return False
+        if re.search(r"^\+?\d[\d\s\.\-\(\)]+$", candidate.strip()):
+            return False
+        if "@" in candidate or "http" in candidate.lower() or "www." in candidate.lower():
+            return False
+        return True
 
     @classmethod
     def extract(
@@ -472,14 +482,10 @@ class ResumeFieldExtractor:
                 sections.setdefault(current, []).append(line)
                 continue
             heading = match.group(1).upper()
-            if "EXPERIENCE" in heading or "EMPLOYMENT" in heading or "EXPOSURE" in heading or "CAREER" in heading or "WORK HISTORY" in heading:
-                current = "experience"
-            elif "EDUCATION" in heading or "ACADEMIC" in heading:
-                current = "education"
-            elif "SKILL" in heading or "COMPETENC" in heading:
-                current = "skills"
-            elif "PROJECT" in heading:
+            if "PROJECT" in heading:
                 current = "projects"
+            elif "EXPERIENCE" in heading or "EMPLOYMENT" in heading or "EXPOSURE" in heading or "CAREER" in heading or "WORK HISTORY" in heading:
+                current = "experience"
             elif "SUMMARY" in heading or "PROFILE" in heading or "OBJECTIVE" in heading:
                 current = "summary"
             elif "CERTIFICATION" in heading or "CERTIFICATE" in heading:
@@ -865,22 +871,38 @@ class ResumeFieldExtractor:
     def _extract_projects(lines: list[str]) -> list[dict[str, Any]]:
         projects: list[dict[str, Any]] = []
         current: dict[str, Any] = {}
+
+        def commit() -> None:
+            nonlocal current
+            raw_name = (current.get("name") or "").strip()
+            has_details = bool(current.get("bullet_points") or current.get("description") or current.get("technologies"))
+            if raw_name and has_details:
+                parts = [p.strip() for p in raw_name.split("|") if p.strip()]
+                clean_title = parts[0] if parts else raw_name
+                current["title"] = clean_title
+                current["name"] = clean_title
+                if len(parts) > 1 and not current.get("description"):
+                    current["description"] = " | ".join(parts[1:])
+                projects.append(current)
+            current = {}
+
         for raw_line in lines:
             line = raw_line.strip()
             if not line:
                 continue
             if line.startswith(("##", "###")):
-                if current.get("name"):
-                    projects.append(current)
+                commit()
                 current = {"name": line.replace("#", "").strip()}
-            elif "|" in line and not line.startswith("-"):
+            elif line.lower().startswith("tech:") or line.lower().startswith("technologies:"):
+                tech_str = line.split(":", 1)[1].strip()
+                current["technologies"] = [t.strip() for t in re.split(r"[,|]+", tech_str) if t.strip()]
+            elif "|" in line and not line.startswith(("-", "•", "·")):
                 current["technologies"] = [value.strip() for value in line.split("|") if value.strip()]
-            elif line.startswith(("-", "•")):
-                current.setdefault("bullet_points", []).append(line.lstrip("-• ").strip())
+            elif line.startswith(("-", "•", "·")):
+                current.setdefault("bullet_points", []).append(line.lstrip("-•· ").strip())
             else:
                 current["description"] = " ".join(filter(None, (current.get("description"), line)))
-        if current.get("name"):
-            projects.append(current)
+        commit()
         return projects
 
     @classmethod
@@ -912,16 +934,23 @@ class ResumeFieldExtractor:
         if normalized_candidate in normalized_headings:
             return False
         upper_tokens = [token.upper() for token in tokens]
-        denied = cls.JOB_TITLE_KEYWORDS | cls.RESUME_HEADER_KEYWORDS
+        tech_and_role_denylist = {
+            "AI", "IT", "ML", "UI", "UX", "QA", "HR", "PR", "DBA", "SEO", "PMP", "API", "ETL", "ELT", "SRE",
+            "REACT", "NATIVE", "ANDROID", "FLUTTER", "IONIC", "NODE", "NODEJS", "PYTHON", "ANGULAR", "VUE",
+            "TYPESCRIPT", "JAVASCRIPT", "JAVA", "SPRING", "DOCKER", "AWS", "AZURE", "KUBERNETES",
+            "DEVELOPER", "ENGINEER", "LEADER", "LEAD", "ARCHITECT", "INTEGRATION", "SERVICES",
+            "FRONTEND", "BACKEND", "FULLSTACK", "STACK", "MOBILE", "SOFTWARE", "SENIOR", "JUNIOR",
+        }
+        denied = cls.JOB_TITLE_KEYWORDS | cls.RESUME_HEADER_KEYWORDS | tech_and_role_denylist
         first_token = re.sub(r"[^A-Z]", "", upper_tokens[0])
         field_labels = {label.upper() for label in _LABEL_PREFIX_DENYLIST} | {
             "STATE", "NATIONALITY", "GENDER", "DOB", "BIRTH", "MARITAL", "PIN", "PINCODE",
         }
         if first_token in field_labels:
             return False
-        if len(tokens) == 1 and upper_tokens[0] in denied:
+        if len(tokens) == 1 and (upper_tokens[0] in denied or len(tokens[0]) <= 2):
             return False
-        if sum(token in denied for token in upper_tokens) >= len(tokens) * 0.5:
+        if sum(token in denied for token in upper_tokens) >= len(tokens) * 0.35:
             return False
         # Reject configured role phrases without baking industries or technologies into extraction code.
         role_terms = cls._configured_job_title_terms()
@@ -929,16 +958,13 @@ class ResumeFieldExtractor:
             role_pattern = r"\s+".join(re.escape(part) for part in term.split())
             if role_pattern and re.search(rf"\b{role_pattern}\b", candidate, re.IGNORECASE):
                 return False
-        # Reject names that look like company names
-        try:
-            company_suffixes = RuleConfigManager.get_keywords("company_name", "suffixes")
-        except KeyError:
-            company_suffixes = set()
-            
-        if company_suffixes:
-            pattern = r"\b(" + "|".join(re.escape(s) for s in company_suffixes) + r")\b"
-            if re.search(pattern, candidate, re.IGNORECASE):
-                return False
+        country_names = {
+            "INDIA", "UNITED STATES", "USA", "UK", "UNITED KINGDOM", "CANADA", "GERMANY",
+            "FRANCE", "AUSTRALIA", "SINGAPORE", "UAE", "DUBAI", "JAPAN", "CHINA", "ITALY",
+            "SPAIN", "BRAZIL", "MEXICO", "NETHERLANDS", "SWITZERLAND", "SWEDEN",
+        }
+        if candidate.upper().strip() in country_names or candidate.lower().strip() in cls.KNOWN_GAZETTEER:
+            return False
         return not any(value and (candidate in value or value in candidate) for value in (email, phone, location))
 
     @staticmethod

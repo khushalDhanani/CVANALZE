@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from app.core.analysis_context import get_analysis_candidate, get_analysis_run_id
 from app.core.config import settings
 from app.core.logging import logger
+from app.services.tokenizer_service import TokenizerService
 
 T = TypeVar("T")
 
@@ -204,6 +205,10 @@ class OllamaTransport:
         "model_inference_duration_ms": 0.0,
         "unload_duration_ms": 0.0,
         "total_duration_ms": 0.0,
+        "prompt_eval_count": 0,
+        "prompt_eval_duration_ms": 0.0,
+        "eval_count": 0,
+        "eval_duration_ms": 0.0,
         "operations": {},
     }
 
@@ -313,7 +318,7 @@ class OllamaTransport:
                     deadline=deadline,
                 )
             finally:
-                if model and operation != "unload":
+                if model and operation != "unload" and not settings.OLLAMA_RESIDENCY_ENABLED:
                     cls._unload_safely(model, parent_operation=operation)
 
     @classmethod
@@ -344,7 +349,7 @@ class OllamaTransport:
         num_ctx = generation_options.get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
         num_predict = generation_options.get("num_predict", "default") if operation not in ("tags", "embed", "unload") else None
         prompt = str((payload or {}).get("prompt") or "")
-        prompt_tokens = max(1, len(prompt) // 4) if prompt else 0
+        prompt_tokens = TokenizerService.count_tokens(prompt) if prompt else 0
         analysis_run_id = get_analysis_run_id()
         analysis_candidate = get_analysis_candidate()
         logger.info(
@@ -401,6 +406,11 @@ class OllamaTransport:
                 attempt_elapsed = time.perf_counter() - attempt_started
                 total_remaining = max(0.0, operation_deadline - time.perf_counter())
                 response_prompt_tokens = response_data.get("prompt_eval_count", prompt_tokens)
+                prompt_eval_dur_ns = int(response_data.get("prompt_eval_duration") or 0)
+                eval_count = int(response_data.get("eval_count") or 0)
+                eval_dur_ns = int(response_data.get("eval_duration") or 0)
+                prompt_eval_tok_sec = round(response_prompt_tokens / (prompt_eval_dur_ns / 1e9), 2) if prompt_eval_dur_ns > 0 else 0.0
+                eval_tok_sec = round(eval_count / (eval_dur_ns / 1e9), 2) if eval_dur_ns > 0 else 0.0
                 cls._record_success(operation, duration_ms, response_bytes, response_data)
                 cls._circuit_success(operation)
                 logger.info(
@@ -409,7 +419,9 @@ class OllamaTransport:
                     f"attempt={attempt}/{total_attempts} "
                     f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
                     f"elapsed_s={round(attempt_elapsed, 3)} total_remaining_s={round(total_remaining, 3)} "
-                    f"prompt_tokens={response_prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} "
+                    f"prompt_tokens={response_prompt_tokens} prompt_eval_tok_sec={prompt_eval_tok_sec} "
+                    f"eval_count={eval_count} eval_tok_sec={eval_tok_sec} "
+                    f"num_ctx={num_ctx} num_predict={num_predict} "
                     f"status=SUCCESS exception=none response_bytes={response_bytes}"
                 )
                 return OllamaTransportResult(
@@ -597,7 +609,8 @@ class OllamaTransport:
                     deadline=deadline,
                 )
             finally:
-                cls._unload_safely(model, parent_operation=operation)
+                if not settings.OLLAMA_RESIDENCY_ENABLED:
+                    cls._unload_safely(model, parent_operation=operation)
 
     @classmethod
     def embed(cls, model: str, inputs: list[str]) -> OllamaTransportResult[list[list[float]]]:
@@ -640,7 +653,8 @@ class OllamaTransport:
                     attempts=attempts,
                 )
             finally:
-                cls._unload_safely(normalized_model, parent_operation="embed")
+                if not settings.OLLAMA_RESIDENCY_ENABLED:
+                    cls._unload_safely(normalized_model, parent_operation="embed")
 
     @classmethod
     def _embed_batch_with_split(cls, model: str, inputs: list[str], *, deadline: float) -> OllamaTransportResult[list[list[float]]]:
@@ -812,9 +826,35 @@ class OllamaTransport:
     def get_metrics(cls) -> dict[str, Any]:
         with cls._metrics_lock:
             metrics = {key: value for key, value in cls._metrics.items() if key != "operations"}
-            metrics["operations"] = {operation: operation_metrics.copy() for operation, operation_metrics in cls._metrics["operations"].items()}
+            metrics["operations"] = {}
+            for operation, operation_metrics in cls._metrics["operations"].items():
+                op_copy = operation_metrics.copy()
+                op_prompt_eval_ms = float(op_copy.get("prompt_eval_duration_ms", 0.0))
+                op_eval_ms = float(op_copy.get("eval_duration_ms", 0.0))
+                op_prompt_eval_count = int(op_copy.get("prompt_eval_count", 0))
+                op_eval_count = int(op_copy.get("eval_count", 0))
+                op_copy["prompt_eval_tokens_per_sec"] = (
+                    round(op_prompt_eval_count / (op_prompt_eval_ms / 1000.0), 2) if op_prompt_eval_ms > 0 else 0.0
+                )
+                op_copy["eval_tokens_per_sec"] = (
+                    round(op_eval_count / (op_eval_ms / 1000.0), 2) if op_eval_ms > 0 else 0.0
+                )
+                metrics["operations"][operation] = op_copy
+
             completed = int(metrics["successes"]) + int(metrics["failures"])
             metrics["average_duration_ms"] = round(float(metrics["total_duration_ms"]) / completed, 2) if completed else 0.0
+
+            prompt_eval_ms = float(metrics.get("prompt_eval_duration_ms", 0.0))
+            eval_ms = float(metrics.get("eval_duration_ms", 0.0))
+            prompt_eval_count = int(metrics.get("prompt_eval_count", 0))
+            eval_count = int(metrics.get("eval_count", 0))
+            metrics["prompt_eval_tokens_per_sec"] = (
+                round(prompt_eval_count / (prompt_eval_ms / 1000.0), 2) if prompt_eval_ms > 0 else 0.0
+            )
+            metrics["eval_tokens_per_sec"] = (
+                round(eval_count / (eval_ms / 1000.0), 2) if eval_ms > 0 else 0.0
+            )
+
         now = time.monotonic()
         with cls._circuit_lock:
             metrics["circuits"] = {
@@ -845,6 +885,10 @@ class OllamaTransport:
                 "model_inference_duration_ms": 0.0,
                 "unload_duration_ms": 0.0,
                 "total_duration_ms": 0.0,
+                "prompt_eval_count": 0,
+                "prompt_eval_duration_ms": 0.0,
+                "eval_count": 0,
+                "eval_duration_ms": 0.0,
                 "operations": {},
             }
         with cls._circuit_lock:
@@ -1022,27 +1066,75 @@ class OllamaTransport:
         with cls._metrics_lock:
             cls._metrics["requests"] += 1
             operations = cls._metrics["operations"]
-            operation_metrics = operations.setdefault(operation, {"requests": 0, "successes": 0, "failures": 0})
+            operation_metrics = operations.setdefault(
+                operation,
+                {
+                    "requests": 0,
+                    "successes": 0,
+                    "failures": 0,
+                    "prompt_eval_count": 0,
+                    "prompt_eval_duration_ms": 0.0,
+                    "eval_count": 0,
+                    "eval_duration_ms": 0.0,
+                },
+            )
             operation_metrics["requests"] += 1
 
     @classmethod
     def _record_success(cls, operation: str, duration_ms: float, response_bytes: int, response_data: dict[str, Any]) -> None:
+        prompt_eval_count = max(0, int(response_data.get("prompt_eval_count") or 0))
+        prompt_eval_duration_ms = max(0.0, float(response_data.get("prompt_eval_duration") or 0) / 1_000_000.0)
+        eval_count = max(0, int(response_data.get("eval_count") or 0))
+        eval_duration_ms = max(0.0, float(response_data.get("eval_duration") or 0) / 1_000_000.0)
+
         with cls._metrics_lock:
             cls._metrics["successes"] += 1
             cls._metrics["response_bytes"] += response_bytes
             cls._metrics["total_duration_ms"] += duration_ms
             cls._metrics["model_load_duration_ms"] += max(0, int(response_data.get("load_duration") or 0)) / 1_000_000.0
-            cls._metrics["model_inference_duration_ms"] += max(0, int(response_data.get("eval_duration") or 0)) / 1_000_000.0
+            cls._metrics["model_inference_duration_ms"] += eval_duration_ms
+            cls._metrics["prompt_eval_count"] += prompt_eval_count
+            cls._metrics["prompt_eval_duration_ms"] += prompt_eval_duration_ms
+            cls._metrics["eval_count"] += eval_count
+            cls._metrics["eval_duration_ms"] += eval_duration_ms
             if operation == "unload":
                 cls._metrics["unload_duration_ms"] += duration_ms
-            cls._metrics["operations"][operation]["successes"] += 1
+
+            op_metrics = cls._metrics["operations"].setdefault(
+                operation,
+                {
+                    "requests": 0,
+                    "successes": 0,
+                    "failures": 0,
+                    "prompt_eval_count": 0,
+                    "prompt_eval_duration_ms": 0.0,
+                    "eval_count": 0,
+                    "eval_duration_ms": 0.0,
+                },
+            )
+            op_metrics["successes"] += 1
+            op_metrics["prompt_eval_count"] = op_metrics.get("prompt_eval_count", 0) + prompt_eval_count
+            op_metrics["prompt_eval_duration_ms"] = op_metrics.get("prompt_eval_duration_ms", 0.0) + prompt_eval_duration_ms
+            op_metrics["eval_count"] = op_metrics.get("eval_count", 0) + eval_count
+            op_metrics["eval_duration_ms"] = op_metrics.get("eval_duration_ms", 0.0) + eval_duration_ms
 
     @classmethod
     def _record_failure(cls, operation: str, duration_ms: float) -> None:
         with cls._metrics_lock:
             cls._metrics["failures"] += 1
             cls._metrics["total_duration_ms"] += duration_ms
-            cls._metrics["operations"].setdefault(operation, {"requests": 0, "successes": 0, "failures": 0})["failures"] += 1
+            cls._metrics["operations"].setdefault(
+                operation,
+                {
+                    "requests": 0,
+                    "successes": 0,
+                    "failures": 0,
+                    "prompt_eval_count": 0,
+                    "prompt_eval_duration_ms": 0.0,
+                    "eval_count": 0,
+                    "eval_duration_ms": 0.0,
+                },
+            )["failures"] += 1
 
     @classmethod
     def _record_retry(cls) -> None:

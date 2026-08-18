@@ -32,6 +32,7 @@ from app.services.ollama_transport import (
     OllamaTransport,
     OllamaUnavailableError,
 )
+from app.services.tokenizer_service import TokenizerService
 from app.schemas.llm_trace import LLMExecutionTrace
 
 TModel = TypeVar("TModel", bound=BaseModel)
@@ -246,7 +247,7 @@ class OllamaLLMService:
             prompt_version=prompt_version,
             cache_key=cache_key,
             response_model=DynamicMappingResponse,
-            think=True,
+            think=False,
             options={
                 "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
                 "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
@@ -411,12 +412,31 @@ class OllamaLLMService:
         resolved_think = think if supports_thinking else None
         if think and not supports_thinking:
             logger.info(f"[OLLAMA] operation={operation} model='{model}' thinking=UNSUPPORTED_OMITTED")
+
+        prompt_tokens = TokenizerService.count_tokens(request_prompt)
+        effective_options = dict(options) if options else {}
+        if "num_predict" in effective_options or "num_ctx" in effective_options:
+            default_predict = settings.OLLAMA_OPTIMIZED_NUM_PREDICT if operation == "optimized_match" else settings.OLLAMA_GENERATION_NUM_PREDICT
+            default_ctx = settings.OLLAMA_OPTIMIZED_NUM_CTX if operation == "optimized_match" else settings.OLLAMA_GENERATION_NUM_CTX
+            req_predict = int(effective_options.get("num_predict") or default_predict)
+            req_ctx = int(effective_options.get("num_ctx") or default_ctx)
+            safety_buffer = 512
+
+            # Ensure num_ctx accommodates prompt + predict + buffer (capped at 32768)
+            effective_num_ctx = min(32768, max(req_ctx, prompt_tokens + req_predict + safety_buffer))
+            # Cap num_predict dynamically so prompt_tokens + num_predict + buffer <= effective_num_ctx
+            max_available_predict = max(256, effective_num_ctx - prompt_tokens - safety_buffer)
+            effective_num_predict = min(req_predict, max_available_predict)
+
+            effective_options["num_ctx"] = effective_num_ctx
+            effective_options["num_predict"] = effective_num_predict
+
         payload = OllamaTransport.build_generation_payload(
             model=model,
             prompt=request_prompt,
             response_schema=response_model.model_json_schema(),
             think=resolved_think,
-            options=options,
+            options=effective_options,
         )
 
         def parse(data: dict[str, Any]) -> _StructuredGeneration:
@@ -425,7 +445,7 @@ class OllamaLLMService:
                 logger.warning(
                     f"[OLLAMA] operation={operation} model='{model}' status=OUTPUT_LIMIT "
                     f"response_chars={len(envelope.response)} output_tokens={envelope.eval_count} "
-                    f"num_predict={options.get('num_predict', 'default')} num_ctx={options.get('num_ctx', 'default')}"
+                    f"num_predict={effective_options.get('num_predict', 'default')} num_ctx={effective_options.get('num_ctx', 'default')}"
                 )
                 raise OllamaInvalidResponseError(
                     "Ollama generation reached the output limit and is incomplete.",
@@ -454,7 +474,7 @@ class OllamaLLMService:
         logger.info(
             f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
             f"model='{model}' status=CALLING "
-            f"prompt_chars={prompt_chars} estimated_tokens={max(1, prompt_chars // 4)}"
+            f"prompt_chars={prompt_chars} prompt_tokens={prompt_tokens}"
         )
         llm_started = time.perf_counter()
         try:
@@ -501,11 +521,18 @@ class OllamaLLMService:
             profiler.metrics.prompt_output_tokens = generation.envelope.eval_count
             profiler.metrics.prompt_input_tokens = generation.envelope.prompt_eval_count or profiler.metrics.prompt_input_tokens
 
+        prompt_eval_dur_ns = generation.envelope.prompt_eval_duration or 0
+        eval_dur_ns = generation.envelope.eval_duration or 0
+        prompt_eval_tok_sec = round(generation.envelope.prompt_eval_count / (prompt_eval_dur_ns / 1e9), 2) if prompt_eval_dur_ns > 0 else 0.0
+        eval_tok_sec = round(generation.envelope.eval_count / (eval_dur_ns / 1e9), 2) if eval_dur_ns > 0 else 0.0
+
         logger.info(
             f"[OLLAMA] operation={operation} model='{model}' status=SUCCESS "
             f"duration_ms={transport_result.duration_ms} "
             f"input_tokens={generation.envelope.prompt_eval_count} "
             f"output_tokens={generation.envelope.eval_count} "
+            f"prompt_eval_tok_sec={prompt_eval_tok_sec} "
+            f"eval_tok_sec={eval_tok_sec} "
             f"response_chars={len(generation.raw_response)} "
             f"num_predict={options.get('num_predict', 'default')} "
             f"num_ctx={options.get('num_ctx', 'default')} "

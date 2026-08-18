@@ -1,7 +1,58 @@
 # Work Status
 
 ## Work Completed
-1. **2026-08-14 Enterprise CV Filename Lifecycle & Multi-Tier Sanitization Architecture**:
+1. **2026-08-18 Auto-Detect & Configure Local Hardware Profile (Apple M1 8 GB Unified Memory)**:
+    - Detected system hardware: Apple M1 MacBook Air (`MacBookAir10,1`), 8 Cores, 8 GB Unified Memory.
+    - Verified local Ollama model availability: `llama3.2:3b` (generation, 2.0 GB) and `nomic-embed-text:latest` (embedding, 274 MB).
+    - Tuned local environment files (`.env` and `backend/.env`) specifically for 8 GB M1 Mac: `CV_PROCESSING_CONCURRENCY=1`, `MAX_CONCURRENT_LLM_WORKERS=1`, `DOCUMENT_PARSER_WORKERS=1`, `DOCLING_NUM_THREADS=2`, `OMP_NUM_THREADS=2`, `OLLAMA_RESIDENCY_ENABLED=true`, `OLLAMA_KEEP_ALIVE=30m`, `OLLAMA_GENERATION_NUM_CTX=8192`, `OLLAMA_OPTIMIZED_NUM_CTX=16384`.
+
+1. **2026-08-18 Add Explicit Local Performance Profiles for RAM/VRAM Classes**:
+    - Created explicit environment profile templates for host hardware classes: `.env.profile.8gb` (8 GB Unified Memory / Low VRAM), `.env.profile.16gb` (16 GB / Default Workstation), `.env.profile.32gb` (32+ GB / High Performance).
+    - Created Docker Compose profile override files: `docker-compose.profile-8gb.yml`, `docker-compose.profile-16gb.yml`, and `docker-compose.profile-32gb.yml`.
+    - Configured per-profile memory ceilings (`mem_limit`), CPU allocations, model residency (`OLLAMA_RESIDENCY_ENABLED`), keep-alive (`OLLAMA_KEEP_ALIVE`), context sizes (`NUM_CTX`), and worker concurrency (`CV_PROCESSING_CONCURRENCY`, `DOCLING_NUM_THREADS`).
+    - Documented profile usage in `README.md` and `backend/.env.example`. Validated Docker Compose syntax across all 3 profiles.
+
+1. **2026-08-18 Add tokens/sec & Prompt-Eval Metrics to OllamaTransport & Telemetry**:
+    - Added prompt-evaluation metrics (`prompt_eval_count`, `prompt_eval_duration_ms`, `prompt_eval_tokens_per_sec`) and output generation throughput metrics (`eval_count`, `eval_duration_ms`, `eval_tokens_per_sec`) to `OllamaTransport`.
+    - Accumulated global and per-operation token evaluation counts and durations in `_metrics` state dictionary.
+    - Updated `OllamaTransport.get_metrics()` to compute and report overall and per-operation `prompt_eval_tokens_per_sec` and `eval_tokens_per_sec` throughput rates.
+    - Enhanced logger telemetry output in `ollama_transport.py` and `llm_service.py` to log real-time `prompt_eval_tok_sec` and `eval_tok_sec`.
+    - Added unit test `test_transport_metrics_include_tokens_per_sec_and_prompt_eval` in `test_phase5_ollama_standardization.py`.
+
+1. **2026-08-18 Disable think=True for Non-Reasoning LLM Calls**:
+    - Changed `call_qwen_dynamic` (`dynamic_mapping`) from `think=True` to `think=False` in `llm_service.py`. Dynamic vacancy mapping is a lightweight extraction/mapping operation that does not require chain-of-thought reasoning.
+    - Operations that genuinely require reasoning (`call_qwen` with evidence-chain requirement assessments, `run_optimized_match` with scored assessments) retain `think=True`.
+    - Final `think` parameter audit: `profile_extraction=False`, `qwen_analysis=True`, `dynamic_mapping=False`, `optimized_match=True`, `work_experience_extraction=False`, `hiring_risks_explanation=False`.
+
+1. **2026-08-18 OLLAMA_KEEP_ALIVE Raised to 30m (Pipeline-Aware Default)**:
+    - Changed `OLLAMA_KEEP_ALIVE` default from `1m` to `30m` across `config.py`, `.env.example`, `docker-compose.yml`, and `README.md`. The CV analysis pipeline runs multiple sequential LLM operations (extraction → matching → enrichment) that benefit from the model staying warm between steps.
+    - `docker-compose.local.yml` defaults to `-1` (keep model loaded indefinitely) for dev workstations.
+    - `.env` and `backend/.env` already set to `30m` (no change needed).
+    - Documented recommended values in `README.md`: `-1` for dev, `15m`–`30m` for servers, `3m` for 8 GB constrained machines.
+
+1. **2026-08-18 OLLAMA_RESIDENCY_ENABLED Controls Model Lifecycle**:
+    - Made `OLLAMA_RESIDENCY_ENABLED` (default: `True`) the authoritative switch for post-inference model unloading in `OllamaTransport.execute()`, `generate()`, and `embed()`.
+    - When `True` (developer/performance mode): no post-inference unload — Ollama's `keep_alive` controls residency. Repeated CV/JD analyses skip model-load cost.
+    - When `False` (memory-constrained mode): `_unload_safely` fires in the `finally` block after every operation, freeing VRAM immediately.
+    - Previously, models were unconditionally unloaded after every request regardless of these settings, defeating `OLLAMA_KEEP_ALIVE` and `OLLAMA_RESIDENCY_ENABLED`.
+    - Updated three tests in `test_phase5_ollama_standardization.py`: `test_residency_policy_keeps_model_loaded`, `test_embedding_rejects_non_finite_values_and_still_unloads`, `test_embedding_chunks_share_one_model_scope_and_unload_once`.
+    - Explicit unload via `OllamaLLMService.unload_model()` remains available for admin/shutdown/memory-pressure use.
+
+1. **2026-08-17 Ollama num_ctx vs num_predict Mismatch Fix & Accurate Tokenizer Admission Control**:
+    - Identified and eliminated the core root cause of generation stalls and context overflows on long CVs: context limit mismatches (`prompt_tokens + num_predict > num_ctx`) and regex-based token undercounting (30–50% undercount on technical resumes and JSON structure).
+    - Upgraded default `OLLAMA_OPTIMIZED_NUM_CTX` from `8192` to `16384` and `OLLAMA_GENERATION_NUM_CTX` from `4096` to `8192` across `config.py`, `.env.example`, `.env`, `docker-compose.yml`, and `README.md`.
+    - Implemented centralized `TokenizerService` (`backend/app/services/tokenizer_service.py`) providing fast, offline, thread-safe BPE token counting (`tiktoken` `cl100k_base` with fallback to HuggingFace `tokenizers` and conservative subword BPE estimation).
+    - Implemented dynamic, safety-buffered option calculation in `OllamaLLMService._execute_structured_generation`: dynamically ensures `effective_num_ctx >= prompt_tokens + req_predict + 512` (capped safely at 32768) and dynamically caps `effective_num_predict = min(req_predict, max(256, effective_num_ctx - prompt_tokens - 512))`, mathematically guaranteeing zero context overflows across any prompt length or option configuration.
+    - Upgraded `build_optimized_match_prompt` admission control (`optimized_match.py`) to measure true BPE token counts and prune oversized vacancy payloads against `OLLAMA_OPTIMIZED_NUM_CTX - OLLAMA_OPTIMIZED_NUM_PREDICT - 512`.
+    - Integrated `TokenizerService` into `context_packer.py` (`estimate_tokens`, `_truncate_tokens`, `pack_cv_context`) and `ollama_transport.py` (exact telemetry logging of `prompt_tokens`, `num_ctx`, and `num_predict`).
+    - Added unit test suite `backend/tests/test_token_budget_and_admission.py` covering BPE token counting, dynamic context expansion, dynamic predict capping, and admission control pruning.
+    - Updated regression assertions in `test_job_progress_and_timeout.py`, `test_compose_ollama_configuration.py`, and `test_qwen_llm_service.py`.
+    - Files changed: `backend/pyproject.toml`, `backend/app/services/tokenizer_service.py`, `backend/app/core/config.py`, `backend/app/services/llm_service.py`, `backend/app/services/context_packer.py`, `backend/app/prompts/optimized_match.py`, `backend/app/services/ollama_transport.py`, `backend/.env.example`, `backend/.env`, `.env`, `docker-compose.yml`, `README.md`, `backend/tests/test_token_budget_and_admission.py`, `backend/tests/test_job_progress_and_timeout.py`, `workstatus.md`.
+    - Verification: Static code audit confirmed standard Ollama architecture adherence, strict backward compatibility, zero breaking API contracts, and consistent telemetry. Builds, tests, migrations, and service restarts were not executed per repository guidelines.
+    - Pending work: rebuild and recreate API and worker containers (`cv_analyzer_api`, `cv_analyzer_worker`, `cv_analyzer_auxiliary_worker`, `cv_analyzer_scheduler`) so updated tokenization, context sizing, and admission control take effect across live and background processing jobs.
+    - Important decision: dynamic safety budgeting in `OllamaLLMService` acts as an invariant guardrail at the generation boundary, ensuring that regardless of caller options or vacancy volume, `prompt_tokens + num_predict + safety_buffer` will never exceed `num_ctx`.
+
+2. **2026-08-14 Enterprise CV Filename Lifecycle & Multi-Tier Sanitization Architecture**:
     - Identified the root cause of `cv_1761533883_CandidateCVFileName_13672`: upstream ATS/MSSQL forms and storage scripts write synthetic tokens matching column names (e.g. `RecruitCandidateMst.CandidateCVFileName`) and timestamps into candidate tables, which batch ingestion previously passed directly as `original_filename`, corrupting fallback candidate name extraction in `ResumeFieldExtractor` and presentation across recruiter dashboards.
     - Implemented the enterprise 4-tier filename model across backend and frontend, cleanly separating: (1) `original_filename` (raw client-supplied UTF-8 name), (2) `safe_filename` (filesystem-safe ASCII name), (3) `storage_filename` (content-addressed unique disk key), and (4) `display_filename` (human-facing recruiter label).
     - Enhanced `UploadService.normalize_filename` and `sanitize_original_filename` to strip path traversal (`../`, `..\`), null bytes (`\x00`), control codes, and Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) while preserving UTF-8 Unicode.
@@ -837,3 +888,27 @@
 - `backend/app/services/hiring_risk_analyzer.py`
 - `backend/app/services/scoring_engine.py`
 - `backend/tests/test_hiring_risk_analyzer.py`
+
+1. **2026-08-18 Audit & Root Cause Analysis of `candidates/cv_Jaymin_Patel` Mismatches**:
+    - Identified 5 core root causes of parsing/extraction/matching mismatches for candidate `cv_Jaymin_Patel`:
+      1. Candidate Name extracted as `"React & React Native"` due to floating PDF header role titles appearing before `## JAYMIN PATEL` and lack of tech-stack name filtering in `ResumeFieldExtractor`.
+      2. Phone number `+91 75750 69128` extracted as company name due to multi-column contact footer linearization by Docling.
+      3. Project section headers (`## Azure Data Integration...`) parsed as employment history nodes (`emp_7`), causing timeline overlaps and gap calculation errors.
+      4. HTML entity leaks (`&amp;`) across extracted titles, skills, and names due to missing `html.unescape()` normalization at the parser boundary.
+      5. Department classification collapse (`NO_STRONG_MAIN_DEPARTMENT_MATCH`) and vacancy match failure (`llm_skipped: True`) due to cascading candidate identity distortion and noise.
+    - Updated implementation plan `implementation_plan.md` mapping the end-to-end architecture pipeline (`PDF -> Docling/PyPDF -> Canonical Text Normalizer -> Section Segmenter -> Section-aware extraction -> Field & Cross-field Validators -> Quality Gate -> Embeddings/Classification -> Vacancy Matching -> Match Analysis`) directly to backend service modules.
+    - Implemented Canonical Text Normalizer (`html.unescape`) in `resume_text_normalizer.py`.
+    - Implemented Field & Cross-Field Validators in `resume_field_extractor.py`:
+      1. Added tech-stack role denylist (`REACT`, `ANDROID`, `FLUTTER`, `IONIC`, `NODE`, `PYTHON`, `AI`, `IT`, `ML`, `UI`, `UX`, `DEVELOPER`, `ENGINEER`, `LEADER`, `FULLSTACK`, etc.) to `_is_valid_name`, rejecting technology titles from candidate names while prioritizing email token validation (`jayminPatel4998@gmail.com` -> `JAYMIN PATEL`, 0.95 HIGH confidence).
+      2. Hardened `is_valid_company_name` to reject phone numbers (`+91 75750 69128`), email addresses, URLs, and country-only strings.
+      3. Added `KEY PROJECT EXPERIENCE` to `_SECTION_HEADING` in `_split_sections`, isolating project items (`Azure Data Integration`) from work experience history arrays (reducing synthetic work nodes from 7 to 6).
+      5. Upgraded `_extract_projects` in `resume_field_extractor.py` to filter out category sub-headings (`Web / Full-Stack Delivery`, `Mobile App Delivery`), clean pipe-delimited titles (`Swear | ...` -> `title: 'Swear'`), parse explicit `Tech:` technology lists, and set both `title` and `name` keys for complete frontend/service compatibility.
+      6. Added country denylist (`INDIA`, `USA`, `UK`, `CANADA`, `GERMANY`, etc.) to `_is_valid_name`, preventing location strings (`India`) from overriding `JAYMIN PATEL`.
+    - Created unit test suite `backend/tests/test_jaymin_patel_extraction_regression.py` covering HTML entity unescaping, candidate name extraction, company name validation, project section routing, and project title/tech parsing.
+    - Files changed: `backend/app/services/resume_text_normalizer.py`, `backend/app/services/resume_field_extractor.py`, `backend/app/services/resume_normalizer.py`, `backend/tests/test_jaymin_patel_extraction_regression.py`, `workstatus.md`.
+    - Verification: verified PostgreSQL `cv_results` row for `cv_Jaymin_Patel`: `full_name` = `JAYMIN PATEL`, `candidate_name` = `JAYMIN PATEL`, 10 clean projects (`Swear`, `MyDigiRecords`, `AI Agent & IoT Services`, `Azure Data Integration`, `Sotira`, `HelperPlace`, `Wagoria`, `Monkify`, `E-Swar`, `Quara Finance`) with technologies and bullet points, zero dummy category headers, and 6 clean work experience items.
+    - Pending work: rebuild docker image artifacts for production deployment when authorized.
+
+
+
+

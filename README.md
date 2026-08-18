@@ -258,7 +258,7 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `OLLAMA_UNLOAD_TIMEOUT_SECONDS` | `10` | Deadline for the mandatory unload request. |
 | `OLLAMA_MAX_RETRIES` | `0` | Retries after the initial request; local defaults avoid multiplying load. |
 | `OLLAMA_RETRY_BACKOFF_SECONDS` | `0.5` | Base exponential backoff. |
-| `OLLAMA_KEEP_ALIVE` | `1m` | Keeps one model resident only inside a bounded logical operation; explicit unload follows. |
+| `OLLAMA_KEEP_ALIVE` | `30m` | How long Ollama keeps a model loaded after the last request. Use `-1` for dev workstations, `15m`–`30m` for servers, `3m` for 8 GB constrained machines. |
 | `OLLAMA_UNLOAD_ON_SHUTDOWN` | `true` | Unloads configured generation and embedding models during shutdown as a final safeguard. |
 | `OLLAMA_MAX_CONNECTIONS` | `1` | Shared transport maximum connections. |
 | `OLLAMA_MAX_KEEPALIVE_CONNECTIONS` | `1` | Shared transport idle keep-alive connections. |
@@ -270,9 +270,9 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `OLLAMA_EMBEDDING_EXPECTED_DIMENSION` | `768` | Required vector dimension for the current pgvector/cache contract. |
 | `OLLAMA_EMBEDDING_MAX_DIMENSION` | `4096` | Defensive maximum vector dimension. |
 | `OLLAMA_LIVE_TESTS_ENABLED` | `false` | Explicit opt-in required by manual/live Ollama tests. |
-| `OLLAMA_GENERATION_NUM_CTX` | `4096` | Local-friendly generation context window. |
-| `OLLAMA_GENERATION_NUM_PREDICT` | `1024` | Output-token limit for profile and compatibility generation. |
-| `OLLAMA_OPTIMIZED_NUM_CTX` | `8192` | Dedicated context window for the larger optimized-match prompt and response. |
+| `OLLAMA_GENERATION_NUM_CTX` | `8192` | Local-friendly generation context window. |
+| `OLLAMA_GENERATION_NUM_PREDICT` | `1536` | Output-token limit for profile and compatibility generation. |
+| `OLLAMA_OPTIMIZED_NUM_CTX` | `16384` | Dedicated context window for the larger optimized-match prompt and response. |
 | `OLLAMA_OPTIMIZED_NUM_PREDICT` | `3072` | Output-token limit for optimized matching. |
 
 `backend/app/core/config.py` also defines scoring, matching, extraction-version, batch, recommendation, and retrieval tuning. Treat changes to parser, schema, prompt,
@@ -359,6 +359,31 @@ docker compose up -d pgvector redis
 docker compose --profile tools run --rm migrate-postgres
 docker compose up -d api worker auxiliary-worker scheduler
 ```
+
+### RAM/VRAM Performance Profiles
+
+Explicit local performance profiles are provided for different host hardware resource classes:
+
+| Class / Profile | Host Hardware | Worker RAM | Concurrency | Residency | `OLLAMA_KEEP_ALIVE` | Context (`NUM_CTX`) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **8 GB Profile** (`profile-8gb`) | 8 GB Unified RAM / Low VRAM | 2 GB limit | 1 worker | `false` | `3m` | 4096 / 8192 |
+| **16 GB Profile** (`profile-16gb`) | 16 GB Unified RAM / Medium VRAM | 4 GB limit | 2 workers | `true` | `30m` | 8192 / 16384 |
+| **32 GB+ Profile** (`profile-32gb`) | 32+ GB RAM / Dedicated GPU | 8 GB limit | 4 workers | `true` | `-1` | 16384 / 32768 |
+
+Run Docker Compose with an explicit performance profile override:
+
+```bash
+# 8 GB RAM / Constrained environment
+docker compose -f docker-compose.yml -f docker-compose.profile-8gb.yml up -d
+
+# 16 GB RAM / Standard workstation environment (Default)
+docker compose -f docker-compose.yml -f docker-compose.profile-16gb.yml up -d
+
+# 32+ GB RAM / High-Performance workstation environment
+docker compose -f docker-compose.yml -f docker-compose.profile-32gb.yml up -d
+```
+
+Corresponding environment templates (`.env.profile.8gb`, `.env.profile.16gb`, `.env.profile.32gb`) are provided in the repository root for non-containerized local processes.
 
 PostgreSQL normalized rule tables are the only source of CV rule configuration; Redis is a cache and the application has no bundled or hardcoded rule profile. On a
 clean database, `/config` directs an administrator to a structured initial setup screen generated from `GET /api/config/schema`. The completed options are validated

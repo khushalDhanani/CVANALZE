@@ -497,7 +497,9 @@ def test_residency_policy_keeps_model_loaded(monkeypatch):
 
     unload_calls = [request_call for request_call in client.stream.call_args_list if request_call.kwargs.get("json", {}).get("keep_alive") == 0]
     assert unload_calls == []
-    assert OllamaTransport.get_metrics()["residency_skips"] == 1
+    # With OLLAMA_RESIDENCY_ENABLED=True the finally block never calls
+    # _unload_safely, so residency_skips stays at 0.
+    assert OllamaTransport.get_metrics()["residency_skips"] == 0
 
 
 def test_circuit_breaker_fails_fast_after_threshold(monkeypatch):
@@ -748,6 +750,8 @@ def test_transport_serializes_parallel_ollama_calls(monkeypatch):
 
 
 def test_embedding_rejects_non_finite_values_and_still_unloads(monkeypatch):
+    """With OLLAMA_RESIDENCY_ENABLED=False (fixture default) the model is
+    unloaded even when the embedding request fails validation."""
     monkeypatch.setattr(settings, "OLLAMA_EMBEDDING_EXPECTED_DIMENSION", 0)
     
     mock_resp = httpx.Response(
@@ -771,6 +775,8 @@ def test_embedding_rejects_non_finite_values_and_still_unloads(monkeypatch):
 
 
 def test_embedding_chunks_share_one_model_scope_and_unload_once(monkeypatch):
+    """With OLLAMA_RESIDENCY_ENABLED=False (fixture default) the model is
+    unloaded exactly once after all embedding batches complete."""
     monkeypatch.setattr(settings, "OLLAMA_EMBEDDING_EXPECTED_DIMENSION", 0)
     monkeypatch.setattr(settings, "OLLAMA_EMBED_BATCH_SIZE", 1)
     client = _install_client(
@@ -784,3 +790,37 @@ def test_embedding_chunks_share_one_model_scope_and_unload_once(monkeypatch):
     assert result.value == [[0.1, 0.2], [0.2, 0.3]]
     unload_calls = [request_call for request_call in client.stream.call_args_list if request_call.kwargs.get("json", {}).get("keep_alive") == 0]
     assert len(unload_calls) == 1
+
+
+def test_transport_metrics_include_tokens_per_sec_and_prompt_eval(monkeypatch):
+    _disable_cache(monkeypatch)
+    client = _install_client(
+        monkeypatch,
+        _response({
+            "model": settings.OLLAMA_MODEL,
+            "response": "{}",
+            "done": True,
+            "done_reason": "stop",
+            "prompt_eval_count": 50,
+            "prompt_eval_duration": 100_000_000,  # 100ms -> 500.0 tokens/sec
+            "eval_count": 100,
+            "eval_duration": 200_000_000,  # 200ms -> 500.0 tokens/sec
+        }),
+    )
+
+    result = OllamaLLMService.call_qwen("analyze", "phase5", "test-metrics-key")
+    assert result is not None
+
+    metrics = OllamaTransport.get_metrics()
+    assert metrics["prompt_eval_count"] == 50
+    assert metrics["prompt_eval_duration_ms"] == 100.0
+    assert metrics["eval_count"] == 100
+    assert metrics["eval_duration_ms"] == 200.0
+    assert metrics["prompt_eval_tokens_per_sec"] == 500.0
+    assert metrics["eval_tokens_per_sec"] == 500.0
+
+    op_metrics = metrics["operations"]["qwen_analysis"]
+    assert op_metrics["prompt_eval_count"] == 50
+    assert op_metrics["prompt_eval_tokens_per_sec"] == 500.0
+    assert op_metrics["eval_tokens_per_sec"] == 500.0
+

@@ -176,8 +176,14 @@ class ResumeNormalizer:
             return NormalizedEmployment(evidence=[raw_value] if raw_value else [])
         title_raw = cls._as_string(item.get("job_title"))
         company_raw = cls._as_string(item.get("company"))
+        if company_raw and (re.search(r"^\+?\d[\d\s\.\-\(\)]+$", company_raw.strip()) or "@" in company_raw):
+            company_raw = ""
         dates_raw = cls._as_string(item.get("dates"))
-        responsibilities = [str(value).strip() for value in item.get("responsibilities") or [] if str(value).strip()]
+        raw_resps = [str(value).strip() for value in item.get("responsibilities") or [] if str(value).strip()]
+        responsibilities = [
+            resp for resp in raw_resps
+            if not (re.search(r"^\+?\d[\d\s\.\-\(\)]+$", resp) or "@" in resp or resp.lower() in {"india", "usa", "uk"})
+        ]
         description = cls._as_string(item.get("description"))
         evidence = [value for value in (title_raw, company_raw, dates_raw, description) if value] + responsibilities
         return NormalizedEmployment(

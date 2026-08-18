@@ -32,7 +32,7 @@ def test_ollama_settings_aligned():
     assert settings.OLLAMA_REQUEST_TIMEOUT == 180.0
     assert settings.LLM_TOP_N == 6
     assert settings.OLLAMA_GENERATE_TIMEOUT_SECONDS == 360.0
-    assert settings.OLLAMA_OPTIMIZED_NUM_CTX == 8192
+    assert settings.OLLAMA_OPTIMIZED_NUM_CTX == 16384
 
 
 def test_build_optimized_match_prompt_budget_within_context_limits():

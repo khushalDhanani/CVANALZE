@@ -81,8 +81,9 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
 
         compact_vacancies.append(item)
 
-    # Dynamic admission control: ensure prompt token budget never exceeds model context window headroom
-    max_prompt_token_budget = max(1000, settings.OLLAMA_OPTIMIZED_NUM_CTX - settings.OLLAMA_OPTIMIZED_NUM_PREDICT)
+    # Dynamic admission control: ensure prompt token budget never exceeds model context window headroom minus predict budget and safety buffer
+    safety_buffer = 512
+    max_prompt_token_budget = max(1000, settings.OLLAMA_OPTIMIZED_NUM_CTX - settings.OLLAMA_OPTIMIZED_NUM_PREDICT - safety_buffer)
     while len(compact_vacancies) > 1:
         trial_input = {
             "task": "Extract candidate profile, classify vacancy requirements, extract dual evidence, and analyze semantic fit.",
@@ -96,7 +97,7 @@ def build_optimized_match_prompt(cv_text: str, filtered_vacancies: list[dict[str
         pruned = compact_vacancies.pop()
         logger.info(
             f"[ADMISSION_CONTROL] Pruned vacancy {pruned.get('vacancy_id')} to respect token budget "
-            f"(estimated_tokens={trial_tokens} budget={max_prompt_token_budget})."
+            f"(trial_tokens={trial_tokens} budget={max_prompt_token_budget})."
         )
 
     structured_input = {
