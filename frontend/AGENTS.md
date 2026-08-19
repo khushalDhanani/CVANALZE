@@ -10,6 +10,14 @@ Read the root `AGENTS.md` first.
 
 ---
 
+# Frontend Work Logging (`workstats.md`)
+
+All frontend modifications, UI/UX improvements, new components, screens, hooks, types, API client integrations, and styling changes must be logged immediately upon completion into `workstats.md` at the repository root.
+
+Follow the append-only rule: never delete, overwrite, or edit past log entries; add each change as a new sequential entry (`### Entry #XXX`) at the bottom of the file.
+
+---
+
 # Frontend Mission
 
 The frontend is a recruiter-facing interface for:
@@ -756,6 +764,7 @@ Before considering frontend work complete, confirm as applicable:
 - accessibility is preserved;
 - no unrelated visual changes were introduced;
 - authorized lint/tests/build were actually run;
-- no verification is claimed unless executed.
+- no verification is claimed unless executed;
+- changes were logged immediately to root `workstats.md` (append-only).
 
 The recruiter should be able to understand the important candidate/vacancy outcome faster after the change, not slower.

@@ -46,7 +46,7 @@ Before changing code:
 
 1. Read this `AGENTS.md`.
 2. Read the nearest nested `AGENTS.md`, if one exists.
-3. Read `workstatus.md` when present.
+3. Review recent entries in `workstats.md` for relevant context.
 4. Inspect the relevant implementation before proposing changes.
 5. Search for existing helpers, schemas, services, repositories, components, tests, configuration, and compatibility adapters related to the task.
 6. Identify public contracts and downstream consumers before modifying shared behavior.
@@ -92,14 +92,13 @@ When cleanup is part of the task, verify references before deleting files or sym
 cv-analyzer/
 ├── AGENTS.md
 ├── README.md
-├── workstatus.md
+├── workstats.md
 ├── docker-compose.yml
 ├── docker-compose.local.yml
 │
 ├── backend/
 │   ├── AGENTS.md
 │   ├── app/
-│   ├── docs/
 │   ├── scripts/
 │   ├── tests/
 │   ├── uploads/
@@ -112,6 +111,20 @@ cv-analyzer/
     ├── AGENTS.md
     ├── src/
     └── package.json
+```
+
+---
+
+# Work Logging Protocol (`workstats.md`)
+
+`workstats.md` at the repository root is the permanent, append-only work log for all frontend, backend, infrastructure, and documentation changes.
+
+All AI coding agents MUST strictly follow these rules:
+
+1. **Immediate Logging**: Log every change, feature, bug fix, refactor, migration, and documentation update immediately into `workstats.md` upon completion.
+2. **Strict Append-Only**: Never delete, truncate, overwrite, or modify past log entries.
+3. **Sequential Entries**: Add each change as a new sequential entry (`### Entry #XXX`) at the end of the log.
+4. **Complete History**: Keep an unbroken historical record from start to finish, including timestamp, scope, category, author, modified files, summary, and detailed changes.
 ```
 
 ---
@@ -672,17 +685,19 @@ For a substantial implementation task:
 ```text
 1. Understand request
 2. Read applicable AGENTS.md files
-3. Inspect current architecture
-4. Search references/usages
-5. Identify root cause
-6. Identify affected contracts
-7. Design smallest generalized fix
-8. Implement
-9. Update tests
-10. Run authorized verification
-11. Review diff for unrelated changes
-12. Update documentation/workstatus if needed
-13. Report exact outcome and remaining risk
+3. Review workstats.md
+4. Inspect current architecture
+5. Search references/usages
+6. Identify root cause
+7. Identify affected contracts
+8. Design smallest generalized fix
+9. Implement
+10. Update tests
+11. Run authorized verification
+12. Review diff for unrelated changes
+13. Update documentation if needed
+14. Log changes immediately to workstats.md (append-only)
+15. Report exact outcome and remaining risk
 ```
 
 Do not jump directly from a reported symptom to code changes without locating the responsible layer.
@@ -724,6 +739,7 @@ Before considering a change complete, confirm as applicable:
 - tests were updated where behavior changed;
 - authorized verification was actually run;
 - no unrelated files were modified;
-- documentation reflects meaningful operational changes.
+- documentation reflects meaningful operational changes;
+- changes were logged immediately to workstats.md (append-only).
 
 Correctness, maintainability, compatibility, and evidence are more important than making a single test case pass.
