@@ -63,7 +63,7 @@ export function useCvUpload() {
   ]);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -82,7 +82,7 @@ export function useCvUpload() {
 
   const stopPollTimer = useCallback(() => {
     if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
+      clearTimeout(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
   }, []);
@@ -116,250 +116,266 @@ export function useCvUpload() {
   }, []);
 
   const pollCvStatus = useCallback(
-    async (cvKey: string, isEnriched: boolean = false) => {
+    (cvKey: string, isEnriched: boolean = false) => {
       stopPollTimer();
       let attempts = 0;
       let consecutiveErrors = 0;
-      pollIntervalRef.current = setInterval(async () => {
-        attempts++;
-        if (attempts > API_CONFIG.MAX_POLL_RETRIES) {
-          stopPollTimer();
-          stopTimer();
-          setUploading(false);
-          setError('Processing is taking longer than expected. The backend may still be working — please check the candidates list later.');
-          setStepStates((prev) => {
-            const next = [...prev];
-            next[currentStepIndexRef.current] = 'failed';
-            return next;
-          });
-          return;
-        }
 
-        try {
-          if (isEnriched) {
-            const res = await matchService.getMatchStatus(cvKey);
-            const resStatus = (res as any).status?.toUpperCase() || '';
-            const isFinished =
-              (resStatus === 'COMPLETED' ||
-                resStatus === 'COMPLETED_DEGRADED' ||
-                resStatus === 'NEW_CV' ||
-                resStatus === 'REPROCESSED' ||
-                resStatus === 'CACHE_HIT' ||
-                (res as any).progress === 100 ||
-                (res as any).is_complete === true) &&
-              resStatus !== 'PROCESSING';
-
-            if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
-              stopPollTimer();
-              stopTimer();
-              setUploading(false);
-              const failedRes = res as CVProcessingResponse;
-              const errMsg = failedRes.message || 'CV processing failed.';
-              setError(errMsg);
-              setErrorDetails(failedRes.error_details || null);
-              setFailedStepName(failedRes.failed_step || null);
-              
-              const stageMap: Record<string, number> = {
-                 'parsing': 2,
-                 'extraction': 3,
-                 'ai_analysis': 4,
-                 'matching': 5,
-                 'complete': 7
-              };
-              let fIndex = currentStepIndexRef.current;
-              if (failedRes.stage && stageMap[failedRes.stage] !== undefined) {
-                  fIndex = stageMap[failedRes.stage];
-              }
-              if (fIndex === 4 && !isEnriched) fIndex = 5;
-              
-              setCurrentStepIndex(fIndex);
-              setStepStates((prev) => {
-                const next = [...prev];
-                next[fIndex] = 'failed';
-                return next;
-              });
-            } else if (isFinished) {
-              stopPollTimer();
-              stopTimer();
-              if ('scan_id' in res || 'match_analysis' in res) {
-                setEnrichedResult(res as EnrichedCandidateAnalysis);
-              }
-              setUploading(false);
-              setIsComplete(true);
-              setCurrentStepIndex(7);
-              
-              const isCacheHit = resStatus === 'CACHE_HIT';
-              const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
-              setStatusMessage(
-                isDegraded
-                  ? 'Analysis completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
-                  : isCacheHit
-                    ? 'Loaded from cache instantly!'
-                    : 'Candidate analysis & job matching complete!'
-              );
-              
-              setStepStates([
-                'completed',
-                'completed',
-                'completed',
-                'completed',
-                isEnriched ? 'completed' : 'skipped',
-                'completed',
-                'completed',
-                'completed',
-              ]);
-            } else {
-              const procRes = res as CVProcessingResponse;
-              const stateLabel = getProcessingStateLabel(procRes);
-              const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Processing LLM match...';
-              setStatusMessage(msg);
-
-              const stageMap: Record<string, number> = {
-                 'validation': 1,
-                 'parsing': 2,
-                 'extraction': 3,
-                 'ai_analysis': 4,
-                 'matching': 5,
-                 'ranking': 6,
-                 'complete': 7
-              };
-              let nextStep = currentStepIndexRef.current;
-              if (procRes.stage && stageMap[procRes.stage] !== undefined) {
-                  nextStep = stageMap[procRes.stage];
-              } else {
-                  const prog = procRes.progress || 0;
-                  if (prog >= 90) nextStep = 6;
-                  else if (prog >= 75) nextStep = 5;
-                  else if (prog >= 50) nextStep = 4;
-                  else if (prog >= 35) nextStep = 3;
-                  else if (prog >= 20) nextStep = 2;
-                  else if (prog >= 10) nextStep = 1;
-              }
-
-              if (nextStep === 4 && !isEnriched) {
-                nextStep = 5;
-              }
-
-              setCurrentStepIndex(nextStep);
-              updateStepState(nextStep, 'active', isEnriched);
-              consecutiveErrors = 0;
-            }
-          } else {
-            const res = await cvService.getCvStatus(cvKey);
-            const resStatus = (res as any).status?.toUpperCase() || '';
-            const isFinished =
-              (resStatus === 'COMPLETED' ||
-                resStatus === 'COMPLETED_DEGRADED' ||
-                resStatus === 'NEW_CV' ||
-                resStatus === 'REPROCESSED' ||
-                resStatus === 'CACHE_HIT' ||
-                (res as any).progress === 100 ||
-                (res as any).is_complete === true) &&
-              resStatus !== 'PROCESSING';
-
-            if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
-              stopPollTimer();
-              stopTimer();
-              setUploading(false);
-              const failedRes = res as CVProcessingResponse;
-              const errMsg = failedRes.message || 'CV processing failed.';
-              setError(errMsg);
-              setErrorDetails(failedRes.error_details || null);
-              setFailedStepName(failedRes.failed_step || null);
-              
-              const stageMap: Record<string, number> = {
-                 'validation': 1,
-                 'parsing': 2,
-                 'extraction': 3,
-                 'ai_analysis': 4,
-                 'matching': 5,
-                 'ranking': 6,
-                 'complete': 7
-              };
-              let fIndex = currentStepIndexRef.current;
-              if (failedRes.stage && stageMap[failedRes.stage] !== undefined) {
-                  fIndex = stageMap[failedRes.stage];
-              }
-              if (fIndex === 4 && !isEnriched) fIndex = 5;
-              
-              setCurrentStepIndex(fIndex);
-              setStepStates((prev) => {
-                const next = [...prev];
-                next[fIndex] = 'failed';
-                return next;
-              });
-            } else if (isFinished) {
-              stopPollTimer();
-              stopTimer();
-              setBasicResult(res as CVUploadResponse);
-              setUploading(false);
-              setIsComplete(true);
-              setCurrentStepIndex(7);
-              const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
-              setStatusMessage(
-                isDegraded
-                  ? 'CV processing completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
-                  : 'CV parsing & job matching complete!'
-              );
-              setStepStates([
-                'completed',
-                'completed',
-                'completed',
-                'completed',
-                'skipped',
-                'completed',
-                'completed',
-                'completed',
-              ]);
-            } else {
-              const procRes = res as CVProcessingResponse;
-              const stateLabel = getProcessingStateLabel(procRes);
-              const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Parsing CV...';
-              setStatusMessage(msg);
-
-              const stageMap: Record<string, number> = {
-                 'validation': 1,
-                 'parsing': 2,
-                 'extraction': 3,
-                 'ai_analysis': 4,
-                 'matching': 5,
-                 'ranking': 6,
-                 'complete': 7
-              };
-              let nextStep = currentStepIndexRef.current;
-              if (procRes.stage && stageMap[procRes.stage] !== undefined) {
-                  nextStep = stageMap[procRes.stage];
-              } else {
-                  const prog = procRes.progress || 0;
-                  if (prog >= 90) nextStep = 6;
-                  else if (prog >= 75) nextStep = 5;
-                  else if (prog >= 50) nextStep = 5; // AI Analysis skipped
-                  else if (prog >= 35) nextStep = 3;
-                  else if (prog >= 20) nextStep = 2;
-                  else if (prog >= 10) nextStep = 1;
-              }
-
-              setCurrentStepIndex(nextStep);
-              updateStepState(nextStep, 'active', false);
-              consecutiveErrors = 0;
-            }
-          }
-        } catch (err: any) {
-          consecutiveErrors++;
-          console.warn(`[POLL_RETRY] Status check transient error (attempt ${consecutiveErrors}/5):`, err?.message);
-          if (consecutiveErrors >= 5) {
+      const scheduleNextPoll = () => {
+        pollIntervalRef.current = setTimeout(async () => {
+          attempts++;
+          if (attempts > API_CONFIG.MAX_POLL_RETRIES) {
             stopPollTimer();
             stopTimer();
             setUploading(false);
-            setError(err.message || 'Status check failed');
+            setError('Processing is taking longer than expected. The backend may still be working — please check the candidates list later.');
             setStepStates((prev) => {
               const next = [...prev];
               next[currentStepIndexRef.current] = 'failed';
               return next;
             });
+            return;
           }
-        }
-      }, API_CONFIG.POLL_INTERVAL_MS);
+
+          let shouldScheduleNext = true;
+
+          try {
+            if (isEnriched) {
+              const res = await matchService.getMatchStatus(cvKey);
+              const resStatus = (res as any).status?.toUpperCase() || '';
+              const isFinished =
+                (resStatus === 'COMPLETED' ||
+                  resStatus === 'COMPLETED_DEGRADED' ||
+                  resStatus === 'NEW_CV' ||
+                  resStatus === 'REPROCESSED' ||
+                  resStatus === 'CACHE_HIT' ||
+                  (res as any).progress === 100 ||
+                  (res as any).is_complete === true) &&
+                resStatus !== 'PROCESSING';
+
+              if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
+                shouldScheduleNext = false;
+                stopPollTimer();
+                stopTimer();
+                setUploading(false);
+                const failedRes = res as CVProcessingResponse;
+                const errMsg = failedRes.message || 'CV processing failed.';
+                setError(errMsg);
+                setErrorDetails(failedRes.error_details || null);
+                setFailedStepName(failedRes.failed_step || null);
+                
+                const stageMap: Record<string, number> = {
+                   'parsing': 2,
+                   'extraction': 3,
+                   'ai_analysis': 4,
+                   'matching': 5,
+                   'complete': 7
+                };
+                let fIndex = currentStepIndexRef.current;
+                if (failedRes.stage && stageMap[failedRes.stage] !== undefined) {
+                    fIndex = stageMap[failedRes.stage];
+                }
+                if (fIndex === 4 && !isEnriched) fIndex = 5;
+                
+                setCurrentStepIndex(fIndex);
+                setStepStates((prev) => {
+                  const next = [...prev];
+                  next[fIndex] = 'failed';
+                  return next;
+                });
+              } else if (isFinished) {
+                shouldScheduleNext = false;
+                stopPollTimer();
+                stopTimer();
+                if ('scan_id' in res || 'match_analysis' in res) {
+                  setEnrichedResult(res as EnrichedCandidateAnalysis);
+                }
+                setUploading(false);
+                setIsComplete(true);
+                setCurrentStepIndex(7);
+                
+                const isCacheHit = resStatus === 'CACHE_HIT';
+                const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
+                setStatusMessage(
+                  isDegraded
+                    ? 'Analysis completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
+                    : isCacheHit
+                      ? 'Loaded from cache instantly!'
+                      : 'Candidate analysis & job matching complete!'
+                );
+                
+                setStepStates([
+                  'completed',
+                  'completed',
+                  'completed',
+                  'completed',
+                  isEnriched ? 'completed' : 'skipped',
+                  'completed',
+                  'completed',
+                  'completed',
+                ]);
+              } else {
+                const procRes = res as CVProcessingResponse;
+                const stateLabel = getProcessingStateLabel(procRes);
+                const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Processing LLM match...';
+                setStatusMessage(msg);
+
+                const stageMap: Record<string, number> = {
+                   'validation': 1,
+                   'parsing': 2,
+                   'extraction': 3,
+                   'ai_analysis': 4,
+                   'matching': 5,
+                   'ranking': 6,
+                   'complete': 7
+                };
+                let nextStep = currentStepIndexRef.current;
+                if (procRes.stage && stageMap[procRes.stage] !== undefined) {
+                    nextStep = stageMap[procRes.stage];
+                } else {
+                    const prog = procRes.progress || 0;
+                    if (prog >= 90) nextStep = 6;
+                    else if (prog >= 75) nextStep = 5;
+                    else if (prog >= 50) nextStep = 4;
+                    else if (prog >= 35) nextStep = 3;
+                    else if (prog >= 20) nextStep = 2;
+                    else if (prog >= 10) nextStep = 1;
+                }
+
+                if (nextStep === 4 && !isEnriched) {
+                  nextStep = 5;
+                }
+
+                setCurrentStepIndex(nextStep);
+                updateStepState(nextStep, 'active', isEnriched);
+                consecutiveErrors = 0;
+              }
+            } else {
+              const res = await cvService.getCvStatus(cvKey);
+              const resStatus = (res as any).status?.toUpperCase() || '';
+              const isFinished =
+                (resStatus === 'COMPLETED' ||
+                  resStatus === 'COMPLETED_DEGRADED' ||
+                  resStatus === 'NEW_CV' ||
+                  resStatus === 'REPROCESSED' ||
+                  resStatus === 'CACHE_HIT' ||
+                  (res as any).progress === 100 ||
+                  (res as any).is_complete === true) &&
+                resStatus !== 'PROCESSING';
+
+              if (resStatus === 'FAILED' || resStatus === 'CANCELLED') {
+                shouldScheduleNext = false;
+                stopPollTimer();
+                stopTimer();
+                setUploading(false);
+                const failedRes = res as CVProcessingResponse;
+                const errMsg = failedRes.message || 'CV processing failed.';
+                setError(errMsg);
+                setErrorDetails(failedRes.error_details || null);
+                setFailedStepName(failedRes.failed_step || null);
+                
+                const stageMap: Record<string, number> = {
+                   'validation': 1,
+                   'parsing': 2,
+                   'extraction': 3,
+                   'ai_analysis': 4,
+                   'matching': 5,
+                   'ranking': 6,
+                   'complete': 7
+                };
+                let fIndex = currentStepIndexRef.current;
+                if (failedRes.stage && stageMap[failedRes.stage] !== undefined) {
+                    fIndex = stageMap[failedRes.stage];
+                }
+                if (fIndex === 4 && !isEnriched) fIndex = 5;
+                
+                setCurrentStepIndex(fIndex);
+                setStepStates((prev) => {
+                  const next = [...prev];
+                  next[fIndex] = 'failed';
+                  return next;
+                });
+              } else if (isFinished) {
+                shouldScheduleNext = false;
+                stopPollTimer();
+                stopTimer();
+                setBasicResult(res as CVUploadResponse);
+                setUploading(false);
+                setIsComplete(true);
+                setCurrentStepIndex(7);
+                const isDegraded = resStatus === 'COMPLETED_DEGRADED' || (res as any).persistence_status === 'degraded';
+                setStatusMessage(
+                  isDegraded
+                    ? 'CV processing completed, but PostgreSQL persistence failed. The result is available only from fallback storage.'
+                    : 'CV parsing & job matching complete!'
+                );
+                setStepStates([
+                  'completed',
+                  'completed',
+                  'completed',
+                  'completed',
+                  'skipped',
+                  'completed',
+                  'completed',
+                  'completed',
+                ]);
+              } else {
+                const procRes = res as CVProcessingResponse;
+                const stateLabel = getProcessingStateLabel(procRes);
+                const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Parsing CV...';
+                setStatusMessage(msg);
+
+                const stageMap: Record<string, number> = {
+                   'validation': 1,
+                   'parsing': 2,
+                   'extraction': 3,
+                   'ai_analysis': 4,
+                   'matching': 5,
+                   'ranking': 6,
+                   'complete': 7
+                };
+                let nextStep = currentStepIndexRef.current;
+                if (procRes.stage && stageMap[procRes.stage] !== undefined) {
+                    nextStep = stageMap[procRes.stage];
+                } else {
+                    const prog = procRes.progress || 0;
+                    if (prog >= 90) nextStep = 6;
+                    else if (prog >= 75) nextStep = 5;
+                    else if (prog >= 50) nextStep = 5; // AI Analysis skipped
+                    else if (prog >= 35) nextStep = 3;
+                    else if (prog >= 20) nextStep = 2;
+                    else if (prog >= 10) nextStep = 1;
+                }
+
+                setCurrentStepIndex(nextStep);
+                updateStepState(nextStep, 'active', false);
+                consecutiveErrors = 0;
+              }
+            }
+          } catch (err: any) {
+            consecutiveErrors++;
+            console.warn(`[POLL_RETRY] Status check transient error (attempt ${consecutiveErrors}/5):`, err?.message);
+            if (consecutiveErrors >= 5) {
+              shouldScheduleNext = false;
+              stopPollTimer();
+              stopTimer();
+              setUploading(false);
+              setError(err.message || 'Status check failed');
+              setStepStates((prev) => {
+                const next = [...prev];
+                next[currentStepIndexRef.current] = 'failed';
+                return next;
+              });
+            }
+          }
+
+          if (shouldScheduleNext) {
+            scheduleNextPoll();
+          }
+        }, API_CONFIG.POLL_INTERVAL_MS);
+      };
+
+      scheduleNextPoll();
     },
     [stopPollTimer, stopTimer, updateStepState, setCurrentStepIndex]
   );
