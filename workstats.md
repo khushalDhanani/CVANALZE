@@ -73,3 +73,95 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Updated `backend/AGENTS.md` with backend logging rules referencing `workstats.md` and added completion verification to Backend Definition of Done.
   - Updated `frontend/AGENTS.md` with frontend logging rules referencing `workstats.md` and added completion verification to Frontend Definition of Done.
 
+---
+
+### Entry #005
+- **Timestamp**: 2026-08-19 12:45:00 +05:30
+- **Scope**: Testing Infrastructure / Backend Tests
+- **Category**: Restructuring & Cleanup
+- **Author**: Antigravity Assistant
+- **Files Modified**:
+  - `backend/tests/conftest.py` [MODIFIED]
+  - `backend/tests/__init__.py` [NEW]
+  - `backend/tests/unit/__init__.py` [NEW]
+  - `backend/tests/unit/core/__init__.py` [NEW]
+  - `backend/tests/unit/core/test_config.py` [NEW]
+  - `backend/tests/unit/core/test_cache.py` [NEW]
+  - `backend/tests/unit/core/test_rule_config_manager.py` [NEW]
+  - `backend/tests/unit/core/test_security_and_access.py` [NEW]
+  - `backend/tests/unit/core/test_rate_limit_and_profiler.py` [NEW]
+  - `backend/tests/unit/schemas/__init__.py` [NEW]
+  - `backend/tests/unit/schemas/test_cv_schemas.py` [NEW]
+  - `backend/tests/unit/schemas/test_job_schemas.py` [NEW]
+  - `backend/tests/unit/schemas/test_match_and_scoring_schemas.py` [NEW]
+  - `backend/tests/unit/services/__init__.py` [NEW]
+  - `backend/tests/unit/services/test_document_conversion.py` [NEW]
+  - `backend/tests/unit/services/test_resume_field_extractor.py` [NEW]
+  - `backend/tests/unit/services/test_experience_calculation.py` [NEW]
+  - `backend/tests/unit/services/test_match_evaluators.py` [NEW]
+  - `backend/tests/unit/services/test_scoring_engine.py` [NEW]
+  - `backend/tests/unit/services/test_hiring_risk_analyzer.py` [NEW]
+  - `backend/tests/unit/services/test_embedding_and_search.py` [NEW]
+  - `backend/tests/unit/services/test_llm_and_prompt_service.py` [NEW]
+  - `backend/tests/unit/services/test_queue_and_batch_service.py` [NEW]
+  - `backend/tests/unit/services/test_taxonomy_service.py` [NEW]
+  - `backend/tests/unit/repositories/__init__.py` [NEW]
+  - `backend/tests/unit/repositories/test_processing_job_repo.py` [NEW]
+  - `backend/tests/unit/repositories/test_department_domain_repo.py` [NEW]
+  - `backend/tests/unit/models/__init__.py` [NEW]
+  - `backend/tests/unit/models/test_database_models.py` [NEW]
+  - `backend/tests/api/__init__.py` [NEW]
+  - `backend/tests/api/test_cv_endpoints.py` [NEW]
+  - `backend/tests/api/test_candidates_endpoints.py` [NEW]
+  - `backend/tests/api/test_analysis_endpoints.py` [NEW]
+  - `backend/tests/api/test_jobs_endpoints.py` [NEW]
+  - `backend/tests/api/test_batch_endpoints.py` [NEW]
+  - `backend/tests/api/test_config_endpoints.py` [NEW]
+  - `backend/tests/api/test_auth_and_org_endpoints.py` [NEW]
+  - `backend/tests/integration/__init__.py` [NEW]
+  - `backend/tests/integration/test_cv_processing_pipeline.py` [NEW]
+  - `backend/tests/integration/test_batch_workflow_pipeline.py` [NEW]
+  - `backend/tests/integration/test_hybrid_search_and_matching.py` [NEW]
+  - 115 legacy top-level `test_*.py` files [DELETED]
+- **Summary**: Removed 115 legacy, static, candidate-specific, and phase-scattered test files; created a clean, modular, maintainable test suite organized into unit, api, and integration layers.
+- **Details**:
+  - Deleted legacy phase files (`test_phase0_contracts.py` through `test_phase6_api_reliability.py`), candidate-specific regression tests (`test_jaymin_patel_extraction_regression.py`, `test_tarun_gupta_pipeline.py`), and monolithic audit dumps (`test_audit_fixes.py`).
+  - Rewrote `backend/tests/conftest.py` with centralized, safe fixtures (TestClient, isolated caches, mock rule configuration, mock taxonomy repository, mock prompt service, and synthetic test data factories).
+  - Created unit test suites for `core/` (config, cache, rule config manager, security, access policy, rate limit, profiler).
+
+### Entry #006
+- **Timestamp**: 2026-08-19T12:54:00+05:30
+- **Scope**: backend/tests
+- **Category**: Tests / Verification
+- **Author**: Antigravity Agent
+- **Modified Files**:
+  - `backend/tests/conftest.py`
+  - `backend/tests/api/test_analysis_endpoints.py`
+  - `backend/tests/api/test_candidates_endpoints.py`
+  - `backend/tests/api/test_jobs_endpoints.py`
+  - `backend/tests/unit/core/test_cache.py`
+  - `backend/tests/unit/core/test_rule_config_manager.py`
+  - `backend/tests/unit/models/test_database_models.py`
+  - `backend/tests/unit/repositories/test_department_domain_repo.py`
+  - `backend/tests/unit/repositories/test_processing_job_repo.py`
+  - `backend/tests/unit/schemas/test_cv_schemas.py`
+  - `backend/tests/unit/schemas/test_match_and_scoring_schemas.py`
+  - `backend/tests/unit/services/test_document_conversion.py`
+  - `backend/tests/unit/services/test_embedding_and_search.py`
+  - `backend/tests/unit/services/test_experience_calculation.py`
+  - `backend/tests/unit/services/test_hiring_risk_analyzer.py`
+  - `backend/tests/unit/services/test_queue_and_batch_service.py`
+  - `backend/tests/unit/services/test_resume_field_extractor.py`
+  - `backend/tests/unit/services/test_scoring_engine.py`
+  - `backend/tests/integration/test_batch_workflow_pipeline.py`
+  - `backend/tests/integration/test_cv_processing_pipeline.py`
+- **Summary**: Resolved all pytest collection errors, schema signature mismatches, MSSQL readonly startup check during test sessions, and assertions across the new test suite. Verified 89/89 tests passing (100% pass rate).
+- **Details**:
+  - Fixed collection import errors in schemas: replaced `SuitableOpening` with `JobMatchResult`, `CandidateContext` with `CandidateAnalysisContext`, and imported `DEFAULT_COMPONENT_WEIGHTS` and `ScoringConfig`.
+  - Added `disable_mssql_readonly_enforcement` autouse fixture to `conftest.py` ensuring isolated test suite runs cleanly without requiring external production MSSQL role boundaries.
+  - Aligned `ProcessingJobRecord` test instantiations with current schema fields (`storage_filename`, `parser_version`, `schema_version`, `state`, `attempt`).
+  - Corrected `ResumeFieldExtractor` method calls (`extract_candidate_name` with contact context and `_extract_skills`).
+  - Fixed `ExperienceCalculator` assertions to check `total_experience_years` and inclusive month parsing.
+  - Corrected API endpoint response expectations in `/api/jobs` and `/api/candidates/search`.
+  - Executed full backend test suite (`uv run pytest`) verifying 89 passed in 6.65s with zero errors or failures.
+
