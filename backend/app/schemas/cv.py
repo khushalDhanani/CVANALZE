@@ -25,6 +25,8 @@ class CVProcessingResponse(BaseModel):
     error_message: str | None = Field(default=None, description="Safe processing failure reason")
     error_retryable: bool | None = Field(default=None, description="Whether the failure can be retried")
     correlation_id: str | None = Field(default=None, description="Support correlation identifier")
+    analysis_run_id: str | None = Field(default=None, description="End-to-end analysis execution identifier")
+    analysis_version: str | None = Field(default=None, description="Version identifier for the current candidate analysis")
     job_id: str | None = Field(default=None, description="Content-addressed background processing job ID")
     job_state: str | None = Field(
         default=None,
@@ -40,6 +42,9 @@ class CVProcessingJobSummary(BaseModel):
     job_id: str
     cv_key: str
     filename: str
+    original_filename: str | None = None
+    display_filename: str | None = None
+    storage_filename: str | None = None
     job_state: str
     progress: int
     stage: str
@@ -52,6 +57,7 @@ class CVProcessingJobSummary(BaseModel):
     error_message: str | None = None
     error_retryable: bool | None = None
     correlation_id: str | None = None
+    analysis_run_id: str | None = None
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None = None
@@ -63,6 +69,9 @@ class CVUploadResponse(BaseModel):
     scan_id: str = Field(..., description="Unique scan execution ID (alias for id)")
     parsed_at: str | None = Field(None, description="ISO timestamp of parsing (alias for scanned_at)")
     filename: str = Field(..., description="Uploaded CV filename")
+    original_filename: str | None = Field(None, description="Original user/client uploaded filename")
+    display_filename: str | None = Field(None, description="Recruiter-facing display filename")
+    storage_filename: str | None = Field(None, description="Durable physical storage filename")
     content_type: str | None = Field(None, description="MIME content type")
     characters: int = Field(..., description="Total character count of extracted Markdown text")
     page_count: int = Field(..., description="Total number of pages in the document")
@@ -118,6 +127,8 @@ class CVUploadResponse(BaseModel):
     job_state: str | None = Field(default=None, description="Canonical background processing state")
     execution_mode: str | None = Field(default=None, description="Background execution mode")
     retry_count: int | None = Field(default=None, description="Number of processing attempts already started")
+    analysis_run_id: str | None = Field(default=None, description="End-to-end analysis execution identifier")
+    analysis_version: str | None = Field(default=None, description="Version identifier for the current candidate analysis")
 
 
 class CVMatchRequest(BaseModel):

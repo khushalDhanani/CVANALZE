@@ -191,18 +191,29 @@ def process_batch_job(batch_job_id: str) -> dict[str, str | int]:
                 for part in (candidate.CandidateFirstName, candidate.CandidateLastName)
                 if isinstance(part, str) and part.strip()
             ) or f"Candidate {candidate_id}"
-            filename = str(candidate.CandidateCVFileName)
-            identity = resolve_cv_identity(filename, candidate_id=candidate_id)
+
+            raw_db_filename = str(candidate.CandidateCVFileName or "").strip()
+            extension = str(getattr(candidate, "CandidateCVFileExtention", "") or "").lower().lstrip(".")
+            if not extension and "." in raw_db_filename:
+                extension = raw_db_filename.rsplit(".", 1)[-1].lower()
+            extension = extension if extension in ("pdf", "docx") else "pdf"
+
+            # Derive a clean human-readable original filename from candidate name instead of raw storage column
+            import re
+            clean_display_name = re.sub(r"[^A-Za-z0-9\s_-]+", "", candidate_name).strip().replace(" ", "_")
+            original_filename = f"{clean_display_name}_CV.{extension}" if clean_display_name else f"Candidate_{candidate_id}_CV.{extension}"
+
+            identity = resolve_cv_identity(raw_db_filename or original_filename, candidate_id=candidate_id)
             try:
                 source = UploadService.load_reprocessable_upload(
-                    storage_filename=filename,
-                    original_filename=filename,
+                    storage_filename=raw_db_filename,
+                    original_filename=original_filename,
                     cv_key=identity.canonical_key,
                 )
                 if source is None:
                     raise FileNotFoundError("CV file is missing.")
                 retained = UploadService.persist_bytes(
-                    filename=source.safe_filename,
+                    filename=original_filename,
                     content=source.content,
                     storage_key=identity.canonical_key,
                     declared_content_type=source.detected_content_type,
@@ -211,6 +222,8 @@ def process_batch_job(batch_job_id: str) -> dict[str, str | int]:
                     cv_key=identity.canonical_key,
                     content_hash=retained.content_hash,
                     filename=retained.safe_filename,
+                    original_filename=original_filename,
+                    display_filename=retained.display_filename,
                     storage_filename=retained.storage_filename,
                     content_type=retained.detected_content_type,
                     candidate_id=candidate_id,
@@ -220,7 +233,7 @@ def process_batch_job(batch_job_id: str) -> dict[str, str | int]:
                     BatchJobItem(
                         candidate_id=candidate_id,
                         candidate_name=candidate_name,
-                        filename=filename,
+                        filename=original_filename,
                         cv_key=identity.canonical_key,
                         processing_job_id=submission.record.job_id,
                     )
@@ -231,7 +244,7 @@ def process_batch_job(batch_job_id: str) -> dict[str, str | int]:
                     BatchJobItem(
                         candidate_id=candidate_id,
                         candidate_name=candidate_name,
-                        filename=filename,
+                        filename=original_filename,
                         cv_key=identity.canonical_key,
                         error="CV file could not be validated or queued.",
                     )

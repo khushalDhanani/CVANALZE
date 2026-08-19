@@ -269,6 +269,7 @@ class EmbeddingService:
     @classmethod
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
         if cls._is_model_throttled(model):
+            logger.warning(f"[EMBEDDING] request=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE retry_window_seconds=60")
             return None
 
         try:
@@ -293,6 +294,7 @@ class EmbeddingService:
     @classmethod
     def _call_ollama_batch_embed(cls, model: str, texts: list[str]) -> list[list[float]] | None:
         if cls._is_model_throttled(model):
+            logger.warning(f"[EMBEDDING] batch=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE retry_window_seconds=60")
             return None
 
         try:
@@ -333,11 +335,15 @@ def save_candidate_embedding(
     source_snapshot: str | None = None,
     source_watermark: Any = None,
     freshness_status: str = "FRESH",
+    profile_embedding: list[float] | None = None,
+    skills_embedding: list[float] | None = None,
+    experience_embedding: list[float] | None = None,
+    projects_embedding: list[float] | None = None,
+    domain_embedding: list[float] | None = None,
 ) -> bool:
     """
-    Upsert candidate embedding into PostgreSQL candidate_embeddings table keyed by cv_key.
+    Upsert candidate embedding and section multi-vectors into PostgreSQL candidate_embeddings table keyed by cv_key.
     Guarantees PostgreSQL commit succeeds BEFORE updating L2/L3 cache.
-    On DB failure: invokes pg_db.rollback() and re-raises exception (never populates cache).
     """
     from app.core.database import PostgresAppSession
 
@@ -351,34 +357,136 @@ def save_candidate_embedding(
 
         from app.models.pg import CandidateEmbedding
 
-        stmt = insert(CandidateEmbedding).values(
-            cv_key=cv_key,
-            embedding=embedding,
-            embedding_model_version=settings.EMBEDDING_MODEL,
-            content_hash=content_hash,
-            source_snapshot=source_snapshot,
-            source_watermark=source_watermark,
-            freshness_status=freshness_status,
-            updated_at=func.now(),
-        )
+        insert_values = {
+            "cv_key": cv_key,
+            "embedding": embedding,
+            "embedding_model_version": settings.EMBEDDING_MODEL,
+            "content_hash": content_hash,
+            "source_snapshot": source_snapshot,
+            "source_watermark": source_watermark,
+            "freshness_status": freshness_status,
+            "updated_at": func.now(),
+        }
+        if profile_embedding is not None:
+            insert_values["profile_embedding"] = profile_embedding
+        if skills_embedding is not None:
+            insert_values["skills_embedding"] = skills_embedding
+        if experience_embedding is not None:
+            insert_values["experience_embedding"] = experience_embedding
+        if projects_embedding is not None:
+            insert_values["projects_embedding"] = projects_embedding
+        if domain_embedding is not None:
+            insert_values["domain_embedding"] = domain_embedding
+
+        stmt = insert(CandidateEmbedding).values(**insert_values)
+
+        update_dict = {
+            "embedding": stmt.excluded.embedding,
+            "embedding_model_version": stmt.excluded.embedding_model_version,
+            "content_hash": stmt.excluded.content_hash,
+            "source_snapshot": stmt.excluded.source_snapshot,
+            "source_watermark": stmt.excluded.source_watermark,
+            "freshness_status": stmt.excluded.freshness_status,
+            "updated_at": func.now(),
+        }
+        if profile_embedding is not None:
+            update_dict["profile_embedding"] = stmt.excluded.profile_embedding
+        if skills_embedding is not None:
+            update_dict["skills_embedding"] = stmt.excluded.skills_embedding
+        if experience_embedding is not None:
+            update_dict["experience_embedding"] = stmt.excluded.experience_embedding
+        if projects_embedding is not None:
+            update_dict["projects_embedding"] = stmt.excluded.projects_embedding
+        if domain_embedding is not None:
+            update_dict["domain_embedding"] = stmt.excluded.domain_embedding
+
         stmt = stmt.on_conflict_do_update(
             index_elements=["cv_key"],
-            set_={
-                "embedding": stmt.excluded.embedding,
-                "embedding_model_version": stmt.excluded.embedding_model_version,
-                "content_hash": stmt.excluded.content_hash,
-                "source_snapshot": stmt.excluded.source_snapshot,
-                "source_watermark": stmt.excluded.source_watermark,
-                "freshness_status": stmt.excluded.freshness_status,
-                "updated_at": func.now(),
-            },
+            set_=update_dict,
         )
         pg_db.execute(stmt)
+
+        # Upsert section embeddings into candidate_section_embeddings table
+        from app.models.pg import CandidateSearchDocument, CandidateSectionEmbedding
+
+        section_map = {
+            "overall": embedding,
+            "profile": profile_embedding,
+            "skills": skills_embedding,
+            "experience": experience_embedding,
+            "projects": projects_embedding,
+            "domain": domain_embedding,
+        }
+
+        for s_type, s_vec in section_map.items():
+            if s_vec is not None:
+                sec_stmt = insert(CandidateSectionEmbedding).values(
+                    cv_key=cv_key,
+                    section_type=s_type,
+                    embedding=s_vec,
+                    embedding_model_version=settings.EMBEDDING_MODEL,
+                    content_hash=content_hash,
+                    freshness_status=freshness_status,
+                    created_at=func.now(),
+                    updated_at=func.now(),
+                )
+                sec_stmt = sec_stmt.on_conflict_do_update(
+                    constraint="uix_cv_key_section_type",
+                    set_={
+                        "embedding": sec_stmt.excluded.embedding,
+                        "embedding_model_version": sec_stmt.excluded.embedding_model_version,
+                        "content_hash": sec_stmt.excluded.content_hash,
+                        "freshness_status": sec_stmt.excluded.freshness_status,
+                        "updated_at": func.now(),
+                    },
+                )
+                pg_db.execute(sec_stmt)
+
+        # Upsert PostgreSQL FTS search document if source_snapshot or text available
+        if source_snapshot:
+            from app.services.candidate_search_document_builder import CandidateSearchDocumentBuilder
+
+            try:
+                import json
+                snap_dict = json.loads(source_snapshot) if isinstance(source_snapshot, str) and source_snapshot.startswith("{") else {}
+                markdown_text = snap_dict.get("markdown") or snap_dict.get("text") or ""
+                resume_json = snap_dict.get("resume_json") or {}
+
+                snapshot_text = CandidateSearchDocumentBuilder.build_fts_content_snapshot(markdown_text, resume_json)
+
+                doc_stmt = insert(CandidateSearchDocument).values(
+                    cv_key=cv_key,
+                    search_document=func.websearch_to_tsquery("english", snapshot_text) if snapshot_text else None,
+                    content_snapshot=snapshot_text,
+                    updated_at=func.now(),
+                )
+                doc_stmt = doc_stmt.on_conflict_do_update(
+                    index_elements=["cv_key"],
+                    set_={
+                        "content_snapshot": doc_stmt.excluded.content_snapshot,
+                        "updated_at": func.now(),
+                    },
+                )
+                pg_db.execute(doc_stmt)
+            except Exception as fts_exc:
+                logger.debug(f"[EMBEDDING] FTS document build non-fatal warning for cv_key='{cv_key}': {fts_exc}")
+
         pg_db.commit()
 
         # ONLY AFTER successful DB commit, update L2/L3 cache
         cache_key = f"{settings.EMBEDDING_MODEL}:{cv_key}"
         embedding_cache_manager.set(cache_key, embedding)
+        if profile_embedding:
+            embedding_cache_manager.set(f"{settings.EMBEDDING_MODEL}:profile:{cv_key}", profile_embedding)
+        if skills_embedding:
+            embedding_cache_manager.set(f"{settings.EMBEDDING_MODEL}:skills:{cv_key}", skills_embedding)
+        if experience_embedding:
+            embedding_cache_manager.set(f"{settings.EMBEDDING_MODEL}:experience:{cv_key}", experience_embedding)
+        if projects_embedding:
+            embedding_cache_manager.set(f"{settings.EMBEDDING_MODEL}:projects:{cv_key}", projects_embedding)
+        if domain_embedding:
+            embedding_cache_manager.set(f"{settings.EMBEDDING_MODEL}:domain:{cv_key}", domain_embedding)
+
         if content_hash and content_hash != cv_key:
             hash_cache_key = f"{settings.EMBEDDING_MODEL}:{content_hash}"
             embedding_cache_manager.set(hash_cache_key, embedding)
@@ -393,6 +501,34 @@ def save_candidate_embedding(
         raise
     finally:
         pg_db.close()
+
+
+def generate_candidate_multi_vector_embeddings(
+    cv_key: str,
+    markdown_text: str,
+    resume_json: dict[str, Any] | None = None,
+    domain_profile: dict[str, Any] | None = None,
+    model_version: str | None = None,
+) -> dict[str, list[float]]:
+    """
+    Generate distinct multi-vector embeddings for profile, skills, experience, projects, domain, and overall text.
+    Uses batch generation in a single HTTP payload to Ollama for maximum performance.
+    """
+    from app.services.candidate_vector_extractor import CandidateVectorTextExtractor
+
+    sections = CandidateVectorTextExtractor.build_section_texts(markdown_text, resume_json, domain_profile)
+    section_keys = ["overall", "profile", "skills", "experience", "projects", "domain"]
+    texts = [sections[k] for k in section_keys]
+
+    batch_res = EmbeddingService.generate_batch_embeddings(texts, model_version=model_version)
+
+    multi_vectors: dict[str, list[float]] = {}
+    for idx, k in enumerate(section_keys):
+        vec = batch_res.get(str(idx))
+        if vec:
+            multi_vectors[k] = vec
+
+    return multi_vectors
 
 
 def get_candidate_embedding_with_status(
@@ -465,6 +601,42 @@ def get_candidate_embedding_with_status(
         raise
     finally:
         pg_db.close()
+
+
+def get_candidate_multi_vectors(cv_key: str) -> dict[str, list[float]]:
+    """
+    Retrieve candidate multi-vector dictionary (overall, profile, skills, experience, projects, domain)
+    from PostgreSQL or cache.
+    """
+    from app.core.database import PostgresAppSession
+    from app.models.pg import CandidateEmbedding
+
+    vectors: dict[str, list[float]] = {}
+    if PostgresAppSession is None:
+        return vectors
+
+    pg_db = PostgresAppSession()
+    try:
+        rec = pg_db.query(CandidateEmbedding).filter(CandidateEmbedding.cv_key == cv_key).first()
+        if rec:
+            if rec.embedding:
+                vectors["overall"] = [float(x) for x in list(rec.embedding)]
+            if getattr(rec, "profile_embedding", None):
+                vectors["profile"] = [float(x) for x in list(rec.profile_embedding)]
+            if getattr(rec, "skills_embedding", None):
+                vectors["skills"] = [float(x) for x in list(rec.skills_embedding)]
+            if getattr(rec, "experience_embedding", None):
+                vectors["experience"] = [float(x) for x in list(rec.experience_embedding)]
+            if getattr(rec, "projects_embedding", None):
+                vectors["projects"] = [float(x) for x in list(rec.projects_embedding)]
+            if getattr(rec, "domain_embedding", None):
+                vectors["domain"] = [float(x) for x in list(rec.domain_embedding)]
+    except Exception as exc:
+        logger.warning(f"get_candidate_multi_vectors failed for cv_key={cv_key}: {exc}")
+    finally:
+        pg_db.close()
+
+    return vectors
 
 
 def get_candidate_embedding(cv_key: str) -> list[float] | None:

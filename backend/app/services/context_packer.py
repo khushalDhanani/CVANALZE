@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 
 from app.services.llm_input_security import sanitize_untrusted_text, wrap_untrusted_data
 from app.services.quality_metrics import QualityMetrics
+from app.services.tokenizer_service import TokenizerService
 
-_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+|[^\s]", re.UNICODE)
 _HEADING_PATTERN = re.compile(
     r"^\s*(?:#{1,6}\s*)?(summary|profile|objective|experience|employment|work history|skills?|education|qualifications?|certifications?|projects?|achievements?|languages?)\s*:?[\s#]*$",
     re.IGNORECASE,
@@ -26,16 +26,11 @@ class PackedContext:
 
 
 def estimate_tokens(value: str) -> int:
-    return len(_TOKEN_PATTERN.findall(value or ""))
+    return TokenizerService.count_tokens(value)
 
 
 def _truncate_tokens(value: str, limit: int) -> str:
-    if limit <= 0:
-        return ""
-    matches = list(_TOKEN_PATTERN.finditer(value))
-    if len(matches) <= limit:
-        return value
-    return value[: matches[limit - 1].end()].rstrip()
+    return TokenizerService.truncate_to_tokens(value, limit)
 
 
 def pack_cv_context(cv_text: str, *, max_tokens: int, deidentify: bool) -> PackedContext:

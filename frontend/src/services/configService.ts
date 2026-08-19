@@ -13,7 +13,7 @@ const getActiveConfig = (): Promise<UnifiedRuleConfig> => {
   return apiClient.get<UnifiedRuleConfig>('/api/config/active');
 };
 
-const toMatchEngineConfig = (config: UnifiedRuleConfig): MatchEngineConfigResponse => {
+export const toMatchEngineConfig = (config: UnifiedRuleConfig): MatchEngineConfigResponse => {
   const parameters = config.scoring.match.scoring_parameters;
   return {
     MATCH_HIGH_THRESHOLD: parameters.match_high_threshold,
@@ -23,10 +23,11 @@ const toMatchEngineConfig = (config: UnifiedRuleConfig): MatchEngineConfigRespon
     LLM_SEMANTIC_WEIGHT: parameters.llm_semantic_weight,
     MAX_LLM_BOOST: parameters.max_llm_boost,
     MATCH_COMPONENT_WEIGHTS: parameters.component_weights,
+    HIRING_RISK_POLICIES: config.hiring_risks?.policies || {},
   };
 };
 
-const applyMatchUpdate = (
+export const applyMatchUpdate = (
   activeConfig: UnifiedRuleConfig,
   payload: MatchEngineConfigUpdate,
   versionTag: string,
@@ -54,6 +55,10 @@ const applyMatchUpdate = (
           },
         },
       },
+    },
+    hiring_risks: {
+      ...activeConfig.hiring_risks,
+      policies: payload.HIRING_RISK_POLICIES ?? activeConfig.hiring_risks?.policies ?? {},
     },
   };
 };

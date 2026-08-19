@@ -14,6 +14,7 @@ from rq.intermediate_queue import IntermediateQueue
 from app.core.config import settings
 from app.core.config_listener import start_config_invalidation_listener
 from app.core.logging import logger
+from app.core.rq_worker_identity import build_rq_worker_name
 from app.core.rule_config_readiness import RUNTIME_READY, cv_runtime_readiness, wait_for_cv_runtime_dependencies
 from app.services.processing_queue import handle_work_horse_killed
 
@@ -38,17 +39,18 @@ class RuntimeDependencyWorker(Worker):
 def main():
     if settings.CV_PROCESSING_CONCURRENCY != 1:
         raise RuntimeError("CV_PROCESSING_CONCURRENCY must be 1.")
-    logger.info("Starting the single-slot RQ CV worker on queue '%s'.", settings.RQ_QUEUE_NAME)
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     conn = Redis.from_url(redis_url)
     wait_for_cv_runtime_dependencies(process_name="CV_WORKER")
     start_config_invalidation_listener()
 
     queue = Queue(settings.RQ_QUEUE_NAME, connection=conn)
+    worker_name = build_rq_worker_name(f"{settings.RQ_QUEUE_NAME}-worker")
+    logger.info("Starting single-slot RQ CV worker '%s' on queue '%s'.", worker_name, settings.RQ_QUEUE_NAME)
     worker = RuntimeDependencyWorker(
         [queue],
         connection=conn,
-        name=f"{settings.RQ_QUEUE_NAME}-worker-1",
+        name=worker_name,
         maintenance_interval=settings.RQ_MAINTENANCE_INTERVAL_SECONDS,
         work_horse_killed_handler=handle_work_horse_killed,
     )

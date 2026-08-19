@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -113,20 +114,28 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/health")
+@app.get("/api/health")
+@app.get("/api/v1/health")
 async def health() -> JSONResponse:
-    db_status = _database_health(mssql_read_engine, "MSSQL")
-    pg_status = _database_health(postgres_app_engine, "PostgreSQL")
-    redis_status = _redis_health()
-    rule_config_status = _rule_config_health()
-    prompt_status = _prompt_health()
+    dependency_checks = [
+        asyncio.to_thread(_database_health, mssql_read_engine, "MSSQL"),
+        asyncio.to_thread(_database_health, postgres_app_engine, "PostgreSQL"),
+        asyncio.to_thread(_redis_health),
+        asyncio.to_thread(_rule_config_health),
+        asyncio.to_thread(_prompt_health),
+    ]
+    ollama_enabled = settings.LLM_ENABLED or settings.EMBEDDING_ENABLED
+    if ollama_enabled:
+        from app.services.llm_service import OllamaLLMService
+
+        dependency_checks.append(asyncio.to_thread(OllamaLLMService.check_health))
+
+    dependency_results = await asyncio.gather(*dependency_checks)
+    db_status, pg_status, redis_status, rule_config_status, prompt_status = dependency_results[:5]
     from app.repositories.department_domain import department_domain_repository
 
     taxonomy_status = "online" if department_domain_repository.is_ready() else "configuration_required"
-    ollama_status = "disabled"
-    if settings.LLM_ENABLED or settings.EMBEDDING_ENABLED:
-        from app.services.llm_service import OllamaLLMService
-
-        ollama_status = "online" if OllamaLLMService.check_health() else "offline"
+    ollama_status = "online" if ollama_enabled and dependency_results[5] else "offline" if ollama_enabled else "disabled"
 
     dependency_statuses = (db_status, pg_status, redis_status, ollama_status, rule_config_status, prompt_status, taxonomy_status)
     overall_status = "ok" if all(status in ("online", "disabled") for status in dependency_statuses) else "unhealthy"

@@ -100,6 +100,8 @@ export interface CVMatchRequest {
   cv_text: string;
 }
 
+export type AnalysisExecutionState = 'NO_MATCH' | 'LLM_UNAVAILABLE' | 'LLM_TIMEOUT' | 'ANALYSIS_INVALID';
+
 export interface CVProcessingResponse {
   message: string;
   cv_key: string;
@@ -109,10 +111,11 @@ export interface CVProcessingResponse {
   is_complete?: boolean;
   failed_step?: string | null;
   error_details?: string | null;
-  error_code?: string | null;
+  error_code?: AnalysisExecutionState | string | null;
   error_message?: string | null;
   error_retryable?: boolean | null;
   correlation_id?: string | null;
+  analysis_run_id?: string | null;
   job_id?: string | null;
   job_state?: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED' | null;
   execution_mode?: 'RQ' | string | null;
@@ -126,6 +129,9 @@ export interface CVProcessingJobSummary {
   job_id: string;
   cv_key: string;
   filename: string;
+  original_filename?: string | null;
+  display_filename?: string | null;
+  storage_filename?: string | null;
   job_state: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'COMPLETED_DEGRADED' | 'FAILED' | 'CANCELLED';
   progress: number;
   stage: string;
@@ -138,6 +144,7 @@ export interface CVProcessingJobSummary {
   error_message?: string | null;
   error_retryable?: boolean | null;
   correlation_id?: string | null;
+  analysis_run_id?: string | null;
   created_at: string;
   updated_at: string;
   started_at?: string | null;
@@ -160,6 +167,33 @@ export interface MandatoryFailureDetails {
   description: string;
   reason: string;
   score_impact: number;
+  failure_code?: string;
+}
+
+export interface HiringRisk {
+  risk_code: string;
+  category: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN' | string;
+  title: string;
+  explanation: string;
+  evidence: string[];
+  source: string;
+  requires_manual_review: boolean;
+}
+
+export type HiringRiskSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+
+export interface HiringRiskPolicy {
+  enabled: boolean;
+  severity: HiringRiskSeverity;
+  manual_review: boolean;
+  category: string;
+  title?: string | null;
+  source?: string | null;
+}
+
+export interface HiringRiskConfig {
+  policies: Record<string, HiringRiskPolicy>;
 }
 
 export interface RequirementEvaluation {
@@ -172,6 +206,28 @@ export interface RequirementEvaluation {
   matched?: boolean;
   evidence?: DualEvidence | string;
   failure_reason?: string | null;
+}
+
+export interface LlmClassifiedRequirement {
+  requirement_id: string;
+  description: string;
+  tier: 'MANDATORY' | 'PREFERRED' | 'OPTIONAL' | string;
+  status: 'SATISFIED' | 'PARTIALLY_SATISFIED' | 'FAILED' | string;
+  failure_reason?: string | null;
+}
+
+export interface LlmRequirementAssessment {
+  requirement_id: string;
+  requirement: string;
+  category: string;
+  mandatory: boolean;
+  jd_evidence: string;
+  cv_evidence: string;
+  match_type: 'DIRECT' | 'INFERRED' | 'PARTIAL' | 'MISSING' | 'NOT_ASSESSABLE';
+  conclusion?: string;
+  rationale: string;
+  confidence: number;
+  impact: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
 export type CanonicalVacancyMatchStatus =
@@ -193,7 +249,7 @@ export interface VacancyFitScoreBreakdown {
   semantic_similarity_score: number;
   overall_fit_score: number;
   hierarchy_mismatch_penalty: number;
-  is_hierarchy_valid: boolean;
+  is_hierarchy_valid: boolean | null;
   match_status: string;
 }
 
@@ -248,11 +304,25 @@ export interface JobMatchScore {
   missing_criteria: string[];
   evidence: Record<string, DualEvidence>;
   confidence: number;
+  hiring_risks?: HiringRisk[];
   hr_review_required: boolean;
   reason: string;
   ranking_reason: string;
   llm_reason?: string | null;
+  semantic_reason?: string | null;
+  top_strength?: string | null;
+  main_concern?: string | null;
+  ai_match_explanation?: string | null;
   inferred_skills?: string[];
+  semantic_score_boost?: number | null;
+  calibrated_confidence?: number | null;
+  calibration_version?: string | null;
+  quality_flags?: string[];
+  retrieval_provenance?: Record<string, unknown>;
+  llm_classified_requirements?: LlmClassifiedRequirement[];
+  llm_evidence_snippets?: Record<string, DualEvidence>;
+  llm_requirement_assessments?: LlmRequirementAssessment[];
+  llm_model_used?: string | null;
   classification?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   retrieval_source?: 'keyword' | 'vector' | 'both' | string;
   vector_score?: number | null;
@@ -268,6 +338,7 @@ export interface CandidateMatchAnalysis {
   parsed_at: string;
   full_name?: string | null;
   candidate_name?: string | null;
+  primary_department?: string | null;
   best_match?: JobMatchScore | null;
   suitable_openings: JobMatchScore[];
   unsuitable_openings?: JobMatchScore[];
@@ -275,14 +346,19 @@ export interface CandidateMatchAnalysis {
 
 export interface EnrichedJobEvaluation extends JobMatchScore {
   llm_reason: string;
+  top_strength?: string | null;
+  main_concern?: string | null;
+  ai_match_explanation?: string | null;
   inferred_skills: string[];
-  semantic_score_boost: number;
+  semantic_score_boost?: number | null;
   classification: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   retrieval_source?: 'keyword' | 'vector' | 'both' | string;
   vector_score?: number | null;
 }
 
 export interface EnrichedCandidateAnalysis {
+  analysis_run_id?: string | null;
+  analysis_version?: string | null;
   status?: string | null;
   progress?: number | null;
   stage?: string | null;
@@ -293,13 +369,17 @@ export interface EnrichedCandidateAnalysis {
   parsed_at?: string;
   full_name?: string | null;
   candidate_name?: string | null;
-  primary_department?: string;
-  recommended_department?: string;
-  professional_domain?: string;
+  primary_department?: string | null;
+  recommended_department?: string | null;
+  professional_domain?: string | null;
   strengths?: string[];
   suitable_job_roles?: string[];
   has_genuine_match?: boolean;
   active_vacancy_summary?: string;
+  scoring_profile_code?: string | null;
+  scoring_profile_version?: string | null;
+  config_version?: string | null;
+  prompt_version?: string | null;
   ai_career_summary?: string;
   best_match?: EnrichedJobEvaluation | null;
   suitable_openings: EnrichedJobEvaluation[];
@@ -307,6 +387,9 @@ export interface EnrichedCandidateAnalysis {
   rejection_policy_note: string;
   llm_model_used?: string;
   llm_skipped?: boolean;
+  freshness_status?: string | null;
+  source_watermark?: string | null;
+  quality_metadata?: Record<string, unknown>;
   match_status?: CanonicalVacancyMatchStatus | string | null;
   hiring_recommendation?: CanonicalVacancyMatchStatus | string | null;
   normalized_resume?: any;
@@ -329,6 +412,9 @@ export interface OptimizedCandidateProfile {
 export interface OptimizedVacancyMatch {
   vacancy_id: number | string;
   semantic_reason?: string;
+  top_strength?: string;
+  main_concern?: string;
+  ai_match_explanation?: string;
   inferred_skills?: string[];
   matched_skills?: string[];
   missing_critical?: string[];
@@ -371,6 +457,9 @@ export interface CandidateResumeJson {
 export interface CVUploadResponse {
   scan_id: string;
   filename: string;
+  original_filename?: string | null;
+  display_filename?: string | null;
+  storage_filename?: string | null;
   parsed_at: string;
   markdown: string;
   full_name?: string | null;
@@ -393,6 +482,9 @@ export interface CVUploadResponse {
   field_confidence_tiers?: FieldConfidenceTiers | null;
   name_extraction_source?: string | null;
   id?: string | null;
+  analysis_run_id?: string | null;
+  analysis_version?: string | null;
+  result_generation_id?: string | null;
   candidate_id?: string | null;
   cv_id?: string | null;
   legacy_cv_keys?: string[] | null;
@@ -407,8 +499,28 @@ export interface CVUploadResponse {
   ocr_applied?: boolean | null;
   scanned_at?: string | null;
   created_at?: string | null;
+  matching_version?: string | null;
+  rule_config_version?: string | null;
+  hiring_risk_policy_version?: string | null;
+  hiring_risk_prompt_version?: string | null;
+  hiring_risk_prompt_identity?: string | null;
+  optimized_prompt_version?: string | null;
+  llm_model_version?: string | null;
   experience_years?: number | null;
+  total_experience_years?: number | null;
+  total_experience_months?: number | null;
+  gross_display?: string | null;
   seniority?: string | null;
+  dynamic_profile?: {
+    current_role?: string | null;
+    current_domain?: string | null;
+    relevant_experience_years?: number | null;
+    professional_domains?: string[] | null;
+    confidence?: string | null;
+    evidence_notes?: string | null;
+  } | null;
+  experience_gap_analysis?: Record<string, unknown> | null;
+  experience_summary?: Record<string, unknown> | null;
   work_experience?: Record<string, unknown>[] | null;
   education?: Array<string | Record<string, unknown>> | null;
   skills?: string[] | { all_skills?: string[]; skills?: string[]; categorized?: Record<string, string[]> } | null;
@@ -416,6 +528,7 @@ export interface CVUploadResponse {
   certifications?: Array<string | Record<string, unknown>> | Record<string, unknown> | null;
   resume_json?: CandidateResumeJson | null;
   normalized_resume?: Record<string, unknown> | null;
+  quality_metadata?: Record<string, unknown> | null;
   similar_candidates?: Array<Record<string, any>> | null;
   match_analysis?: CandidateMatchAnalysis | null;
   enriched_match_analysis?: EnrichedCandidateAnalysis | null;
@@ -466,6 +579,7 @@ export interface MatchEngineConfigResponse {
   LLM_SEMANTIC_WEIGHT: number;
   MAX_LLM_BOOST: number;
   MATCH_COMPONENT_WEIGHTS: MatchComponentWeights;
+  HIRING_RISK_POLICIES: Record<string, HiringRiskPolicy>;
 }
 
 export interface MatchEngineConfigUpdate {
@@ -476,6 +590,7 @@ export interface MatchEngineConfigUpdate {
   LLM_SEMANTIC_WEIGHT?: number;
   MAX_LLM_BOOST?: number;
   MATCH_COMPONENT_WEIGHTS?: Partial<MatchComponentWeights>;
+  HIRING_RISK_POLICIES?: Record<string, HiringRiskPolicy>;
 }
 
 export interface UnifiedMatchScoringParameters {
@@ -512,6 +627,7 @@ export interface UnifiedRuleConfig {
     domain_embedding: Record<string, unknown>;
   };
   workflow: Record<string, unknown>;
+  hiring_risks: HiringRiskConfig;
 }
 
 export interface ConfigVersionCreatedResponse {
@@ -614,6 +730,9 @@ export interface LlmHealthResponse {
   status: string;
   model_configured?: string;
   model_available?: boolean;
+  embedding_model_configured?: string | null;
+  embedding_model_available?: boolean;
+  missing_models?: string[];
   available_models?: string[];
   message?: string;
   error?: string;

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import functools
 import re
 from typing import Any
@@ -19,6 +20,7 @@ from app.schemas.match import (
 from app.schemas.profile import DynamicCandidateProfile
 from app.schemas.scoring_config import ScoringConfig
 from app.services.candidate_domain_service import CandidateDomainService
+from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
 from app.services.match_evaluators import (
     CareerTransitionEvaluator,
     ComponentScoreEvaluator,
@@ -142,10 +144,8 @@ class ScoringEngine:
         missing = []
 
         assets = RuleConfigManager.get_term_matching_assets()
-        noise_words = set(assets.get("noise_words", []))
-        noise_words.update(["general", "knowledge", "basic", "advanced", "good", "excellent", "working", "understanding", "hands-on", "familiarity", "experience", "skills", "ability"])
-        noise_words = list(noise_words)
-        aliases = assets["aliases"]
+        noise_words = set(assets.get("noise_words") or [])
+        aliases = assets.get("aliases") or {}
 
         def normalize_token(token: str) -> str:
             if len(token) > 4 and token.endswith("ies"):
@@ -296,6 +296,13 @@ class ScoringEngine:
 
         from app.services.match_evaluators import VacancyFitEvaluator
         resolved_cand_hierarchy = cand_hierarchy if cand_hierarchy is not None else getattr(context, "cand_hierarchy", None)
+        
+        llm_boost = 0.0
+        if llm_match and getattr(llm_match, 'semantic_fit_score', 0.0):
+            max_boost = typed_scoring_config.max_llm_boost
+            llm_weight = typed_scoring_config.component_weights.get("llm", 0.1)
+            llm_boost = min(max_boost, getattr(llm_match, 'semantic_fit_score', 0.0) * llm_weight)
+            
         fit_results = VacancyFitEvaluator.evaluate_fit(
             context=context,
             job=job_ctx,
@@ -304,6 +311,7 @@ class ScoringEngine:
             comp_results=comp_results,
             mandatory_failures=req_results.mandatory_failures,
             scoring_config=typed_scoring_config,
+            llm_boost=llm_boost,
         )
         if guard_results.is_domain_capped and guard_results.final_score < fit_results.vacancy_fit_score:
             fit_results.vacancy_fit_score = guard_results.final_score
@@ -326,7 +334,7 @@ class ScoringEngine:
             missing_criteria=req_results.missing_criteria,
         )
 
-        return JobMatchResult(
+        match_result = JobMatchResult(
             job_id=job_ctx.job_id,
             job_title=job_ctx.title,
             department=job_ctx.department,
@@ -365,6 +373,7 @@ class ScoringEngine:
             mandatory_failures=req_results.mandatory_failures,
             mandatory_fails=[
                 {
+                    "failure_code": f.failure_code,
                     "requirement": f.description,
                     "details": f.reason,
                     "impact": f.score_impact,
@@ -385,6 +394,10 @@ class ScoringEngine:
             candidate_job_family=context.cand_primary_family,
             vacancy_job_family=job_ctx.vac_family,
         )
+
+        HiringRiskAnalyzer.generate_risks(match_result, context, job_ctx)
+
+        return match_result
 
     @classmethod
     def analyze_cv(

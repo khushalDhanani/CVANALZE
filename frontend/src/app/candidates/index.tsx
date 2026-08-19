@@ -17,6 +17,7 @@ import {
   FieldConfidenceView,
   Breadcrumbs,
   ErrorBanner,
+  PageHeader,
 } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import {
@@ -225,8 +226,8 @@ export default function CandidateListScreen() {
     const phoneText = item.phone || '—';
 
     const subtitleNode = (
-      <View className="gap-1 mt-0.5">
-        <View className="flex-row flex-wrap items-center gap-3">
+      <View className="gap-0.5">
+        <View className="flex-row flex-wrap items-center gap-2">
           <View className="flex-row items-center gap-1">
             <Mail size={12} color={COLORS.textFaint} />
             <Text numberOfLines={1} className="font-sans text-xs text-text-muted">{emailText}</Text>
@@ -238,7 +239,7 @@ export default function CandidateListScreen() {
         </View>
 
         {/* 4 Rule-Config Fields: Job Title, Company, Location */}
-        <View className="gap-1 mt-0.5">
+        <View className="gap-0.5">
           <FieldConfidenceView
             fieldName="job_title"
             value={jobTitleVal}
@@ -246,7 +247,7 @@ export default function CandidateListScreen() {
             fallbackLabel="Job title not detected"
             textClassName="text-xs"
           />
-          <View className="flex-row flex-wrap items-center gap-3">
+          <View className="flex-row flex-wrap items-center gap-2">
             <FieldConfidenceView
               fieldName="company_name"
               value={item.company_name}
@@ -264,7 +265,7 @@ export default function CandidateListScreen() {
           </View>
         </View>
 
-        <Text numberOfLines={1} className="text-[11px] font-sans text-text-faint mt-0.5">
+        <Text numberOfLines={1} className="text-[11px] font-sans text-text-faint">
           File: {item.filename}
         </Text>
       </View>
@@ -305,30 +306,23 @@ export default function CandidateListScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Candidate Directory' }]} />
 
-      {/* Responsive PageHeader */}
-      <View className="flex-col sm:flex-row items-start sm:items-center justify-between px-3 py-2.5 bg-surface border-b border-border gap-3">
-        <View>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-base font-sans-bold text-text-primary">Candidate Directory</Text>
-            {searchQuery.trim() !== '' && (
-              <Badge
-                label={searchMode === 'semantic' ? 'Semantic Search' : 'Keyword Search'}
-                tone={searchMode === 'semantic' ? 'success' : 'neutral'}
-              />
-            )}
-          </View>
-          <Text className="text-[11px] font-sans text-text-muted">
-            Showing {filteredCandidates.length} of {totalFound || candidates.length} candidate records matching filters
-          </Text>
-        </View>
-        <Button
+      <PageHeader
+        title="Candidate Directory"
+        subtitle={`Showing ${filteredCandidates.length} of ${totalFound || candidates.length} candidate records matching filters`}
+        badge={searchQuery.trim() !== '' ? (
+          <Badge
+            label={searchMode === 'semantic' ? 'Semantic Search' : 'Keyword Search'}
+            tone={searchMode === 'semantic' ? 'success' : 'neutral'}
+          />
+        ) : undefined}
+        actions={<Button
           label="Refresh"
           variant="secondary"
           size="sm"
           onPress={() => refreshCandidates(buildSearchPayload())}
           disabled={loading}
-        />
-      </View>
+        />}
+      />
 
       <View className="flex-1 px-3 pt-3">
         {/* Search Input without unnecessary blank label space */}
@@ -450,7 +444,7 @@ export default function CandidateListScreen() {
 
         {/* Loading / Error / Data state */}
         {loading ? (
-          <View className="items-center justify-center flex-1 py-12">
+          <View className="items-center justify-center flex-1 py-8">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="mt-2 font-sans text-xs text-text-muted">
               Loading candidate directory...
@@ -484,7 +478,7 @@ export default function CandidateListScreen() {
                   subtitle="Upload or analyze CVs to populate the candidate directory."
                 />
               ) : (
-                <View className="items-center gap-3 py-6">
+                <View className="items-center gap-2 py-4">
                   <EmptyState
                     title="No Matching Candidate Records"
                     subtitle="No candidates match the active search criteria and filter rules."

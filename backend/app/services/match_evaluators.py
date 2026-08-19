@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,14 +25,8 @@ _EXPERIENCE_CLAUSE_RE = re.compile(
     r"\b\d+\s*\+?\s*(?:to\s*\d+\s*)?years?\b", re.IGNORECASE
 )
 
-_stop_phrases_cache: frozenset[str] | None = None
-
-
 def _stop_phrases() -> frozenset[str]:
-    global _stop_phrases_cache
-    if _stop_phrases_cache is None:
-        _stop_phrases_cache = RuleConfigManager.get_term_matching_assets()["stop_phrases"]
-    return _stop_phrases_cache
+    return RuleConfigManager.get_term_matching_assets().get("stop_phrases", frozenset())
 
 
 def is_ignorable_requirement(term: str | None) -> bool:
@@ -122,6 +117,126 @@ def _has_relevant_experience(
     return False
 
 
+def _calculate_relevant_experience(
+    context: CandidateAnalysisContext,
+    job: JobEvaluationContext,
+    extract_term_matches_fn: Any
+) -> float | None:
+    if not context.normalized_resume or not context.normalized_resume.employment:
+        return 0.0
+
+    from datetime import datetime
+
+    from app.core.rule_config_manager import RuleConfigManager
+    from app.services.experience_calculator import ExperienceCalculator
+    config = RuleConfigManager.get_config()
+    noise_words = set(w.lower() for w in config.scoring.match.term_matching.noise_words)
+    if not noise_words:
+        noise_words = {"manager", "senior", "lead", "associate", "analyst", "specialist", "executive", "director", "engineer", "developer", "consultant"}
+    sp = config.scoring.match.scoring_parameters
+    threshold_relevant = sp.experience_relevance_threshold # e.g. 7.0
+    threshold_partial = sp.experience_partial_threshold # e.g. 5.5
+
+    valid_intervals = []
+    has_unparsed = False
+    
+    from app.services.job_taxonomy import DynamicTaxonomyService
+    
+    # Pre-calculate job taxonomy family for contradiction check
+    job_family = job.vac_family if job.vac_family not in (None, "Unknown") else None
+    job_domain = job.vac_tax_domain if job.vac_tax_domain not in (None, "Unknown") else None
+
+    for emp in context.normalized_resume.employment:
+        evidence_score = 0.0
+        
+        emp_title = emp.job_title.normalized_value or emp.job_title.raw_value or ""
+        emp_text = " ".join([emp_title, *emp.responsibilities, *emp.evidence]).lower()
+        
+        # 1. Block-Level Taxonomy Alignment (+5.0)
+        # We classify this specific employment block independently
+        block_tax = DynamicTaxonomyService.resolve_vacancy_domain_and_family(
+            title=emp_title,
+            department="",
+            description=" ".join(emp.responsibilities),
+            required_skills=emp.evidence,
+            skip_vector=False
+        )
+        
+        # TaxonomyClassification returns 'job_family' and 'domain' (or 'industry_department' if DynamicTaxonomyResolution)
+        block_family = getattr(block_tax, "job_family", getattr(block_tax, "industry_department", None))
+        block_domain = getattr(block_tax, "domain", getattr(block_tax, "industry_domain", None))
+        
+        is_same_canonical_domain = False
+        if block_domain and block_domain != "Unknown" and job_domain and job_domain != "Unknown":
+            if block_domain.strip().lower() == job_domain.strip().lower():
+                is_same_canonical_domain = True
+
+        from app.services.job_taxonomy import TaxonomyClassifier
+        
+        if job_family and block_family:
+            is_parent_child = False
+            if is_same_canonical_domain and (job_family.strip().lower() == job_domain.strip().lower() or block_family.strip().lower() == block_domain.strip().lower()):
+                is_parent_child = True
+
+            if TaxonomyClassifier.are_families_compatible([block_family], job_family):
+                evidence_score += sp.block_weight_taxonomy
+            elif is_same_canonical_domain and is_parent_child:
+                evidence_score += sp.block_weight_taxonomy
+            elif is_same_canonical_domain:
+                evidence_score += (sp.block_weight_taxonomy * 0.5)
+            else:
+                # Contradiction: Block domain explicitly misaligns and no evidence bridging
+                evidence_score -= sp.block_weight_taxonomy
+
+        # 2. Job Title Match (Filtered) (+3.0)
+        if emp_title and job.title_words:
+            title_words = set(re.findall(r"\w+", emp_title.lower()))
+            filtered_title_words = title_words - noise_words
+            filtered_job_words = job.title_words - noise_words
+            
+            if filtered_title_words.intersection(filtered_job_words):
+                evidence_score += sp.block_weight_title
+        
+        # 3. Responsibilities / Skills Density (+2.0 per match)
+        matched_skills = 0
+        if job.required_skills:
+            matched, _ = extract_term_matches_fn(emp_text, job.required_skills)
+            matched_skills += len(matched)
+            
+        if job.responsibilities:
+            matched, _ = extract_term_matches_fn(emp_text, job.responsibilities)
+            matched_skills += len(matched)
+            
+        evidence_score += (matched_skills * sp.block_weight_skills)
+
+        # Threshold Evaluation
+        if evidence_score >= threshold_relevant:
+            status = "RELEVANT"
+        elif evidence_score >= threshold_partial:
+            status = "PARTIAL"
+        else:
+            status = "NOT_RELEVANT"
+
+        if status == "RELEVANT":
+            if not emp.interval.start_date:
+                has_unparsed = True
+                continue
+            
+            start_date = datetime.fromisoformat(emp.interval.start_date)
+            end_date = datetime.fromisoformat(emp.interval.end_date) if emp.interval.end_date else (datetime.now() if emp.interval.is_current else start_date)
+            valid_intervals.append((start_date, end_date))
+
+    if has_unparsed and not valid_intervals:
+        return None
+
+    if not valid_intervals:
+        return 0.0
+
+    merged = ExperienceCalculator._merge_intervals(valid_intervals)
+    total_days = sum((end - start).days + 1 for start, end in merged)
+    return round(total_days / 365.25, 1)
+
+
 @dataclass
 class RequirementEvaluationResults:
     mandatory_reqs: list[RequirementEvaluation] = field(default_factory=list)
@@ -133,6 +248,8 @@ class RequirementEvaluationResults:
     evidence_map: dict[str, DualEvidence] = field(default_factory=dict)
     matched_skills: list[str] = field(default_factory=list)
     missing_skills: list[str] = field(default_factory=list)
+    inferred_skills: list[str] = field(default_factory=list)
+    unverified_skills: list[str] = field(default_factory=list)
     matched_keywords: list[str] = field(default_factory=list)
     missing_keywords: list[str] = field(default_factory=list)
 
@@ -206,65 +323,20 @@ class RequirementEvaluator:
 
     @staticmethod
     def _create_failure(
+        failure_code: str,
         req_id: str,
         desc: str,
         reason: str,
         penalty: float,
     ) -> MandatoryFailureDetails:
         return MandatoryFailureDetails(
+            failure_code=failure_code,
             requirement_id=req_id,
             description=desc,
             reason=reason,
             score_impact=penalty,
         )
 
-    @staticmethod
-    def _match_semantic_skill_gaps(
-        context: CandidateAnalysisContext,
-        missing_skills: list[str],
-    ) -> list[str]:
-        if not missing_skills:
-            return []
-
-        from app.services.domain_embedding_service import DomainEmbeddingService
-        from app.services.embedding_service import EmbeddingService
-
-        threshold = RuleConfigManager.get_taxonomy_rules().semantic_match_threshold
-        noise_words = set(RuleConfigManager.get_term_matching_assets().get("noise_words", []))
-        candidate_terms = list(dict.fromkeys([
-            *context.professional_skills,
-            *context.experience_titles,
-            context.current_role or "",
-        ]))
-        resolved_matches: list[str] = []
-
-        for required_skill in missing_skills:
-            required_tokens = {
-                token for token in re.findall(r"[a-z0-9+#.]+", required_skill.lower())
-                if token not in noise_words and len(token) > 1
-            }
-            comparable_terms = [
-                term for term in candidate_terms
-                if term and required_tokens.intersection(re.findall(r"[a-z0-9+#.]+", term.lower()))
-            ]
-            comparable_terms = list(dict.fromkeys(comparable_terms))
-            if not comparable_terms:
-                continue
-
-            all_terms = [required_skill, *comparable_terms]
-            embeddings = DomainEmbeddingService.get_or_generate_domain_embeddings(all_terms, "skills")
-            requirement_embedding = embeddings.get(required_skill.strip().lower())
-            if not requirement_embedding:
-                continue
-            if any(
-                candidate_embedding
-                and EmbeddingService.cosine_similarity(requirement_embedding, candidate_embedding) >= threshold
-                for candidate_term in comparable_terms
-                if (candidate_embedding := embeddings.get(candidate_term.strip().lower())) is not None
-            ):
-                resolved_matches.append(required_skill)
-
-        return resolved_matches
 
     @classmethod
     def evaluate(
@@ -299,6 +371,10 @@ class RequirementEvaluator:
 
         # 1. Mandatory Skills
         matched_skills, missing_skills = extract_term_matches_fn(context.norm_text, req_skills)
+        
+        # Determine LLM provenance
+        llm_core_matched, _ = extract_term_matches_fn(" ".join(context.llm_core_skills), req_skills)
+        llm_inferred_matched, _ = extract_term_matches_fn(" ".join(context.llm_inferred_skills), req_skills)
 
         results.matched_skills = matched_skills
         results.missing_skills = missing_skills
@@ -313,7 +389,12 @@ class RequirementEvaluator:
             requirement_label = "Mandatory Skill Requirement" if skills_are_mandatory else "Additional Knowledge Requirement"
             vac_ev = f"{requirement_label}: {skill}"
             if skill in matched_skills:
-                cv_ev = f"CV contains skill: '{skill}'"
+                provenance = "VERIFIED_CV"
+                cv_ev = f"[{provenance}] CV explicitly contains skill: '{skill}'"
+                if skill in llm_core_matched:
+                    provenance = "GROUNDED_LLM"
+                    cv_ev = f"[{provenance}] LLM core skill grounded in explicit CV text: '{skill}'"
+                
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 target_requirements = results.mandatory_reqs if skills_are_mandatory else results.preferred_reqs
                 target_requirements.append(
@@ -327,8 +408,48 @@ class RequirementEvaluator:
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Skill ({skill})")
+            elif skill in llm_inferred_matched or skill in llm_core_matched:
+                provenance = "INFERRED_LLM" if skill in llm_inferred_matched else "UNVERIFIED_LLM"
+                if skills_are_mandatory:
+                    cv_ev = f"[{provenance}] LLM generated skill '{skill}', but cannot satisfy mandatory requirement."
+                    ev = cls._create_evidence(cv_ev, vac_ev)
+                    reason = f"Candidate CV lacks explicit/grounded evidence for mandatory skill '{skill}'."
+                    results.mandatory_reqs.append(
+                        cls._create_requirement(
+                            req_id,
+                            f"Skill: {skill}",
+                            RequirementTier.MANDATORY,
+                            RequirementStatus.FAILED,
+                            ev,
+                            failure_reason=reason,
+                        )
+                    )
+                    results.evidence_map[req_id] = ev
+                    results.mandatory_failures.append(cls._create_failure("MISSING_MANDATORY_SKILL", req_id, f"Mandatory Skill: {skill}", reason, penalty))
+                    results.missing_criteria.append(f"Mandatory Skill ({skill})")
+                else:
+                    cv_ev = f"[{provenance}] LLM generated skill: '{skill}'"
+                    ev = cls._create_evidence(cv_ev, vac_ev)
+                    results.preferred_reqs.append(
+                        cls._create_requirement(
+                            req_id,
+                            f"Skill: {skill}",
+                            RequirementTier.PREFERRED,
+                            RequirementStatus.SATISFIED,
+                            ev,
+                        )
+                    )
+                    results.evidence_map[req_id] = ev
+                    results.matched_criteria.append(f"Skill ({skill})")
+                    # Move from missing to inferred/unverified
+                    if skill in results.missing_skills:
+                        results.missing_skills.remove(skill)
+                        if provenance == "INFERRED_LLM":
+                            results.inferred_skills.append(skill)
+                        else:
+                            results.unverified_skills.append(skill)
             else:
-                cv_ev = f"CV missing required skill: '{skill}'"
+                cv_ev = f"[MISSING] CV missing required skill: '{skill}'"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 reason = f"Candidate CV lacks documented skill '{skill}'."
                 target_requirements = results.mandatory_reqs if skills_are_mandatory else results.preferred_reqs
@@ -344,7 +465,7 @@ class RequirementEvaluator:
                 )
                 results.evidence_map[req_id] = ev
                 if skills_are_mandatory:
-                    results.mandatory_failures.append(cls._create_failure(req_id, f"Mandatory Skill: {skill}", reason, penalty))
+                    results.mandatory_failures.append(cls._create_failure("MISSING_MANDATORY_SKILL", req_id, f"Mandatory Skill: {skill}", reason, penalty))
                     results.missing_criteria.append(f"Mandatory Skill ({skill})")
                 else:
                     results.missing_criteria.append(f"Skill Gap ({skill})")
@@ -376,7 +497,7 @@ class RequirementEvaluator:
         if min_exp is not None:
             req_id = "req_min_experience"
             vac_ev = f"Mandatory Minimum Experience: {min_exp} years"
-            if has_relevant_experience and context.candidate_experience is not None and context.candidate_experience >= min_exp:
+            if context.candidate_experience is not None and context.candidate_experience >= min_exp:
                 cv_ev = f"Candidate experience {context.candidate_experience} years meets minimum requirement ({min_exp} years)"
                 ev = cls._create_evidence(cv_ev, vac_ev)
                 results.mandatory_reqs.append(
@@ -394,8 +515,8 @@ class RequirementEvaluator:
                 exp_val = context.candidate_experience if context.candidate_experience is not None else 0.0
                 cv_ev = f"Candidate experience {exp_val} years is below minimum required ({min_exp} years)"
                 reason = (
-                    f"Candidate experience ({exp_val} yrs) is not relevant to the vacancy domain or responsibilities."
-                    if context.candidate_experience is not None and context.candidate_experience >= min_exp and not has_relevant_experience
+                    f"Candidate lacks any relevant experience; {exp_val} years total experience is below minimum ({min_exp} years)."
+                    if context.candidate_experience is not None and context.candidate_experience >= min_exp
                     else f"Candidate experience ({exp_val} yrs) is less than required minimum ({min_exp} yrs)."
                 )
                 ev = cls._create_evidence(cv_ev, vac_ev)
@@ -410,7 +531,7 @@ class RequirementEvaluator:
                     )
                 )
                 results.evidence_map[req_id] = ev
-                results.mandatory_failures.append(cls._create_failure(req_id, f"Min Experience: {min_exp} years", reason, penalty))
+                results.mandatory_failures.append(cls._create_failure("MIN_EXPERIENCE_FAILED", req_id, f"Min Experience: {min_exp} years", reason, penalty))
                 results.missing_criteria.append(f"Min Experience ({min_exp} years)")
 
         # 4. Education alignment is scored and surfaced as a conflict, but it
@@ -486,6 +607,7 @@ class RequirementEvaluator:
                 results.evidence_map[req_id] = ev
                 results.mandatory_failures.append(
                     cls._create_failure(
+                        "MISSING_CERTIFICATION",
                         req_id,
                         f"Mandatory Certification: {certification_req}",
                         reason,
@@ -512,7 +634,7 @@ class RequirementEvaluator:
                 )
             )
             results.evidence_map[req_id] = ev
-            results.mandatory_failures.append(cls._create_failure(req_id, f"Max CTC Budget: {max_ctc}", reason, penalty))
+            results.mandatory_failures.append(cls._create_failure("CTC_MISMATCH", req_id, f"Max CTC Budget: {max_ctc}", reason, penalty))
             results.missing_criteria.append(f"Max CTC Budget ({max_ctc})")
 
         # 7. Preferred Upper Experience Limit
@@ -665,13 +787,22 @@ class ComponentScoreEvaluator:
             matched_responsibilities, _ = extract_term_matches_fn(context.domain_candidate_text or context.norm_text, job_ctx.responsibilities)
             has_relevant_experience = _has_relevant_experience(context, job_ctx, matched_responsibilities)
             experience_score = typed_config.perfect_component_score if has_relevant_experience else 0.0
-            if has_relevant_experience and min_exp is not None and context.candidate_experience is not None and context.candidate_experience < min_exp:
+            
+            relevant_exp = _calculate_relevant_experience(context, job_ctx, extract_term_matches_fn)
+            
+            if min_exp is not None and relevant_exp is not None and relevant_exp < min_exp:
                 if min_exp > 0:
-                    experience_score = (context.candidate_experience / min_exp) * params.below_min_exp_multiplier
+                    experience_score = (relevant_exp / min_exp) * params.below_min_exp_multiplier
                 else:
                     experience_score = 0.0
-            if has_relevant_experience and max_exp is not None and context.candidate_experience is not None and context.candidate_experience > max_exp:
+                req_results.mandatory_failures.append(RequirementEvaluator._create_failure("MIN_EXPERIENCE_FAILED", "req_exp", f"Minimum Experience: {min_exp} years", f"Only {relevant_exp:.1f} years of relevant experience found.", penalty))
+            if max_exp is not None and relevant_exp is not None and relevant_exp > max_exp:
                 experience_score -= params.overqualification_penalty
+            
+            # If dates were unparseable, relevant_exp is None
+            if relevant_exp is None and min_exp is not None:
+                req_results.mandatory_failures.append(RequirementEvaluator._create_failure("EXPERIENCE_UNKNOWN", "req_exp", f"Minimum Experience: {min_exp} years", "Experience is UNKNOWN due to unparseable dates (requires manual review).", penalty))
+                
             experience_score = max(0.0, min(typed_config.perfect_component_score, experience_score))
 
         # 4. Education Score
@@ -762,9 +893,10 @@ class ComponentScoreEvaluator:
                 reason_str += f" | Education mismatch requires HR review: vacancy requires '{education_req}'."
 
         # Penalty for keyword-only matches (0% skills match but high domain/other scores)
-        if skills_score is not None and skills_score == 0.0 and final_score > 40.0:
-            final_score = min(final_score, 40.0)
-            reason_str += " | Capped score due to 0% skills match (keyword-only match)."
+        zero_skills_cap = getattr(typed_config, "zero_skills_score_cap", getattr(params, "zero_skills_score_cap", 40.0))
+        if skills_score is not None and skills_score == 0.0 and final_score > zero_skills_cap:
+            final_score = min(final_score, zero_skills_cap)
+            reason_str += f" | Capped score due to 0% skills match (keyword-only match, cap: {zero_skills_cap}%)."
 
         return ComponentScoreResults(
             role_score=role_score,
@@ -821,8 +953,15 @@ class CrossDomainGuardEvaluator:
 
         is_tax_compat = TaxonomyClassifier.are_families_compatible(context.cand_families, vac_family)
 
+        cand_domain = context.cand_tax_domain or context.cand_domain
+        taxonomy_confident = context.taxonomy_confidence >= RuleConfigManager.get_taxonomy_rules().semantic_match_threshold
+        is_same_canonical_domain = False
+        if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
+            if cand_domain.strip().lower() == vac_tax_domain.strip().lower():
+                is_same_canonical_domain = True
+
         domain_mismatch = False
-        if vac_family not in (None, "Unknown") and context.cand_primary_family not in (None, "Unknown"):
+        if taxonomy_confident and not is_same_canonical_domain and vac_family not in (None, "Unknown") and context.cand_primary_family not in (None, "Unknown"):
             if not is_tax_compat:
                 # Don't cap sub-families of the same root department
                 if not cls._share_root_family(context.cand_primary_family, vac_family):
@@ -833,11 +972,10 @@ class CrossDomainGuardEvaluator:
                 if (not is_compat or (score is not None and score < compatibility_threshold)) and not cls._share_root_family(context.cand_primary_family, vac_family):
                     domain_mismatch = True
 
-        cand_domain = context.cand_domain or context.cand_tax_domain
-        if cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
+        if taxonomy_confident and cand_domain and cand_domain != "Unknown" and vac_tax_domain and vac_tax_domain != "Unknown":
             cand_d_norm = cand_domain.strip().lower()
             vac_d_norm = vac_tax_domain.strip().lower()
-            if cand_d_norm != vac_d_norm:
+            if not is_same_canonical_domain:
                 def domain_groups(label: str) -> set[str]:
                     return {
                         group_name
@@ -878,6 +1016,7 @@ class CrossDomainGuardEvaluator:
             if not any(f.requirement_id == "req_domain_mismatch" for f in mandatory_failures):
                 additional_failures.append(
                     MandatoryFailureDetails(
+                        failure_code="DOMAIN_MISMATCH",
                         requirement_id="req_domain_mismatch",
                         description=f"Domain Mismatch: Candidate family ({context.cand_primary_family or 'Unknown'}) conflicts with vacancy family ({vac_family})",
                         reason=f"Candidate job family ({context.cand_primary_family or 'Unknown'}) is incompatible with target job family ({vac_family}).",
@@ -1006,6 +1145,7 @@ class VacancyFitEvaluator:
         mandatory_failures: list[MandatoryFailureDetails] | None = None,
         scoring_config: Any | None = None,
         threshold: float | None = None,
+        llm_boost: float = 0.0,
     ) -> VacancyFitResults:
         from app.schemas.match import VacancyFitScoreBreakdown
         from app.services.embedding_service import EmbeddingService
@@ -1125,7 +1265,7 @@ class VacancyFitEvaluator:
         ]
         active_weight = sum(weight for _, weight, active in fit_components if active and weight > 0.0)
         weighted_score = sum(score * weight for score, weight, active in fit_components if active and weight > 0.0)
-        raw_fit_score = weighted_score / active_weight if active_weight > 0.0 else 0.0
+        raw_fit_score = (weighted_score / active_weight if active_weight > 0.0 else 0.0) + llm_boost
 
         # Guardrail: High embedding similarity CANNOT override wrong department / invalid hierarchy
         hard_failures = list(mandatory_failures or [])
@@ -1139,7 +1279,7 @@ class VacancyFitEvaluator:
                     "reason": f"Candidate has {cand_exp:.1f} years; vacancy requires {min_exp:.1f} years.",
                 }
             )
-        rejection_cap = max(0.0, typed_config.match_medium_threshold - 0.1)
+        rejection_cap = typed_config.calculate_rejection_cap()
         if hard_failures:
             final_fit_score = round(min(rejection_cap, max(0.0, raw_fit_score)), 1)
             match_status = "NO_STRONG_VACANCY_MATCH"
@@ -1194,7 +1334,11 @@ class VacancyFitEvaluator:
         return None
 
     @classmethod
-    def resolve_opening_score(cls, opening: dict[str, Any] | Any) -> float:
+    def resolve_opening_score(
+        cls,
+        opening: dict[str, Any] | Any,
+        scoring_config: ScoringConfig | None = None,
+    ) -> float:
         """Resolve the canonical score while remaining compatible with legacy persisted matches."""
         if isinstance(opening, dict):
             fit_score = cls._parse_score_value(opening.get("vacancy_fit_score"))
@@ -1208,12 +1352,22 @@ class VacancyFitEvaluator:
             legacy_score = getattr(opening, "score", None)
 
         if fit_score is not None and (fit_score != 0.0 or score_breakdown is not None):
-            return float(fit_score)
+            final_resolved_score = float(fit_score)
+        else:
+            fallback_score = cls._parse_score_value(overall_score)
+            if fallback_score is None:
+                fallback_score = cls._parse_score_value(legacy_score)
+            final_resolved_score = float(fallback_score if fallback_score is not None else fit_score or 0.0)
 
-        fallback_score = cls._parse_score_value(overall_score)
-        if fallback_score is None:
-            fallback_score = cls._parse_score_value(legacy_score)
-        return float(fallback_score if fallback_score is not None else fit_score or 0.0)
+        # Normalize legacy contradictory results (high score + rejection status)
+        status = cls.classify_opening_fit(opening)
+        if status == VacancyMatchStatus.NO_STRONG_MATCH.value:
+            cfg = scoring_config if isinstance(scoring_config, ScoringConfig) else ScoringConfig.load()
+            cap = cfg.calculate_rejection_cap()
+            if final_resolved_score > cap:
+                return float(cap)
+                
+        return final_resolved_score
 
     @classmethod
     def classify_opening_fit(
@@ -1224,55 +1378,41 @@ class VacancyFitEvaluator:
     ) -> str:
         """
         Canonical evaluator classification for an individual vacancy opening/match result.
-        Returns one of: 'MATCHED', 'POTENTIAL_MATCH', or 'NO_STRONG_MATCH'.
+        Returns the canonical match status generated at scoring time.
+        Does not recalculate.
         """
         if not opening:
             return VacancyMatchStatus.NO_STRONG_MATCH.value
 
-        if high_threshold is None or potential_threshold is None:
-            scoring_config = ScoringConfig.load()
-            high_threshold = high_threshold if high_threshold is not None else scoring_config.match_high_threshold
-            potential_threshold = potential_threshold if potential_threshold is not None else scoring_config.match_medium_threshold
-
         if isinstance(opening, dict):
-            score = cls.resolve_opening_score(opening)
             status = str(opening.get("vacancy_match_status") or opening.get("match_status") or "").upper()
-            failures = opening.get("mandatory_failures") or opening.get("mandatory_fails") or []
-            has_domain_mismatch_req = any(
-                isinstance(f, dict) and f.get("requirement_id") == "req_domain_mismatch"
-                for f in failures
-            )
-            is_domain_rejected = bool(opening.get("domain_mismatch_capped") or opening.get("is_cross_domain") or has_domain_mismatch_req)
-            score_breakdown = opening.get("score_breakdown")
-            is_hierarchy_valid = True
-            if isinstance(score_breakdown, dict):
-                is_hierarchy_valid = score_breakdown.get("is_hierarchy_valid", True)
-            elif hasattr(score_breakdown, "is_hierarchy_valid"):
-                is_hierarchy_valid = getattr(score_breakdown, "is_hierarchy_valid", True)
         else:
-            score = cls.resolve_opening_score(opening)
             status = str(getattr(opening, "vacancy_match_status", getattr(opening, "match_status", ""))).upper()
-            failures = getattr(opening, "mandatory_failures", [])
-            has_domain_mismatch_req = any(
-                getattr(f, "requirement_id", None) == "req_domain_mismatch" for f in failures
-            )
-            is_domain_rejected = bool(getattr(opening, "domain_mismatch_capped", False) or getattr(opening, "is_cross_domain", False) or has_domain_mismatch_req)
-            is_hierarchy_valid = getattr(getattr(opening, "score_breakdown", None), "is_hierarchy_valid", True)
 
-        # Mandatory failures, domain rejection, and invalid hierarchy are hard
-        # disqualifiers. They must never be promoted by an otherwise high score.
-        if failures or is_domain_rejected or is_hierarchy_valid is False:
-            return VacancyMatchStatus.NO_STRONG_MATCH.value
+        if status in {"MATCHED", "POTENTIAL_MATCH", "NO_STRONG_MATCH"}:
+            return status
 
-        if status in {"NO_STRONG_MATCH", "NO_STRONG_VACANCY_MATCH"}:
-            return VacancyMatchStatus.NO_STRONG_MATCH.value
-
-        if score >= high_threshold:
-            return VacancyMatchStatus.MATCHED.value
-        elif score >= potential_threshold:
-            return VacancyMatchStatus.POTENTIAL_MATCH.value
+        # Legacy compatibility fallback for historical records / test fixtures without canonical status
+        if isinstance(opening, dict):
+            classification = str(opening.get("classification") or "").upper()
+            recommendation = str(opening.get("recommendation") or "").upper()
+            score_val = cls._parse_score_value(opening.get("score") or opening.get("overall_score") or opening.get("vacancy_fit_score"))
         else:
+            classification = str(getattr(opening, "classification", "") or "").upper()
+            recommendation = str(getattr(opening, "recommendation", "") or "").upper()
+            score_val = cls._parse_score_value(getattr(opening, "score", None) or getattr(opening, "overall_score", None) or getattr(opening, "vacancy_fit_score", None))
+
+        if high_threshold is not None and score_val is not None and score_val < high_threshold:
+            if potential_threshold is not None and score_val >= potential_threshold:
+                return VacancyMatchStatus.POTENTIAL_MATCH.value
             return VacancyMatchStatus.NO_STRONG_MATCH.value
+
+        if classification == "HIGH" or recommendation in {"STRONG_MATCH", "HIGH_MATCH"}:
+            return VacancyMatchStatus.MATCHED.value
+        if classification == "MEDIUM" or recommendation in {"POTENTIAL_MATCH", "MEDIUM_MATCH"}:
+            return VacancyMatchStatus.POTENTIAL_MATCH.value
+
+        return VacancyMatchStatus.NO_STRONG_MATCH.value
 
     @classmethod
     def is_eligible_match(

@@ -12,6 +12,7 @@ from redis import Redis
 from rq import Queue, Retry, Worker, get_current_job
 from rq.registry import ScheduledJobRegistry, StartedJobRegistry
 
+from app.core.analysis_context import analysis_run_context
 from app.core.config import settings
 from app.core.cv_identity import normalize_source_candidate_id
 from app.core.error_handlers import DocumentExtractionTimeoutError, PromptError
@@ -59,6 +60,8 @@ class ProcessingQueueService:
         filename: str,
         storage_filename: str,
         content_type: str | None,
+        original_filename: str | None = None,
+        display_filename: str | None = None,
         candidate_id: str | int | None = None,
         source_candidate_id: str | int | None = None,
         cv_id: str | int | None = None,
@@ -93,6 +96,8 @@ class ProcessingQueueService:
                 content_hash=content_hash,
                 filename=filename,
                 storage_filename=storage_filename,
+                original_filename=original_filename or filename,
+                display_filename=display_filename or filename,
                 content_type=content_type,
                 candidate_id=str(candidate_id) if candidate_id is not None else None,
                 source_candidate_id=normalize_source_candidate_id(source_candidate_id if source_candidate_id is not None else candidate_id),
@@ -146,12 +151,17 @@ class ProcessingQueueService:
             "status": status,
             "progress": record.progress,
             "stage": record.stage,
+            "filename": record.filename,
+            "original_filename": record.original_filename or record.filename,
+            "display_filename": record.display_filename or record.filename,
+            "storage_filename": record.storage_filename,
             "failed_step": record.stage if record.state == JobState.FAILED else None,
             "error_details": None,
             "error_code": record.error.code.value if record.error else None,
             "error_message": record.error.message if record.error else None,
             "error_retryable": record.error.retryable if record.error else None,
             "correlation_id": record.error.correlation_id if record.error else None,
+            "analysis_run_id": record.rq_job_id or record.job_id,
             "job_id": record.job_id,
             "job_state": record.state,
             "execution_mode": record.execution_mode.value,
@@ -466,10 +476,10 @@ class ProcessingQueueService:
     ) -> bool:
         if existing is None:
             return False
-        if existing.state in (JobState.QUEUED, JobState.PROCESSING, JobState.RETRYING):
-            return existing.execution_mode != ProcessingExecutionMode.PENDING
         if force_reprocess:
             return False
+        if existing.state in (JobState.QUEUED, JobState.PROCESSING, JobState.RETRYING):
+            return existing.execution_mode != ProcessingExecutionMode.PENDING
         if existing.state in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED):
             return ResultRepository.resolve_result(existing.cv_key) is not None
         return False
@@ -605,7 +615,12 @@ def process_cv_job(job_id: str, expected_enqueue_count: int | None = None) -> di
     except Exception as exc:
         logger.exception(f"Processing job '{job_id}' failed on attempt {attempt}: {type(exc).__name__}")
         current = ProcessingJobRepository.get(job_id) or record
-        terminal_error = isinstance(exc, (DocumentExtractionTimeoutError, PromptError))
+        from app.services.ollama_transport import OllamaError, OllamaInvalidResponseError
+
+        terminal_error = (
+            isinstance(exc, (DocumentExtractionTimeoutError, PromptError, OllamaInvalidResponseError))
+            or isinstance(exc, OllamaError) and not exc.retryable
+        )
         will_retry = not terminal_error and attempt < current.max_attempts
         state = JobState.RETRYING if will_retry else JobState.FAILED
         error = _safe_processing_error(exc, retryable=will_retry, correlation_id=current.rq_job_id)
@@ -627,8 +642,26 @@ def process_cv_job(job_id: str, expected_enqueue_count: int | None = None) -> di
 
 
 def _safe_processing_error(exc: Exception, *, retryable: bool, correlation_id: str | None) -> CanonicalError:
+    from app.services.ollama_transport import (
+        OllamaHTTPError,
+        OllamaInvalidResponseError,
+        OllamaModelUnavailableError,
+        OllamaTimeoutError,
+        OllamaUnavailableError,
+    )
+
     error_name = type(exc).__name__.lower()
-    if isinstance(exc, FileNotFoundError):
+    if isinstance(exc, OllamaTimeoutError):
+        code = ErrorCode.LLM_TIMEOUT
+        message = "LLM generation exceeded the allowed time."
+    elif isinstance(exc, (OllamaUnavailableError, OllamaModelUnavailableError, OllamaHTTPError)):
+        code = ErrorCode.LLM_UNAVAILABLE
+        message = "The configured LLM service is unavailable."
+    elif isinstance(exc, OllamaInvalidResponseError):
+        code = ErrorCode.ANALYSIS_INVALID
+        message = "The LLM response failed structured analysis validation."
+        retryable = False
+    elif isinstance(exc, FileNotFoundError):
         code = ErrorCode.NOT_FOUND
         message = "The retained CV source was unavailable during processing."
     elif isinstance(exc, PromptError):
@@ -660,16 +693,22 @@ async def _process_source(
 ) -> dict[str, Any]:
     from app.services.cv_service import process_cv_file
 
-    return await process_cv_file(
-        filename=filename,
-        content=content,
-        content_type=content_type,
-        candidate_id=record.candidate_id,
-        source_candidate_id=record.source_candidate_id,
-        cv_id=record.cv_id,
-        force_reprocess=record.force_reprocess,
-        storage_filename=storage_filename,
-    )
+    analysis_run_id = record.rq_job_id or record.job_id
+    with analysis_run_context(analysis_run_id, record.cv_key):
+        return await process_cv_file(
+            filename=filename,
+            content=content,
+            content_type=content_type,
+            original_filename=record.original_filename or filename,
+            display_filename=record.display_filename or filename,
+            candidate_id=record.candidate_id,
+            source_candidate_id=record.source_candidate_id,
+            cv_id=record.cv_id,
+            force_reprocess=record.force_reprocess,
+            storage_filename=storage_filename,
+            analysis_run_id=analysis_run_id,
+            job_id=record.job_id,
+        )
 
 
 def handle_work_horse_killed(job, _retpid, _ret_val, _rusage) -> None:

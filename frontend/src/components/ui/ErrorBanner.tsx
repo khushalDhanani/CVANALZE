@@ -26,7 +26,7 @@ export function ErrorBanner({
   return (
     <View
       testID={testID}
-      className={`bg-danger/10 border border-danger/30 rounded-md p-3 flex-row items-start gap-2.5 ${className}`}
+      className={`bg-danger/10 border border-danger/30 rounded-md p-2.5 flex-row items-start gap-2 ${className}`}
     >
       <View className="mt-0.5">
         <AlertCircle size={16} color={COLORS.danger} />

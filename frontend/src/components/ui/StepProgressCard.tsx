@@ -33,6 +33,8 @@ export interface StepProgressCardProps {
   failedStepName?: string | null;
   useLlmEnrichment?: boolean;
   onRetry?: () => void;
+  onStop?: () => void;
+  onClear?: () => void;
   isProcessing?: boolean;
   isComplete?: boolean;
   className?: string;
@@ -55,6 +57,8 @@ export function StepProgressCard({
   failedStepName,
   useLlmEnrichment = true,
   onRetry,
+  onStop,
+  onClear,
   isProcessing = false,
   isComplete = false,
   className = '',
@@ -73,9 +77,9 @@ export function StepProgressCard({
   }
 
   return (
-    <View className={`bg-surface border border-border rounded-lg p-4 shadow-sm ${className}`}>
-      {/* Header Row: Title, Status Badge, Elapsed Time */}
-      <View className="flex-row items-center justify-between mb-3 border-b border-border/60 pb-3">
+    <View className={`bg-surface border border-border rounded-md p-3 shadow-sm ${className}`}>
+      {/* Header Row: Title, Status Badge, Action Buttons, Elapsed Time */}
+      <View className="flex-row items-center justify-between mb-2.5 border-b border-border/60 pb-2">
         <View className="flex-row items-center gap-2">
           {isProcessing ? (
             <View className="w-2.5 h-2.5 rounded-full bg-primary" />
@@ -97,17 +101,37 @@ export function StepProgressCard({
           </Text>
         </View>
 
-        {/* Elapsed Timer Badge */}
-        <View className="flex-row items-center gap-1.5 bg-background border border-border px-2.5 py-1 rounded-full">
-          <Clock size={13} color={isProcessing ? COLORS.primary : COLORS.textMuted} />
-          <Text className="text-xs font-sans-mono font-medium text-text-primary">
-            {formatElapsedTime(elapsedSeconds)}
-          </Text>
+        <View className="flex-row items-center gap-2">
+          {/* Action Buttons: Stop or Clear */}
+          {isProcessing && onStop && (
+            <Button
+              label="Stop"
+              variant="destructive"
+              size="sm"
+              onPress={onStop}
+            />
+          )}
+          {(isComplete || !!error) && onClear && (
+            <Button
+              label="Clear"
+              variant="secondary"
+              size="sm"
+              onPress={onClear}
+            />
+          )}
+
+          {/* Elapsed Timer Badge */}
+          <View className="flex-row items-center gap-1.5 bg-background border border-border px-2.5 py-1 rounded-full">
+            <Clock size={13} color={isProcessing ? COLORS.primary : COLORS.textMuted} />
+            <Text className="text-xs font-sans-mono font-medium text-text-primary">
+              {formatElapsedTime(elapsedSeconds)}
+            </Text>
+          </View>
         </View>
       </View>
 
       {/* Progress Bar Container */}
-      <View className="mb-4">
+      <View className="mb-3">
         <View className="flex-row justify-between items-center mb-1.5">
           <Text className="text-[11px] font-sans-medium text-text-muted">
             {isComplete
@@ -142,7 +166,7 @@ export function StepProgressCard({
 
       {/* Error Message with Retry Option */}
       {!!error && (
-        <View className="bg-danger/10 border border-danger/30 rounded-md p-3 mb-3 gap-2">
+        <View className="bg-danger/10 border border-danger/30 rounded-md p-2.5 mb-2.5 gap-2">
           <View className="flex-row items-center gap-2">
             <AlertTriangle size={16} color={COLORS.danger} />
             <Text className="text-xs font-sans-bold text-danger flex-1">
@@ -159,7 +183,7 @@ export function StepProgressCard({
           {onRetry && (
             <View className="self-start mt-1">
               <Button
-                label="Retry Upload"
+                label="Re-process CV"
                 variant="destructive"
                 size="sm"
                 icon={<RefreshCw size={12} color={COLORS.textInverse} />}
@@ -180,7 +204,7 @@ export function StepProgressCard({
           return (
             <View
               key={step.id}
-              className={`flex-row items-center gap-3 p-2.5 rounded-md border ${
+              className={`flex-row items-center gap-2 p-2 rounded-md border ${
                 isCurrent
                   ? 'bg-primary/5 border-primary/40'
                   : state === 'completed'

@@ -52,6 +52,38 @@ def test_workflow_state_machine_is_reconstructed_from_normalized_profile():
     assert RuleConfigManager._hydrate_profile(profile)["workflow"] == workflow
 
 
+def test_hiring_risk_policies_are_reconstructed_from_normalized_profile():
+    policy = {
+        "enabled": False,
+        "severity": "HIGH",
+        "manual_review": True,
+        "category": "Compliance",
+        "source": "ConfiguredEvaluator",
+    }
+    profile = SimpleNamespace(
+        version_tag="dynamic-risk-v1",
+        description="Dynamic risk profile",
+        updated_at=datetime.now(timezone.utc),
+        components=[
+            SimpleNamespace(
+                component_type="hiring_risks",
+                component_name="policies",
+                system_rules=[
+                    SimpleNamespace(
+                        rule_type="hiring_risk_policy",
+                        rule_name="NEW_CONFIGURED_CODE",
+                        target_value=json.dumps(policy),
+                    )
+                ],
+            )
+        ],
+    )
+
+    hydrated = RuleConfigManager._hydrate_profile(profile)
+
+    assert hydrated["hiring_risks"]["policies"]["NEW_CONFIGURED_CODE"] == policy
+
+
 def test_taxonomy_branch_boundaries_are_reconstructed_deterministically():
     def condition(scope: str, branch: int) -> SimpleNamespace:
         return SimpleNamespace(

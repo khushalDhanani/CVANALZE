@@ -51,6 +51,9 @@ class ErrorCode(str, Enum):
     PROCESSING_FAILED = "PROCESSING_FAILED"
     WORKER_LOST = "WORKER_LOST"
     JOB_STUCK = "JOB_STUCK"
+    LLM_TIMEOUT = "LLM_TIMEOUT"
+    LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
+    ANALYSIS_INVALID = "ANALYSIS_INVALID"
     RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
@@ -193,6 +196,8 @@ class ProcessingJobRecord(BaseModel):
     content_hash: str
     filename: str
     storage_filename: str
+    original_filename: str | None = None
+    display_filename: str | None = None
     content_type: str | None = None
     candidate_id: str | None = None
     source_candidate_id: int | None = None

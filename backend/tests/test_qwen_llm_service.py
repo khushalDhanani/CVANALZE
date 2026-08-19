@@ -68,8 +68,8 @@ def _generation_payload(client: MagicMock) -> dict:
     raise AssertionError("No generation request was recorded.")
 
 
-def test_ollama_default_model_is_qwen3_4b():
-    assert settings.OLLAMA_MODEL == "gemma3:4b"
+def test_ollama_default_model_is_llama3_2_3b():
+    assert settings.OLLAMA_MODEL == "llama3.2:3b"
 
 
 def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
@@ -104,9 +104,9 @@ def test_extract_candidate_profile_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, DynamicCandidateProfile)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
-    assert payload["prompt"].startswith("/no_think")
-    assert payload["think"] is False
+    assert payload["model"] == "llama3.2:3b"
+    assert payload["prompt"] == "Extract candidate CV details"
+    assert "think" not in payload
     assert payload["format"] == DynamicCandidateProfile.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
     assert payload["keep_alive"] == settings.OLLAMA_KEEP_ALIVE
@@ -119,6 +119,7 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
         "inferred_skills": ["FastAPI"],
         "missing_critical": [],
         "semantic_reason": "Good match",
+        "requirement_assessments": [],
     }
     client = _mock_transport_client(
         monkeypatch,
@@ -137,9 +138,9 @@ def test_call_qwen_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, QwenCVAnalysis)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
-    assert payload["prompt"].startswith("/think")
-    assert payload["think"] is True
+    assert payload["model"] == "llama3.2:3b"
+    assert payload["prompt"] == "Score CV fit for Python Developer"
+    assert "think" not in payload
     assert payload["format"] == QwenCVAnalysis.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
 
@@ -172,15 +173,18 @@ def test_call_qwen_dynamic_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, DynamicMappingResponse)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
-    assert payload["prompt"].startswith("/think")
-    assert payload["think"] is True
+    assert payload["model"] == "llama3.2:3b"
+    assert payload["prompt"] == "Score candidate dynamic mapping"
+    assert "think" not in payload
     assert payload["format"] == DynamicMappingResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
 
 
-def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
+def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="cv_analyzer")
     _disable_llm_cache(monkeypatch)
+    monkeypatch.setattr(settings, "OLLAMA_OPTIMIZED_NUM_CTX", 8192)
+    monkeypatch.setattr(settings, "OLLAMA_OPTIMIZED_NUM_PREDICT", 3072)
     dummy_optimized = {
         "candidate_profile": {
             "core_skills": ["Python"],
@@ -192,9 +196,15 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
             {
                 "vacancy_id": 101,
                 "semantic_reason": "Direct experience with Python",
+                "top_strength": "The CV explicitly documents Python experience, directly matching the vacancy's Python requirement. This is the strongest role-specific evidence.",
+                "main_concern": "The CV does not describe the production scale expected by the vacancy. Recruiters should verify deployment ownership rather than infer it.",
+                "ai_match_explanation": "The high score reflects the direct Python overlap between the CV and vacancy. Missing production-scale evidence limits complete confidence.",
                 "semantic_fit_score": 90.0,
+                "requirement_assessments": [],
             }
         ],
+        "active_vacancy_summary": "Python vacancy evaluated.",
+        "ai_career_summary": "Backend engineering profile.",
     }
     client = _mock_transport_client(
         monkeypatch,
@@ -213,21 +223,73 @@ def test_run_optimized_match_scoring_payload_and_prompt(monkeypatch):
 
     assert isinstance(result, OptimizedLLMMatchResponse)
     payload = _generation_payload(client)
-    assert payload["model"] == "gemma3:4b"
-    assert payload["prompt"].startswith("/think")
-    assert payload["think"] is True
+    assert payload["model"] == "llama3.2:3b"
+    assert payload["prompt"] == "Perform optimized match evaluation"
+    assert "think" not in payload
     assert payload["format"] == OptimizedLLMMatchResponse.model_json_schema()
     assert payload["options"]["temperature"] == 0.0
+    assert payload["options"]["num_ctx"] == 8192
+    assert payload["options"]["num_predict"] == 3072
+    assert "response_chars=" in caplog.text
+    assert "num_predict=3072" in caplog.text
+    assert "num_ctx=8192" in caplog.text
+
+
+def test_thinking_model_retains_native_think_parameter(monkeypatch):
+    _disable_llm_cache(monkeypatch)
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "qwen3:1.7b")
+    client = _mock_transport_client(
+        monkeypatch,
+        {
+            "response": json.dumps({
+                "skill_matches": ["Python"],
+                "inferred_skills": [],
+                "missing_critical": [],
+                "semantic_reason": "Good match",
+                "requirement_assessments": [],
+            }),
+        },
+    )
+
+    result = OllamaLLMService.call_qwen("Score CV fit", "1.0", "thinking-model-cache-key")
+
+    assert isinstance(result, QwenCVAnalysis)
+    payload = _generation_payload(client)
+    assert payload["prompt"] == "Score CV fit"
+    assert payload["think"] is True
+
+
+def test_legacy_thinking_directive_is_removed_before_generation(monkeypatch):
+    _disable_llm_cache(monkeypatch)
+    client = _mock_transport_client(
+        monkeypatch,
+        {
+            "response": json.dumps({
+                "skill_matches": ["Python"],
+                "inferred_skills": [],
+                "missing_critical": [],
+                "semantic_reason": "Good match",
+                "requirement_assessments": [],
+            }),
+        },
+    )
+
+    result = OllamaLLMService.call_qwen("/think\nScore CV fit", "1.0", "legacy-directive-cache-key")
+
+    assert isinstance(result, QwenCVAnalysis)
+    payload = _generation_payload(client)
+    assert payload["prompt"] == "Score CV fit"
+    assert "think" not in payload
 
 
 def test_ollama_unload_model_sends_keep_alive_zero(monkeypatch):
     client = _mock_transport_client(monkeypatch, {})
 
-    success = OllamaLLMService.unload_model("gemma3:4b")
+    success = OllamaLLMService.unload_model("llama3.2:3b")
 
     assert success is True
     payload = client.stream.call_args.kwargs["json"]
-    assert payload["model"] == "gemma3:4b"
+    assert payload["model"] == "llama3.2:3b"
     assert payload["keep_alive"] == 0
 
 

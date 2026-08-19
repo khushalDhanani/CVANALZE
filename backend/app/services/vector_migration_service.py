@@ -79,25 +79,41 @@ class VectorDatabaseMigrationService:
             pending.append((cv_key, markdown_text, cv_hash, r))
 
         if pending:
-            try:
-                batch = EmbeddingService.generate_batch_embeddings(
-                    [markdown_text for _, markdown_text, _ in pending],
-                    model_version=model_version,
-                )
-                for index, (cv_key, _, cv_hash, r) in enumerate(pending):
-                    new_emb = batch.get(str(index))
+            from app.services.embedding_service import generate_candidate_multi_vector_embeddings
+
+            for cv_key, markdown_text, cv_hash, r in pending:
+                try:
+                    resume_json = r.get("resume_json") or {}
+                    multi_vecs = generate_candidate_multi_vector_embeddings(
+                        cv_key,
+                        markdown_text,
+                        resume_json=resume_json,
+                        model_version=model_version,
+                    )
+                    new_emb = multi_vecs.get("overall") or EmbeddingService.generate_embedding(markdown_text, model_version=model_version)
                     if new_emb:
                         source_snapshot = json.dumps(r, default=str)
                         source_watermark = r.get("updated_at")
-                        if save_candidate_embedding(cv_key, new_emb, cv_hash, source_snapshot=source_snapshot, source_watermark=source_watermark):
+                        if save_candidate_embedding(
+                            cv_key,
+                            new_emb,
+                            cv_hash,
+                            source_snapshot=source_snapshot,
+                            source_watermark=source_watermark,
+                            profile_embedding=multi_vecs.get("profile"),
+                            skills_embedding=multi_vecs.get("skills"),
+                            experience_embedding=multi_vecs.get("experience"),
+                            projects_embedding=multi_vecs.get("projects"),
+                            domain_embedding=multi_vecs.get("domain"),
+                        ):
                             metrics["synced"] += 1
                         else:
                             metrics["failed"] += 1
                     else:
                         metrics["failed"] += 1
-            except Exception as exc:
-                logger.warning(f"[VECTOR_SYNC] Candidate embedding batch failed: {type(exc).__name__}")
-                metrics["failed"] += len(pending)
+                except Exception as exc:
+                    logger.warning(f"[VECTOR_SYNC] Candidate embedding sync failed for cv_key='{cv_key}': {exc}")
+                    metrics["failed"] += 1
 
         logger.info(f"[VECTOR_SYNC] Candidate embedding sync complete: {metrics['synced']} synced, {metrics['skipped']} skipped/unchanged, {metrics['failed']} failed.")
         return metrics

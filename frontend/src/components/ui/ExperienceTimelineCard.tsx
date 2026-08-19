@@ -29,19 +29,19 @@ export type {
 interface ExperienceTimelineCardProps {
   analysis?: ExperienceGapAnalysisData | any | null;
   experienceAssessment?: string | null;
-  totalExperienceYears?: number | null;
   candidateData?: any | null;
 }
 
 export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   analysis,
   experienceAssessment,
-  totalExperienceYears,
   candidateData,
 }) => {
   const [showUndated, setShowUndated] = useState(false);
 
   if (!analysis && !experienceAssessment && !candidateData) return null;
+
+  const hasUnresolvedHeaders = candidateData?.resume_json?.work_experience?.some((w: any) => w?.metadata?.unresolved_header) || candidateData?.resume_json?.experience?.some((w: any) => w?.metadata?.unresolved_header);
 
   const summary = analysis?.summary;
   const events = analysis?.timeline_events || [];
@@ -49,92 +49,6 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   const canonicalJobs = analysis?.canonical_jobs || [];
   const hrIndicators = analysis?.hr_review_indicators || [];
   const hrObs = summary?.hr_observations || [];
-
-  const rawState =
-    candidateData?.experience_state ||
-    candidateData?.experience_summary?.experience_state ||
-    candidateData?.validation_status ||
-    summary?.validation_status;
-
-  const resolveCanonicalExperienceYears = (): number | null => {
-    if (typeof totalExperienceYears === 'number' && !isNaN(totalExperienceYears)) {
-      return totalExperienceYears;
-    }
-
-    const sources = [candidateData, analysis];
-    for (const src of sources) {
-      if (!src || typeof src !== 'object') continue;
-
-      if (typeof src.experience_years === 'number' && !isNaN(src.experience_years)) {
-        return src.experience_years;
-      }
-      if (typeof src.total_experience_years === 'number' && !isNaN(src.total_experience_years)) {
-        return src.total_experience_years;
-      }
-      if (typeof src.authoritative_years === 'number' && !isNaN(src.authoritative_years)) {
-        return src.authoritative_years;
-      }
-
-      const expSum = src.experience_summary;
-      if (expSum && typeof expSum === 'object') {
-        if (typeof expSum.authoritative_years === 'number' && !isNaN(expSum.authoritative_years)) {
-          return expSum.authoritative_years;
-        }
-        if (typeof expSum.experience_years === 'number' && !isNaN(expSum.experience_years)) {
-          return expSum.experience_years;
-        }
-        if (typeof expSum.stated_years === 'number' && !isNaN(expSum.stated_years)) {
-          return expSum.stated_years;
-        }
-      }
-
-      const qMetrics = src.quality_metrics;
-      if (qMetrics && typeof qMetrics === 'object' && typeof qMetrics.experience_years === 'number' && !isNaN(qMetrics.experience_years)) {
-        return qMetrics.experience_years;
-      }
-    }
-
-    if (typeof summary?.total_verified_years === 'number' && !isNaN(summary.total_verified_years)) {
-      return summary.total_verified_years;
-    }
-
-    return null;
-  };
-
-  const canonicalYears = resolveCanonicalExperienceYears();
-
-  const experienceState =
-    rawState ||
-    (canonicalYears !== null && canonicalYears > 0 ? 'CALCULATED' : (canonicalYears === 0 ? 'ZERO_CONFIRMED' : 'UNKNOWN'));
-
-  const formatDisplayExperience = (years: number | null): string | undefined => {
-    const rawGross =
-      candidateData?.gross_display ||
-      candidateData?.experience_summary?.gross_display ||
-      summary?.gross_display;
-
-    if (typeof rawGross === 'string' && rawGross.trim().length > 0) {
-      return rawGross;
-    }
-
-    if (experienceState === 'UNKNOWN') {
-      return 'Experience Present (Dates Unparseable)';
-    }
-
-    if (years === null || years === undefined) return undefined;
-
-    if (years === 0 || experienceState === 'ZERO_CONFIRMED') {
-      return '0 years 0 months';
-    }
-
-    const totalMonths = Math.round(years * 12);
-    const yearsPart = Math.floor(totalMonths / 12);
-    const monthsPart = totalMonths % 12;
-    return `${yearsPart} year${yearsPart !== 1 ? 's' : ''} ${monthsPart} month${monthsPart !== 1 ? 's' : ''}`;
-  };
-
-  const experienceDisplayText = formatDisplayExperience(canonicalYears);
-
 
   const formatEmpType = (type?: string | null): string | undefined => {
     if (!type || type.trim().length === 0) return undefined;
@@ -161,6 +75,13 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   const formatDateRange = (start?: string | null, end?: string | null, isCurrent = false): string | undefined => {
     const values = [start?.trim(), isCurrent ? 'Present' : end?.trim()].filter((value): value is string => Boolean(value));
     return values.length > 0 ? values.join(' → ') : undefined;
+  };
+
+  const formatDurationMonths = (months?: number | null): string | undefined => {
+    if (!months || months <= 0) return undefined;
+    const years = Math.floor(months / 12);
+    const remainingMonths = Math.round(months % 12);
+    return [years ? `${years} yr${years === 1 ? '' : 's'}` : '', remainingMonths ? `${remainingMonths} mo${remainingMonths === 1 ? '' : 's'}` : ''].filter(Boolean).join(' ');
   };
 
   const formatAssignmentType = (type: string) => {
@@ -225,7 +146,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   };
 
   const renderChildAssignment = (asg: ChildAssignmentItem, idx?: number) => (
-    <View key={asg.assignment_id || `asg-${idx}`} className="p-2 bg-background/80 border border-border/60 rounded my-1 pl-3 border-l-2 border-l-info">
+    <View key={asg.assignment_id || `asg-${idx}`} className="p-2 bg-background/80 border border-border/60 rounded pl-2.5 border-l-2 border-l-info">
       <View className="flex-row justify-between items-center mb-1">
         <View className="flex-row items-center gap-1 flex-1 pr-2">
           <GitCommit size={11} color={COLORS.info} />
@@ -270,8 +191,8 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
           {formatEmpType(node.employment_type) ? <Badge label={formatEmpType(node.employment_type)!} tone="neutral" /> : null}
         </View>
 
-        {node.company || formatDateRange(node.start_date, node.end_date, node.is_current) || node.duration_months > 0 ? <Text className="text-xs font-sans text-text-muted">
-          {[node.company, formatDateRange(node.start_date, node.end_date, node.is_current), node.duration_months > 0 ? `${node.duration_months} mo` : undefined].filter(Boolean).join(' • ')}
+        {node.company || formatDateRange(node.start_date, node.end_date, node.is_current) || formatDurationMonths(node.duration_months) ? <Text className="text-xs font-sans text-text-muted">
+          {[node.company, formatDateRange(node.start_date, node.end_date, node.is_current), formatDurationMonths(node.duration_months)].filter(Boolean).join(' • ')}
         </Text> : null}
 
         {node.responsibilities && node.responsibilities.length > 0 && (
@@ -298,7 +219,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
   };
 
   const renderCanonicalJob = (cj: CanonicalJobItem, idx?: number) => (
-    <View key={cj.job_id || `cj-${idx}`} className="p-2.5 bg-background border border-border rounded my-1.5">
+    <View key={cj.job_id || `cj-${idx}`} className="p-2 bg-background border border-border rounded">
       <View className="flex-row justify-between items-center mb-1">
         <View className="flex-row items-center gap-1.5 flex-1 pr-2">
           <Briefcase size={12} color={COLORS.info} />
@@ -307,8 +228,8 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
         {formatEmpType(cj.employment_type) ? <Badge label={formatEmpType(cj.employment_type)!} tone="neutral" /> : null}
       </View>
 
-      {cj.parent_company || formatDateRange(cj.start_date, cj.end_date, cj.is_current) || cj.duration_months > 0 ? <Text className="text-xs font-sans text-text-muted">
-        {[cj.parent_company, formatDateRange(cj.start_date, cj.end_date, cj.is_current), cj.duration_months > 0 ? `${cj.duration_months} mo` : undefined].filter(Boolean).join(' • ')}
+      {cj.parent_company || formatDateRange(cj.start_date, cj.end_date, cj.is_current) || formatDurationMonths(cj.duration_months) ? <Text className="text-xs font-sans text-text-muted">
+        {[cj.parent_company, formatDateRange(cj.start_date, cj.end_date, cj.is_current), formatDurationMonths(cj.duration_months)].filter(Boolean).join(' • ')}
       </Text> : null}
 
       {cj.responsibilities && cj.responsibilities.length > 0 && (
@@ -334,12 +255,27 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
 
   return (
     <Card className="p-3 border-border shadow-none gap-3">
-      {/* Header */}
+      {/* Unresolved Header Banner */}
+      {hasUnresolvedHeaders && (
+          <View className="bg-warning/10 border border-warning/30 rounded-md p-3 gap-1 mb-2">
+            <View className="flex-row items-center gap-1.5">
+              <AlertTriangle size={14} color={COLORS.warning} />
+              <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
+                Incomplete Chronology detected
+              </Text>
+            </View>
+            <Text className="text-xs font-sans text-warning leading-4">
+              Some sections of this CV used non-standard formatting and could not be confidently mapped to employment blocks. This may impact relevant experience calculations.
+            </Text>
+          </View>
+        )}
+
+        {/* Global Summary & Insights Header */}
       <View className="flex-row justify-between items-center pb-2 border-b border-border">
         <View className="flex-row items-center gap-1.5">
           <Clock size={14} color={COLORS.info} />
           <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
-            Experience Timeline & Gaps
+            Experience
           </Text>
         </View>
         {summary && (typeof summary.has_current_employment === 'boolean' || typeof summary.unexplained_gaps_count === 'number') ? <Badge
@@ -360,32 +296,9 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
         /> : null}
       </View>
 
-      {/* Assessment Banner */}
-      {experienceAssessment ? (
-        <View className="bg-info/10 p-2.5 rounded border border-info/30 flex-row items-start gap-2">
-          <Info size={14} color={COLORS.info} style={{ marginTop: 2 }} />
-          <Text className="text-xs font-sans text-text-primary leading-4 flex-1">
-            {experienceAssessment}
-          </Text>
-        </View>
-      ) : null}
-
       {/* Single Source KPI Summary from Backend summary object */}
       {summary ? (
         <View className="flex-row flex-wrap gap-2">
-          {experienceDisplayText ? (
-          <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">
-            <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">
-              Total Experience
-            </Text>
-            <Text className="text-xs font-sans-bold text-text-primary">
-              {experienceDisplayText}
-            </Text>
-
-
-          </View>
-          ) : null}
-
           {typeof summary.total_employment_gaps_count === 'number' && typeof summary.unexplained_gaps_count === 'number' ? (
           <View className="flex-1 min-w-[120px] bg-background p-2 rounded border border-border">
             <Text className="text-[10px] font-sans-bold text-text-muted uppercase mb-0.5">
@@ -410,28 +323,11 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
         </View>
       ) : null}
 
-      {/* HR Review Alerts */}
-      {hrIndicators.length > 0 && (
-        <View className="bg-warning/10 p-2.5 rounded border border-warning/30 gap-1">
-          <View className="flex-row items-center gap-1.5 mb-1">
-            <ShieldAlert size={14} color={COLORS.warning} />
-            <Text className="text-xs font-sans-bold text-warning uppercase">
-              HR Review Indicators
-            </Text>
-          </View>
-          {hrIndicators.map((ind: string, idx: number) => (
-            <Text key={idx} className="text-xs text-text-primary leading-4">
-              • {ind}
-            </Text>
-          ))}
-        </View>
-      )}
-
       {/* Chronological Timeline Events (Single Source of Truth) */}
       {events.length > 0 ? (
         <View className="gap-2 pt-1 border-t border-border">
           <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider mb-1">
-            Chronological Employment & Gap Timeline ({events.length})
+            Factual Employment Timeline ({events.length})
           </Text>
 
           <View className="pl-2 border-l-2 border-border/40 gap-2 my-1">
@@ -443,7 +339,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
               if (evt.event_type === 'CONCURRENT_CLUSTER' && evt.cluster) {
                 const cluster = evt.cluster;
                 return (
-                  <View key={evt.event_id} className="p-3 bg-info/5 border border-info/30 rounded my-1.5 gap-1.5">
+                  <View key={evt.event_id} className="p-2.5 bg-info/5 border border-info/30 rounded gap-1.5">
                     <View className="flex-row justify-between items-center pb-1.5 border-b border-info/20">
                       <View className="flex-row items-center gap-1.5">
                         <Layers size={13} color={COLORS.info} />
@@ -458,7 +354,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
                     </View>
 
                     <Text className="text-[11px] font-sans text-text-muted">
-                      Candidate held multiple roles/deputations concurrently during this period ({cluster.duration_months} mo):
+                      Candidate held multiple roles/deputations concurrently during this period ({formatDurationMonths(cluster.duration_months)}):
                     </Text>
 
                     {cluster.child_nodes.map((cNode: ExperienceTimelineNodeItem, cIdx: number) => renderRoleNode(cNode, true, `cluster-${evt.event_id}-${cIdx}`))}
@@ -471,7 +367,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
                 const style = getGapStyling(gap);
 
                 return (
-                  <View key={evt.event_id} className={`p-3 rounded my-2 ${style.cardClass}`}>
+                  <View key={evt.event_id} className={`p-2.5 rounded ${style.cardClass}`}>
                     <View className="flex-row justify-between items-center mb-1">
                       <View className="flex-row items-center gap-1.5">
                         <Calendar size={14} color={style.iconColor} />
@@ -506,7 +402,7 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
         /* Backward Compatibility: Fallback to canonical jobs list if timeline_events is absent */
         <View className="gap-2 pt-1 border-t border-border">
           <Text className="text-[10px] font-sans-bold text-text-muted uppercase tracking-wider mb-1">
-            Canonical Employment History ({canonicalJobs.length})
+            Factual Employment History ({canonicalJobs.length})
           </Text>
           <View className="pl-2 border-l-2 border-border/40 gap-2 my-1">
             {canonicalJobs.map((cj: CanonicalJobItem, idx: number) => renderCanonicalJob(cj, idx))}
@@ -535,6 +431,16 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
         </View>
       )}
 
+      {hrIndicators.length > 0 && (
+        <View className="gap-1 p-2.5 border rounded bg-warning/10 border-warning/30">
+          <View className="flex-row items-center gap-1.5 mb-1">
+            <ShieldAlert size={14} color={COLORS.warning} />
+            <Text className="text-xs font-sans-bold text-warning uppercase">Experience Review</Text>
+          </View>
+          {hrIndicators.map((indicator: string) => <Text key={indicator} className="text-xs leading-4 text-text-primary">⚠ {indicator}</Text>)}
+        </View>
+      )}
+
       {/* HR Observations Footer */}
       {hrObs.length > 0 && (
         <View className="pt-2 border-t border-border gap-1">
@@ -549,6 +455,13 @@ export const ExperienceTimelineCard: React.FC<ExperienceTimelineCardProps> = ({
           ))}
         </View>
       )}
+
+      {experienceAssessment ? (
+        <View className="gap-1 p-2.5 border rounded bg-info/10 border-info/30">
+          <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-info">Experience Assessment</Text>
+          <Text className="text-xs leading-4 text-text-primary">{experienceAssessment}</Text>
+        </View>
+      ) : null}
     </Card>
   );
 };

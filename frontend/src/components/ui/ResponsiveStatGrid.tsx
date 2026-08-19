@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, useWindowDimensions } from 'react-native';
+import { Density } from '@/constants/theme';
 
 export interface ResponsiveStatGridProps {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ export interface ResponsiveStatGridProps {
 export function ResponsiveStatGrid({
   children,
   minCardWidth = 160,
-  gap = 12,
+  gap = Density.component,
   className = '',
   testID,
 }: ResponsiveStatGridProps) {

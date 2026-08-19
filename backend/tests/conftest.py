@@ -35,28 +35,42 @@ def isolate_ollama_transport(monkeypatch):
 @pytest.fixture(autouse=True)
 def mock_rule_config_manager(monkeypatch):
     """Ensure tests always have a loaded rule config since the fallback was removed from runtime."""
-    from app.core.rule_config_manager import RuleConfigManager
-    from pathlib import Path
-    
-    original_load_config = RuleConfigManager.load_config
+
+    from app.core.rule_config_manager import RuleConfigManager, UnifiedRuleConfig
     
     def mocked_load_config(cls, candidate_dict=None, tenant_id=None):
+        from datetime import datetime, timezone
+        from types import MappingProxyType
+
         from tests.mock_rule_config import MOCK_RULE_CONFIG
-        
-        from app.core.cache import config_cache_manager
-        cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
-        
-        if candidate_dict is not None:
-            config_cache_manager.set(cache_key, candidate_dict)
-        else:
-            config_cache_manager.set(cache_key, MOCK_RULE_CONFIG)
-            
-        return original_load_config(tenant_id=tenant_id)
+
+        raw_data = candidate_dict if candidate_dict is not None else MOCK_RULE_CONFIG
+        candidate_config = UnifiedRuleConfig.model_validate(raw_data)
+        cls._run_synthetic_smoke_tests(candidate_config)
+        candidate_cache, compiled_pattern_count = cls._build_and_validate_all_caches(candidate_config)
+
+        with cls._lock:
+            tenant_key = tenant_id or 'GLOBAL'
+            cls._active_configs[tenant_key] = candidate_config
+            cls._caches[tenant_key] = candidate_cache
+            cls._load_counter += 1
+            cls._metrics = MappingProxyType(
+                {
+                    "config_version": candidate_config.version,
+                    "config_load_count": cls._load_counter,
+                    "config_load_time_ms": 1.0,
+                    "cache_build_time_ms": 1.0,
+                    "compiled_pattern_count": compiled_pattern_count,
+                    "configuration_size_bytes": len(str(raw_data)),
+                    "last_loaded_timestamp": datetime.now(timezone.utc).isoformat(),
+                    "file_hash": getattr(candidate_config, "version", "mock"),
+                }
+            )
+        return candidate_config
 
     monkeypatch.setattr(RuleConfigManager, "load_config", classmethod(mocked_load_config))
     
-    if not RuleConfigManager._active_configs:
-        RuleConfigManager.load_config()
+    RuleConfigManager.load_config()
 
 @pytest.fixture(autouse=True)
 def mock_department_domain_repo(monkeypatch):
@@ -68,7 +82,7 @@ def mock_department_domain_repo(monkeypatch):
         domains = [
             DepartmentDomain(
                 id=1, department_id=9, department_name="CIS Team", domain_name="Information Technology & Software",
-                keywords=["developer", "flutter", "dotnet", "full stack", "ui/ux", "desktop support", "software engineer", "machine learning"],
+                keywords=["developer", "flutter", "dotnet", "full stack", "ui/ux", "desktop support", "software engineer", "machine learning", {"term": "IT", "match_type": "CASE_SENSITIVE_ACRONYM", "weight": 1.0}, "network", "server", "infrastructure"],
                 default_roles=["Software Developer"], priority=1
             ),
             DepartmentDomain(
@@ -85,7 +99,8 @@ def mock_department_domain_repo(monkeypatch):
             DepartmentDomain(id=5, department_id=5, department_name="HR", domain_name="HR", keywords=["hr"], default_roles=[], priority=5),
             DepartmentDomain(id=6, department_id=6, department_name="Operations", domain_name="Operations", keywords=["operations"], default_roles=[], priority=6),
             DepartmentDomain(id=7, department_id=7, department_name="Legal", domain_name="Legal", keywords=["legal"], default_roles=[], priority=7),
-            DepartmentDomain(id=8, department_id=8, department_name="Other", domain_name="Other", keywords=["other"], default_roles=[], priority=8)
+            DepartmentDomain(id=8, department_id=8, department_name="Other", domain_name="Other", keywords=["other"], default_roles=[], priority=8),
+            DepartmentDomain(id=9, department_id=29, department_name="QA Team", domain_name="Quality Assurance", keywords=["quality assurance", "qa", "validation", "audit", "test cases"], default_roles=["QA Manager"], priority=1)
         ]
         return domains
         
@@ -96,12 +111,19 @@ def mock_prompt_service(monkeypatch, request):
     if request.module and "test_prompt_service" in request.module.__name__:
         return
         
-    from app.services.prompt_service import PromptReadiness, PromptService
+    from app.services.prompt_service import PromptReadiness, PromptService, ResolvedPrompt
     
     def mocked_fetch_prompt_from_db(cls, prompt_name, tenant_id, model, target_schema, language, environment):
         return "NO_SUITABLE_MATCH recommended_department MUST be selected from EVIDENCE CITATION"
         
     monkeypatch.setattr(PromptService, "_fetch_prompt_from_db", classmethod(mocked_fetch_prompt_from_db))
+    monkeypatch.setattr(
+        PromptService,
+        "get_prompt_with_version",
+        classmethod(lambda _cls, prompt_name, placeholders, **kwargs: ResolvedPrompt("SAFE TEST PROMPT", "test-prompt-v1")),
+    )
+    monkeypatch.setattr(PromptService, "get_active_prompt_version", classmethod(lambda _cls, *args, **kwargs: "test-prompt-v1"))
+    monkeypatch.setattr(PromptService, "get_active_prompt_identity", classmethod(lambda _cls, *args, **kwargs: "test-prompt-v1:test-hash"))
     monkeypatch.setattr(
         PromptService,
         "check_required_optimized_match_prompt",
@@ -114,9 +136,9 @@ def cleanup_test_cv_results():
     """Ensure test runs do not leave mock candidate records (Jane Doe/John Doe/test keys) in the active database or cache."""
     yield
     try:
+        from app.core.cache import cv_result_cache_manager
         from app.core.database import PostgresAppSession
         from app.models.result import CVResult
-        from app.core.cache import cv_result_cache_manager
         if PostgresAppSession is not None:
             with PostgresAppSession() as db:
                 test_rows = db.query(CVResult).filter(

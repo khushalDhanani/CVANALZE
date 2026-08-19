@@ -15,17 +15,21 @@ import httpx
 from filelock import FileLock, Timeout as FileLockTimeout
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from app.core.analysis_context import get_analysis_candidate, get_analysis_run_id
 from app.core.config import settings
 from app.core.logging import logger
+from app.services.tokenizer_service import TokenizerService
 
 T = TypeVar("T")
 
 
 class OllamaError(RuntimeError):
-    def __init__(self, message: str, *, operation: str, retryable: bool = True):
+    def __init__(self, message: str, *, operation: str, retryable: bool = True, detail: str = "", status_code: int | None = None):
         super().__init__(message)
         self.operation = operation
         self.retryable = retryable
+        self.detail = detail
+        self.status_code = status_code
 
 
 class OllamaUnavailableError(OllamaError):
@@ -49,18 +53,18 @@ class OllamaLiveAccessDisabledError(OllamaError):
 
 
 class OllamaHTTPError(OllamaError):
-    def __init__(self, message: str, *, operation: str, status_code: int, retryable: bool):
-        super().__init__(message, operation=operation, retryable=retryable)
-        self.status_code = status_code
+    def __init__(self, message: str, *, operation: str, status_code: int, retryable: bool, detail: str = ""):
+        super().__init__(message, operation=operation, retryable=retryable, detail=detail, status_code=status_code)
 
 
 class OllamaModelUnavailableError(OllamaHTTPError):
-    def __init__(self, model: str, *, operation: str):
+    def __init__(self, model: str, *, operation: str, detail: str = ""):
         super().__init__(
-            f"Ollama model '{model}' is unavailable.",
+            f"Ollama model '{model}' is unavailable." + (f" Detail: {detail}" if detail else ""),
             operation=operation,
             status_code=404,
             retryable=False,
+            detail=detail,
         )
         self.model = model
 
@@ -201,6 +205,10 @@ class OllamaTransport:
         "model_inference_duration_ms": 0.0,
         "unload_duration_ms": 0.0,
         "total_duration_ms": 0.0,
+        "prompt_eval_count": 0,
+        "prompt_eval_duration_ms": 0.0,
+        "eval_count": 0,
+        "eval_duration_ms": 0.0,
         "operations": {},
     }
 
@@ -248,29 +256,37 @@ class OllamaTransport:
 
     @classmethod
     @contextmanager
-    def _operation_scope(cls, operation: str, models: tuple[str, ...] = ()) -> Iterator[None]:
+    def _operation_scope(cls, operation: str, models: tuple[str, ...] = (), *, deadline: float | None = None) -> Iterator[None]:
         started = time.perf_counter()
-        lock_timeout = max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS)
+        operation_deadline = deadline if deadline is not None else started + cls._operation_timeout(operation)
+        lock_timeout = min(max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS), max(0.0, operation_deadline - started))
         acquired = cls._operation_lock.acquire(timeout=lock_timeout)
         if not acquired:
             raise OllamaConcurrencyError(
-                "Timed out waiting for the local Ollama operation lock.",
+                "Ollama operation deadline expired while waiting for the local operation lock.",
                 operation=operation,
             )
 
         file_lock: FileLock | None = None
         try:
-            lock_path = Path(settings.OLLAMA_LOCK_FILE)
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
-            file_lock = FileLock(str(lock_path), timeout=lock_timeout)
-            file_lock.acquire()
+            remaining = max(0.0, operation_deadline - time.perf_counter())
+            if remaining <= 0:
+                raise OllamaConcurrencyError(
+                    "Ollama operation deadline expired before acquiring the shared operation lock.",
+                    operation=operation,
+                )
+            if operation != "tags":
+                lock_path = Path(settings.OLLAMA_LOCK_FILE)
+                lock_path.parent.mkdir(parents=True, exist_ok=True)
+                file_lock = FileLock(str(lock_path), timeout=min(max(0.0, settings.OLLAMA_LOCK_TIMEOUT_SECONDS), remaining))
+                file_lock.acquire()
             lock_wait_ms = round((time.perf_counter() - started) * 1000.0, 2)
             cls._record_lock_wait(lock_wait_ms)
             logger.info(f"[OLLAMA] operation={operation} status=LOCKED wait_ms={lock_wait_ms}")
             yield
         except FileLockTimeout as exc:
             raise OllamaConcurrencyError(
-                "Timed out waiting for the shared Ollama operation lock.",
+                "Ollama operation deadline expired while waiting for the shared operation lock.",
                 operation=operation,
             ) from exc
         finally:
@@ -290,7 +306,8 @@ class OllamaTransport:
     ) -> OllamaTransportResult[T]:
         """Compatibility entry point for one non-model or explicitly managed request."""
         model = str((payload or {}).get("model") or "").strip()
-        with cls._operation_scope(operation, (model,) if model else ()):
+        deadline = time.perf_counter() + cls._operation_timeout(operation)
+        with cls._operation_scope(operation, (model,) if model else (), deadline=deadline):
             try:
                 return cls._execute_request(
                     operation=operation,
@@ -298,9 +315,10 @@ class OllamaTransport:
                     path=path,
                     payload=payload,
                     parser=parser,
+                    deadline=deadline,
                 )
             finally:
-                if model and operation != "unload":
+                if model and operation != "unload" and not settings.OLLAMA_RESIDENCY_ENABLED:
                     cls._unload_safely(model, parent_operation=operation)
 
     @classmethod
@@ -317,47 +335,94 @@ class OllamaTransport:
     ) -> OllamaTransportResult[T]:
         retries = max(0, settings.OLLAMA_MAX_RETRIES if max_retries is None else max_retries)
         total_attempts = retries + 1
-        timeout_seconds = cls._operation_timeout(operation)
+        # The request timeout caps one attempt; the operation timeout owns the full budget, including retry backoff.
+        operation_timeout_seconds = cls._operation_timeout(operation)
+        attempt_timeout_seconds = cls._attempt_timeout(operation)
         started = time.perf_counter()
-        operation_deadline = deadline if deadline is not None else started + timeout_seconds
+        operation_deadline = deadline if deadline is not None else started + operation_timeout_seconds
+        total_budget_seconds = max(0.0, operation_deadline - started)
         last_error: OllamaError | None = None
         cls._circuit_before_request(operation)
 
-        num_ctx = (payload or {}).get("options", {}).get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
+        requested_model = str((payload or {}).get("model") or "not_applicable").strip()
+        generation_options = (payload or {}).get("options", {})
+        num_ctx = generation_options.get("num_ctx", "default") if operation not in ("tags", "embed", "unload") else None
+        num_predict = generation_options.get("num_predict", "default") if operation not in ("tags", "embed", "unload") else None
+        prompt = str((payload or {}).get("prompt") or "")
+        prompt_tokens = TokenizerService.count_tokens(prompt) if prompt else 0
+        analysis_run_id = get_analysis_run_id()
+        analysis_candidate = get_analysis_candidate()
         logger.info(
-            f"[OLLAMA] operation={operation} config: max_retries={retries} total_attempts={total_attempts} "
-            f"timeout_s={timeout_seconds}"
+            f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+            f"path={path} model='{requested_model}' "
+            f"config: max_retries={retries} total_attempts={total_attempts} "
+            f"attempt_timeout_s={attempt_timeout_seconds} total_deadline_s={round(total_budget_seconds, 3)} "
+            f"prompt_tokens={prompt_tokens}"
             + (f" num_ctx={num_ctx}" if num_ctx is not None else "")
+            + (f" num_predict={num_predict}" if num_predict is not None else "")
         )
 
         for attempt in range(1, total_attempts + 1):
-            remaining = operation_deadline - time.perf_counter()
-            if remaining <= 0:
+            attempt_started = time.perf_counter()
+            remaining_total = operation_deadline - attempt_started
+            if remaining_total <= 0:
                 cls._record_timeout()
                 last_error = OllamaTimeoutError(
                     "Ollama operation exceeded its total deadline.",
                     operation=operation,
                 )
+                logger.error(
+                    f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                    f"model='{requested_model}' "
+                    f"attempt={attempt}/{total_attempts} "
+                    f"attempt_timeout_s=0 total_deadline_s={round(total_budget_seconds, 3)} "
+                    f"elapsed_s={round(attempt_started - started, 3)} total_remaining_s=0 "
+                    f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} "
+                    f"status=DEADLINE_EXHAUSTED exception={type(last_error).__name__}"
+                )
                 break
 
+            attempt_timeout = min(attempt_timeout_seconds, remaining_total)
             cls._record_attempt(operation)
-            logger.info(f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} status=START")
+            logger.info(
+                f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                f"model='{requested_model}' "
+                f"attempt={attempt}/{total_attempts} "
+                f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                f"elapsed_s={round(attempt_started - started, 3)} total_remaining_s={round(remaining_total, 3)} "
+                f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} status=START exception=none"
+            )
             try:
                 response_data, response_bytes = cls._request_json(
                     operation=operation,
                     method=method,
                     path=path,
                     payload=payload,
-                    timeout_seconds=remaining,
+                    timeout_seconds=attempt_timeout,
                 )
                 cls._validate_error_field(response_data, operation=operation)
                 value = parser(response_data)
                 duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
+                attempt_elapsed = time.perf_counter() - attempt_started
+                total_remaining = max(0.0, operation_deadline - time.perf_counter())
+                response_prompt_tokens = response_data.get("prompt_eval_count", prompt_tokens)
+                prompt_eval_dur_ns = int(response_data.get("prompt_eval_duration") or 0)
+                eval_count = int(response_data.get("eval_count") or 0)
+                eval_dur_ns = int(response_data.get("eval_duration") or 0)
+                prompt_eval_tok_sec = round(response_prompt_tokens / (prompt_eval_dur_ns / 1e9), 2) if prompt_eval_dur_ns > 0 else 0.0
+                eval_tok_sec = round(eval_count / (eval_dur_ns / 1e9), 2) if eval_dur_ns > 0 else 0.0
                 cls._record_success(operation, duration_ms, response_bytes, response_data)
                 cls._circuit_success(operation)
                 logger.info(
-                    f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} status=SUCCESS "
-                    f"duration_ms={duration_ms} response_bytes={response_bytes}"
+                    f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                    f"model='{requested_model}' "
+                    f"attempt={attempt}/{total_attempts} "
+                    f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                    f"elapsed_s={round(attempt_elapsed, 3)} total_remaining_s={round(total_remaining, 3)} "
+                    f"prompt_tokens={response_prompt_tokens} prompt_eval_tok_sec={prompt_eval_tok_sec} "
+                    f"eval_count={eval_count} eval_tok_sec={eval_tok_sec} "
+                    f"num_ctx={num_ctx} num_predict={num_predict} "
+                    f"status=SUCCESS exception=none response_bytes={response_bytes}"
                 )
                 return OllamaTransportResult(
                     value=value,
@@ -369,43 +434,68 @@ class OllamaTransport:
                 last_error = exc
             except httpx.TimeoutException as exc:
                 cls._record_timeout()
-                last_error = OllamaTimeoutError("Ollama request timed out.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama request timed out." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaTimeoutError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except (httpx.ConnectError, httpx.NetworkError, httpx.RequestError) as exc:
-                last_error = OllamaUnavailableError("Ollama is unavailable.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama is unavailable." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaUnavailableError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except json.JSONDecodeError as exc:
-                last_error = OllamaInvalidResponseError("Ollama returned invalid JSON.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama returned invalid JSON." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaInvalidResponseError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except ValidationError as exc:
-                last_error = OllamaSchemaValidationError("Ollama response failed schema validation.", operation=operation)
+                detail = cls._validation_error_detail(exc)
+                message = "Ollama response failed schema validation." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaSchemaValidationError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
             except (TypeError, ValueError) as exc:
-                last_error = OllamaInvalidResponseError("Ollama response could not be normalized.", operation=operation)
+                detail = cls._sanitize_error_detail(exc)
+                message = "Ollama response could not be normalized." + (f" Detail: {detail}" if detail else "")
+                last_error = OllamaInvalidResponseError(message, operation=operation, detail=detail)
                 last_error.__cause__ = exc
 
             assert last_error is not None
             should_retry = last_error.retryable and attempt < total_attempts
+            attempt_elapsed = time.perf_counter() - attempt_started
+            total_remaining = max(0.0, operation_deadline - time.perf_counter())
+            backoff = 0.0
+            if should_retry:
+                backoff = max(0.0, settings.OLLAMA_RETRY_BACKOFF_SECONDS) * (2 ** (attempt - 1))
+                backoff += random.uniform(0.0, max(0.0, settings.OLLAMA_RETRY_JITTER_SECONDS))
+            retry_fits = should_retry and (backoff <= 0 or backoff < total_remaining)
+            status = "TIMEOUT" if isinstance(last_error, OllamaTimeoutError) else "RETRY" if retry_fits else "FAILED"
             logger.warning(
-                f"[OLLAMA] operation={operation} attempt={attempt}/{total_attempts} "
-                f"status={'RETRY' if should_retry else 'FAILED'} error={type(last_error).__name__}"
+                f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                f"model='{requested_model}' "
+                f"attempt={attempt}/{total_attempts} "
+                f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                f"elapsed_s={round(attempt_elapsed, 3)} total_remaining_s={round(total_remaining, 3)} "
+                f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} status={status} "
+                f"exception={type(last_error).__name__} retryable={last_error.retryable} "
+                f"retry_in_s={round(backoff, 3) if retry_fits else 'none'} detail={last_error}"
             )
             if not should_retry:
                 break
-            cls._record_retry()
-            backoff = max(0.0, settings.OLLAMA_RETRY_BACKOFF_SECONDS) * (2 ** (attempt - 1))
-            backoff += random.uniform(0.0, max(0.0, settings.OLLAMA_RETRY_JITTER_SECONDS))
-            remaining = operation_deadline - time.perf_counter()
-            if backoff <= 0:
-                continue
-            if backoff >= remaining:
+            if not retry_fits:
                 cls._record_timeout()
-                last_error = OllamaTimeoutError(
-                    "Ollama retry backoff exceeded the total deadline.",
-                    operation=operation,
+                logger.error(
+                    f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+                    f"model='{requested_model}' "
+                    f"attempt={attempt}/{total_attempts} "
+                    f"attempt_timeout_s={round(attempt_timeout, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+                    f"elapsed_s={round(time.perf_counter() - started, 3)} total_remaining_s={round(total_remaining, 3)} "
+                    f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} "
+                    f"status=DEADLINE_EXHAUSTED exception={type(last_error).__name__} retry_in_s={round(backoff, 3)}"
                 )
                 break
-            time.sleep(backoff)
+            cls._record_retry()
+            if backoff > 0:
+                time.sleep(backoff)
 
         duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
         cls._record_failure(operation, duration_ms)
@@ -413,7 +503,17 @@ class OllamaTransport:
             last_error = OllamaUnavailableError("Ollama request failed.", operation=operation)
         if last_error.retryable and isinstance(last_error, (OllamaUnavailableError, OllamaTimeoutError, OllamaHTTPError)):
             cls._circuit_failure(operation)
-        logger.error(f"[OLLAMA] operation={operation} status=FAILED duration_ms={duration_ms} error={type(last_error).__name__}")
+        total_remaining = max(0.0, operation_deadline - time.perf_counter())
+        logger.error(
+            f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+            f"path={path} model='{requested_model}' "
+            f"attempt={attempt}/{total_attempts} "
+            f"attempt_timeout_s={round(attempt_timeout_seconds, 3)} total_deadline_s={round(total_budget_seconds, 3)} "
+            f"elapsed_s={round(duration_ms / 1000.0, 3)} total_remaining_s={round(total_remaining, 3)} "
+            f"prompt_tokens={prompt_tokens} num_ctx={num_ctx} num_predict={num_predict} status=FAILED "
+            f"exception={type(last_error).__name__} "
+            f"status_code={getattr(last_error, 'status_code', 'none')} retryable={last_error.retryable} detail={last_error}"
+        )
         raise last_error
 
     @classmethod
@@ -488,9 +588,17 @@ class OllamaTransport:
         def validated_parser(data: dict[str, Any]) -> T:
             envelope = OllamaGenerateEnvelope.model_validate(data)
             cls._validate_returned_model(model, envelope.model, operation=operation)
+            if envelope.done_reason.lower() not in {"stop", "length"}:
+                raise OllamaSchemaValidationError(
+                    "Ollama generation returned an invalid completion reason.",
+                    operation=operation,
+                    retryable=False,
+                    detail=envelope.done_reason,
+                )
             return parser(data)
 
-        with cls._operation_scope(operation, (model,)):
+        deadline = time.perf_counter() + cls._operation_timeout(operation)
+        with cls._operation_scope(operation, (model,), deadline=deadline):
             try:
                 return cls._execute_request(
                     operation=operation,
@@ -498,9 +606,11 @@ class OllamaTransport:
                     path="/api/generate",
                     payload=payload,
                     parser=validated_parser,
+                    deadline=deadline,
                 )
             finally:
-                cls._unload_safely(model, parent_operation=operation)
+                if not settings.OLLAMA_RESIDENCY_ENABLED:
+                    cls._unload_safely(model, parent_operation=operation)
 
     @classmethod
     def embed(cls, model: str, inputs: list[str]) -> OllamaTransportResult[list[list[float]]]:
@@ -526,7 +636,7 @@ class OllamaTransport:
         attempts = 0
         deadline = time.perf_counter() + cls._operation_timeout("embed")
 
-        with cls._operation_scope("embed", (normalized_model,)):
+        with cls._operation_scope("embed", (normalized_model,), deadline=deadline):
             try:
                 for offset in range(0, len(unique_inputs), batch_size):
                     batch = unique_inputs[offset : offset + batch_size]
@@ -543,7 +653,8 @@ class OllamaTransport:
                     attempts=attempts,
                 )
             finally:
-                cls._unload_safely(normalized_model, parent_operation="embed")
+                if not settings.OLLAMA_RESIDENCY_ENABLED:
+                    cls._unload_safely(normalized_model, parent_operation="embed")
 
     @classmethod
     def _embed_batch_with_split(cls, model: str, inputs: list[str], *, deadline: float) -> OllamaTransportResult[list[list[float]]]:
@@ -590,9 +701,10 @@ class OllamaTransport:
         normalized_model = model.strip()
         if not normalized_model:
             raise OllamaInvalidResponseError("An Ollama model is required for unload.", operation="unload", retryable=False)
-        with cls._operation_scope("unload"):
+        deadline = time.perf_counter() + cls._operation_timeout("unload")
+        with cls._operation_scope("unload", deadline=deadline):
             try:
-                result = cls._unload_request(normalized_model)
+                result = cls._unload_request(normalized_model, deadline=deadline)
                 with cls._metrics_lock:
                     cls._metrics["unloads"] += 1
                 return result
@@ -602,7 +714,7 @@ class OllamaTransport:
                 raise
 
     @classmethod
-    def _unload_request(cls, model: str) -> OllamaTransportResult[bool]:
+    def _unload_request(cls, model: str, *, deadline: float | None = None) -> OllamaTransportResult[bool]:
         def parse(data: dict[str, Any]) -> bool:
             envelope = OllamaUnloadEnvelope.model_validate(data)
             cls._validate_returned_model(model, envelope.model, operation="unload")
@@ -615,6 +727,7 @@ class OllamaTransport:
             payload=cls.build_unload_payload(model),
             parser=parse,
             max_retries=0,
+            deadline=deadline,
         )
 
     @classmethod
@@ -642,18 +755,20 @@ class OllamaTransport:
         model: str,
         prompt: str,
         response_schema: dict[str, Any],
-        think: bool,
+        think: bool | None,
         options: dict[str, Any],
     ) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "model": model,
             "prompt": prompt,
             "format": response_schema,
             "stream": False,
-            "think": think,
             "keep_alive": settings.OLLAMA_KEEP_ALIVE,
             "options": options,
         }
+        if think is not None:
+            payload["think"] = think
+        return payload
 
     @staticmethod
     def build_embedding_payload(*, model: str, inputs: list[str]) -> dict[str, Any]:
@@ -711,9 +826,35 @@ class OllamaTransport:
     def get_metrics(cls) -> dict[str, Any]:
         with cls._metrics_lock:
             metrics = {key: value for key, value in cls._metrics.items() if key != "operations"}
-            metrics["operations"] = {operation: operation_metrics.copy() for operation, operation_metrics in cls._metrics["operations"].items()}
+            metrics["operations"] = {}
+            for operation, operation_metrics in cls._metrics["operations"].items():
+                op_copy = operation_metrics.copy()
+                op_prompt_eval_ms = float(op_copy.get("prompt_eval_duration_ms", 0.0))
+                op_eval_ms = float(op_copy.get("eval_duration_ms", 0.0))
+                op_prompt_eval_count = int(op_copy.get("prompt_eval_count", 0))
+                op_eval_count = int(op_copy.get("eval_count", 0))
+                op_copy["prompt_eval_tokens_per_sec"] = (
+                    round(op_prompt_eval_count / (op_prompt_eval_ms / 1000.0), 2) if op_prompt_eval_ms > 0 else 0.0
+                )
+                op_copy["eval_tokens_per_sec"] = (
+                    round(op_eval_count / (op_eval_ms / 1000.0), 2) if op_eval_ms > 0 else 0.0
+                )
+                metrics["operations"][operation] = op_copy
+
             completed = int(metrics["successes"]) + int(metrics["failures"])
             metrics["average_duration_ms"] = round(float(metrics["total_duration_ms"]) / completed, 2) if completed else 0.0
+
+            prompt_eval_ms = float(metrics.get("prompt_eval_duration_ms", 0.0))
+            eval_ms = float(metrics.get("eval_duration_ms", 0.0))
+            prompt_eval_count = int(metrics.get("prompt_eval_count", 0))
+            eval_count = int(metrics.get("eval_count", 0))
+            metrics["prompt_eval_tokens_per_sec"] = (
+                round(prompt_eval_count / (prompt_eval_ms / 1000.0), 2) if prompt_eval_ms > 0 else 0.0
+            )
+            metrics["eval_tokens_per_sec"] = (
+                round(eval_count / (eval_ms / 1000.0), 2) if eval_ms > 0 else 0.0
+            )
+
         now = time.monotonic()
         with cls._circuit_lock:
             metrics["circuits"] = {
@@ -744,6 +885,10 @@ class OllamaTransport:
                 "model_inference_duration_ms": 0.0,
                 "unload_duration_ms": 0.0,
                 "total_duration_ms": 0.0,
+                "prompt_eval_count": 0,
+                "prompt_eval_duration_ms": 0.0,
+                "eval_count": 0,
+                "eval_duration_ms": 0.0,
                 "operations": {},
             }
         with cls._circuit_lock:
@@ -795,6 +940,10 @@ class OllamaTransport:
             return max(0.001, settings.OLLAMA_UNLOAD_TIMEOUT_SECONDS)
         return max(0.001, settings.OLLAMA_GENERATE_TIMEOUT_SECONDS)
 
+    @classmethod
+    def _attempt_timeout(cls, operation: str) -> float:
+        return min(max(0.001, settings.OLLAMA_REQUEST_TIMEOUT), cls._operation_timeout(operation))
+
     @staticmethod
     def _require_requested_model(payload: dict[str, Any], *, operation: str) -> str:
         model = str(payload.get("model") or "").strip()
@@ -803,21 +952,65 @@ class OllamaTransport:
         return model
 
     @staticmethod
+    def normalize_model_name(model: str) -> str:
+        normalized = model.strip().lower()
+        return normalized.removesuffix(":latest")
+
+    @classmethod
+    def is_model_available(cls, configured_model: str, available_models: list[str]) -> bool:
+        configured = cls.normalize_model_name(configured_model)
+        return bool(configured) and any(cls.normalize_model_name(available) == configured for available in available_models)
+
+    @staticmethod
     def _validate_error_field(data: dict[str, Any], *, operation: str) -> None:
         if data.get("error"):
-            raise OllamaInvalidResponseError("Ollama returned an error response.", operation=operation, retryable=False)
+            detail = OllamaTransport._sanitize_error_detail(data.get("error"))
+            message = "Ollama returned an error response." + (f" Detail: {detail}" if detail else "")
+            raise OllamaInvalidResponseError(message, operation=operation, retryable=False, detail=detail)
+
+    @staticmethod
+    def _sanitize_error_detail(value: Any) -> str:
+        return " ".join(str(value or "").split())[:300]
+
+    @staticmethod
+    def _validation_error_detail(exc: ValidationError) -> str:
+        details: list[str] = []
+        for error in exc.errors(include_url=False, include_context=False, include_input=False)[:5]:
+            location = ".".join(str(part) for part in error.get("loc", ())) or "response"
+            details.append(f"{location}:{error.get('type', 'validation_error')}")
+        return ", ".join(details)[:300]
+
+    @classmethod
+    def _read_error_detail(cls, response: httpx.Response) -> str:
+        limit = min(4096, max(1, settings.OLLAMA_MAX_RESPONSE_BYTES))
+        content = bytearray()
+        for chunk in response.iter_bytes():
+            remaining = limit - len(content)
+            if remaining <= 0:
+                break
+            content.extend(chunk[:remaining])
+        raw = bytes(content)
+        if not raw:
+            return ""
+        try:
+            decoded = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return cls._sanitize_error_detail(raw.decode("utf-8", errors="replace"))
+        if isinstance(decoded, dict):
+            return cls._sanitize_error_detail(decoded.get("error") or decoded.get("message"))
+        return cls._sanitize_error_detail(decoded)
 
     @staticmethod
     def _validate_returned_model(requested: str, returned: str, *, operation: str) -> None:
-        requested_name = requested.strip()
-        returned_name = returned.strip()
-        requested_canonical = requested_name.removesuffix(":latest")
-        returned_canonical = returned_name.removesuffix(":latest")
-        if not returned_name or returned_canonical != requested_canonical:
+        requested_canonical = OllamaTransport.normalize_model_name(requested)
+        returned_canonical = OllamaTransport.normalize_model_name(returned)
+        if not returned_canonical or returned_canonical != requested_canonical:
+            detail = f"requested={requested.strip()} returned={returned.strip() or 'missing'}"
             raise OllamaSchemaValidationError(
                 "Ollama returned a response for a different model.",
                 operation=operation,
                 retryable=False,
+                detail=detail,
             )
 
     @classmethod
@@ -855,14 +1048,17 @@ class OllamaTransport:
         if response.status_code < 400:
             return
         model = str((payload or {}).get("model") or "")
+        detail = cls._read_error_detail(response)
         if response.status_code == 404 and model:
-            raise OllamaModelUnavailableError(model, operation=operation)
+            raise OllamaModelUnavailableError(model, operation=operation, detail=detail)
         retryable = response.status_code in (408, 429) or response.status_code >= 500
+        message = f"Ollama returned HTTP {response.status_code}." + (f" Detail: {detail}" if detail else "")
         raise OllamaHTTPError(
-            f"Ollama returned HTTP {response.status_code}.",
+            message,
             operation=operation,
             status_code=response.status_code,
             retryable=retryable,
+            detail=detail,
         )
 
     @classmethod
@@ -870,27 +1066,75 @@ class OllamaTransport:
         with cls._metrics_lock:
             cls._metrics["requests"] += 1
             operations = cls._metrics["operations"]
-            operation_metrics = operations.setdefault(operation, {"requests": 0, "successes": 0, "failures": 0})
+            operation_metrics = operations.setdefault(
+                operation,
+                {
+                    "requests": 0,
+                    "successes": 0,
+                    "failures": 0,
+                    "prompt_eval_count": 0,
+                    "prompt_eval_duration_ms": 0.0,
+                    "eval_count": 0,
+                    "eval_duration_ms": 0.0,
+                },
+            )
             operation_metrics["requests"] += 1
 
     @classmethod
     def _record_success(cls, operation: str, duration_ms: float, response_bytes: int, response_data: dict[str, Any]) -> None:
+        prompt_eval_count = max(0, int(response_data.get("prompt_eval_count") or 0))
+        prompt_eval_duration_ms = max(0.0, float(response_data.get("prompt_eval_duration") or 0) / 1_000_000.0)
+        eval_count = max(0, int(response_data.get("eval_count") or 0))
+        eval_duration_ms = max(0.0, float(response_data.get("eval_duration") or 0) / 1_000_000.0)
+
         with cls._metrics_lock:
             cls._metrics["successes"] += 1
             cls._metrics["response_bytes"] += response_bytes
             cls._metrics["total_duration_ms"] += duration_ms
             cls._metrics["model_load_duration_ms"] += max(0, int(response_data.get("load_duration") or 0)) / 1_000_000.0
-            cls._metrics["model_inference_duration_ms"] += max(0, int(response_data.get("eval_duration") or 0)) / 1_000_000.0
+            cls._metrics["model_inference_duration_ms"] += eval_duration_ms
+            cls._metrics["prompt_eval_count"] += prompt_eval_count
+            cls._metrics["prompt_eval_duration_ms"] += prompt_eval_duration_ms
+            cls._metrics["eval_count"] += eval_count
+            cls._metrics["eval_duration_ms"] += eval_duration_ms
             if operation == "unload":
                 cls._metrics["unload_duration_ms"] += duration_ms
-            cls._metrics["operations"][operation]["successes"] += 1
+
+            op_metrics = cls._metrics["operations"].setdefault(
+                operation,
+                {
+                    "requests": 0,
+                    "successes": 0,
+                    "failures": 0,
+                    "prompt_eval_count": 0,
+                    "prompt_eval_duration_ms": 0.0,
+                    "eval_count": 0,
+                    "eval_duration_ms": 0.0,
+                },
+            )
+            op_metrics["successes"] += 1
+            op_metrics["prompt_eval_count"] = op_metrics.get("prompt_eval_count", 0) + prompt_eval_count
+            op_metrics["prompt_eval_duration_ms"] = op_metrics.get("prompt_eval_duration_ms", 0.0) + prompt_eval_duration_ms
+            op_metrics["eval_count"] = op_metrics.get("eval_count", 0) + eval_count
+            op_metrics["eval_duration_ms"] = op_metrics.get("eval_duration_ms", 0.0) + eval_duration_ms
 
     @classmethod
     def _record_failure(cls, operation: str, duration_ms: float) -> None:
         with cls._metrics_lock:
             cls._metrics["failures"] += 1
             cls._metrics["total_duration_ms"] += duration_ms
-            cls._metrics["operations"].setdefault(operation, {"requests": 0, "successes": 0, "failures": 0})["failures"] += 1
+            cls._metrics["operations"].setdefault(
+                operation,
+                {
+                    "requests": 0,
+                    "successes": 0,
+                    "failures": 0,
+                    "prompt_eval_count": 0,
+                    "prompt_eval_duration_ms": 0.0,
+                    "eval_count": 0,
+                    "eval_duration_ms": 0.0,
+                },
+            )["failures"] += 1
 
     @classmethod
     def _record_retry(cls) -> None:

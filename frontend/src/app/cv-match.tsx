@@ -31,6 +31,7 @@ import {
   StepProgressCard,
   Breadcrumbs,
   ErrorBanner,
+  PageHeader,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { SUPPORTED_RESUME_FORMATS } from '@/constants/upload';
@@ -71,6 +72,8 @@ export default function CvMatchScreen() {
     stepStates,
     uploadAndProcess,
     forceReanalyze,
+    stopProcessing,
+    resetUpload,
   } = useCvUpload();
   const {
     items: queuedUploads,
@@ -78,6 +81,12 @@ export default function CvMatchScreen() {
     isActive: queueIsActive,
     uploadFiles,
     clearFinished,
+    clearAll,
+    stopItem,
+    stopAll,
+    removeItem,
+    reprocessItem,
+    reprocessFailed,
     hydrationError: queueHydrationError,
   } = useCvQueueUploads();
 
@@ -202,18 +211,13 @@ export default function CvMatchScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'CV Match Analysis' }]} />
 
-      {/* Sticky PageHeader */}
-      <View className="px-3 py-2.5 bg-surface border-b border-border">
-        <Text className="text-base font-sans-bold text-text-primary">
-          CV Parsing & Job Match Analysis
-        </Text>
-        <Text className="text-[11px] font-sans text-text-muted">
-          Multi-stage document extraction, rule-based scoring, and semantic LLM enrichment
-        </Text>
-      </View>
+      <PageHeader
+        title="CV Parsing & Job Match Analysis"
+        subtitle="Multi-stage document extraction, rule-based scoring, and semantic LLM enrichment"
+      />
 
-      <ScrollView className="flex-1 px-3 py-4">
-        <View className="gap-4 mb-8">
+      <ScrollView className="flex-1 px-3 py-3">
+        <View className="gap-3 pb-4">
           {/* Mode Selector Tabs with Processing Lock */}
           <View className="gap-1.5">
             <SegmentedControl
@@ -266,9 +270,9 @@ export default function CvMatchScreen() {
           {activeTab === 'file' && (
             <View className="gap-3">
               {/* Document Selection Card */}
-              <Card className="items-center justify-center p-6 gap-2 border-border/80">
-                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mb-1">
-                  <FileText size={24} color={COLORS.primary} />
+              <Card className="items-center justify-center py-4 gap-2 border-border/80">
+                <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
+                  <FileText size={20} color={COLORS.primary} />
                 </View>
                 <Text className="text-sm font-sans-bold text-text-primary">
                   Select CV Documents to Match
@@ -310,9 +314,18 @@ export default function CvMatchScreen() {
                       <Text className="text-sm font-sans-bold text-text-primary">CV Processing Queue</Text>
                       <Text className="text-xs font-sans text-text-muted">Execution order is controlled exclusively by the backend FIFO worker.</Text>
                     </View>
-                    {!queueIsActive && (
-                      <Button label="Clear Finished" variant="secondary" size="sm" onPress={clearFinished} />
-                    )}
+                    <View className="flex-row items-center gap-1.5">
+                      {queueIsActive && (
+                        <Button label="Stop Queue" variant="destructive" size="sm" onPress={stopAll} />
+                      )}
+                      {queueSummary.FAILED > 0 && (
+                        <Button label="Re-process Failed CVs" variant="destructive" size="sm" onPress={reprocessFailed} />
+                      )}
+                      {!queueIsActive && (
+                        <Button label="Clear Finished" variant="secondary" size="sm" onPress={clearFinished} />
+                      )}
+                      <Button label="Clear All" variant="secondary" size="sm" onPress={clearAll} />
+                    </View>
                   </View>
                   <View className="flex-row flex-wrap gap-1.5">
                     <Badge label={`${queueSummary.PROCESSING} Processing`} tone="info" />
@@ -325,12 +338,24 @@ export default function CvMatchScreen() {
                     {queuedUploads.map((item) => {
                       const stateMeta = getCvQueueStateMeta(item.state);
                       const tracking = item.jobId ? `Job ${item.jobId}` : 'Preparing upload';
+                      const isItemActive = item.state === 'PROCESSING' || item.state === 'PENDING' || item.state === 'RETRYING';
                       return (
                         <DenseRow
                           key={item.clientId}
                           title={item.filename}
                           subtitle={`${tracking} · ${item.progress}% · ${item.errorCode ? `${item.errorCode}: ` : ''}${item.message}${item.syncError ? ` · Refresh error: ${item.syncError}` : ''}`}
-                          trailing={<Badge label={stateMeta.label} tone={stateMeta.tone} />}
+                          trailing={
+                            <View className="flex-row items-center gap-1.5">
+                              {isItemActive && (
+                                <Button label="Stop" variant="destructive" size="sm" onPress={() => stopItem(item.clientId)} />
+                              )}
+                              {item.state === 'FAILED' && (
+                                <Button label="Re-process" variant="destructive" size="sm" onPress={() => reprocessItem(item.clientId)} />
+                              )}
+                              <Button label="Remove" variant="secondary" size="sm" onPress={() => removeItem(item.clientId)} />
+                              <Badge label={stateMeta.label} tone={stateMeta.tone} />
+                            </View>
+                          }
                         />
                       );
                     })}
@@ -348,6 +373,8 @@ export default function CvMatchScreen() {
                   error={uploadError}
                   useLlmEnrichment={useLlmEnrichment}
                   onRetry={handleRetry}
+                  onStop={stopProcessing}
+                  onClear={resetUpload}
                   isProcessing={uploading}
                   isComplete={isComplete}
                 />
@@ -365,7 +392,8 @@ export default function CvMatchScreen() {
                 multiline
                 numberOfLines={8}
                 placeholder="Paste candidate resume/CV text here..."
-                style={{ textAlignVertical: 'top', minHeight: 140, maxHeight: 280 }}
+                className="min-h-[112px] max-h-[240px]"
+                style={{ textAlignVertical: 'top' }}
                 error={textError || undefined}
                 helperText="Paste raw plain-text resume content to perform instant semantic vacancy matching."
               />
@@ -382,7 +410,7 @@ export default function CvMatchScreen() {
 
           {/* ANALYSIS RESULTS SECTION */}
           {currentAnalysis && (
-            <View className="gap-4">
+            <View className="gap-3">
               <View className="flex-row items-center justify-between border-b border-border pb-2">
                 <Text className="text-base font-sans-bold text-text-primary">
                   Match Results Summary

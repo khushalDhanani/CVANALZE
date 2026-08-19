@@ -23,7 +23,7 @@ export function ComponentScoreBar({ scores, className = '' }: ComponentScoreBarP
   if (!scores) return null;
 
   return (
-    <View className={`gap-2 my-2 ${className}`}>
+    <View className={`gap-1.5 ${className}`}>
       {ORDERED_COMPONENTS.map(({ key, label }) => {
         const val = scores[key];
         if (val === undefined || val === null) return null;

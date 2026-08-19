@@ -3,10 +3,9 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'rea
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ArrowLeft, Award, FileText, CheckCircle, AlertCircle, CpuIcon, Edit3,
-  RefreshCw, X, Clock, Mail, Phone, UserCheck, Briefcase, Target,
-  CheckCircle2, Sparkles, AlertTriangle, Users, MapPin, Building,
-  Activity, Search, BookOpen, Layers, Link, Code2
+  ArrowLeft, CheckCircle, Edit3,
+  RefreshCw, X, Mail, Phone, UserCheck, Target, Sparkles,
+  AlertTriangle, MapPin, Link, Code2
 } from 'lucide-react-native';
 import { candidateService } from '@/services/candidateService';
 import { cvService } from '@/services/cvService';
@@ -16,21 +15,14 @@ import {
   Card,
   Button,
   Badge,
-  DenseRow,
   FieldConfidenceView,
   Breadcrumbs,
   ExperienceTimelineCard,
-  ComponentScoreBar,
   ErrorBanner,
+  VacancyEnrichmentPanel,
+  PageHeader,
 } from '@/components/ui';
-import { ScoreBadge } from '@/components/ui/ScoreBadge';
-import {
-  VacancyMatchStatusBadge,
-  VacancyFitScoreBreakdownCard,
-  getCanonicalMatchStatusMeta,
-  normalizeCanonicalMatchStatus,
-  resolveVacancyFitScore,
-} from '@/components/ui/VacancyMatchStatusBadge';
+import { VacancyMatchStatusBadge } from '@/components/ui/VacancyMatchStatusBadge';
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -38,15 +30,37 @@ import { COLORS } from '@/constants/colors';
 import { formatDateTime } from '@/utils/date';
 import { getCvQueueStateMeta, resolveCvQueueUiState } from '@/utils/cvQueueState';
 import {
+  buildCandidateFiveSecondSummary,
+  buildCandidateDecisionNarratives,
   buildCandidateDetailViewModel,
   cleanCandidateText,
   cleanRecommendationText,
+  humanizeRecruiterText,
   normalizeCandidateMatchAnalysis,
   normalizeCandidateRouteId,
   responseMatchesCandidateId,
 } from '@/utils/candidateDetail';
+import { getProcessingProvenanceRows } from '@/utils/processingProvenance';
+import { getReanalysisErrorPresentation, type ReanalysisErrorPresentation } from '@/utils/reanalysisError';
+import { reanalyzeCandidateAndCommit } from '@/utils/candidateReanalysis';
+import { buildCandidateDecisionEvidence, buildCandidateSkillsSummaryPresentation, buildVacancyDecisionEvidence } from '@/utils/candidateDecisionEvidence';
 
-type TabType = 'overview' | 'processing';
+type TabType = 'overview' | 'skills' | 'experience' | 'education' | 'matches' | 'risks' | 'cv';
+
+const normalizeRecruiterLabels = (value: unknown, objectKeys: string[] = []): string[] => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.reduce<string[]>((labels, item) => {
+    const record = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : undefined;
+    const label = cleanCandidateText(item) || objectKeys.map((key) => cleanCandidateText(record?.[key])).find(Boolean);
+    if (!label) return labels;
+    const normalizedLabel = label.toLocaleLowerCase();
+    if (seen.has(normalizedLabel)) return labels;
+    seen.add(normalizedLabel);
+    labels.push(label);
+    return labels;
+  }, []);
+};
 
 export default function CandidateDetailScreen() {
   const router = useRouter();
@@ -80,6 +94,14 @@ export default function CandidateDetailScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showFullText, setShowFullText] = useState<boolean>(false);
+  const [showAllSkills, setShowAllSkills] = useState<boolean>(false);
+  const [showExperienceDetails, setShowExperienceDetails] = useState<boolean>(false);
+  const [showAllEducation, setShowAllEducation] = useState<boolean>(false);
+  const [showAllMatches, setShowAllMatches] = useState<boolean>(false);
+  const [showAllRisks, setShowAllRisks] = useState<boolean>(false);
+  const [showAllAiReasoning, setShowAllAiReasoning] = useState<boolean>(false);
+  const [showAllCvDetails, setShowAllCvDetails] = useState<boolean>(false);
+  const [technicalDetailsExpanded, setTechnicalDetailsExpanded] = useState<boolean>(false);
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
   const [selectedJobForReview, setSelectedJobForReview] = useState<any>(null);
 
@@ -92,6 +114,7 @@ export default function CandidateDetailScreen() {
   const [reprocessStatusMsg, setReprocessStatusMsg] = useState<string>('Initializing re-analysis...');
   const [stepStates, setStepStates] = useState<StepState[]>(Array(8).fill('pending'));
   const [isReanalyzing, setIsReanalyzing] = useState<boolean>(false);
+  const [reanalyzeError, setReanalyzeError] = useState<ReanalysisErrorPresentation | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -112,9 +135,18 @@ export default function CandidateDetailScreen() {
     setData(null);
     setRecommendations(null);
     setShowFullText(false);
+    setShowAllSkills(false);
+    setShowExperienceDetails(false);
+    setShowAllEducation(false);
+    setShowAllMatches(false);
+    setShowAllRisks(false);
+    setShowAllAiReasoning(false);
+    setShowAllCvDetails(false);
+    setTechnicalDetailsExpanded(false);
     setReviewModalVisible(false);
     setSelectedJobForReview(null);
     setIsReanalyzing(false);
+    setReanalyzeError(null);
     setIsReprocessing(false);
     setReprocessError(null);
     setRecommendationsError(null);
@@ -187,7 +219,7 @@ export default function CandidateDetailScreen() {
     setCurrentStepIndex(1);
     setReprocessStatusMsg('Caches purged. Re-running CV analysis pipeline...');
     setStepStates(['completed', 'active', ...Array(6).fill('pending')]);
-    setActiveTab('processing');
+    setActiveTab('cv');
 
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
@@ -247,10 +279,13 @@ export default function CandidateDetailScreen() {
           errorCount = 0;
         } catch (err: any) {
           errorCount++;
-          if (errorCount >= 3) {
+          console.warn(`[REPROCESS_POLL] Transient status check error (${errorCount}/10):`, err?.message);
+          if (errorCount >= 10) {
             stopTimers();
             setIsReprocessing(false);
             setReprocessError(err.message || 'Connection lost during polling (CONNECTION_LOST).');
+          } else {
+            setReprocessStatusMsg('Connecting to processing worker...');
           }
         }
       }, 1500);
@@ -266,22 +301,70 @@ export default function CandidateDetailScreen() {
     if (!scanId) return;
     const requestedCandidateId = candidateCvId;
     setIsReanalyzing(true);
+    setReanalyzeError(null);
     try {
-      await matchService.reanalyzeScan(scanId);
-      setTimeout(() => {
-        if (activeCandidateIdRef.current !== requestedCandidateId) return;
-        fetchDetail();
-        setIsReanalyzing(false);
-      }, 1500);
-    } catch (err: any) {
-      console.warn('Reanalysis failed:', err);
-      setIsReanalyzing(false);
+      await reanalyzeCandidateAndCommit({
+        scanId,
+        reanalyze: matchService.reanalyzeScan,
+        commit: setData,
+        isCurrent: () => activeCandidateIdRef.current === requestedCandidateId,
+      });
+      if (activeCandidateIdRef.current !== requestedCandidateId) return;
+      setError(null);
+    } catch (requestError: unknown) {
+      if (activeCandidateIdRef.current === requestedCandidateId) {
+        setReanalyzeError(getReanalysisErrorPresentation(requestError));
+      }
+    } finally {
+      if (activeCandidateIdRef.current === requestedCandidateId) setIsReanalyzing(false);
     }
   };
 
   const rawAnalysis = data?.enriched_match_analysis || data?.match_analysis;
   const analysis: any = useMemo(() => normalizeCandidateMatchAnalysis(rawAnalysis), [rawAnalysis]);
   const bestMatch = analysis?.best_match;
+  const suggestedRoles = useMemo(
+    () => normalizeRecruiterLabels(analysis?.suitable_job_roles, ['suggested_role', 'role', 'job_title', 'title', 'name']),
+    [analysis],
+  );
+  const interviewFocusAreas = useMemo(
+    () => normalizeRecruiterLabels(recommendations?.interview_focus_areas, ['focus', 'focus_area', 'area', 'title', 'name']),
+    [recommendations],
+  );
+  const talentPools = useMemo(
+    () => normalizeRecruiterLabels(recommendations?.talent_pools, ['talent_pool', 'pool', 'title', 'name']),
+    [recommendations],
+  );
+  const candidateSummary = useMemo(
+    () => data && candidateView ? buildCandidateFiveSecondSummary(data, candidateView, analysis, recommendations) : null,
+    [analysis, candidateView, data, recommendations],
+  );
+  const decisionNarratives = useMemo(
+    () => data && candidateView ? buildCandidateDecisionNarratives(data, candidateView, analysis, recommendations) : null,
+    [analysis, candidateView, data, recommendations],
+  );
+  const decisionEvidence = useMemo(
+    () => data && candidateView ? buildCandidateDecisionEvidence(data, candidateView, analysis, recommendations) : null,
+    [analysis, candidateView, data, recommendations],
+  );
+  const skillsSummary = useMemo(
+    () => decisionEvidence ? buildCandidateSkillsSummaryPresentation(decisionEvidence.skills) : null,
+    [decisionEvidence],
+  );
+  const vacancyMatches = useMemo(() => {
+    const matches = [bestMatch, ...(analysis?.suitable_openings || []), ...(analysis?.unsuitable_openings || [])].filter(Boolean);
+    const seen = new Set<string>();
+    return matches.filter((match: any) => {
+      const key = String(match.vacancy_id || match.job_id || `${match.job_title}:${match.department_name || match.department}`);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [analysis, bestMatch]);
+  const experienceAnalysis = (data as any)?.experience_gap_analysis
+    || (data as any)?.experience_summary?.gap_analysis
+    || (analysis as any)?.experience_gap_analysis
+    || (recommendations as any)?.experience_gap_analysis;
   const scanId = data?.scan_id || data?.id || candidateCvId || '';
 
   const rawTimestamp = data?.parsed_at || data?.scanned_at || data?.created_at;
@@ -296,262 +379,268 @@ export default function CandidateDetailScreen() {
     return 'neutral';
   };
 
+  const recommendationTone = candidateSummary?.recommendation === 'STRONG MATCH'
+    ? 'success'
+    : candidateSummary?.recommendation === 'POTENTIAL MATCH'
+      ? 'warning'
+      : candidateSummary?.recommendation === 'MANUAL REVIEW'
+        ? 'info'
+        : 'neutral';
+  const recommendationAction = candidateSummary?.recommendation === 'STRONG MATCH'
+    ? 'Continue to the next screening step.'
+    : candidateSummary?.recommendation === 'POTENTIAL MATCH'
+      ? 'Continue with a focused review.'
+      : candidateSummary?.recommendation === 'MANUAL REVIEW'
+        ? 'Continue after completing the highlighted checks.'
+        : 'Review only if broader role alignment is relevant.';
+
   // -------------------------------------------------------------
   // TAB RENDERERS
   // -------------------------------------------------------------
 
+  const visibleLimit = 6;
+  const visibleSkills = (skills: string[]) => showAllSkills ? skills : skills.slice(0, visibleLimit);
+  const visibleMatches = showAllMatches ? vacancyMatches : vacancyMatches.slice(0, 3);
+  const visibleConcerns = showAllRisks ? decisionEvidence?.concerns || [] : (decisionEvidence?.concerns || []).slice(0, 4);
+  const visibleStrengths = showAllRisks ? decisionEvidence?.strengths || [] : (decisionEvidence?.strengths || []).slice(0, 4);
+  const reasoningMatches = vacancyMatches.slice(1).filter((match: any) => cleanCandidateText(match.ai_match_explanation || match.llm_reason || match.semantic_reason));
+
+  const renderAiReasoning = () => (
+    <Card className="gap-2.5 shadow-none border-info/30 bg-info/5 lg:flex-1">
+      <View className="flex-row items-center gap-1.5 pb-2 border-b border-info/20">
+        <Sparkles size={14} color={COLORS.info} />
+        <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Additional AI Context</Text>
+      </View>
+      <Text className="text-[11px] leading-4 text-text-muted">AI interpretation is not confirmed CV evidence. Verify it against the factual tabs.</Text>
+      {analysis?.ai_career_summary ? (
+        <Text numberOfLines={showAllAiReasoning ? undefined : 4} className="text-xs leading-5 text-text-primary">
+          {humanizeRecruiterText(analysis.ai_career_summary)}
+        </Text>
+      ) : null}
+      {showAllAiReasoning && recommendations?.experience_assessment ? (
+        <View className="gap-1">
+          <Text className="text-[11px] font-sans-bold text-text-primary">Experience interpretation</Text>
+          <Text className="text-xs leading-4 text-text-primary">{humanizeRecruiterText(recommendations.experience_assessment)}</Text>
+        </View>
+      ) : null}
+      {(showAllAiReasoning ? reasoningMatches : reasoningMatches.slice(0, 1)).map((match: any, index: number) => (
+        <View key={String(match.vacancy_id || match.job_id || index)} className="gap-1">
+          <Text className="text-xs font-sans-bold text-text-primary">{cleanCandidateText(match.job_title) || `Vacancy ${index + 1}`}</Text>
+          <VacancyEnrichmentPanel match={match} showDecisionMetadata={false} />
+        </View>
+      ))}
+      {!analysis?.ai_career_summary && reasoningMatches.length === 0 ? <Text className="text-xs text-text-muted">An AI match explanation is not available.</Text> : null}
+      {(analysis?.ai_career_summary || recommendations?.experience_assessment || reasoningMatches.length > 1) ? (
+        <View className="items-start">
+          <Button label={showAllAiReasoning ? 'Show Less' : 'View Full Reasoning'} variant="ghost" size="sm" onPress={() => setShowAllAiReasoning(!showAllAiReasoning)} />
+        </View>
+      ) : null}
+    </Card>
+  );
+
   const renderOverviewTab = () => (
-    <View className="flex-col gap-4 lg:flex-row lg:items-start">
-      {/* Left Column (Candidate Data) */}
-      <View className="w-full min-w-0 gap-4 lg:w-5/12 lg:flex-none">
-
-        {/* Active Vacancy Summary Card */}
-        {analysis && (analysis.active_vacancy_summary || analysis.match_status || bestMatch) ? (
-        <Card className="gap-2 p-3 shadow-none border-border">
-          <View className="flex-row items-center justify-between pb-2 mb-1 border-b border-border">
-            <View className="flex-row items-center gap-1.5">
-              <Target size={14} color={analysis?.has_genuine_match ? COLORS.success : COLORS.warning} />
-              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Active Vacancy Summary</Text>
-            </View>
-            <VacancyMatchStatusBadge
-              status={analysis.match_status || (analysis.has_genuine_match ? 'MATCHED' : 'ANALYSIS_NOT_AVAILABLE')}
-              score={resolveVacancyFitScore(bestMatch)}
-            />
+    <View className="flex-col gap-3 lg:flex-row lg:items-start">
+      <Card className="gap-2.5 shadow-none border-border lg:flex-1">
+        <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Recruiter Snapshot</Text>
+        <View className="gap-1.5 p-2 border rounded bg-primary/5 border-primary/20">
+          <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-primary">Recommended Next Step</Text>
+          <Text className="text-xs leading-4 text-text-primary">{recommendationAction}</Text>
+        </View>
+        {candidateView && (candidateView.email || candidateView.phone || candidateView.location) ? (
+          <View className="gap-1.5">
+            <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-text-muted">Contact</Text>
+            {candidateView.email ? <FieldConfidenceView fieldName="email" value={candidateView.email} icon={<Mail size={14} color={COLORS.textFaint} />} /> : null}
+            {candidateView.phone ? <FieldConfidenceView fieldName="phone" value={candidateView.phone} icon={<Phone size={14} color={COLORS.textFaint} />} /> : null}
+            {candidateView.location ? <FieldConfidenceView fieldName="location" value={candidateView.location} icon={<MapPin size={14} color={COLORS.textFaint} />} /> : null}
           </View>
-          {analysis.active_vacancy_summary ? <View className={`p-2 rounded ${analysis?.has_genuine_match ? 'bg-success/5 border border-success/20' : 'bg-surface border border-border'}`}>
-            {analysis.active_vacancy_summary ? <Text className="text-xs leading-5 text-text-primary">{analysis.active_vacancy_summary}</Text> : null}
-          </View> : null}
-
-          {/* Render canonical score breakdown if available on best match */}
-          {bestMatch?.score_breakdown ? (
-            <VacancyFitScoreBreakdownCard
-              breakdown={bestMatch.score_breakdown}
-              penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
-              rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
-            />
-          ) : null}
-        </Card>
         ) : null}
+        <View className="flex-row flex-wrap gap-2 pt-2 border-t border-border">
+          <Button label="Review Skills" variant="secondary" size="sm" onPress={() => setActiveTab('skills')} />
+          <Button label="Review Matches" variant="secondary" size="sm" onPress={() => setActiveTab('matches')} />
+          <Button label="Review Risks" variant="secondary" size="sm" onPress={() => setActiveTab('risks')} />
+        </View>
+      </Card>
+      {renderAiReasoning()}
+    </View>
+  );
 
-        {/* Contact Info Card with FieldConfidenceView */}
-        {candidateView && (candidateView.email || candidateView.phone || candidateView.location || candidateView.linkedin || candidateView.github) ? (
-        <Card className="gap-2 p-3 shadow-none border-border">
-          <Text className="mb-1 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Contact Information</Text>
-          {candidateView.email ? (
-          <FieldConfidenceView
-            fieldName="email"
-            value={candidateView.email}
-            icon={<Mail size={14} color={COLORS.textFaint} />}
-          />
-          ) : null}
-          {candidateView.phone ? (
-          <FieldConfidenceView
-            fieldName="phone"
-            value={candidateView.phone}
-            icon={<Phone size={14} color={COLORS.textFaint} />}
-          />
-          ) : null}
-          {candidateView.location ? (
-          <FieldConfidenceView
-            fieldName="location"
-            value={candidateView.location}
-            tier={data?.location_confidence_tier || data?.field_confidence_tiers?.location}
-            icon={<MapPin size={14} color={COLORS.textFaint} />}
-          />
-          ) : null}
-          {candidateView.linkedin ? <FieldConfidenceView fieldName="linkedin" value={candidateView.linkedin} icon={<Link size={14} color={COLORS.textFaint} />} /> : null}
-          {candidateView.github ? <FieldConfidenceView fieldName="github" value={candidateView.github} icon={<Code2 size={14} color={COLORS.textFaint} />} /> : null}
-        </Card>
+  const renderSkillsTab = () => (
+    <View className="gap-3">
+      <Card className="gap-3 shadow-none border-border">
+        <View className="flex-row flex-wrap items-center justify-between gap-2 pb-2 border-b border-border">
+          <View className="flex-row items-center gap-1.5">
+            <CheckCircle size={14} color={COLORS.primary} />
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Skills Intelligence</Text>
+          </View>
+          <View className="flex-row flex-wrap gap-1">
+            {skillsSummary?.matchedLabel ? <Badge label={skillsSummary.matchedLabel} tone="success" /> : null}
+            {skillsSummary?.missingLabel ? <Badge label={skillsSummary.missingLabel} tone={decisionEvidence?.skills.missingRequired.length ? 'warning' : 'neutral'} /> : null}
+          </View>
+        </View>
+        <View className="flex-col gap-3 lg:flex-row">
+          <View className="flex-1 gap-1.5">
+            <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-success">Matched Skills</Text>
+            {decisionEvidence?.skills.matched.length ? visibleSkills(decisionEvidence.skills.matched).map((skill) => (
+              <Text key={skill} className="text-xs text-text-primary">✓ {skill}</Text>
+            )) : <Text className="text-xs text-text-muted">No confirmed required-skill matches were found.</Text>}
+          </View>
+          <View className="flex-1 gap-1.5">
+            <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-danger">Missing Required Skills</Text>
+            {decisionEvidence?.skills.missingRequired.length ? visibleSkills(decisionEvidence.skills.missingRequired).map((skill) => (
+              <Text key={skill} className="text-xs text-text-primary">• {skill}</Text>
+            )) : <Text className="text-xs text-success">No identified required-skill gaps.</Text>}
+          </View>
+          <View className="flex-1 gap-1.5">
+            <Text className="text-[11px] tracking-wider uppercase font-sans-bold text-text-muted">Additional CV Skills</Text>
+            {decisionEvidence?.skills.additional.length ? (
+              <View className="flex-row flex-wrap gap-1">
+                {visibleSkills(decisionEvidence.skills.additional).map((skill) => <Badge key={skill} label={skill} tone="neutral" />)}
+              </View>
+            ) : <Text className="text-xs text-text-muted">No additional skills were identified.</Text>}
+          </View>
+        </View>
+        {decisionEvidence && Math.max(decisionEvidence.skills.matched.length, decisionEvidence.skills.missingRequired.length, decisionEvidence.skills.additional.length) > visibleLimit ? (
+          <View className="items-start"><Button label={showAllSkills ? 'Show Top Skills' : 'View All Skills'} variant="ghost" size="sm" onPress={() => setShowAllSkills(!showAllSkills)} /></View>
         ) : null}
+      </Card>
+    </View>
+  );
 
-        {/* {candidateView?.summary ? (
-          <Card className="gap-2 p-3 shadow-none border-border">
-            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Professional Summary</Text>
-            <Text className="text-xs leading-5 text-text-primary">{candidateView.summary}</Text>
-          </Card>
-        ) : null} */}
-
-        {/* Unsuitable Openings — Manual Review Required */}
-        {analysis?.unsuitable_openings && analysis.unsuitable_openings.length > 0 && (
-          <Card className="gap-2 p-3 shadow-none border-warning/30 bg-warning/5">
-            <View className="flex-row items-center gap-1.5 mb-1 border-b border-warning/20 pb-2">
-              <AlertTriangle size={14} color={COLORS.warning} />
-              <Text className="text-xs tracking-wider uppercase font-sans-bold text-warning">
-                Manual Review Required ({analysis.unsuitable_openings.length})
-              </Text>
+  const renderExperienceTab = () => (
+    <View className="gap-3">
+      {!showExperienceDetails ? (
+        <Card className="gap-2.5 shadow-none border-border">
+          <View className="flex-row flex-wrap items-center justify-between gap-2">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Experience Snapshot</Text>
+            <Badge label={candidateSummary?.totalExperience || 'Not identified'} tone="neutral" />
+          </View>
+          {candidateView?.experience.length ? candidateView.experience.slice(0, 2).map((experience, index) => (
+            <View key={`${experience.title || 'role'}-${index}`} className="gap-0.5 p-2 border rounded bg-background border-border">
+              {experience.title ? <Text className="text-sm font-sans-bold text-text-primary">{experience.title}</Text> : null}
+              <Text className="text-xs text-text-muted">{[experience.company, experience.dates].filter(Boolean).join(' • ')}</Text>
+              {experience.responsibilities[0] ? <Text numberOfLines={2} className="text-[11px] leading-4 text-text-primary">{experience.responsibilities[0]}</Text> : null}
             </View>
-            <Text className="text-[11px] text-text-muted mb-1">
-              These vacancies did not meet every verified-match criterion. HR review is recommended before any decision.
-            </Text>
-            {analysis.unsuitable_openings.map((match: any, idx: number) => {
-              const fitScore = resolveVacancyFitScore(match);
-              const jobTitle = cleanCandidateText(match.job_title);
-              const departmentName = cleanCandidateText(match.department_name || match.department);
-              return (
-              <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
-                <View className="flex-1 pr-2">
-                  {jobTitle ? <Text className="text-xs font-sans-bold text-text-primary">{jobTitle}</Text> : null}
-                  {departmentName ? <Text className="text-[11px] text-text-muted">{departmentName}</Text> : null}
-                </View>
-                <View className="flex-row items-center gap-2">
-                  {fitScore != null ? <ScoreBadge score={fitScore} classification={match.classification} /> : null}
-                  <Button
-                    label="Review"
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => {
-                      setSelectedJobForReview(match);
-                      setReviewModalVisible(true);
-                    }}
-                  />
-                </View>
-              </View>
-              );
-            })}
-          </Card>
-        )}
-
-        {/* Experience Timeline */}
-        {/* {candidateView && candidateView.experience.length > 0 ? (
-            <Card className="gap-3 p-3 shadow-none border-border">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Experience History</Text>
-                <Text className="text-[11px] font-sans text-text-muted">{candidateView.experience.length} roles</Text>
-              </View>
-
-              {candidateView.experience.map((exp, idx) => (
-                  <View key={idx} className="pb-3 pl-3 border-l-2 border-border">
-                    {exp.title ? <Text className="text-xs font-sans-bold text-text-primary">{exp.title}</Text> : null}
-                    {exp.company || exp.dates ? <Text className="font-sans text-xs text-text-muted">{[exp.company, exp.dates].filter(Boolean).join(' • ')}</Text> : null}
-                    {exp.responsibilities.map((responsibility, responsibilityIndex) => (
-                      <Text key={responsibilityIndex} className="mt-1 text-[11px] leading-4 text-text-primary">• {responsibility}</Text>
-                    ))}
-                  </View>
+          )) : <Text className="text-xs text-text-muted">Employment history was not identified from the CV.</Text>}
+          {(data && experienceAnalysis) || (candidateView?.experience.length || 0) > 2 ? (
+            <View className="items-start">
+              <Button label="View Full Timeline" variant="secondary" size="sm" onPress={() => setShowExperienceDetails(true)} />
+            </View>
+          ) : null}
+        </Card>
+      ) : data && experienceAnalysis ? (
+        <View className="gap-2">
+          <View className="items-start"><Button label="Collapse Timeline" variant="ghost" size="sm" onPress={() => setShowExperienceDetails(false)} /></View>
+          <ExperienceTimelineCard analysis={experienceAnalysis} candidateData={data} />
+        </View>
+      ) : candidateView?.experience.length ? (
+        <Card className="gap-2.5 shadow-none border-border">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Full Experience</Text>
+            <Button label="Collapse" variant="ghost" size="sm" onPress={() => setShowExperienceDetails(false)} />
+          </View>
+          {candidateView.experience.map((experience, index) => (
+            <View key={`${experience.title || 'role'}-${index}`} className="gap-1 p-2 border rounded bg-background border-border">
+              {experience.title ? <Text className="text-sm font-sans-bold text-text-primary">{experience.title}</Text> : null}
+              <Text className="text-xs text-text-muted">{[experience.company, experience.dates].filter(Boolean).join(' • ')}</Text>
+              {experience.responsibilities.map((responsibility) => (
+                <Text key={responsibility} className="text-[11px] leading-4 text-text-primary">• {responsibility}</Text>
               ))}
-            </Card>
-        ) : null} */}
+            </View>
+          ))}
+        </Card>
+      ) : null}
+    </View>
+  );
 
-        {/* Education & Certs */}
-        {candidateView && (candidateView.education.length > 0 || candidateView.certifications.length > 0) ? (
-        <Card className="gap-3 p-3 shadow-none border-border">
-          {candidateView.education.length > 0 ? (
-            <View className="gap-2">
-            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Education</Text>
-            {candidateView.education.map((edu, idx) => (
-              <View key={idx}>
-                {edu.degree ? <Text className="text-xs font-sans-bold text-text-primary">{edu.degree}</Text> : null}
-                {edu.institution || edu.dates ? <Text className="text-[11px] font-sans text-text-muted">{[edu.institution, edu.dates].filter(Boolean).join(' • ')}</Text> : null}
-                {edu.grade ? <Text className="text-[11px] font-sans text-text-primary">{edu.grade}</Text> : null}
-                {edu.details ? <Text className="text-[11px] font-sans text-text-primary">{edu.details}</Text> : null}
-              </View>
-            ))}
+  const renderEducationTab = () => {
+    const educationItems = candidateView?.education || [];
+    const visibleEducation = showAllEducation ? educationItems : educationItems.slice(0, 2);
+    const visibleCertifications = showAllEducation ? candidateView?.certifications || [] : (candidateView?.certifications || []).slice(0, visibleLimit);
+    return (
+      <View className="flex-col gap-3 lg:flex-row lg:items-start">
+        <Card className="gap-2.5 shadow-none border-border lg:flex-1">
+          <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Education</Text>
+          {visibleEducation.length ? visibleEducation.map((education, index) => (
+            <View key={`${education.degree || 'education'}-${index}`} className="gap-0.5 p-2 border rounded bg-background border-border">
+              {education.degree ? <Text className="text-sm font-sans-bold text-text-primary">{education.degree}</Text> : null}
+              {education.institution ? <Text className="text-xs font-sans-medium text-text-muted">{education.institution}</Text> : null}
+              {education.dates ? <Text className="text-xs text-text-muted">{education.dates}</Text> : null}
+              {education.grade ? <Text className="text-[11px] text-text-primary">{education.grade}</Text> : null}
+              {education.details ? <Text className="text-[11px] text-text-primary">{education.details}</Text> : null}
+            </View>
+          )) : <Text className="text-xs text-text-muted">Education was not identified from the CV.</Text>}
+          {Math.max(educationItems.length, candidateView?.certifications.length || 0) > visibleLimit || educationItems.length > 2 ? (
+            <View className="items-start">
+              <Button label={showAllEducation ? 'Show Less' : 'View All Education'} variant="ghost" size="sm" onPress={() => setShowAllEducation(!showAllEducation)} />
             </View>
           ) : null}
-
-          {candidateView.certifications.length > 0 && (
-            <View className="mt-2 border-t border-border pt-2 gap-1.5">
-              <Text className="text-[11px] font-sans-bold text-text-muted uppercase tracking-wider">Certifications</Text>
-              <View className="flex-row flex-wrap gap-1">
-                {candidateView.certifications.map((cert, idx) => (
-                  <Badge key={idx} label={cert} tone="neutral" />
-                ))}
-              </View>
-            </View>
-          )}
         </Card>
-        ) : null}
+        <Card className="gap-2.5 shadow-none border-border lg:flex-1">
+          <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Qualification Review</Text>
+          {decisionEvidence?.education ? (
+            <View className={`gap-1 p-2 border rounded ${decisionEvidence.education.status === 'MATCHED' ? 'bg-success/5 border-success/20' : 'bg-warning/10 border-warning/30'}`}>
+              <Text className={`text-xs font-sans-bold ${decisionEvidence.education.status === 'MATCHED' ? 'text-success' : 'text-warning'}`}>
+                {decisionEvidence.education.status === 'MATCHED' ? '✓ Education Match' : '⚠ Education Review'}
+              </Text>
+              {decisionEvidence.education.requirement ? <Text className="text-xs text-text-primary">Requirement: {decisionEvidence.education.requirement}</Text> : null}
+              {decisionEvidence.education.candidateEvidence ? <Text className="text-xs text-text-primary">CV evidence: {decisionEvidence.education.candidateEvidence}</Text> : null}
+              {decisionEvidence.education.explanation ? <Text className="text-[11px] text-text-muted">{decisionEvidence.education.explanation}</Text> : null}
+            </View>
+          ) : <Text className="text-xs text-text-muted">No vacancy-specific education assessment is available.</Text>}
+          {visibleCertifications.length ? (
+            <View className="flex-row flex-wrap gap-1">
+              {visibleCertifications.map((certification) => <Badge key={certification} label={certification} tone="neutral" />)}
+            </View>
+          ) : <Text className="text-xs text-text-muted">No certifications were identified.</Text>}
+        </Card>
+      </View>
+    );
+  };
 
-        {/* Candidate Skills */}
-        {/* {candidateView && candidateView.skills.length > 0 ? (
-            <Card className="gap-2 p-3 shadow-none border-border">
-              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Skills</Text>
-              <View className="flex-row flex-wrap gap-1">
-                {candidateView.skills.map((skill, idx) => (
-                  <Badge key={idx} label={skill} tone="neutral" />
-                ))}
-              </View>
-            </Card>
-        ) : null} */}
-
-        {/* {candidateView && candidateView.projects.length > 0 ? (
-          <Card className="gap-3 p-3 shadow-none border-border">
-            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Projects</Text>
-            {candidateView.projects.map((project, idx) => (
-              <View key={idx} className="pb-3 border-b border-border last:border-b-0">
-                {project.name ? <Text className="text-xs font-sans-bold text-text-primary">{project.name}</Text> : null}
-                {project.description ? <Text className="mt-1 text-[11px] leading-4 text-text-primary">{project.description}</Text> : null}
-                {project.technologies.length > 0 ? (
-                  <View className="flex-row flex-wrap gap-1 mt-1">{project.technologies.map((technology, techIndex) => <Badge key={techIndex} label={technology} tone="neutral" />)}</View>
-                ) : null}
-                {project.bulletPoints.map((point, pointIndex) => <Text key={pointIndex} className="mt-1 text-[11px] leading-4 text-text-primary">• {point}</Text>)}
-              </View>
-            ))}
-          </Card>
-        ) : null} */}
-
-        {/* Suitable Openings */}
-        {analysis?.suitable_openings && analysis.suitable_openings.length > 0 ? (
-          analysis.suitable_openings.slice(0, 5).map((match: any, idx: number) => {
+  const renderMatchesTab = () => (
+    <View className="gap-3">
+      <Card className="gap-2.5 shadow-none border-border">
+        <View className="flex-row items-center justify-between pb-2 border-b border-border">
+          <View className="flex-row items-center gap-1.5">
+            <Target size={14} color={COLORS.primary} />
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Vacancy Matches</Text>
+          </View>
+          <Badge label={`${vacancyMatches.length} Evaluated`} tone="neutral" />
+        </View>
+        <View className="flex-row flex-wrap gap-2">
+          {visibleMatches.length ? visibleMatches.map((match: any, index: number) => {
+            const evidence = buildVacancyDecisionEvidence(match);
             const rawStatus = match.vacancy_match_status || match.match_status || match.classification;
-            const fitScore = resolveVacancyFitScore(match);
-            const isTop = idx === 0 && (rawStatus === 'MATCHED' || rawStatus === 'HIGH');
             return (
-              <Card key={idx} className={`p-3 border-primary/40 shadow-none gap-2 ${idx > 0 ? 'mt-3 opacity-90 border-border' : ''}`}>
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1 pr-2">
-                    <View className="flex-row items-center gap-1.5 mb-1">
-                      <Award size={14} color={isTop ? COLORS.primary : COLORS.textMuted} />
-                      <Text className={`text-xs font-sans-bold uppercase tracking-wider ${isTop ? 'text-primary' : 'text-text-muted'}`}>
-                        {isTop ? 'Top Job Match' : 'Evaluated Match'}
-                      </Text>
-                    </View>
-                    <Text className="text-sm font-sans-bold text-text-primary">{match.job_title}</Text>
-                    <Text className="text-[11px] font-sans-medium text-text-muted">{match.department_name || match.department}</Text>
+              <View key={String(match.vacancy_id || match.job_id || index)} className="flex-1 min-w-[280px] gap-2 p-2.5 border rounded bg-background border-border">
+                <View className="flex-row items-start justify-between gap-2">
+                  <View className="flex-1">
+                    <Text className="text-sm font-sans-bold text-text-primary">{cleanCandidateText(match.job_title) || 'Vacancy title not available'}</Text>
+                    <Text className="text-xs text-text-muted">{cleanCandidateText(match.department_name || match.department)}</Text>
                   </View>
-                  <VacancyMatchStatusBadge
-                    status={rawStatus}
-                    score={fitScore}
-                  />
+                  <VacancyMatchStatusBadge status={rawStatus} score={evidence.overallFit} />
                 </View>
-
-                {/* Score Breakdown if present */}
-                {match.score_breakdown ? (
-                  <VacancyFitScoreBreakdownCard
-                    breakdown={match.score_breakdown}
-                    penalty={match.score_breakdown.hierarchy_mismatch_penalty}
-                    rejectionReason={match.domain_mismatch_reason || match.reason}
-                  />
-                ) : match.component_scores ? (
-                  <ComponentScoreBar scores={match.component_scores} />
-                ) : null}
-
-                {match.llm_reason ? (
-                  <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
-                    <Text className="mb-1 text-xs leading-4 text-text-primary font-sans-bold">AI Reasoning:</Text>
-                    <Text className="text-xs leading-4 text-text-primary">{match.llm_reason}</Text>
-                  </View>
-                ) : null}
-
-                {match.missing_skills && match.missing_skills.length > 0 && (
-                  <View className="mt-1">
-                    <Text className="text-[11px] font-sans-bold text-danger uppercase mb-1">Skill Gaps:</Text>
-                    <View className="flex-row flex-wrap gap-1">
-                      {match.missing_skills.map((s: string, sIdx: number) => (
-                        <Badge key={sIdx} label={s} tone="danger" />
-                      ))}
+                <View className="flex-row gap-1.5">
+                  {[['Skills', evidence.skillsFit], ['Experience', evidence.experienceFit], ['Education', evidence.educationFit]].map(([label, value]) => value != null ? (
+                    <View key={String(label)} className="flex-1 p-1.5 border rounded bg-surface border-border">
+                      <Text className="text-[10px] text-text-muted">{label}</Text>
+                      <Text className="text-xs font-sans-bold text-text-primary">{Math.round(Number(value))}%</Text>
                     </View>
-                  </View>
-                )}
-
-                {(match.recommendation && !match.llm_reason) ? (
-                  <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
-                    <Text className="text-xs leading-4 text-text-primary">💡 {match.recommendation}</Text>
-                  </View>
+                  ) : null)}
+                </View>
+                {evidence.whyItFits ? (
+                  <Text numberOfLines={2} className="text-xs leading-4 text-text-primary">
+                    <Text className="font-sans-bold text-success">Fit: </Text>{evidence.whyItFits}
+                  </Text>
                 ) : null}
-
-                <View className="flex-row justify-end mt-2">
+                {evidence.mainGap ? (
+                  <Text numberOfLines={2} className="text-xs leading-4 text-text-primary">
+                    <Text className="font-sans-bold text-danger">Gap: </Text>{evidence.mainGap}
+                  </Text>
+                ) : null}
+                <View className="items-start">
                   <Button
-                    label="HR Review"
+                    label="View Details / HR Review"
                     variant="secondary"
                     size="sm"
                     icon={<Edit3 size={12} color={COLORS.primary} />}
@@ -561,302 +650,255 @@ export default function CandidateDetailScreen() {
                     }}
                   />
                 </View>
-              </Card>
+              </View>
             );
-          })
-        ) : bestMatch && analysis?.has_genuine_match ? (
-          <Card className="gap-2 p-3 shadow-none border-primary/40">
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1 pr-2">
-                <View className="flex-row items-center gap-1.5 mb-1">
-                  <Award size={14} color={COLORS.primary} />
-                  <Text className="text-xs tracking-wider uppercase font-sans-bold text-primary">Top Job Match</Text>
-                </View>
-                <Text className="text-sm font-sans-bold text-text-primary">{bestMatch.job_title}</Text>
-                <Text className="text-[11px] font-sans-medium text-text-muted">{bestMatch.department_name}</Text>
-              </View>
-              <VacancyMatchStatusBadge
-                status={bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification}
-                score={resolveVacancyFitScore(bestMatch)}
-              />
-            </View>
-
-            {bestMatch.score_breakdown ? (
-              <VacancyFitScoreBreakdownCard
-                breakdown={bestMatch.score_breakdown}
-                penalty={bestMatch.score_breakdown.hierarchy_mismatch_penalty}
-                rejectionReason={bestMatch.domain_mismatch_reason || bestMatch.reason}
-              />
-            ) : bestMatch.component_scores ? (
-              <ComponentScoreBar scores={bestMatch.component_scores} />
-            ) : null}
-
-            {bestMatch.recommendation ? (
-              <View className="p-2 mt-1 border rounded bg-primary/5 border-primary/10">
-                <Text className="text-xs leading-4 text-text-primary">💡 {bestMatch.recommendation}</Text>
-              </View>
-            ) : null}
-            <View className="flex-row justify-end mt-2">
-              <Button
-                label="HR Review"
-                variant="secondary"
-                size="sm"
-                icon={<Edit3 size={12} color={COLORS.primary} />}
-                onPress={() => {
-                  setSelectedJobForReview(bestMatch);
-                  setReviewModalVisible(true);
-                }}
-              />
-            </View>
-          </Card>
+          }) : <Text className="text-xs text-text-muted">No active vacancy evaluation is available.</Text>}
+        </View>
+        {vacancyMatches.length > 3 ? (
+          <View className="items-start">
+            <Button label={showAllMatches ? 'Show Top Matches' : 'View All Matches'} variant="ghost" size="sm" onPress={() => setShowAllMatches(!showAllMatches)} />
+          </View>
         ) : null}
+      </Card>
+    </View>
+  );
 
-        {/* Similar Candidates (pgvector) */}
-        {data?.similar_candidates && data.similar_candidates.length > 0 && (
-          <Card className="gap-2 p-3 shadow-none border-border">
-            <View className="flex-row items-center justify-between pb-2 mb-1 border-b border-border">
-              <View className="flex-row items-center gap-1.5">
-                <Users size={14} color={COLORS.primary} />
-                <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Similar Candidates</Text>
+  const renderRisksTab = () => (
+    <View className="flex-col gap-3 lg:flex-row lg:items-start">
+      <Card className="gap-2 shadow-none border-success/30 lg:flex-1">
+        <Text className="text-xs tracking-wider uppercase font-sans-bold text-success">Strengths</Text>
+        {visibleStrengths.length ? visibleStrengths.map((strength) => (
+          <Text key={strength} className="text-xs leading-4 text-text-primary">✓ {strength}</Text>
+        )) : <Text className="text-xs text-text-muted">Not enough evidence to identify strengths.</Text>}
+      </Card>
+      <Card className="gap-2 shadow-none border-warning/30 lg:flex-1">
+        <Text className="text-xs tracking-wider uppercase font-sans-bold text-warning">Risks & Concerns</Text>
+        {recommendationsLoading ? <Text className="text-xs text-text-muted">Loading supporting hiring insights…</Text> : null}
+        {recommendationsError ? <Text className="text-xs text-danger">Additional insights are unavailable: {recommendationsError}</Text> : null}
+        {visibleConcerns.length ? visibleConcerns.map((concern) => (
+          <Text key={concern} className="text-xs leading-4 text-text-primary">⚠ {concern}</Text>
+        )) : <Text className="text-xs text-success">No major concern was identified in the available evidence.</Text>}
+        {Math.max(decisionEvidence?.strengths.length || 0, decisionEvidence?.concerns.length || 0) > 4 ? (
+          <View className="items-start">
+            <Button label={showAllRisks ? 'Show Top Evidence' : 'View All Evidence'} variant="ghost" size="sm" onPress={() => setShowAllRisks(!showAllRisks)} />
+          </View>
+        ) : null}
+      </Card>
+    </View>
+  );
+
+  const renderTechnicalDetails = () => {
+    if (!data) return null;
+    const provenanceRows = getProcessingProvenanceRows(data);
+    const technicalMatchRows = [
+      ['Calibration Version', bestMatch?.calibration_version],
+      ['Scoring Profile', bestMatch?.scoring_profile_code === 'FALLBACK' ? 'FALLBACK (Degraded Defaults)' : bestMatch?.scoring_profile_code],
+      ['RRF Score', bestMatch?.rrf_score],
+      ['Stage 0 Compatible', bestMatch?.stage0_compatible],
+      ['Stage 1 Compatible', bestMatch?.stage1_compatible],
+      ['Retrieval Path', bestMatch?.retrieval_path || bestMatch?.retrieval_source],
+      ['Taxonomy Path', bestMatch?.taxonomy_path],
+      ['Retrieval Provenance', bestMatch?.retrieval_provenance],
+    ].map(([label, value]) => ({
+      label: String(label),
+      value: value && typeof value === 'object' ? JSON.stringify(value) : value == null ? '' : String(value),
+    })).filter(({ value }) => value !== '');
+    return (
+      <Card className="p-0 overflow-hidden shadow-none border-border">
+        <Pressable
+          onPress={() => setTechnicalDetailsExpanded(!technicalDetailsExpanded)}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle technical details"
+          accessibilityState={{ expanded: technicalDetailsExpanded }}
+          className="flex-row items-center justify-between p-2.5 min-h-[44px] active:bg-background"
+        >
+          <View>
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Technical Details</Text>
+            <Text className="text-[11px] text-text-faint">Processing, extraction, versions, calibration, and debug provenance</Text>
+          </View>
+          <Text className="text-xs font-sans-bold text-primary">{technicalDetailsExpanded ? 'Collapse' : 'View Details'}</Text>
+        </Pressable>
+        {technicalDetailsExpanded ? (
+          <View className="gap-2 p-3 border-t border-border">
+            {cleanCandidateText(data.display_filename || data.original_filename || data.filename || data.id) ? (
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-xs text-text-muted">Filename</Text>
+                <Text selectable className="max-w-[65%] font-mono text-xs text-right text-text-primary">{data.display_filename || data.original_filename || data.filename || data.id}</Text>
               </View>
-              <Badge label={`${data.similar_candidates.length} Profiles`} tone="info" />
+            ) : null}
+            {data.storage_filename && data.storage_filename !== (data.display_filename || data.filename) ? (
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-xs text-text-muted">Storage Key</Text>
+                <Text selectable className="max-w-[65%] font-mono text-xs text-right text-text-muted">{data.storage_filename}</Text>
+              </View>
+            ) : null}
+            {rawTimestamp ? (
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-xs text-text-muted">Analyzed At</Text>
+                <Text className="font-mono text-xs text-text-primary">{formattedParsedAt}</Text>
+              </View>
+            ) : null}
+            {typeof data.ocr_applied === 'boolean' ? (
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-xs text-text-muted">Extraction Method</Text>
+                <Badge label={data.ocr_applied ? 'RapidOCR' : 'Native PDF'} tone="info" />
+              </View>
+            ) : null}
+            {data.page_count != null ? (
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-xs text-text-muted">Pages</Text>
+                <Text className="font-mono text-xs text-text-primary">{data.page_count} pg</Text>
+              </View>
+            ) : null}
+            {cleanCandidateText(data.status) ? (
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-xs text-text-muted">Status</Text>
+                <Badge label={data.status!} tone={getStatusTone(data.status || undefined)} />
+              </View>
+            ) : null}
+            <View className="gap-2 pt-2 border-t border-border">
+              {provenanceRows.map(({ key, label, value }) => (
+                <View key={key} className="flex-row items-start justify-between gap-3">
+                  <Text className="text-xs text-text-muted">{label}</Text>
+                  <Text
+                    selectable={Boolean(value)}
+                    className={`max-w-[65%] font-mono text-xs text-right ${value ? 'text-text-primary' : 'text-text-faint'}`}
+                  >
+                    {value || 'Not recorded'}
+                  </Text>
+                </View>
+              ))}
             </View>
-            <View className="gap-2">
-              {data.similar_candidates.map((sim: any, idx: number) => {
-                const similarCandidateId = cleanCandidateText(sim.candidate_id || sim.id);
-                const similarCandidateName = cleanCandidateText(sim.full_name || sim.filename || similarCandidateId);
-                if (!similarCandidateId || !similarCandidateName) return null;
-                const simScore = Math.round((sim.similarity_score || sim.score || 0) * 100);
-                return (
-                  <View key={idx} className="flex-row items-center justify-between p-2 border rounded bg-background border-border">
-                    <View>
-                      <Text className="text-xs cursor-pointer font-sans-bold text-text-primary" onPress={() => router.push(`/candidates/${encodeURIComponent(similarCandidateId)}` as any)}>
-                        {similarCandidateName}
-                      </Text>
-                      {cleanCandidateText(sim.primary_department) ? <Text className="text-[11px] text-text-muted">Dept: {sim.primary_department}</Text> : null}
-                    </View>
-                    <Badge label={`${simScore}%`} tone={simScore >= 80 ? 'success' : simScore >= 60 ? 'info' : 'neutral'} />
+            {technicalMatchRows.length ? (
+              <View className="gap-2 pt-2 border-t border-border">
+                {technicalMatchRows.map(({ label, value }) => (
+                  <View key={label} className="flex-row items-start justify-between gap-3">
+                    <Text className="text-xs text-text-muted">{label}</Text>
+                    <Text selectable className="max-w-[65%] font-mono text-xs text-right text-text-primary">{value}</Text>
                   </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </Card>
+    );
+  };
+
+  const renderCvTab = () => {
+    const projectItems = candidateView?.projects || [];
+    const focusItems = showAllCvDetails ? interviewFocusAreas : interviewFocusAreas.slice(0, 3);
+    const similarItems = showAllCvDetails ? data?.similar_candidates || [] : (data?.similar_candidates || []).slice(0, 3);
+    return (
+      <View className="gap-3">
+        <View className="flex-col gap-3 lg:flex-row lg:items-start">
+          <Card className="gap-2.5 shadow-none border-border lg:flex-1">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Contact & Profile</Text>
+            {candidateView?.email ? <FieldConfidenceView fieldName="email" value={candidateView.email} icon={<Mail size={14} color={COLORS.textFaint} />} /> : null}
+            {candidateView?.phone ? <FieldConfidenceView fieldName="phone" value={candidateView.phone} icon={<Phone size={14} color={COLORS.textFaint} />} /> : null}
+            {candidateView?.location ? <FieldConfidenceView fieldName="location" value={candidateView.location} icon={<MapPin size={14} color={COLORS.textFaint} />} /> : null}
+            {candidateView?.linkedin ? <FieldConfidenceView fieldName="linkedin" value={candidateView.linkedin} icon={<Link size={14} color={COLORS.textFaint} />} /> : null}
+            {candidateView?.github ? <FieldConfidenceView fieldName="github" value={candidateView.github} icon={<Code2 size={14} color={COLORS.textFaint} />} /> : null}
+            {suggestedRoles.length ? (
+              <View className="gap-1">
+                <Text className="text-[11px] font-sans-bold text-text-muted">Suggested Roles</Text>
+                <View className="flex-row flex-wrap gap-1">
+                  {(showAllCvDetails ? suggestedRoles : suggestedRoles.slice(0, visibleLimit)).map((role) => (
+                    <Badge key={role} label={role} tone="neutral" />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            {talentPools.length ? (
+              <View className="gap-1">
+                <Text className="text-[11px] font-sans-bold text-text-muted">Talent Pools</Text>
+                <View className="flex-row flex-wrap gap-1">
+                  {(showAllCvDetails ? talentPools : talentPools.slice(0, visibleLimit)).map((pool) => (
+                    <Badge key={pool} label={pool} tone="info" />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </Card>
+          <Card className="gap-2.5 shadow-none border-border lg:flex-1">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Projects ({projectItems.length}) & Interview Focus</Text>
+            {projectItems.length ? projectItems.map((project, index) => (
+              <View key={`${project.name || 'project'}-${index}`} className="gap-1 py-1 border-b border-border/40 last:border-b-0">
+                <Text className="text-xs font-sans-bold text-text-primary">{project.name || `Project ${index + 1}`}</Text>
+                {project.description ? (
+                  <Text className="text-[11px] leading-4 text-text-primary">{project.description}</Text>
+                ) : null}
+                {project.technologies?.length ? (
+                  <View className="flex-row flex-wrap gap-1 mt-0.5">
+                    {project.technologies.map((tech) => (
+                      <Badge key={tech} label={tech} tone="neutral" />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            )) : <Text className="text-xs text-text-muted">No projects were identified.</Text>}
+            {focusItems.length ? (
+              <View className="gap-1 pt-2 border-t border-border">
+                <Text className="text-[11px] font-sans-bold text-text-muted">Interview Focus</Text>
+                {focusItems.map((focus) => (
+                  <Text key={focus} className="text-xs leading-4 text-text-primary">• {cleanRecommendationText(focus)}</Text>
+                ))}
+              </View>
+            ) : null}
+          </Card>
+        </View>
+        {similarItems.length ? (
+          <Card className="gap-2 shadow-none border-border">
+            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Similar Candidates</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {similarItems.map((similar: any, index: number) => {
+                const similarCandidateId = cleanCandidateText(similar.candidate_id || similar.id);
+                const similarCandidateName = cleanCandidateText(similar.full_name || similar.filename || similarCandidateId);
+                const rawSimilarity = Number(similar.similarity_score ?? similar.score);
+                const similarity = Number.isFinite(rawSimilarity)
+                  ? Math.round(rawSimilarity <= 1 ? rawSimilarity * 100 : rawSimilarity)
+                  : undefined;
+                if (!similarCandidateId || !similarCandidateName) return null;
+                return (
+                  <Pressable
+                    key={`${similarCandidateId}-${index}`}
+                    onPress={() => router.push(`/candidates/${encodeURIComponent(similarCandidateId)}` as any)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${similarCandidateName}`}
+                    className="flex-1 min-w-[220px] flex-row items-center justify-between gap-2 p-2 border rounded bg-background border-border active:bg-surface-hover"
+                  >
+                    <Text className="text-xs font-sans-bold text-text-primary">{similarCandidateName}</Text>
+                    {similarity != null ? <Badge label={`${similarity}%`} tone="neutral" /> : null}
+                  </Pressable>
                 );
               })}
             </View>
           </Card>
-        )}
-
-        {/* Resume Extracted Text without Nested ScrollView */}
-        {candidateView?.extractedText ? (
-        <Card className="p-0 overflow-hidden shadow-none border-border">
-          <View className="flex-row items-center justify-between p-3 border-b border-border bg-background">
-            <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">Extracted CV Text</Text>
+        ) : null}
+        {(candidateView?.projects.length || interviewFocusAreas.length || suggestedRoles.length > visibleLimit
+          || talentPools.length > visibleLimit || (data?.similar_candidates?.length || 0) > 3) ? (
+          <View className="items-start">
             <Button
-              label={showFullText ? 'Collapse' : 'Expand Full'}
+              label={showAllCvDetails ? 'Show Compact CV Details' : 'View More CV Details'}
               variant="ghost"
               size="sm"
-              onPress={() => setShowFullText(!showFullText)}
+              onPress={() => setShowAllCvDetails(!showAllCvDetails)}
             />
           </View>
-          <View className="p-3 bg-surface">
-            <Text
-              numberOfLines={showFullText ? undefined : 8}
-              className="text-[11px] font-mono text-text-primary leading-5"
-            >
-              {candidateView.extractedText}
-            </Text>
-          </View>
-        </Card>
         ) : null}
-
-      </View>
-
-      {/* Right Column (Hiring Intelligence & Matches) */}
-      <View className="w-full min-w-0 gap-4 lg:flex-1">
-
-        {/* Recommendation Engine */}
-        {recommendationsLoading ? (
-          <Card className="items-center justify-center p-3 py-8 shadow-none border-info/30">
-            <ActivityIndicator size="small" color={COLORS.info} />
-            <Text className="mt-2 font-sans text-xs text-text-muted">Running Hiring Intelligence...</Text>
-          </Card>
-        ) : recommendationsError ? (
-          <Card className="gap-1 p-3 shadow-none bg-danger/5 border-danger/30">
+        {candidateView?.extractedText ? (
+          <Card className="gap-2 shadow-none border-border">
             <View className="flex-row items-center justify-between">
-              <Text className="text-xs font-sans-bold text-danger">Hiring Intelligence Error</Text>
-              <VacancyMatchStatusBadge status="FAILED" />
+              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Extracted CV</Text>
+              <Button label={showFullText ? 'Collapse' : 'View Full CV'} variant="ghost" size="sm" onPress={() => setShowFullText(!showFullText)} />
             </View>
-            <Text className="text-xs text-danger">{recommendationsError}</Text>
-          </Card>
-        ) : recommendations ? (
-          <Card className="items-stretch w-full gap-3 p-3 shadow-none border-info/40">
-            <View className="flex-row flex-wrap items-center justify-between w-full gap-2 pb-2 border-b border-border">
-              <View className="flex-row items-center min-w-0 gap-1.5">
-                <Sparkles size={14} color={COLORS.info} />
-                <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Hiring Intelligence</Text>
-              </View>
-              <VacancyMatchStatusBadge
-                status={recommendations.hiring_recommendation}
-                score={recommendations.overall_match_confidence}
-              />
-            </View>
-
-            {/* 2-Column Insight Grid inside Card */}
-            {recommendations.experience_assessment || recommendations.role_department_fit ? <View className="flex-row flex-wrap gap-2">
-              {recommendations.experience_assessment ? (
-              <View className="flex-1 min-w-[140px] bg-background p-2 rounded border border-border">
-                <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-0.5">Experience & Seniority</Text>
-                <Text className="text-xs leading-4 text-text-primary">{cleanRecommendationText(recommendations.experience_assessment)}</Text>
-              </View>
-              ) : null}
-              {recommendations.role_department_fit ? (
-              <View className="flex-1 min-w-[140px] bg-background p-2 rounded border border-border">
-                <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-0.5">Role & Dept Fit</Text>
-                <Text className="text-xs leading-4 text-text-primary">{cleanRecommendationText(recommendations.role_department_fit)}</Text>
-              </View>
-              ) : null}
-            </View> : null}
-
-            {recommendations.risk_flags && recommendations.risk_flags.length > 0 && (
-              <View className="w-full p-2 border rounded bg-danger/5 border-danger/20">
-                <View className="flex-row items-center gap-1 mb-1">
-                  <AlertTriangle size={12} color={COLORS.danger} />
-                  <Text className="text-[11px] font-sans-bold text-danger uppercase">Risk Flags</Text>
-                </View>
-                {recommendations.risk_flags.map((flag, idx) => (
-                  <Text key={idx} className="text-xs leading-4 text-danger">• {cleanRecommendationText(flag)}</Text>
-                ))}
-              </View>
-            )}
-
-            {recommendations.strengths && recommendations.strengths.length > 0 && (
-              <View className="w-full">
-                <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-1">Key Strengths</Text>
-                {recommendations.strengths.map((str, idx) => (
-                  <Text key={idx} className="text-xs text-text-primary leading-4 mb-0.5"><Text className="text-success">✓</Text> {cleanRecommendationText(str)}</Text>
-                ))}
-              </View>
-            )}
-
-            {recommendations.interview_focus_areas && recommendations.interview_focus_areas.length > 0 && (
-              <View className="w-full pt-2 border-t border-border">
-                <Text className="text-[11px] font-sans-bold text-text-muted uppercase mb-1">Interview Focus Areas</Text>
-                {recommendations.interview_focus_areas.map((focus, idx) => (
-                  <Text key={idx} className="text-xs text-text-primary leading-4 mb-0.5">• {cleanRecommendationText(focus)}</Text>
-                ))}
-              </View>
-            )}
+            <Text numberOfLines={showFullText ? undefined : 6} className="text-[11px] font-mono text-text-primary leading-5">{candidateView.extractedText}</Text>
           </Card>
         ) : null}
-
-        {/* Experience Timeline & Gaps Section */}
-        {data && (data.experience_gap_analysis || data.experience_summary || recommendations?.experience_assessment) ? <ExperienceTimelineCard
-          analysis={(data as any)?.experience_gap_analysis || (data as any)?.experience_summary?.gap_analysis || (analysis as any)?.experience_gap_analysis || (recommendations as any)?.experience_gap_analysis}
-          experienceAssessment={(data as any)?.experience_summary?.experience_assessment || recommendations?.experience_assessment}
-          candidateData={data}
-        /> : null}
-
-        {/* AI Career Summary & Domain Insights */}
-        {(analysis?.ai_career_summary || analysis?.recommended_department || analysis?.professional_domain) && (
-          <Card className="gap-3 p-3 shadow-none border-border">
-            <View className="flex-row items-center gap-1.5 border-b border-border pb-2">
-              <CpuIcon size={14} color={COLORS.textMuted} />
-              <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-muted">AI Domain Analysis</Text>
-            </View>
-
-            {analysis?.ai_career_summary ? (
-              <Text className="mb-2 font-sans text-xs leading-5 text-text-primary">{analysis.ai_career_summary}</Text>
-            ) : null}
-
-            {analysis?.recommended_department || analysis?.primary_department ? <View className="flex-row flex-wrap items-center justify-between gap-2">
-              <Text className="flex-1 min-w-[140px] text-xs font-sans-medium text-text-muted">Recommended Dept:</Text>
-              <Badge label={analysis.recommended_department || analysis.primary_department} tone="info" />
-            </View> : null}
-            {analysis?.professional_domain ? <View className="flex-row flex-wrap items-start justify-between gap-2 mt-1">
-              <Text className="flex-1 min-w-[140px] text-xs font-sans-medium text-text-muted">Professional Domain:</Text>
-              <Text className="text-xs font-sans-bold text-right text-text-primary max-w-[70%]">{analysis.professional_domain}</Text>
-            </View> : null}
-            {analysis?.suitable_job_roles?.length > 0 && (
-              <View className="pt-2 mt-2 border-t border-border">
-                <Text className="mb-1 text-xs font-sans-medium text-text-muted">Suitable Job Roles:</Text>
-                <View className="flex-row flex-wrap gap-1">
-                  {analysis.suitable_job_roles.map((role: string, idx: number) => (
-                    <Badge key={idx} label={role} tone="neutral" />
-                  ))}
-                </View>
-              </View>
-            )}
-            {recommendations?.talent_pools && recommendations.talent_pools.length > 0 && (
-              <View className="pt-2 mt-2 border-t border-border">
-                <Text className="mb-1 text-xs font-sans-medium text-text-muted">Assigned Talent Pools:</Text>
-                <View className="flex-row flex-wrap gap-1">
-                  {recommendations.talent_pools.map((pool: string, idx: number) => (
-                    <Badge key={idx} label={pool} tone="success" />
-                  ))}
-                </View>
-              </View>
-            )}
-          </Card>
-        )}
-
+        {renderTechnicalDetails()}
       </View>
-    </View>
-  );
-
-  const renderProcessingTab = () => (
-    <View className="gap-4">
-      {/* Active Processing Step Card */}
-      {isReprocessing && (
-        <View className="mb-4">
-          <StepProgressCard
-            currentStepIndex={currentStepIndex}
-            stepStates={stepStates}
-            statusMessage={reprocessStatusMsg}
-            elapsedSeconds={elapsedSeconds}
-            isComplete={false}
-            useLlmEnrichment={true}
-          />
-        </View>
-      )}
-
-      {reprocessError && (
-        <ErrorBanner title="Reprocessing Error" message={reprocessError} />
-      )}
-
-      {data && (cleanCandidateText(data.filename || data.id) || rawTimestamp || typeof data.ocr_applied === 'boolean' || data.page_count != null || cleanCandidateText(data.status)) ? <Card className="p-3 shadow-none border-border">
-        <Text className="mb-2 text-xs tracking-wider uppercase font-sans-bold text-text-muted">Processing Metadata</Text>
-        <View className="gap-2">
-          {cleanCandidateText(data.filename || data.id) ? (
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs text-text-muted">Filename:</Text>
-            <Text className="font-mono text-xs text-text-primary">{data?.filename || data?.id}</Text>
-          </View>
-          ) : null}
-          {rawTimestamp ? (
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs text-text-muted">Analyzed At:</Text>
-            <Text className="font-mono text-xs text-text-primary">{formattedParsedAt}</Text>
-          </View>
-          ) : null}
-          {typeof data.ocr_applied === 'boolean' ? (
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs text-text-muted">Extraction Method:</Text>
-            <Badge label={data?.ocr_applied ? 'RapidOCR' : 'Native PDF'} tone="info" />
-          </View>
-          ) : null}
-          {data.page_count != null ? (
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs text-text-muted">Pages:</Text>
-            <Text className="font-mono text-xs text-text-primary">{data.page_count} pg</Text>
-          </View>
-          ) : null}
-          {cleanCandidateText(data.status) ? (
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs text-text-muted">Status:</Text>
-            <Badge label={data.status!} tone={getStatusTone(data.status || undefined)} />
-          </View>
-          ) : null}
-        </View>
-      </Card> : null}
-    </View>
-  );
+    );
+  };
 
   // -------------------------------------------------------------
   // MAIN RENDER
@@ -870,107 +912,164 @@ export default function CandidateDetailScreen() {
           { label: candName || candidateCvId || 'Candidate Profile' },
         ]}
       />
-      {/* 1. Header Area (Responsive & Tokenized) */}
-      <View className="z-10 px-4 py-3 border-b shadow-sm bg-surface border-border">
-        <View className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+      <PageHeader
+        title="CV Intelligence Dashboard"
+        leading={(
+          <Pressable
+            onPress={handleBack}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Candidate Directory"
+            className="min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] items-center justify-center"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <ArrowLeft size={18} color={COLORS.textPrimary} />
+          </Pressable>
+        )}
+        actions={(
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={isReanalyzing ? 'Matching...' : 'Re-run Matching'}
+              icon={!isReanalyzing ? <Sparkles size={14} color={COLORS.primary} /> : undefined}
+              onPress={handleReanalyze}
+              disabled={isReanalyzing || isReprocessing}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              label="Reprocess"
+              icon={<RefreshCw size={14} color={COLORS.textMuted} />}
+              onPress={() => setReprocessModalVisible(true)}
+              disabled={isReprocessing}
+            />
+          </>
+        )}
+      />
 
-          {/* Left Side: Back Button & High-Level Identity */}
-          <View className="flex-row items-center flex-1 gap-2">
-            <Pressable
-              onPress={handleBack}
-              accessibilityRole="button"
-              accessibilityLabel="Back to Candidate Directory"
-              className="min-h-[44px] min-w-[44px] items-center justify-center -ml-2"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <ArrowLeft size={18} color={COLORS.textPrimary} />
-            </Pressable>
-            <View className="flex-row items-center flex-1 gap-3 pr-2">
-              <View className="items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                <UserCheck size={18} color={COLORS.primary} />
+      {/* 1. Recruiter 5-second summary */}
+      <View className="z-10 px-3 py-2.5 border-b bg-surface border-border">
+        {candidateSummary ? (
+          <View className="gap-2.5">
+            <View className="flex-col justify-between gap-2 md:flex-row md:items-start">
+              <View className="flex-row items-center flex-1 min-w-0 gap-2">
+                <View className="items-center justify-center w-9 h-9 rounded-full bg-primary/10">
+                  <UserCheck size={18} color={COLORS.primary} />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text numberOfLines={1} ellipsizeMode="tail" className="text-lg font-sans-bold text-text-primary">{candidateSummary.name}</Text>
+                  <Text numberOfLines={1} ellipsizeMode="tail" className="text-sm font-sans-bold text-text-primary">
+                    {candidateSummary.role || 'Latest role not identified from CV'}
+                  </Text>
+                  {candidateSummary.company ? <Text numberOfLines={1} ellipsizeMode="tail" className="text-xs text-text-muted">{candidateSummary.company}</Text> : null}
+                </View>
               </View>
-              <View className="flex-1">
-                <Text numberOfLines={1} ellipsizeMode="tail" className="text-sm font-sans-bold text-text-primary">
-                  {candidateView?.name || 'Candidate Profile'}
+              <View className="items-start gap-1 md:items-end">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Recommendation</Text>
+                <Badge label={candidateSummary.recommendation} tone={recommendationTone} />
+                <Text className="text-[11px] font-sans-medium text-text-muted">{recommendationAction}</Text>
+              </View>
+            </View>
+
+            <View className="flex-row flex-wrap gap-2">
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Overall Match</Text>
+                <Text className="text-base font-sans-bold text-primary">{candidateSummary.overallFit != null ? `${Math.round(candidateSummary.overallFit)}%` : 'Not enough evidence'}</Text>
+                {candidateSummary.matchConfidence != null ? <Text className="text-[10px] text-text-muted">Match Confidence {Math.round(candidateSummary.matchConfidence)}%</Text> : null}
+              </View>
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Experience</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.totalExperience || 'Not identified from CV'}</Text>
+                <Text className="text-[10px] text-text-muted">Relevant: {candidateSummary.relevantExperience || 'Not enough evidence'}</Text>
+              </View>
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Skills Match</Text>
+                <Text className="text-base font-sans-bold text-text-primary">{skillsSummary?.scoreLabel || 'Not enough evidence'}</Text>
+                <Text className="text-[10px] text-text-muted">
+                  {candidateSummary.requiredSkillsCount != null
+                    ? `${candidateSummary.matchedSkillsCount} / ${candidateSummary.requiredSkillsCount} required skills matched`
+                    : 'Required skills not identified'}
                 </Text>
-                {candidateView?.jobTitle || candidateView?.company ? (
-                <Text numberOfLines={1} ellipsizeMode="tail" className="text-[11px] font-sans-medium text-text-muted">
-                  {[candidateView.jobTitle, candidateView.company].filter(Boolean).join(' • ')}
-                </Text>
-                ) : null}
+              </View>
+              <View className="min-w-[138px] flex-1 p-2 border rounded bg-background border-border">
+                <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-text-muted">Domain</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">{candidateSummary.domain || 'Not identified from CV'}</Text>
+                {candidateSummary.department ? <Text className="text-[10px] text-text-muted">Department: {candidateSummary.department}</Text> : null}
+              </View>
+            </View>
+
+            <View className="flex-col gap-2 lg:flex-row">
+              <View className="flex-row items-start flex-1 gap-2 p-2 border rounded bg-success/5 border-success/20">
+                <CheckCircle size={15} color={COLORS.success} />
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-success">Top Strength</Text>
+                  <Text className="text-xs leading-5 text-text-primary">{decisionNarratives?.topStrength}</Text>
+                </View>
+              </View>
+              <View className="flex-row items-start flex-1 gap-2 p-2 border rounded bg-warning/10 border-warning/30">
+                <AlertTriangle size={15} color={COLORS.warning} />
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-warning">Main Concern</Text>
+                  <Text className="text-xs leading-5 text-text-primary">{decisionNarratives?.mainConcern}</Text>
+                </View>
+              </View>
+              <View className="flex-row items-start flex-1 gap-2 p-2 border rounded bg-info/5 border-info/20">
+                <Sparkles size={15} color={COLORS.info} />
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-[10px] tracking-wider uppercase font-sans-bold text-info">AI Match Explanation</Text>
+                  <Text className="text-xs leading-5 text-text-primary">{decisionNarratives?.aiMatchExplanation}</Text>
+                </View>
               </View>
             </View>
           </View>
-
-          {/* Right Side: Primary Metric & Actions */}
-          <View className="flex-row flex-wrap items-center self-end gap-2 sm:self-auto">
-            {/* Hiring Recommendation Badge */}
-            {recommendations && !recommendationsLoading && recommendations.hiring_recommendation ? (
-              <View className="hidden md:flex">
-                <VacancyMatchStatusBadge
-                  status={recommendations.hiring_recommendation}
-                  score={recommendations.overall_match_confidence}
-                />
-              </View>
-            ) : null}
-            {data?.experience_years != null ? (
-              <View className="items-center px-2.5 py-1 border rounded bg-background border-border">
-                <Text className="text-[11px] text-text-muted uppercase font-sans-bold">Experience</Text>
-                <Text className="text-xs font-sans-bold text-text-primary">{data.experience_years} Yrs{cleanCandidateText(data.seniority) ? ` • ${data.seniority}` : ''}</Text>
-              </View>
-            ) : null}
-            {resolveVacancyFitScore(bestMatch) != null ? (
-              <View className="items-center px-2.5 py-1 border rounded bg-background border-border">
-                <Text className="text-[11px] text-text-muted uppercase font-sans-bold">Fit Score</Text>
-                <Text className="text-xs font-sans-bold text-primary">{Math.round(resolveVacancyFitScore(bestMatch) ?? 0)}%</Text>
-              </View>
-            ) : null}
-            <View className="flex-row items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                label={isReanalyzing ? 'Matching...' : 'Re-run Matching'}
-                icon={!isReanalyzing ? <Sparkles size={14} color={COLORS.primary} /> : undefined}
-                onPress={handleReanalyze}
-                disabled={isReanalyzing || isReprocessing}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                label="Reprocess"
-                icon={<RefreshCw size={14} color={COLORS.textMuted} />}
-                onPress={() => setReprocessModalVisible(true)}
-                disabled={isReprocessing}
-              />
-            </View>
-          </View>
-
-        </View>
+        ) : null}
       </View>
 
       {/* 2. Tab Navigation */}
-      <View className="flex-row gap-4 px-4 overflow-x-auto border-b bg-surface border-border">
-        {[
-          { id: 'overview', label: 'Overview', icon: <Activity size={14} color={activeTab === 'overview' ? COLORS.primary : COLORS.textMuted} /> },
-          { id: 'processing', label: 'Processing Pipeline', icon: <Layers size={14} color={activeTab === 'processing' ? COLORS.primary : COLORS.textMuted} /> },
-        ].map(tab => (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-grow-0 border-b bg-surface border-border" contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
+        {([
+          ['overview', 'Overview'],
+          ['skills', 'Skills'],
+          ['experience', 'Experience'],
+          ['education', 'Education'],
+          ['matches', 'Matches'],
+          ['risks', 'Risks'],
+          ['cv', 'CV'],
+        ] as [TabType, string][]).map(([tabId, label]) => (
           <Pressable
-            key={tab.id}
-            className={`py-3 border-b-2 flex-row items-center gap-1.5 ${activeTab === tab.id ? 'border-primary' : 'border-transparent'}`}
-            onPress={() => setActiveTab(tab.id as TabType)}
+            key={tabId}
+            className={`px-1.5 py-2 min-h-[44px] sm:min-h-[36px] border-b-2 items-center justify-center ${activeTab === tabId ? 'border-primary' : 'border-transparent'}`}
+            onPress={() => setActiveTab(tabId)}
+            accessibilityRole="tab"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: activeTab === tabId }}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
-            {tab.icon}
-            <Text className={`text-xs font-sans-bold ${activeTab === tab.id ? 'text-primary' : 'text-text-muted'}`}>
-              {tab.label}
+            <Text className={`text-xs font-sans-bold ${activeTab === tabId ? 'text-primary' : 'text-text-muted'}`}>
+              {label}
             </Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
 
       {/* 3. Main Content Area */}
-      <ScrollView className="flex-1 px-4 py-4">
+      <ScrollView className="flex-1 px-3 py-3">
+        {reanalyzeError ? <ErrorBanner title={reanalyzeError.title} message={reanalyzeError.message} /> : null}
+        {isReprocessing ? (
+          <View className="mb-3">
+            <StepProgressCard
+              currentStepIndex={currentStepIndex}
+              stepStates={stepStates}
+              statusMessage={reprocessStatusMsg}
+              elapsedSeconds={elapsedSeconds}
+              isComplete={false}
+              useLlmEnrichment={true}
+            />
+          </View>
+        ) : null}
+        {reprocessError ? <View className="mb-3"><ErrorBanner title="Reprocessing Error" message={reprocessError} /></View> : null}
         {loading && !isReprocessing ? (
-          <View className="items-center justify-center flex-1 py-16">
+          <View className="items-center justify-center flex-1 py-8">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="mt-2 font-sans text-xs text-text-muted">Loading profile dashboard...</Text>
           </View>
@@ -982,9 +1081,14 @@ export default function CandidateDetailScreen() {
             </View>
           </View>
         ) : (
-          <View className="pb-8">
+          <View className="pb-4">
             {activeTab === 'overview' && renderOverviewTab()}
-            {activeTab === 'processing' && renderProcessingTab()}
+            {activeTab === 'skills' && renderSkillsTab()}
+            {activeTab === 'experience' && renderExperienceTab()}
+            {activeTab === 'education' && renderEducationTab()}
+            {activeTab === 'matches' && renderMatchesTab()}
+            {activeTab === 'risks' && renderRisksTab()}
+            {activeTab === 'cv' && renderCvTab()}
           </View>
         )}
       </ScrollView>
@@ -1006,11 +1110,11 @@ export default function CandidateDetailScreen() {
       {/* Destructive Cache-Purge Confirmation Modal */}
       <Modal animationType="fade" transparent={true} visible={reprocessModalVisible} onRequestClose={() => setReprocessModalVisible(false)}>
         <View className="items-center justify-center flex-1 px-4 bg-black/60">
-          <Card className="w-full max-w-md gap-3 p-4 bg-surface border-border">
+          <Card className="w-full max-w-md gap-2.5 bg-surface border-border">
             <View className="flex-row items-center justify-between pb-2 border-b border-border">
               <View className="flex-row items-center gap-2">
                 <AlertTriangle size={16} color={COLORS.danger} />
-                <Text className="text-sm font-sans-bold text-text-primary">Reprocess Source CV & Purge Cache</Text>
+                <Text className="text-sm font-sans-bold text-text-primary">Reprocess Source CV</Text>
               </View>
               <Pressable
                 onPress={() => setReprocessModalVisible(false)}
@@ -1021,16 +1125,16 @@ export default function CandidateDetailScreen() {
               </Pressable>
             </View>
             <Text className="font-sans text-xs leading-5 text-text-primary">
-              Are you sure you want to completely reprocess <Text className="font-sans-bold">{data?.filename || scanId}</Text>?
+              Are you sure you want to completely reprocess <Text className="font-sans-bold">{data?.display_filename || data?.original_filename || data?.filename || scanId}</Text>?
             </Text>
             <View className="bg-danger/10 p-2.5 rounded-md border border-danger/30">
               <Text className="text-[11px] font-sans text-danger leading-4">
-                ⚠️ This permanently purges cached extraction JSON, LLM reasoning, embeddings, and match score breakdowns, and restarts the complete multi-stage pipeline.
+                This clears the stored analysis for this CV and restarts candidate processing. The current result will be replaced when processing completes.
               </Text>
             </View>
             <View className="flex-row justify-end gap-2 mt-2">
               <Button label="Cancel" variant="ghost" size="sm" onPress={() => setReprocessModalVisible(false)} />
-              <Button label="Purge Cache & Reprocess" variant="destructive" size="sm" onPress={handleConfirmReprocess} />
+              <Button label="Reprocess CV" variant="destructive" size="sm" onPress={handleConfirmReprocess} />
             </View>
           </Card>
         </View>

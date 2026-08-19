@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 # backend/app/core/rule_config_manager.py
 import json
 import logging
 import re
 import threading
 import time
-from datetime import timezone, datetime
+from datetime import datetime, timezone
 from re import Pattern
 from types import MappingProxyType
 from typing import Any, Literal
@@ -97,6 +98,14 @@ class ScoringParameters(BaseModel):
     domain_default_match_score: float = Field(..., ge=0.0, le=100.0)
     low_coverage_threshold: float = Field(..., ge=0.0, le=1.0)
     false_positive_score_cap: float = Field(..., ge=0.0, le=100.0)
+    zero_skills_score_cap: float = Field(default=40.0, ge=0.0, le=100.0)
+    
+    experience_relevance_threshold: float = Field(default=7.0, ge=0.0)
+    experience_partial_threshold: float = Field(default=5.5, ge=0.0)
+    
+    block_weight_taxonomy: float = Field(default=5.0, ge=0.0)
+    block_weight_title: float = Field(default=3.0, ge=0.0)
+    block_weight_skills: float = Field(default=2.0, ge=0.0)
     
     # Migrated from legacy ConfigRepository
     match_high_threshold: float = Field(..., ge=0.0, le=100.0)
@@ -256,6 +265,17 @@ class ScoringRules(BaseModel):
     resume_quality: ResumeQualityRules
     domain_embedding: DomainEmbeddingRules
 
+class HiringRiskPolicy(BaseModel):
+    enabled: bool = True
+    severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
+    manual_review: bool
+    category: str = "Requirements"
+    title: str | None = None
+    source: str | None = None
+
+class HiringRiskConfig(BaseModel):
+    policies: dict[str, HiringRiskPolicy] = Field(default_factory=dict)
+
 
 class UnifiedRuleConfig(BaseModel):
     version: str
@@ -265,6 +285,7 @@ class UnifiedRuleConfig(BaseModel):
     fields: dict[str, FieldRuleConfig]
     scoring: ScoringRules
     workflow: WorkflowRules = Field(default_factory=WorkflowRules)
+    hiring_risks: HiringRiskConfig = Field(default_factory=HiringRiskConfig)
 
     @model_validator(mode="after")
     def validate_safety_invariants(self) -> "UnifiedRuleConfig":
@@ -289,17 +310,21 @@ class UnifiedRuleConfig(BaseModel):
             if not {"dear", "sir", "madam", "salutation"}.intersection(blacklist):
                 raise ValueError("[SAFETY_GATE_VIOLATION] Location field blacklist missing salutations")
 
-        title = self.fields.get("job_title")
-        if title:
-            starters = title.get_keyword_set("narrative_starters")
-            if not {"graduated", "worked"}.intersection(starters):
-                raise ValueError("[SAFETY_GATE_VIOLATION] Job title narrative_starters missing expected verbs")
-
         comp = self.fields.get("company_name")
         if comp:
             generic = comp.get_keyword_set("generic_section_headers")
             if not {"experience", "education"}.intersection(generic):
                 raise ValueError("[SAFETY_GATE_VIOLATION] Company name generic_section_headers missing expected headers")
+            if not comp.get_keyword_set("suffixes"):
+                raise ValueError("[SAFETY_GATE_VIOLATION] Company name suffixes missing. Cannot parse organizations without config.")
+                
+        title = self.fields.get("job_title")
+        if title:
+            starters = title.get_keyword_set("narrative_starters")
+            if not {"graduated", "worked"}.intersection(starters):
+                raise ValueError("[SAFETY_GATE_VIOLATION] Job title narrative_starters missing expected verbs")
+            if not title.get_upper_keyword_set("keywords"):
+                raise ValueError("[SAFETY_GATE_VIOLATION] Job title keywords missing. Cannot parse roles without config.")
 
         match_rules = self.scoring.match
         guard = match_rules.cross_domain_guard
@@ -371,9 +396,10 @@ class RuleConfigManager:
         config_size_bytes = 0
 
         try:
-            from app.core.database import PostgresAppSession
-            from app.models.rules import RuleConfigProfile, RuleComponent, SystemRule, RuleCondition
             from sqlalchemy.orm import selectinload
+
+            from app.core.database import PostgresAppSession
+            from app.models.rules import RuleComponent, RuleCondition, RuleConfigProfile, SystemRule
             
             with PostgresAppSession() as db:
                 query = db.query(RuleConfigProfile).options(
@@ -740,6 +766,17 @@ class RuleConfigManager:
                 if workflow_rule:
                     base_dict["workflow"] = json.loads(workflow_rule.target_value)
 
+            elif comp.component_type == "hiring_risks":
+                policies: dict[str, Any] = {}
+                for rule in comp.system_rules:
+                    if rule.rule_type != "hiring_risk_policy" or not rule.target_value:
+                        continue
+                    policy = json.loads(rule.target_value)
+                    if not isinstance(policy, dict):
+                        raise ValueError(f"Hiring Risk policy '{rule.rule_name}' must be a JSON object.")
+                    policies[rule.rule_name] = policy
+                base_dict["hiring_risks"] = {"policies": policies}
+
         return base_dict
 
 
@@ -851,21 +888,27 @@ class RuleConfigManager:
         return cls._active_configs[tenant_key]
 
     @classmethod
-    def get_field_config(cls, field_name: str) -> FieldRuleConfig:
-        cfg = cls.get_config()
+    def get_field_config(cls, field_name: str, tenant_id: str | None = None) -> FieldRuleConfig:
+        cfg = cls.get_config(tenant_id=tenant_id)
         if field_name not in cfg.fields:
             raise KeyError(f"Field '{field_name}' not configured in UnifiedRuleConfig")
         return cfg.fields[field_name]
 
     @classmethod
-    def get_keywords(cls, field_name: str, key: str) -> set[str]:
-        field_cfg = cls.get_field_config(field_name)
-        return field_cfg.get_keyword_set(key)
+    def get_keywords(cls, field_name: str, key: str, tenant_id: str | None = None) -> set[str]:
+        try:
+            field_cfg = cls.get_field_config(field_name, tenant_id=tenant_id)
+            return field_cfg.get_keyword_set(key)
+        except Exception:
+            return set()
 
     @classmethod
-    def get_upper_keywords(cls, field_name: str, key: str) -> set[str]:
-        field_cfg = cls.get_field_config(field_name)
-        return field_cfg.get_upper_keyword_set(key)
+    def get_upper_keywords(cls, field_name: str, key: str, tenant_id: str | None = None) -> set[str]:
+        try:
+            field_cfg = cls.get_field_config(field_name, tenant_id=tenant_id)
+            return field_cfg.get_upper_keyword_set(key)
+        except Exception:
+            return set()
 
     @classmethod
     def get_confidence_tier(cls, field_name: str, score: float | None) -> str:
@@ -950,9 +993,10 @@ class RuleConfigManager:
     def _run_synthetic_smoke_tests(cls, candidate_config: UnifiedRuleConfig) -> None:
         """Execute in-memory synthetic smoke tests against candidate config before activation."""
         try:
+            import json
+
             from app.core.database import PostgresAppSession
             from app.models.rules import RuleValidationTestCase
-            import json
             
             with PostgresAppSession() as db:
                 tests = db.query(RuleValidationTestCase).filter(RuleValidationTestCase.is_active == True).all()

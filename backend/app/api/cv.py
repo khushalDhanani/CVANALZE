@@ -30,6 +30,9 @@ async def list_processing_jobs():
             job_id=record.job_id,
             cv_key=record.cv_key,
             filename=record.filename,
+            original_filename=record.original_filename or record.filename,
+            display_filename=record.display_filename or record.filename,
+            storage_filename=record.storage_filename,
             job_state=record.state,
             progress=record.progress,
             stage=record.stage,
@@ -42,6 +45,7 @@ async def list_processing_jobs():
             error_message=record.error.message if record.error else None,
             error_retryable=record.error.retryable if record.error else None,
             correlation_id=record.error.correlation_id if record.error else None,
+            analysis_run_id=record.rq_job_id or record.job_id,
             created_at=record.created_at,
             updated_at=record.updated_at,
             started_at=record.started_at,
@@ -68,6 +72,8 @@ async def upload_cv(
                 cv_key=cv_key,
                 content_hash=accepted.content_hash,
                 filename=accepted.safe_filename,
+                original_filename=accepted.original_filename,
+                display_filename=accepted.display_filename,
                 content_type=accepted.detected_content_type,
                 candidate_id=candidate_id,
                 source_candidate_id=identity.source_candidate_id,
@@ -95,6 +101,7 @@ async def upload_cv(
             job_state=record_state,
             execution_mode=record_exec_mode,
             retry_count=submission.record.attempt,
+            analysis_run_id=submission.record.rq_job_id or submission.record.job_id,
         )
     except CVIdentityCollisionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -142,7 +149,13 @@ async def match_cv_text(payload: CVMatchRequest):
 async def get_cv_status(cv_key: str):
     """Get the status or result of a background CV processing job."""
     result = ResultRepository.resolve_result(cv_key)
-    job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    try:
+        job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    except ProcessingJobPersistenceError as exc:
+        if result is None:
+            raise
+        logger.warning(f"Failed fetching job record for cv_key={cv_key} during status query; proceeding with cached result: {exc}")
+        job = None
     if job:
         job = ProcessingQueueService.reconcile_job(job)
     job_state_val = (job.state.value if hasattr(job.state, "value") else str(job.state)) if job else None
@@ -168,6 +181,7 @@ async def get_cv_status(cv_key: str):
                 error_message=job.error.message if job and job.error else result.get("message") or result.get("error") or "CV processing failed.",
                 error_retryable=job.error.retryable if job and job.error else False,
                 correlation_id=job.error.correlation_id if job and job.error else None,
+                analysis_run_id=(job.rq_job_id or job.job_id) if job else result.get("analysis_run_id"),
                 job_id=job.job_id if job else None,
                 job_state=job_state_val or "FAILED",
                 execution_mode=exec_mode_val,
@@ -191,6 +205,7 @@ async def get_cv_status(cv_key: str):
                 job_state=payload.get("job_state", "PROCESSING"),
                 execution_mode=payload.get("execution_mode"),
                 retry_count=payload.get("retry_count"),
+                analysis_run_id=payload.get("analysis_run_id") or result.get("analysis_run_id"),
             )
         if "scan_id" not in result and "id" in result:
             result["scan_id"] = result["id"]
@@ -207,6 +222,7 @@ async def get_cv_status(cv_key: str):
                 job_state=job_state_val,
                 execution_mode=exec_mode_val,
                 retry_count=job.attempt,
+                analysis_run_id=result.get("analysis_run_id") or job.rq_job_id or job.job_id,
             )
         return CVUploadResponse(**result)
 

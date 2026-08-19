@@ -13,9 +13,9 @@ export interface LoadingStateProps {
 }
 
 const VARIANT_CONTAINERS: Record<LoadingStateVariant, string> = {
-  page: 'flex-1 items-center justify-center p-8 gap-3',
-  inline: 'items-center justify-center py-4 px-3 gap-2',
-  card: 'items-center justify-center py-8 px-4 gap-2 bg-surface/50 border border-border/50 rounded-md',
+  page: 'flex-1 items-center justify-center p-5 gap-2',
+  inline: 'items-center justify-center py-3 px-3 gap-2',
+  card: 'items-center justify-center py-5 px-3 gap-2 bg-surface/50 border border-border/50 rounded-md',
 };
 
 export function LoadingState({

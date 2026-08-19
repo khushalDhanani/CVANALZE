@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { matchService } from '@/services/matchService';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { TrainingExample } from '@/types/api';
-import { Card, Button, Badge, EmptyState, Breadcrumbs, ErrorBanner } from '@/components/ui';
+import { Card, Button, Badge, EmptyState, Breadcrumbs, ErrorBanner, PageHeader } from '@/components/ui';
 import { ScoreBadge } from '@/components/ui/ScoreBadge';
 import { COLORS } from '@/constants/colors';
 import { formatDateTime } from '@/utils/date';
@@ -67,13 +67,13 @@ export default function TrainingDataScreen() {
     const formattedTime = formatDateTime(item.timestamp);
 
     return (
-      <Card className="mb-3 p-0 overflow-hidden border-border/80">
+      <Card className="p-0 overflow-hidden border-border/80">
         <Pressable
           onPress={() => setExpandedId(isExpanded ? null : stableId)}
           accessibilityRole="button"
           accessibilityLabel={`Toggle HR correction details for Scan ${item.scan_id}`}
           accessibilityState={{ expanded: isExpanded }}
-          className="p-3 bg-surface active:bg-background flex-row items-center justify-between min-h-[44px]"
+          className="p-2.5 bg-surface active:bg-background flex-row items-center justify-between min-h-[44px] sm:min-h-[40px]"
         >
           <View className="flex-1 pr-2">
             <View className="flex-row items-center gap-2 mb-1 flex-wrap">
@@ -107,7 +107,7 @@ export default function TrainingDataScreen() {
         </Pressable>
 
         {isExpanded && (
-          <View className="p-3 border-t border-border bg-background gap-3">
+          <View className="p-2.5 border-t border-border bg-background gap-2">
             {/* HR Feedback Notes */}
             {item.hr_feedback ? (
               <View className="bg-success/10 border border-success/30 p-2.5 rounded-md gap-1">
@@ -168,29 +168,22 @@ export default function TrainingDataScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'HR Training Data' }]} />
 
-      {/* Responsive PageHeader */}
-      <View className="flex-col sm:flex-row items-start sm:items-center justify-between px-3 py-2.5 bg-surface border-b border-border gap-3">
-        <View className="flex-row items-center gap-2">
-          <Database size={18} color={COLORS.primary} />
-          <View>
-            <Text className="text-base font-sans-bold text-text-primary">HR Training Data Manager</Text>
-            <Text className="text-[11px] font-sans text-text-muted">
-              Showing {examples.length} of {count} collected HR correction examples for fine-tuning & model alignment
-            </Text>
-          </View>
-        </View>
-        <Button
+      <PageHeader
+        title="HR Training Data Manager"
+        subtitle={`Showing ${examples.length} of ${count} collected HR correction examples for fine-tuning & model alignment`}
+        leading={<Database size={18} color={COLORS.primary} />}
+        actions={<Button
           label="Refresh"
           variant="secondary"
           size="sm"
           onPress={() => fetchTrainingData(pageSize, true)}
           disabled={loading || refreshing}
-        />
-      </View>
+        />}
+      />
 
       <View className="flex-1 px-3 pt-3">
         {loading ? (
-          <View className="flex-1 justify-center items-center py-16">
+          <View className="flex-1 justify-center items-center py-8">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="text-xs font-sans text-text-muted mt-2">
               Loading HR feedback training dataset...
@@ -208,7 +201,8 @@ export default function TrainingDataScreen() {
             data={examples}
             keyExtractor={getExampleId}
             renderItem={renderTrainingItem}
-            contentContainerStyle={{ paddingBottom: 24 }}
+            ItemSeparatorComponent={() => <View className="h-2" />}
+            contentContainerStyle={{ paddingBottom: 16 }}
             onRefresh={() => fetchTrainingData(pageSize, true)}
             refreshing={refreshing}
             ListEmptyComponent={

@@ -1,7 +1,9 @@
 from __future__ import annotations
-from typing import Any
 
-from pydantic import BaseModel, Field
+import re
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.config import settings
 from app.schemas.experience_gap import ExperienceGapAnalysis
@@ -14,13 +16,6 @@ from app.schemas.classification_types import (
 )
 from app.schemas.match import JobMatchResult
 from app.schemas.normalized_resume import NormalizedResume
-
-
-class QwenCVAnalysis(BaseModel):
-    skill_matches: list[str] = Field(default_factory=list, description="Direct matches for required skills from CV")
-    inferred_skills: list[str] = Field(default_factory=list, description="Skills inferred from CV content or synonyms")
-    missing_critical: list[str] = Field(default_factory=list, description="Crucial requirements missing")
-    semantic_reason: str = Field(..., description="Explanation of why this candidate fits or lacks fit")
 
 
 class DynamicMatchedVacancy(BaseModel):
@@ -49,6 +44,45 @@ class RequirementEvidence(BaseModel):
     vacancy_evidence: str = Field(default="", description="Target requirement text from vacancy")
 
 
+class RequirementAssessment(BaseModel):
+    # Evidence chain: requirement → jd_evidence → cv_evidence → match_type → conclusion → rationale → impact
+    requirement_id: str = Field(..., min_length=1, description="Stable identifier supplied with the JD requirement")
+    requirement: str = Field(..., min_length=1, description="Normalized requirement text from the JD")
+    category: str = Field(..., min_length=1, description="Requirement category such as SKILL, EXPERIENCE, or EDUCATION")
+    mandatory: bool = Field(..., description="Whether the supplied JD explicitly marks the requirement as mandatory")
+    jd_evidence: str = Field(..., min_length=1, description="Exact supplied JD text for this requirement")
+    cv_evidence: str = Field(..., description="Exact CV quote or fact supporting the classification; empty string when no evidence exists")
+    match_type: Literal["DIRECT", "INFERRED", "PARTIAL", "MISSING", "NOT_ASSESSABLE"]
+    conclusion: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "One recruiter-facing verdict sentence stating the assessment result, "
+            "e.g. 'Python is directly met by the candidate.' or "
+            "'Kubernetes cannot be confirmed from the available CV text.'"
+        ),
+    )
+    rationale: str = Field(..., min_length=1, description="Evidence-grounded reasoning explaining why the match_type was assigned")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in the evidence classification, not the match score")
+    impact: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+
+    @model_validator(mode="after")
+    def validate_evidence_contract(self) -> "RequirementAssessment":
+        if self.match_type in {"DIRECT", "INFERRED", "PARTIAL"} and not self.cv_evidence.strip():
+            raise ValueError("Positive and partial requirement matches must include CV evidence.")
+        if self.mandatory and self.match_type == "MISSING" and self.impact != "CRITICAL":
+            raise ValueError("Missing mandatory requirements must have CRITICAL impact.")
+        return self
+
+
+class QwenCVAnalysis(BaseModel):
+    skill_matches: list[str] = Field(default_factory=list, description="Direct matches for required skills from CV")
+    inferred_skills: list[str] = Field(default_factory=list, description="Skills inferred from CV content or synonyms")
+    missing_critical: list[str] = Field(default_factory=list, description="Crucial requirements missing")
+    semantic_reason: str = Field(..., description="Explanation of why this candidate fits or lacks fit")
+    requirement_assessments: list[RequirementAssessment] = Field(..., description="One grounded assessment for every supplied JD requirement")
+
+
 class OptimizedCandidateProfile(BaseModel):
     core_skills: list[str] = Field(default_factory=list)
     inferred_skills: list[str] = Field(default_factory=list)
@@ -65,22 +99,62 @@ class OptimizedCandidateProfile(BaseModel):
 
 class OptimizedVacancyMatch(BaseModel):
     vacancy_id: int | str
-    semantic_reason: str = ""
+    semantic_reason: str = Field(..., min_length=1)
+    top_strength: str = Field(
+        ...,
+        min_length=80,
+        max_length=1200,
+        description="Two or three recruiter-style sentences identifying the strongest role match from the candidate's background and the role requirements",
+    )
+    main_concern: str = Field(
+        ...,
+        min_length=80,
+        max_length=1200,
+        description="Two or three sentences explaining the largest role-specific gap or the information missing to assess it",
+    )
+    ai_match_explanation: str = Field(
+        ...,
+        min_length=80,
+        max_length=1200,
+        description="Two or three recruiter-style sentences connecting the match score to specific candidate evidence and role requirements",
+    )
     inferred_skills: list[str] = Field(default_factory=list)
     matched_skills: list[str] = Field(default_factory=list)
     missing_critical: list[str] = Field(default_factory=list)
-    semantic_fit_score: float = Field(default=0.0, ge=0.0, le=100.0)
+    semantic_fit_score: float = Field(..., ge=0.0, le=100.0)
     classified_requirements: list[ClassifiedRequirementItem] = Field(default_factory=list)
     evidence_snippets: dict[str, RequirementEvidence] = Field(default_factory=dict)
+    requirement_assessments: list[RequirementAssessment] = Field(..., description="One grounded assessment for every supplied vacancy requirement")
     career_transition_detected: bool = False
     career_transition_note: str | None = None
 
+    @field_validator("top_strength", "main_concern", "ai_match_explanation")
+    @classmethod
+    def require_two_or_three_sentences(cls, value: str) -> str:
+        cleaned = " ".join(value.strip().split())
+        if not cleaned:
+            raise ValueError("Decision narratives must not be empty.")
+        if cleaned[-1] not in ".!?":
+            cleaned = cleaned + "."
+        # Protect single-letter initials and common abbreviations from splitting
+        protected = re.sub(r"\b([A-Za-z])\.", r"\1<DOT>", cleaned)
+        protected = re.sub(
+            r"\b(e\.g|i\.e|etc|vs|inc|ltd|co|corp|dept|dr|mr|mrs|ms|prof|sr|jr|bsc|msc|phd|btech|mtech|b\.s|m\.s|b\.a|m\.a|b\.e|m\.e|u\.s|u\.k)\.",
+            r"\1<DOT>",
+            protected,
+            flags=re.IGNORECASE,
+        )
+        sentences = [sentence.replace("<DOT>", ".").strip() for sentence in re.split(r"(?<=[.!?])\s+", protected) if sentence.strip()]
+        if not 1 <= len(sentences) <= 4:
+            raise ValueError("Decision narratives must contain one to four complete sentences.")
+        return cleaned
+
 
 class OptimizedLLMMatchResponse(BaseModel):
-    candidate_profile: OptimizedCandidateProfile = Field(default_factory=OptimizedCandidateProfile)
-    matched_vacancies: list[OptimizedVacancyMatch] = Field(default_factory=list)
-    active_vacancy_summary: str = Field(default="No suitable active vacancy found.")
-    ai_career_summary: str = Field(default="")
+    candidate_profile: OptimizedCandidateProfile
+    matched_vacancies: list[OptimizedVacancyMatch]
+    active_vacancy_summary: str
+    ai_career_summary: str
 
 
 class PipelineStageMetrics(BaseModel):
@@ -123,14 +197,31 @@ class PipelineStageMetrics(BaseModel):
 
 class EnrichedJobMatchResult(JobMatchResult):
     llm_reason: str = Field(default="", description="Qwen's semantic explanation of the fit")
+    top_strength: str = Field(default="", description="Detailed strongest match supported by candidate and role evidence")
+    main_concern: str = Field(default="", description="Detailed primary gap or missing-information concern")
+    ai_match_explanation: str = Field(default="", description="Detailed explanation connecting the score to candidate and role evidence")
     inferred_skills: list[str] = Field(default_factory=list, description="Additional skills inferred by Qwen")
     calibrated_confidence: float | None = Field(default=None, ge=0.0, le=1.0, description="Evidence-derived confidence; shadow-only until calibrated")
     calibration_version: str | None = Field(default=None, description="Version of the offline confidence calibration artifact")
     quality_flags: list[str] = Field(default_factory=list, description="Non-decisional quality and review signals")
     retrieval_provenance: dict[str, Any] = Field(default_factory=dict, description="Ranks and scores that caused retrieval of this vacancy")
+    llm_classified_requirements: list[ClassifiedRequirementItem] = Field(
+        default_factory=list,
+        description="Grounded LLM requirement classifications retained as non-authoritative lineage",
+    )
+    llm_evidence_snippets: dict[str, RequirementEvidence] = Field(
+        default_factory=dict,
+        description="Grounded LLM dual evidence retained separately from deterministic scoring evidence",
+    )
+    llm_requirement_assessments: list[RequirementAssessment] = Field(
+        default_factory=list,
+        description="Grounded requirement-level LLM explanations retained as non-authoritative lineage",
+    )
 
 
 class EnrichedCandidateAnalysis(BaseModel):
+    analysis_run_id: str | None = Field(default=None, description="End-to-end analysis execution identifier")
+    analysis_version: str | None = Field(default=None, description="Version identifier for the current candidate analysis")
     status: str | None = Field(default="COMPLETED", description="Status of processing job")
     progress: int | None = Field(default=100, description="Progress percentage")
     stage: str | None = Field(default="complete", description="Current stage")

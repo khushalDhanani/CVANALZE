@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, useWindowDimensions } from 'react-native';
+import { Density } from '@/constants/theme';
 
 export interface ResponsiveFieldGridProps {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ export interface ResponsiveFieldGridProps {
 export function ResponsiveFieldGrid({
   children,
   minItemWidth = 220,
-  gap = 12,
+  gap = Density.component,
   className = '',
   testID,
 }: ResponsiveFieldGridProps) {
@@ -22,7 +23,7 @@ export function ResponsiveFieldGrid({
   return (
     <View
       testID={testID}
-      className={`flex-row flex-wrap items-center ${isNarrow ? 'gap-2' : 'gap-3'} ${className}`}
+      className={`flex-row flex-wrap items-center ${className}`}
       style={{ rowGap: gap, columnGap: gap }}
     >
       {React.Children.map(children, (child) => {

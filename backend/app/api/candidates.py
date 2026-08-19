@@ -6,6 +6,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.error_handlers import SystemConfigurationError
+from app.core.logging import logger
+from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,
@@ -50,6 +52,7 @@ def list_candidates(
     education: str | None = Query(None, description="Filter by education background"),
     status: str | None = Query(None, description="Filter candidate status"),
     min_similarity: float | None = Query(None, ge=0.0, le=1.0, description="Minimum vector similarity threshold"),
+    include_incomplete: bool = Query(False, description="Include incomplete or in-flight scanning candidates"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """
@@ -68,6 +71,7 @@ def list_candidates(
             education=education,
             status=status,
             min_similarity=min_similarity,
+            include_incomplete=include_incomplete,
             limit=limit,
         )
         res = CandidateSearchService.search_candidates(req)
@@ -114,6 +118,12 @@ def get_candidate_detail(candidate_id: str):
     result["work_experience"] = canonical_exp["normalized_employment"]
     result["experience_gap_analysis"] = canonical_exp.get("gap_analysis")
 
+    logger.info(
+        f"analysis_run_id={result.get('analysis_run_id', 'not_available')} candidate={stem} "
+        f"candidate_api_result_version={result.get('analysis_version') or result.get('result_generation_id', 'not_available')} "
+        f"status=RETURNED"
+    )
+
     return result
 
 
@@ -143,13 +153,15 @@ async def reprocess_candidate(candidate_id: str):
     cv_key = str(existing_result.get("id") or existing_result.get("scan_id") or requested_key)
     result_filename = f"{cv_key}.json"
 
-    # Prevent duplicate concurrent reprocessing jobs
-    if existing_result.get("status") == "processing":
+    # Prevent duplicate concurrent reprocessing jobs only if an active worker job is actually running
+    active_job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    active_state = str(getattr(active_job.state, "value", active_job.state)) if active_job else ""
+    if active_job and active_state in ("QUEUED", "PROCESSING", "RETRYING"):
         return {
-            "message": existing_result.get("message") or "Analysis is already in progress for this candidate.",
+            "message": active_job.message or "Analysis is already in progress for this candidate.",
             "cv_key": cv_key,
             "status": "processing",
-            "progress": existing_result.get("progress", 20),
+            "progress": active_job.progress,
         }
 
     filename = existing_result.get("filename") or f"{cv_key}.pdf"
@@ -199,10 +211,14 @@ async def reprocess_candidate(candidate_id: str):
             logger.warning(f"Could not remove old result file '{disk_path}': {e}")
 
     # Save active processing marker
+    original_fn = retained_upload.original_filename or existing_result.get("original_filename") or filename
+    display_fn = retained_upload.display_filename or existing_result.get("display_filename") or filename
     processing_marker = {
         "id": cv_key,
         "scan_id": cv_key,
         "filename": filename,
+        "original_filename": original_fn,
+        "display_filename": display_fn,
         "storage_filename": retained_upload.storage_filename,
         "candidate_id": existing_result.get("candidate_id"),
         "source_candidate_id": existing_result.get("source_candidate_id"),
@@ -223,6 +239,8 @@ async def reprocess_candidate(candidate_id: str):
             cv_key=cv_key,
             content_hash=hashlib.sha256(raw_bytes).hexdigest(),
             filename=filename,
+            original_filename=original_fn,
+            display_filename=display_fn,
             content_type=content_type,
             force_reprocess=True,
             candidate_id=existing_result.get("candidate_id"),
@@ -245,4 +263,5 @@ async def reprocess_candidate(candidate_id: str):
         "job_state": record_state,
         "execution_mode": record_exec_mode,
         "retry_count": submission.record.attempt,
+        "analysis_run_id": submission.record.rq_job_id or submission.record.job_id,
     }

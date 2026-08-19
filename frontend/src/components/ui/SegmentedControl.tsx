@@ -46,7 +46,7 @@ export function SegmentedControl<T>({
           accessibilityRole="tab"
           accessibilityState={{ selected: isActive, disabled: Boolean(disabled) }}
           accessibilityLabel={option.accessibilityLabel || option.label}
-          className={`${flexClass} py-1.5 min-h-[36px] rounded items-center flex-row justify-center gap-1.5 ${
+          className={`${flexClass} py-1.5 min-h-[44px] sm:min-h-[36px] rounded items-center flex-row justify-center gap-1.5 ${
             isActive 
               ? 'bg-primary active:bg-primary-dark shadow-xs' 
               : 'bg-transparent active:bg-background'

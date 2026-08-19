@@ -248,17 +248,17 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `LLM_ENABLED` | `true` | Enables semantic generation; deterministic scoring remains available when disabled. |
 | `EMBEDDING_ENABLED` | `true` | Enables embedding-backed retrieval and related features. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint; Compose defaults to `host.docker.internal`. |
-| `OLLAMA_MODEL` | `gemma3:4b` | Generation model. |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Generation model. Required in the repository-root `.env` for Compose. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model. |
-| `OLLAMA_REQUEST_TIMEOUT` | `60` | Compatibility timeout used by the shared client. |
+| `OLLAMA_REQUEST_TIMEOUT` | `180` | Compatibility timeout used by the shared client. Required in the repository-root `.env` for Compose. |
 | `OLLAMA_CONNECT_TIMEOUT_SECONDS` | `3` | Connection timeout for every Ollama operation. |
 | `OLLAMA_TAGS_TIMEOUT_SECONDS` | `3` | Total tags/health deadline. |
-| `OLLAMA_GENERATE_TIMEOUT_SECONDS` | `60` | Total structured-generation deadline. |
+| `OLLAMA_GENERATE_TIMEOUT_SECONDS` | `360` | Total structured-generation deadline. Required in the repository-root `.env` for Compose. |
 | `OLLAMA_EMBED_TIMEOUT_SECONDS` | `30` | Total deadline for a complete embedding batch, including chunks. |
 | `OLLAMA_UNLOAD_TIMEOUT_SECONDS` | `10` | Deadline for the mandatory unload request. |
 | `OLLAMA_MAX_RETRIES` | `0` | Retries after the initial request; local defaults avoid multiplying load. |
 | `OLLAMA_RETRY_BACKOFF_SECONDS` | `0.5` | Base exponential backoff. |
-| `OLLAMA_KEEP_ALIVE` | `1m` | Keeps one model resident only inside a bounded logical operation; explicit unload follows. |
+| `OLLAMA_KEEP_ALIVE` | `30m` | How long Ollama keeps a model loaded after the last request. Use `-1` for dev workstations, `15m`–`30m` for servers, `3m` for 8 GB constrained machines. |
 | `OLLAMA_UNLOAD_ON_SHUTDOWN` | `true` | Unloads configured generation and embedding models during shutdown as a final safeguard. |
 | `OLLAMA_MAX_CONNECTIONS` | `1` | Shared transport maximum connections. |
 | `OLLAMA_MAX_KEEPALIVE_CONNECTIONS` | `1` | Shared transport idle keep-alive connections. |
@@ -270,9 +270,10 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `OLLAMA_EMBEDDING_EXPECTED_DIMENSION` | `768` | Required vector dimension for the current pgvector/cache contract. |
 | `OLLAMA_EMBEDDING_MAX_DIMENSION` | `4096` | Defensive maximum vector dimension. |
 | `OLLAMA_LIVE_TESTS_ENABLED` | `false` | Explicit opt-in required by manual/live Ollama tests. |
-| `OLLAMA_GENERATION_NUM_CTX` | `4096` | Local-friendly generation context window. |
-| `OLLAMA_GENERATION_NUM_PREDICT` | `1024` | Output-token limit for profile and compatibility generation. |
-| `OLLAMA_OPTIMIZED_NUM_PREDICT` | `2048` | Output-token limit for optimized matching. |
+| `OLLAMA_GENERATION_NUM_CTX` | `8192` | Local-friendly generation context window. |
+| `OLLAMA_GENERATION_NUM_PREDICT` | `1536` | Output-token limit for profile and compatibility generation. |
+| `OLLAMA_OPTIMIZED_NUM_CTX` | `16384` | Dedicated context window for the larger optimized-match prompt and response. |
+| `OLLAMA_OPTIMIZED_NUM_PREDICT` | `3072` | Output-token limit for optimized matching. |
 
 `backend/app/core/config.py` also defines scoring, matching, extraction-version, batch, recommendation, and retrieval tuning. Treat changes to parser, schema, prompt,
 model, vacancy, and matching versions as cache-invalidating changes.
@@ -293,6 +294,33 @@ Run the explicit migration for the PostgreSQL database:
 ```bash
 uv run python scripts/run_migrations.py
 ```
+
+### Explicit bootstrap and maintenance commands
+
+Database migrations create schemas and tables but do not populate every governed runtime dataset. For a fresh environment, install the active rule profile and
+seed the required PostgreSQL-backed assets explicitly from `backend/`:
+
+```bash
+uv run python scripts/install_matching_quality_rule_profile.py
+uv run python scripts/seed_department_domains.py
+uv run python scripts/seed_geo_and_headings.py
+uv run python scripts/seed_scoring_profiles_and_stopwords.py
+uv run python scripts/seed_prompts.py
+uv run python scripts/seed_taxonomy_from_json.py
+```
+
+`seed_department_domains.py` consumes `app/data/department_domains_seed.json`; the file remains the maintained bootstrap source even though runtime taxonomy reads
+from PostgreSQL. `seed_taxonomy_from_json.py` retains its historical name but reads the active PostgreSQL rule configuration and builds taxonomy/vector records.
+
+The following commands are manual evaluation or reprocessing operations and are not application startup steps:
+
+```bash
+uv run python scripts/reprocess_all_cvs.py
+uv run python scripts/reprocess_matching_quality_fixtures.py
+uv run python scripts/run_llm_reliability_evaluations.py
+```
+
+Run reprocessing only during an approved maintenance window because it queues or recomputes persisted candidate results.
 
 Start the API and worker in separate terminals from `backend/` so they share the same configured paths:
 
@@ -332,6 +360,31 @@ docker compose --profile tools run --rm migrate-postgres
 docker compose up -d api worker auxiliary-worker scheduler
 ```
 
+### RAM/VRAM Performance Profiles
+
+Explicit local performance profiles are provided for different host hardware resource classes:
+
+| Class / Profile | Host Hardware | Worker RAM | Concurrency | Residency | `OLLAMA_KEEP_ALIVE` | Context (`NUM_CTX`) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **8 GB Profile** (`profile-8gb`) | 8 GB Unified RAM / Low VRAM | 2 GB limit | 1 worker | `false` | `3m` | 4096 / 8192 |
+| **16 GB Profile** (`profile-16gb`) | 16 GB Unified RAM / Medium VRAM | 4 GB limit | 2 workers | `true` | `30m` | 8192 / 16384 |
+| **32 GB+ Profile** (`profile-32gb`) | 32+ GB RAM / Dedicated GPU | 8 GB limit | 4 workers | `true` | `-1` | 16384 / 32768 |
+
+Run Docker Compose with an explicit performance profile override:
+
+```bash
+# 8 GB RAM / Constrained environment
+docker compose -f docker-compose.yml -f docker-compose.profile-8gb.yml up -d
+
+# 16 GB RAM / Standard workstation environment (Default)
+docker compose -f docker-compose.yml -f docker-compose.profile-16gb.yml up -d
+
+# 32+ GB RAM / High-Performance workstation environment
+docker compose -f docker-compose.yml -f docker-compose.profile-32gb.yml up -d
+```
+
+Corresponding environment templates (`.env.profile.8gb`, `.env.profile.16gb`, `.env.profile.32gb`) are provided in the repository root for non-containerized local processes.
+
 PostgreSQL normalized rule tables are the only source of CV rule configuration; Redis is a cache and the application has no bundled or hardcoded rule profile. On a
 clean database, `/config` directs an administrator to a structured initial setup screen generated from `GET /api/config/schema`. The completed options are validated
 by the authoritative backend model and persisted through `POST /api/config/initialize`; no rule JSON file, test fixture, or frontend seed is used. The setup screen
@@ -361,19 +414,15 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d pgvector 
 ```
 
 The override limits the API to 768 MiB/0.75 CPU, the single RQ worker to 2 GiB/1.25 CPUs, PostgreSQL to 384 MiB/0.5 CPU, and Redis to 96 MiB/0.25 CPU.
-It disables startup warmup, LLM generation, embeddings, Torch compilation, and Docling's table-structure model by default. Text-rich PDFs and DOCX files use the
+It disables startup warmup, embeddings, Torch compilation, and Docling's table-structure model by default. Text-rich PDFs and DOCX files use the
 existing native extractors without loading Torch; sparse/scanned PDFs still fall through to Docling/OCR. The profile also caps Docling, OpenMP, BLAS, and LLM
 concurrency; recycles the RQ worker after ten jobs; persists downloaded Docling models in a named cache volume; and omits the unused MSSQL ODBC driver. The Linux
 image resolves Torch and torchvision from PyTorch's CPU-only index, so it does not download CUDA libraries. Ollama calls are serialized across the API and worker,
 responses are bounded and validated, and every generation or embedding batch unloads its model and closes the HTTP client in `finally`.
 
-Deterministic extraction and scoring remain available. To opt into host Ollama features, start with one feature and a small installed model:
-
-```bash
-LLM_ENABLED=true OLLAMA_MODEL=qwen3:1.7b docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api worker scheduler
-```
-
-Set `EMBEDDING_ENABLED=true` separately when semantic retrieval is needed. The local profile uses `qwen3:1.7b`, keeps `nomic-embed-text` for the existing 768-dimensional
+LLM generation inherits the base Compose default and is enabled unless `LLM_ENABLED=false` is explicitly supplied. Set `EMBEDDING_ENABLED=true` separately when
+semantic retrieval is needed. The local profile inherits `OLLAMA_MODEL` from the base Compose environment, keeps
+`nomic-embed-text` for the existing 768-dimensional
 vector contract, and never pulls models automatically. Configure the host Ollama process with `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, and a zero or short
 server keep-alive. Restart Ollama after changing its host environment. Local AI consumes unified memory outside Docker limits, but application serialization prevents
 the generation and embedding models from intentionally running in parallel. The base `docker-compose.yml` remains production-oriented and retains MSSQL ODBC support.

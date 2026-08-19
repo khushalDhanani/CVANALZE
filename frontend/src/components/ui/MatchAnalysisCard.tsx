@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { Badge } from './Badge';
 import { VacancyMatchStatusBadge, VacancyFitScoreBreakdownCard, resolveVacancyFitScore } from './VacancyMatchStatusBadge';
 import { ComponentScoreBar } from './ComponentScoreBar';
+import { HiringRisksCard } from './HiringRisksCard';
 import { COLORS } from '@/constants/colors';
 import { JobMatchScore } from '@/types/api';
 
@@ -35,7 +36,7 @@ export function MatchAnalysisCard({
 }: MatchAnalysisCardProps) {
   if (!bestMatch) {
     return (
-      <Card testID={testID} className={`p-5 items-center justify-center gap-2 border-border/80 ${className}`}>
+      <Card testID={testID} className={`py-5 items-center justify-center gap-2 border-border/80 ${className}`}>
         <AlertCircle size={22} color={COLORS.textMuted} />
         <Text className="text-sm font-sans-bold text-text-primary">No Suitable Vacancy Match Found</Text>
         <Text className="text-xs font-sans text-text-muted text-center max-w-sm">
@@ -50,15 +51,15 @@ export function MatchAnalysisCard({
 
   const isDomainCapped = Boolean(
     bestMatch.domain_mismatch_capped ||
-    (bestMatch.mandatory_failures || []).some((f: any) => f.requirement_id === 'req_domain_mismatch') ||
-    (bestMatch.mandatory_fails || []).some((f: any) => (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')
+    (bestMatch.mandatory_failures || []).some((f: any) => f.failure_code === 'DOMAIN_MISMATCH' || f.requirement_id === 'req_domain_mismatch') ||
+    (bestMatch.mandatory_fails || []).some((f: any) => f.failure_code === 'DOMAIN_MISMATCH' || (f.requirement && f.requirement.includes('Domain Mismatch')) || f.requirement === 'req_domain_mismatch')
   );
 
   const matchStatus = bestMatch.vacancy_match_status || (bestMatch as any).match_status || bestMatch.classification;
   const fitScore = resolveVacancyFitScore(bestMatch);
 
   return (
-    <Card testID={testID} className={`border-primary/40 shadow-sm gap-3.5 ${className}`}>
+    <Card testID={testID} className={`border-primary/40 shadow-sm gap-3 ${className}`}>
       {!!resolvedName && (
         <View className="flex-row items-center gap-2 pb-2 border-b border-border/50">
           <View className="w-6 h-6 rounded-full bg-primary/10 items-center justify-center">
@@ -113,7 +114,7 @@ export function MatchAnalysisCard({
 
       {/* Cross-Domain Guard Explainability Banner */}
       {isDomainCapped && !bestMatch.score_breakdown && (
-        <View className="bg-warning/10 border border-warning/30 rounded-md p-3 gap-1">
+        <View className="bg-warning/10 border border-warning/30 rounded-md p-2.5 gap-1">
           <View className="flex-row items-center gap-1.5">
             <AlertTriangle size={14} color={COLORS.warning} />
             <Text className="text-xs font-sans-bold text-warning uppercase tracking-wider">
@@ -137,7 +138,7 @@ export function MatchAnalysisCard({
 
       {/* LLM Reason if available */}
       {!!bestMatch.llm_reason && (
-        <View className="bg-info/10 border border-info/30 rounded-md p-3">
+        <View className="bg-info/10 border border-info/30 rounded-md p-2.5">
           <View className="flex-row items-center gap-1.5 mb-1">
             <Sparkles size={14} color={COLORS.info} />
             <Text className="text-xs font-sans-bold text-info">
@@ -160,14 +161,14 @@ export function MatchAnalysisCard({
 
         if (rawFails.length > 0) {
           rawFails.forEach((f: any) => {
-            const title = typeof f === 'string' ? f : (f.requirement || f.description || f.requirement_id || 'Mandatory Requirement');
+            const title = typeof f === 'string' ? f : (f.failure_code || f.requirement || f.description || f.requirement_id || 'Mandatory Requirement');
             const details = typeof f === 'string' ? '' : (f.details || f.reason || f.failure_reason || '');
             failureList.push({ title, details });
           });
         } else if (failedReqs.length > 0) {
           failedReqs.forEach((r: any) => {
             failureList.push({
-              title: r.description || r.requirement_id || 'Mandatory Requirement',
+              title: r.failure_code || r.description || r.requirement_id || 'Mandatory Requirement',
               details: r.failure_reason || r.reason || '',
             });
           });
@@ -180,7 +181,7 @@ export function MatchAnalysisCard({
         if (failureList.length === 0) return null;
 
         return (
-          <View className="bg-danger/10 border border-danger/30 rounded-md p-3 gap-1.5">
+          <View className="bg-danger/10 border border-danger/30 rounded-md p-2.5 gap-1.5">
             <View className="flex-row items-center gap-1.5 mb-1">
               <CpuIcon size={14} color={COLORS.danger} />
               <Text className="text-xs font-sans-bold text-danger">
@@ -198,6 +199,11 @@ export function MatchAnalysisCard({
           </View>
         );
       })()}
+
+      {/* Hiring Risks & Concerns */}
+      {!!bestMatch.hiring_risks && bestMatch.hiring_risks.length > 0 && (
+        <HiringRisksCard risks={bestMatch.hiring_risks} />
+      )}
 
       {/* Skills Analysis */}
       {(() => {

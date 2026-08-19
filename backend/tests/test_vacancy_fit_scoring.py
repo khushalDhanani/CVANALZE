@@ -34,6 +34,12 @@ def sample_cand_hierarchy():
     )
 
 
+def test_score_breakdown_preserves_unknown_hierarchy_validation():
+    breakdown = VacancyFitScoreBreakdown(is_hierarchy_valid=None)
+
+    assert breakdown.is_hierarchy_valid is None
+
+
 def test_1_exact_hierarchy_match(sample_candidate_context, sample_cand_hierarchy):
     """
     Test 1: Exact 3-level hierarchy match (MainDeptID=10, DeptID=101, DesigID=1001).

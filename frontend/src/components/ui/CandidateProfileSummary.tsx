@@ -28,11 +28,11 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
   const location = contact.location;
 
   return (
-    <Card className="mb-4 shadow-sm border-border/60">
+    <Card className="shadow-sm border-border/60">
       {/* Header Info */}
-      <View className="flex-row items-center gap-3 pb-3 mb-3 border-b border-border/50">
-        <View className="items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-          <User size={20} color={COLORS.primary} />
+      <View className="flex-row items-center gap-2.5 pb-2 mb-2 border-b border-border/50">
+        <View className="items-center justify-center w-9 h-9 rounded-full bg-primary/10">
+          <User size={18} color={COLORS.primary} />
         </View>
         <View className="flex-1">
           <Text className="text-base font-sans-bold text-text-primary">
@@ -63,7 +63,7 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
 
       {/* Domain & Department */}
       {(!!professional_domain || !!recommended_department) && (
-        <View className="flex-row flex-wrap gap-2 mb-3">
+        <View className="flex-row flex-wrap gap-1.5 mb-2">
           {!!professional_domain && (
             <Badge
               label={`Domain: ${professional_domain}`}
@@ -81,7 +81,7 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
 
       {/* Strengths */}
       {!!strengths && strengths.length > 0 && (
-        <View className="mb-3">
+        <View className="mb-2">
           <Text className="text-xs font-sans-bold text-text-muted mb-1.5 uppercase tracking-wider">
             Key Strengths
           </Text>
@@ -100,7 +100,7 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
 
       {/* AI Career Summary */}
       {!!ai_career_summary && (
-        <View className="p-3 border rounded-md bg-primary/5 border-primary/20">
+        <View className="p-2.5 border rounded-md bg-primary/5 border-primary/20">
           <View className="flex-row items-center gap-1.5 mb-1.5">
             <Sparkles size={14} color={COLORS.primary} />
             <Text className="text-xs font-sans-bold text-primary">

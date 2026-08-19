@@ -55,11 +55,11 @@ export function SidebarLayout() {
       {/* Sidebar */}
       {(drawerOpen || !isMobile) && (
         <View
-          className={`bg-surface border-r border-border z-50 ${isMobile ? 'absolute left-0 top-0 bottom-0 w-64' : 'w-64'}`}
+          className={`bg-surface border-r border-border z-50 ${isMobile ? 'absolute left-0 top-0 bottom-0 w-64' : 'w-[232px]'}`}
           style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         >
           {/* Fixed Header */}
-          <View className="flex-row items-center justify-between px-4 py-3.5 border-b border-border">
+          <View className="flex-row items-center justify-between px-3 py-2.5 border-b border-border min-h-[44px]">
             <Text className="text-base font-sans-bold text-text-primary tracking-wide">{BRAND.name}</Text>
             {isMobile && (
               <Pressable
@@ -76,8 +76,8 @@ export function SidebarLayout() {
 
           {/* Scrollable Nav Container for short phones / landscape */}
           <ScrollView
-            className="flex-1 px-3 py-3"
-            contentContainerStyle={{ gap: 6 }}
+            className="flex-1 px-2 py-2"
+            contentContainerStyle={{ gap: 4 }}
             showsVerticalScrollIndicator={false}
           >
             {NAV_ITEMS.map((item) => {
@@ -94,11 +94,11 @@ export function SidebarLayout() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: isActive }}
                   accessibilityLabel={item.name}
-                  className={`flex-row items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md ${
+                  className={`flex-row items-center gap-2 px-2.5 py-1.5 min-h-[44px] md:min-h-[38px] rounded-md ${
                     isActive ? 'bg-primary/10' : 'active:bg-background'
                   }`}
                 >
-                  <Icon size={20} color={isActive ? COLORS.primary : COLORS.textMuted} />
+                  <Icon size={18} color={isActive ? COLORS.primary : COLORS.textMuted} />
                   <Text
                     className={`text-sm ${
                       isActive
@@ -114,17 +114,17 @@ export function SidebarLayout() {
           </ScrollView>
 
           {authRequired && (
-            <View className="border-t border-border px-3 py-3 gap-1">
+            <View className="border-t border-border px-2 py-2 gap-1">
               {!!role && (
                 <Text className="px-3 text-[11px] font-sans text-text-muted capitalize">{role} session</Text>
               )}
               <Pressable
                 onPress={signOut}
-                className="flex-row items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md active:bg-background"
+                className="flex-row items-center gap-2 px-2.5 py-1.5 min-h-[44px] md:min-h-[38px] rounded-md active:bg-background"
                 accessibilityRole="button"
                 accessibilityLabel="Sign out"
               >
-                <LogOut size={20} color={COLORS.textMuted} />
+                <LogOut size={18} color={COLORS.textMuted} />
                 <Text className="text-sm font-sans text-text-muted">Sign out</Text>
               </Pressable>
             </View>
@@ -140,12 +140,12 @@ export function SidebarLayout() {
         {isMobile && !drawerOpen && (
           <Pressable
             onPress={() => setDrawerOpen(true)}
-            className="absolute bottom-6 right-6 bg-primary rounded-full p-3.5 shadow-lg z-50 min-h-[48px] min-w-[48px] items-center justify-center"
+            className="absolute bottom-4 right-4 bg-primary rounded-full p-3 shadow-lg z-50 min-h-[44px] min-w-[44px] items-center justify-center"
             style={{ elevation: 5 }}
             accessibilityRole="button"
             accessibilityLabel="Open navigation menu"
           >
-            <Layers size={24} color={COLORS.textInverse} />
+            <Layers size={20} color={COLORS.textInverse} />
           </Pressable>
         )}
       </View>

@@ -268,3 +268,73 @@ async def test_reprocess_missing_raw_returns_409_without_deleting_result(monkeyp
     assert result_path.exists()
     assert invalidated == []
     assert deleted == []
+
+
+@pytest.mark.asyncio
+async def test_reprocess_candidate_success(monkeypatch, tmp_path):
+    from app.api.candidates import reprocess_candidate
+    from app.core.cache import CacheInvalidator, cv_result_cache_manager
+    from app.schemas.contracts import JobState, ProcessingExecutionMode, ProcessingJobRecord
+    from app.repositories.processing_job import ProcessingJobRepository
+    from app.repositories.result import ResultRepository
+    from app.services.processing_queue import ProcessingQueueService, QueueSubmission
+    from app.services.upload_service import StoredUpload, UploadService
+
+    uploads_dir = tmp_path / "uploads"
+    results_dir = tmp_path / "results"
+    uploads_dir.mkdir()
+    results_dir.mkdir()
+    result_path = results_dir / "cv_ARCV.json"
+    result_path.write_text('{"id":"cv_ARCV"}', encoding="utf-8")
+
+    existing_result = {
+        "id": "cv_ARCV",
+        "scan_id": "cv_ARCV",
+        "filename": "cv_ARCV.pdf",
+        "cv_hash": "dummyhash123",
+        "status": "COMPLETED",
+    }
+    retained = StoredUpload(
+        content=b"%PDF-1.4 test document content",
+        safe_filename="cv_ARCV.pdf",
+        detected_content_type="application/pdf",
+        original_filename="cv_ARCV.pdf",
+        display_filename="cv_ARCV.pdf",
+        storage_filename="cv_ARCV.pdf",
+        path=uploads_dir / "cv_ARCV.pdf",
+    )
+    dummy_record = ProcessingJobRecord(
+        job_id="cvjob_123",
+        cv_key="cv_ARCV",
+        content_hash="dummyhash123",
+        filename="cv_ARCV.pdf",
+        storage_filename="cv_ARCV.pdf",
+        parser_version="1.0.0",
+        schema_version="1.0.0",
+        state=JobState.QUEUED,
+        execution_mode=ProcessingExecutionMode.RQ,
+        message="Queued",
+        progress=10,
+    )
+    submission = QueueSubmission(
+        record=dummy_record,
+        reused_existing_job=False,
+    )
+
+    monkeypatch.setattr(settings, "UPLOADS_DIR", uploads_dir)
+    monkeypatch.setattr(settings, "RESULTS_DIR", results_dir)
+    monkeypatch.setattr(ResultRepository, "resolve_result", lambda _: existing_result)
+    monkeypatch.setattr(ResultRepository, "save_result", lambda *args, **kwargs: None)
+    monkeypatch.setattr(ProcessingJobRepository, "get_by_cv_key", lambda _: None)
+    monkeypatch.setattr(UploadService, "load_reprocessable_upload", lambda **_: retained)
+    monkeypatch.setattr(ProcessingQueueService, "submit_upload", lambda **_: submission)
+    monkeypatch.setattr(cv_result_cache_manager, "delete", lambda *_: None)
+    monkeypatch.setattr(cv_result_cache_manager, "delete_by_pattern", lambda *_: None)
+    monkeypatch.setattr(CacheInvalidator, "invalidate_candidate", lambda *_: None)
+    monkeypatch.setattr(CacheInvalidator, "invalidate_cv", lambda *_: None)
+
+    response = await reprocess_candidate("cv_ARCV")
+    assert response["cv_key"] == "cv_ARCV"
+    assert response["status"] == "processing"
+    assert response["job_id"] == "cvjob_123"
+

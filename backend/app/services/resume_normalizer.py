@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import re
 from datetime import datetime
 from typing import Any
@@ -176,8 +177,14 @@ class ResumeNormalizer:
             return NormalizedEmployment(evidence=[raw_value] if raw_value else [])
         title_raw = cls._as_string(item.get("job_title"))
         company_raw = cls._as_string(item.get("company"))
+        if company_raw and (re.search(r"^\+?\d[\d\s\.\-\(\)]+$", company_raw.strip()) or "@" in company_raw):
+            company_raw = ""
         dates_raw = cls._as_string(item.get("dates"))
-        responsibilities = [str(value).strip() for value in item.get("responsibilities") or [] if str(value).strip()]
+        raw_resps = [str(value).strip() for value in item.get("responsibilities") or [] if str(value).strip()]
+        responsibilities = [
+            resp for resp in raw_resps
+            if not (re.search(r"^\+?\d[\d\s\.\-\(\)]+$", resp) or "@" in resp or resp.lower() in {"india", "usa", "uk"})
+        ]
         description = cls._as_string(item.get("description"))
         evidence = [value for value in (title_raw, company_raw, dates_raw, description) if value] + responsibilities
         return NormalizedEmployment(
@@ -232,10 +239,34 @@ class ResumeNormalizer:
             (r"\b(b\.?\s*tech|bachelor of technology)\b", "B.Tech"),
             (r"\b(b\.?\s*e\.?|bachelor of engineering)\b", "B.E."),
             (r"\b(b\.?\s*sc\.?|bachelor of science)\b", "B.Sc."),
+            (r"\b(bca|bachelor of computer applications?)\b", "BCA"),
+            (r"\b(bba|bachelor of business administration)\b", "BBA"),
+            (r"\b(b\.?\s*com\.?|bcom|bachelor of commerce)\b", "B.Com"),
+            (r"\b(b\.?\s*a\.?|bachelor of arts)\b", "B.A."),
+            (r"\b(b\.?\s*pharm|bachelor of pharmacy)\b", "B.Pharm"),
+            (r"\b(b\.?\s*arch|bachelor of architecture)\b", "B.Arch"),
+            (r"\b(b\.?\s*des|bachelor of design)\b", "B.Des"),
+            (r"\b(b\.?\s*ed|bachelor of education)\b", "B.Ed"),
+            (r"\b(l\.?l\.?b|bachelor of laws?)\b", "LLB"),
             (r"\b(m\.?\s*tech|master of technology)\b", "M.Tech"),
+            (r"\b(m\.?\s*e\.?|master of engineering)\b", "M.E."),
             (r"\b(m\.?\s*sc\.?|master of science)\b", "M.Sc."),
+            (r"\b(mca|master of computer applications?)\b", "MCA"),
             (r"\b(mba|master of business administration)\b", "MBA"),
-            (r"\b(ph\.?\s*d|doctor of philosophy)\b", "Ph.D."),
+            (r"\b(m\.?\s*com\.?|mcom|master of commerce)\b", "M.Com"),
+            (r"\b(m\.?\s*a\.?|master of arts)\b", "M.A."),
+            (r"\b(m\.?\s*pharm|master of pharmacy)\b", "M.Pharm"),
+            (r"\b(m\.?\s*arch|master of architecture)\b", "M.Arch"),
+            (r"\b(m\.?\s*des|master of design)\b", "M.Des"),
+            (r"\b(m\.?\s*ed|master of education)\b", "M.Ed"),
+            (r"\b(l\.?l\.?m|master of laws?)\b", "LLM"),
+            (r"\b(ph\.?\s*d|doctor of philosophy|doctorate)\b", "Ph.D."),
+            (r"\b(pgdm|post graduate diploma in management)\b", "PGDM"),
+            (r"\b(pgdca|post graduate diploma in computer applications?)\b", "PGDCA"),
+            (r"\b(iti|industrial training institute)\b", "ITI"),
+            (r"\b(ca|chartered accountant)\b", "CA"),
+            (r"\b(cs|company secretary)\b", "CS"),
+            (r"\b(icwa|cma|cost and management accountant)\b", "CMA"),
             (r"\bdiploma\b", "Diploma"),
         )
         for pattern, canonical in checks:
@@ -247,22 +278,58 @@ class ResumeNormalizer:
     def _education_domain(value: str | None) -> str | None:
         if not value:
             return None
+
+        # 1. Check RuleConfigManager domain embedding canonical equivalents for education_domains
+        try:
+            from app.core.rule_config_manager import RuleConfigManager
+            cfg = RuleConfigManager.get_config()
+            canonical_map = cfg.scoring.domain_embedding.canonical_equivalents.get("education_domains", {})
+            for raw_k, canon_v in canonical_map.items():
+                if re.search(r"\b" + re.escape(raw_k) + r"\b", value, re.IGNORECASE):
+                    return canon_v
+        except Exception:
+            pass
+
+        # 2. Comprehensive standard education domains (engineering, sciences, medical, business, law)
         domains = (
-            (
-                r"computer science|software|information technology|\bIT\b",
-                "Computer Science & IT",
-            ),
-            (r"mechanical", "Mechanical Engineering"),
-            (
-                r"electrical|electronics|communication",
-                "Electrical & Electronics Engineering",
-            ),
-            (r"civil", "Civil Engineering"),
-            (r"business|management|finance|account", "Business & Finance"),
+            (r"computer science|software|information technology|\bIT\b|informatics|comput", "Computer Science & IT"),
+            (r"mechanical|automobile|automotive|mechatronics", "Mechanical Engineering"),
+            (r"electrical|electronics|communication|telecom|instrumentation", "Electrical & Electronics Engineering"),
+            (r"civil|structural|construction", "Civil Engineering"),
+            (r"chemical engineering|petrochemical|polymer|process engineering", "Chemical Engineering"),
+            (r"biomedical|biotechnology|bio-tech|biotech|bioinformatics", "Biomedical & Biotechnology"),
+            (r"aerospace|aeronautical|aviation|avionics", "Aerospace Engineering"),
+            (r"pharmacy|pharmaceutical|pharmacology|pharmaceutics|\bpharm\b", "Pharmacy & Pharmaceutical Sciences"),
+            (r"business|management|finance|account|commerce|economics|marketing|human resources|administration|\bmba\b|\bbba\b|\bb\.?com\b|\bm\.?com\b", "Business & Finance"),
+            (r"chemistry|chemical sciences?|organic chemistry|analytical chemistry|\bchemical\b", "Chemical Sciences"),
+            (r"physics|applied physics", "Physical Sciences"),
+            (r"mathematics|statistics|data science", "Mathematics & Data Science"),
+            (r"medicine|nursing|healthcare|medical|clinical", "Medicine & Healthcare"),
+            (r"law|legal|jurisprudence|\bllb\b|\bllm\b", "Law & Legal Studies"),
+            (r"architecture|urban planning|interior design|\bb\.?arch\b", "Architecture & Design"),
         )
         for pattern, domain in domains:
             if re.search(pattern, value, re.IGNORECASE):
                 return domain
+
+        # 3. Check live taxonomy / repository domain matchers if available (from 52-entry seeded taxonomy)
+        try:
+            from app.repositories.department_domain import department_domain_repository
+            matchers = department_domain_repository.get_domain_matchers()
+            if matchers:
+                best_domain = None
+                max_matches = 0
+                for matcher in matchers:
+                    matches = matcher.keyword_match_count(value)
+                    if matches > max_matches:
+                        max_matches = matches
+                        best_domain = matcher.domain.domain_name
+                if best_domain and max_matches >= 2:
+                    return best_domain
+        except Exception:
+            pass
+
+        # 4. Fallback: extract trailing qualification clause
         match = re.search(r"\b(?:in|of)\s+(.+?)(?:\s*[-|,]|$)", value, re.IGNORECASE)
         return ResumeNormalizer._clean_whitespace(match.group(1)) if match else None
 

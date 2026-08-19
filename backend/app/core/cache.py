@@ -20,7 +20,14 @@ if settings.REDIS_URL:
     try:
         import redis as redis_module
 
-        _REDIS_CLIENT = redis_module.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        _REDIS_CLIENT = redis_module.Redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            socket_timeout=10.0,
+            socket_connect_timeout=5.0,
+            retry_on_timeout=True,
+            health_check_interval=30,
+        )
         _REDIS_CLIENT.ping()
     except Exception:
         _REDIS_CLIENT = None
@@ -292,7 +299,7 @@ class RedisCache(CacheProvider):
             payload = json.dumps(value, ensure_ascii=False)
             prefixed = self._prefixed(key)
             if ttl is not None:
-                client.setex(prefixed, ttl, payload)
+                client.set(prefixed, payload, ex=ttl)
             else:
                 client.set(prefixed, payload)
         except Exception as exc:

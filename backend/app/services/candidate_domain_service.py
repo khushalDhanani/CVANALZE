@@ -132,6 +132,9 @@ class CandidateDomainService:
             recommended_dept = industry_dept or prof_domain
             resolved_role = dyn_res.industry_designation or dyn_res.db_designation_name
             suitable_roles = [resolved_role] if resolved_role else []
+            taxonomy_confidence = dyn_res.confidence
+            taxonomy_match_status = dyn_res.match_status.value
+            taxonomy_match_source = dyn_res.match_source
         else:
             tax_rules = RuleConfigManager.get_taxonomy_rules()
             w_exp = tax_rules.evidence_weight_experience
@@ -167,14 +170,21 @@ class CandidateDomainService:
                     dept_scores.append((score, matcher.domain))
 
             if dept_scores:
-                best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))[1]
+                best_score, best_domain = max(dept_scores, key=lambda item: (item[0], -item[1].priority))
                 recommended_dept = best_domain.department_name
                 prof_domain = best_domain.domain_name
                 suitable_roles = best_domain.default_roles
+                evidence_weight_total = w_exp + w_resp + w_skills
+                taxonomy_confidence = min(1.0, best_score / evidence_weight_total) if evidence_weight_total > 0 else 0.0
+                taxonomy_match_status = MatchStatus.DB_MATCH.value
+                taxonomy_match_source = "DepartmentDomainMaster"
             else:
                 recommended_dept = ""
                 prof_domain = ""
                 suitable_roles = []
+                taxonomy_confidence = 0.0
+                taxonomy_match_status = dyn_res.match_status.value
+                taxonomy_match_source = dyn_res.match_source
 
         # Build custom roles from structured profile roles first
         custom_roles: list[str] = []
@@ -206,6 +216,9 @@ class CandidateDomainService:
             "professional_domain": prof_domain,
             "strengths": strengths,
             "suitable_job_roles": custom_roles[:4],
+            "taxonomy_confidence": taxonomy_confidence,
+            "taxonomy_match_status": taxonomy_match_status,
+            "taxonomy_match_source": taxonomy_match_source,
         }
 
     @classmethod
@@ -284,6 +297,85 @@ class CandidateDomainService:
         return cls._validate_skills(candidates, cv_text, resume_json, repo or department_domain_repository)
 
     @classmethod
+    def _has_domain_evidence(
+        cls,
+        domain_name: str,
+        cv_text: str,
+        resume_json: dict[str, Any] | None,
+        repo: DepartmentDomainRepository,
+    ) -> bool:
+        """
+        Validates if the provided canonical domain has supporting keyword evidence natively
+        in the candidate's CV (roles, skills, projects).
+        """
+        from app.services.resume_field_extractor import ResumeFieldExtractor
+
+        search_parts: list[str] = []
+
+        if resume_json:
+            for exp in resume_json.get("work_experience") or resume_json.get("experience") or []:
+                if not isinstance(exp, dict):
+                    continue
+                if exp.get("job_title") or exp.get("title") or exp.get("position"):
+                    search_parts.append(str(exp.get("job_title") or exp.get("title") or exp.get("position")))
+                if exp.get("description"):
+                    search_parts.append(str(exp["description"]))
+                for resp in exp.get("responsibilities") or []:
+                    if isinstance(resp, str):
+                        search_parts.append(resp)
+
+            for edu in resume_json.get("education") or []:
+                if isinstance(edu, dict):
+                    if edu.get("degree"):
+                        search_parts.append(str(edu["degree"]))
+                    if edu.get("field_of_study"):
+                        search_parts.append(str(edu["field_of_study"]))
+            
+            skills_data = resume_json.get("skills")
+            if isinstance(skills_data, dict):
+                if "all_skills" in skills_data:
+                    search_parts.extend(str(s) for s in skills_data["all_skills"])
+                elif "categorized" in skills_data:
+                    for cat, s_list in skills_data["categorized"].items():
+                        if isinstance(s_list, list):
+                            search_parts.extend(str(s) for s in s_list)
+            elif isinstance(skills_data, list):
+                search_parts.extend(str(s) for s in skills_data)
+
+            for proj in resume_json.get("projects") or []:
+                if isinstance(proj, dict):
+                    if proj.get("title"):
+                        search_parts.append(str(proj["title"]))
+                    if proj.get("description"):
+                        search_parts.append(str(proj["description"]))
+                else:
+                    search_parts.append(str(proj))
+
+        if not search_parts and cv_text:
+            sections = ResumeFieldExtractor._split_sections(cv_text.splitlines())
+            search_parts.extend(sections.get("experience", []))
+            search_parts.extend(sections.get("education", []))
+            search_parts.extend(sections.get("skills", []))
+            search_parts.extend(sections.get("projects", []))
+
+        # Final fallback: use raw CV text when no structured sections found
+        if not search_parts and cv_text:
+            search_parts.append(cv_text)
+
+        search_text = " ".join(search_parts).lower()
+        if not search_text.strip():
+            return False
+
+        for matcher in repo.get_domain_matchers():
+            if matcher.domain.domain_name == domain_name:
+                # If there's at least 1 keyword match for this domain natively in the CV text, it's validated
+                if matcher.keyword_match_count(search_text) > 0:
+                    return True
+                break
+
+        return False
+
+    @classmethod
     def validate_optimized_profile(
         cls,
         profile: OptimizedCandidateProfile,
@@ -298,10 +390,10 @@ class CandidateDomainService:
         canonical_domains = set(RuleConfigManager.get_taxonomy_rules().canonical_domains)
         professional_domains = [
             domain for domain in profile.professional_domains
-            if domain in canonical_domains and cls._contains_entity(cv_text, domain)
+            if domain in canonical_domains and cls._has_domain_evidence(domain, cv_text, resume_json, repository)
         ]
         professional_domain = profile.professional_domain
-        if professional_domain not in canonical_domains or not cls._contains_entity(cv_text, professional_domain or ""):
+        if professional_domain not in canonical_domains or not cls._has_domain_evidence(professional_domain, cv_text, resume_json, repository):
             professional_domain = None
         return profile.model_copy(
             update={
@@ -383,7 +475,10 @@ class CandidateDomainService:
             if ResumeFieldExtractor._looks_like_company(role):
                 continue
             has_occupation_type = cls._matches_vocabulary(role, occupation_vocabulary, require_role=True)
-            if not has_occupation_type or not ResumeFieldExtractor.is_valid_job_title(role):
+            is_valid_structural_title = ResumeFieldExtractor.is_structural_job_title_noun_phrase(role)
+            if not has_occupation_type and not is_valid_structural_title:
+                continue
+            if not ResumeFieldExtractor.is_valid_job_title(role):
                 continue
             if taxonomy_inferred:
                 score = 0.85
@@ -392,7 +487,10 @@ class CandidateDomainService:
                 in_cv = cls._contains_entity(cv_text, role)
                 if not in_cv:
                     continue
-                score = source_scores.get(key, 0.50) + 0.25 + (0.20 if in_experience else 0.05)
+                base_score = source_scores.get(key, 0.50 if has_occupation_type else 0.40)
+                boost = 0.25 if has_occupation_type else 0.15
+                exp_boost = 0.20 if in_experience else 0.05
+                score = base_score + boost + exp_boost
             if score >= cls._ENTITY_CONFIDENCE_THRESHOLD:
                 seen.add(key)
                 accepted.append(role)
@@ -405,7 +503,7 @@ class CandidateDomainService:
             if include_roles:
                 vocabulary.update(cls._clean_entity(role).casefold() for role in matcher.domain.default_roles if role)
             else:
-                vocabulary.update(cls._clean_entity(term).casefold() for term in matcher.domain.keywords if term)
+                vocabulary.update(cls._clean_entity(term.term).casefold() for term in matcher.domain.keywords if term)
         if include_roles:
             from app.services.resume_field_extractor import ResumeFieldExtractor
 
@@ -574,7 +672,6 @@ class CandidateDomainService:
                 [
                     optimized_profile.current_role or "",
                     *optimized_profile.core_skills,
-                    *optimized_profile.inferred_skills,
                     *optimized_profile.professional_domains,
                 ]
             )

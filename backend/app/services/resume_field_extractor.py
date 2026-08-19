@@ -7,35 +7,12 @@ from app.core.rule_config_manager import RuleConfigManager
 from app.services.dynamic_geo_heading_service import DynamicGeoAndHeadingService
 from app.services.resume_normalizer import ResumeNormalizer
 
-_COMPANY_SUFFIXES = re.compile(
-    r"\b(ltd|limited|pvt|private|inc|incorporated|llc|llp|corp|corporation|industries|solutions|enterprises|infosys|infotech|technologies|pharma|chemicals|remedies|generics|organics|techno\s*labs?)\b",
-    re.IGNORECASE,
-)
-_TECH_LOCATION_BLACKLIST = {
-    "provider", "getx", "bloc", "riverpod", "react", "flutter", "dart",
-    "angular", "vue", "redux", "mobx", "kotlin", "swift", "java",
-    "firebase", "nodejs", "django", "fastapi", "springboot",
-}
-_TITLE_KEYWORD_SPLIT_RE = re.compile(
-    r"\s+(?=(?:Sr\.?|Jr\.?|Ex\w+tive|Officer|Incharge|In\s*[-\s]*charge|Supervisor|Manager|Engineer|Assistant|Technician|Analyst|Chemist|Specialist|Shift|Lead|Head|Operator|Trainee|Apprentice)\b)",
-    re.IGNORECASE,
-)
+
 
 # Field-label tokens that should never be treated as a job title.
-# CVs formatted like "Duration: July 2021" or "Designation: Fitter" use
-# these words as section labels — not as role titles.
-_LABEL_PREFIX_DENYLIST: frozenset[str] = frozenset({
-    "duration", "period", "tenure", "date", "from", "to",
-    "organization", "company", "employer", "institution",
-    "designation", "position", "role", "department",
-    "location", "address", "place", "city",
-    "qualification", "education", "degree", "board", "institute",
-})
-_NON_NAME_FIELD_LABELS: frozenset[str] = frozenset({
-    "subject", "contact", "phone", "mobile", "email", "language", "address",
-    "gender", "state", "nationality", "marital status", "date of birth", "dob",
-    "pin", "pin code", "pincode", "personal data", "personal details", "resume", "cv",
-})
+# Dynamically sourced from DynamicGeoAndHeadingService.
+_LABEL_PREFIX_DENYLIST: set[str] = DynamicGeoAndHeadingService.get_label_prefix_denylist()
+_NON_NAME_FIELD_LABELS: set[str] = DynamicGeoAndHeadingService.get_non_name_field_labels()
 
 
 class classproperty:
@@ -48,7 +25,7 @@ class classproperty:
 
 class ResumeFieldExtractor:
     _SECTION_HEADING = re.compile(
-        r"^(?:#+|\*\*|[-•*]|\d+\.?)?\s*(SUMMARY|PROFILE\s+SUMMARY|PROFESSIONAL\s+SUMMARY|EXECUTIVE\s+SUMMARY|CAREER\s+OBJECTIVE|OBJECTIVE|PROFILE|WORK\s+EXPERIENCE|WORKING\s+EXPERIENCE|PROFESSIONAL\s+EXPERIENCE|PRACTICAL\s+EXPOSURE|EXPERIENCE\s+SUMMARY|EMPLOYMENT\s+HISTORY|CAREER\s+HISTORY|WORK\s+HISTORY|PROFESSIONAL\s+BACKGROUND|EXPERIENCE\s+HIGHLIGHTS|RELEVANT\s+EXPERIENCE|PROJECTS?\s*&\s*EXPERIENCE|EXPERIENCE|EMPLOYMENT|EDUCATION|ACADEMIC\s+BACKGROUND|ACADEMICS|SKILLS|TECHNICAL\s+SKILLS|CORE\s+COMPETENCIES|KEY\s+SKILLS|PROJECTS|PROJECT\s+WORK|CERTIFICATIONS|CERTIFICATES|LANGUAGES|HOBBIES|CONTACT|PERSONAL\s+DETAILS)\b",
+        r"^(?:#+|\*\*|[-•*]|\d+\.?)?\s*(SUMMARY|PROFILE\s+SUMMARY|PROFESSIONAL\s+SUMMARY|EXECUTIVE\s+SUMMARY|CAREER\s+OBJECTIVE|OBJECTIVE|PROFILE|KEY\s+PROJECT\s+EXPERIENCE|KEY\s+PROJECTS?|PROJECTS?\s*&\s*EXPERIENCE|PROJECTS?\s+EXPERIENCE|WORK\s+EXPERIENCE|WORKING\s+EXPERIENCE|PROFESSIONAL\s+EXPERIENCE|PRACTICAL\s+EXPOSURE|EXPERIENCE\s+SUMMARY|EMPLOYMENT\s+HISTORY|CAREER\s+HISTORY|WORK\s+HISTORY|CAREER\s+GRAPH|CAREER\s+PATH|CAREER\s+HIGHLIGHTS|EMPLOYMENT\s+RECORD|EMPLOYMENT\s+DETAILS|WORK\s+RECORD|PROFESSIONAL\s+BACKGROUND|EXPERIENCE\s+HIGHLIGHTS|RELEVANT\s+EXPERIENCE|PRESENT\s+EMPLOYMENT|CURRENT\s+EMPLOYMENT|EXPERIENCE|EMPLOYMENT|EDUCATION|ACADEMIC\s+BACKGROUND|ACADEMICS|SKILLS|TECHNICAL\s+SKILLS|CORE\s+COMPETENCIES|KEY\s+SKILLS|PROJECTS|PROJECT\s+WORK|CERTIFICATIONS|CERTIFICATES|LANGUAGES|HOBBIES|CONTACT|PERSONAL\s+DETAILS)\b",
         re.IGNORECASE,
     )
     _DATE_PART = (
@@ -90,7 +67,7 @@ class ResumeFieldExtractor:
 
     @classproperty
     def JOB_TITLE_KEYWORDS(cls) -> set[str]:
-        return DynamicGeoAndHeadingService.get_name_denylist()
+        return RuleConfigManager.get_upper_keywords("job_title", "keywords")
 
     @classproperty
     def RESUME_HEADER_KEYWORDS(cls) -> set[str]:
@@ -115,6 +92,50 @@ class ResumeFieldExtractor:
     @classproperty
     def GENERIC_SECTION_HEADERS(cls) -> set[str]:
         return DynamicGeoAndHeadingService.get_section_headings()
+
+    @classproperty
+    def LABEL_PREFIX_DENYLIST(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_label_prefix_denylist()
+
+    @classproperty
+    def NON_NAME_FIELD_LABELS(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_non_name_field_labels()
+
+    @classproperty
+    def VERB_STARTERS(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_verb_starters()
+
+    @classproperty
+    def PREPOSITION_AND_CONJUNCTION_STARTERS(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_preposition_and_conjunction_starters()
+
+    @classproperty
+    def ALLOWED_COMPOUND_TITLES(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_allowed_compound_titles()
+
+    @classproperty
+    def COMMON_ROLES(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_common_roles()
+
+    @classproperty
+    def COMMON_COMPANY_WORDS(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_common_company_words()
+
+    @classproperty
+    def COMPANY_SUFFIXES(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_company_suffixes()
+
+    @classproperty
+    def TECH_AND_ROLE_DENYLIST(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_tech_and_role_denylist()
+
+    @classproperty
+    def COUNTRY_NAMES(cls) -> set[str]:
+        return DynamicGeoAndHeadingService.get_countries()
+
+    @classproperty
+    def DEGREE_PATTERN(cls) -> re.Pattern:
+        return DynamicGeoAndHeadingService.get_degree_pattern()
 
     @classmethod
     def extract_candidate_name(
@@ -188,7 +209,7 @@ class ResumeFieldExtractor:
                     word in email_tokens or any(word in token or token in word for token in email_tokens if len(token) >= 3 and len(word) >= 3)
                     for word in words
                 )
-                candidates.append((combined_header_name, matches_email, cls._name_structure_score(combined_header_name, index, text_lines)))
+                candidates.append((combined_header_name, matches_email, cls._name_structure_score(combined_header_name, index, text_lines) + 10))
 
         # If no valid candidates found in header, search full document for lines matching email tokens
         if not candidates and email_tokens:
@@ -334,8 +355,9 @@ class ResumeFieldExtractor:
                 tokens = [token.lower() for token in re.split(r"[,\s]+", candidate) if token]
                 if any(token in cls.LOCATION_BLACKLIST_KEYWORDS for token in tokens):
                     continue
-                if any(token in _TECH_LOCATION_BLACKLIST for token in tokens):
-                    continue
+                blacklist = cls.LOCATION_BLACKLIST_KEYWORDS
+                if blacklist and any(token in blacklist for token in tokens):
+                    return None, 0.0
                 gazetteer_match = candidate.lower() in cls.KNOWN_GAZETTEER or any(token in cls.KNOWN_GAZETTEER for token in tokens)
                 confidence = location_cfg.confidence_scoring.get(
                     "gazetteer_match_score" if gazetteer_match else "contact_block_generic_score",
@@ -352,23 +374,247 @@ class ResumeFieldExtractor:
         max_chars = config.downstream_gates.max_char_length or 60
         if not candidate or len(candidate) < 2 or len(candidate) > max_chars or candidate.endswith(".") or candidate.count(",") > 2:
             return False
+        first_colon_token = candidate.split(":")[0].strip().lower()
+        if first_colon_token in cls.LABEL_PREFIX_DENYLIST or first_colon_token in cls.NON_NAME_FIELD_LABELS or first_colon_token in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization"):
+            return False
+        if any(candidate.lower().startswith(p + ":") for p in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization", "duration", "period", "tenure", "dates")):
+            return False
         # Reject bare label tokens (e.g. "Duration:", "Designation:", "Period")
         stripped_colon = candidate.rstrip(":").strip().lower()
-        if stripped_colon in _LABEL_PREFIX_DENYLIST:
+        if stripped_colon in cls.LABEL_PREFIX_DENYLIST or stripped_colon in cls.GENERIC_SECTION_HEADERS:
             return False
         title_without_dates = cls._DATE_RANGE.sub("", candidate).strip(" ()-|–—")
         tokens = [token.lower() for token in re.split(r"[\s/\-&()]+", title_without_dates) if token]
         if not (1 <= len(tokens) <= max_words) or tokens[0] in cls.NARRATIVE_SENTENCE_STARTERS:
             return False
+        if tokens[0] in cls.VERB_STARTERS or tokens[0] in cls.PREPOSITION_AND_CONJUNCTION_STARTERS:
+            return False
+        if " and " in title_without_dates.lower() or " or " in title_without_dates.lower():
+            if not any(ac in title_without_dates.lower() for ac in cls.ALLOWED_COMPOUND_TITLES):
+                return False
         if any(phrase in title_without_dates.lower() for phrase in cls.NARRATIVE_PHRASES):
             return False
-        return any(token.upper() in cls.JOB_TITLE_KEYWORDS for token in tokens) or any(word[0].isupper() for word in title_without_dates.split() if word and word[0].isalpha())
+        if re.search(r"^\+?\d[\d\s.\-]*$", title_without_dates) or "@" in candidate or "http" in candidate.lower():
+            return False
+
+        # Reinforced by configured keywords when present
+        keywords = cls.JOB_TITLE_KEYWORDS
+        if keywords and any(token.upper() in keywords for token in tokens):
+            return True
+
+        # Structurally clean non-numeric line is a valid dynamic job title candidate
+        return True
+
+    @classmethod
+    def is_structural_job_title_noun_phrase(cls, candidate: str) -> bool:
+        """
+        Structural sanity check for job titles found in CV text that may not exist
+        in the static occupation_vocabulary. Ensures we only accept coherent noun phrases
+        (1-6 words) and avoid false-positive roles pulled from sentences or junk text.
+        """
+        if not candidate or not isinstance(candidate, str):
+            return False
+        clean = candidate.strip().lstrip("#*-• \uf0b7").rstrip(":")
+        clean = cls._DATE_RANGE.sub("", clean).strip(" ()-|–—")
+        if not clean or len(clean) < 2 or len(clean) > 60:
+            return False
+
+        first_colon_token = candidate.split(":")[0].strip().lower()
+        if first_colon_token in cls.LABEL_PREFIX_DENYLIST or first_colon_token in cls.NON_NAME_FIELD_LABELS or first_colon_token in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization"):
+            return False
+        if any(candidate.lower().startswith(p + ":") for p in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization", "duration", "period", "tenure", "dates")):
+            return False
+
+        # Must not be email, url, phone, pure numbers, or dates
+        if "@" in clean or "http://" in clean.lower() or "https://" in clean.lower() or "www." in clean.lower():
+            return False
+        if re.search(r"^\+?\d[\d\s.\-()]*$", clean):
+            return False
+        if re.search(r"\b(?:19|20)\d{2}\b", clean):
+            return False
+
+        # Check against section headings and label denylists
+        if cls._SECTION_HEADING.match(clean) or cls._SECTION_HEADING.match(candidate.strip()):
+            return False
+
+        clean_lower = clean.lower()
+        if clean_lower in cls.LABEL_PREFIX_DENYLIST or clean_lower in cls.GENERIC_SECTION_HEADERS:
+            return False
+        if any(
+            clean_lower.startswith(h)
+            for h in (
+                "work exp", "education", "personal detail", "declaration", "skills",
+                "projects", "certif", "career graph", "career path", "work history",
+                "employment", "academic", "hobbies", "languages", "contact"
+            )
+        ):
+            return False
+
+        # Check first token against verb and preposition/conjunction starters
+        tokens = [t.lower() for t in re.split(r"[\s/\-&()]+", clean) if t]
+        if not (1 <= len(tokens) <= 6):
+            return False
+        first_token = tokens[0]
+        if first_token in cls.VERB_STARTERS or first_token in cls.PREPOSITION_AND_CONJUNCTION_STARTERS:
+            return False
+        if " and " in clean_lower or " or " in clean_lower:
+            if not any(ac in clean_lower for ac in cls.ALLOWED_COMPOUND_TITLES):
+                return False
+        if first_token in cls.NARRATIVE_SENTENCE_STARTERS:
+            return False
+        if any(phrase in clean_lower for phrase in cls.NARRATIVE_PHRASES):
+            return False
+
+        # Punctuation check: Reject sentence terminators (!, ?, ;) unless recognized abbreviation
+        if clean.endswith(("!", "?", ";")) or (
+            clean.endswith(".")
+            and not any(clean_lower.endswith(abbr) for abbr in ("sr.", "jr.", "dr.", "ph.d.", "qa.", "qc.", "dev.", "inc."))
+        ):
+            return False
+        if clean.count(",") > 1:
+            return False
+
+        # Narrative / Verb avoidance
+        first_token = re.split(r"[\s/\-&()]+", clean_lower)[0] if clean_lower else ""
+        if first_token in cls.NARRATIVE_SENTENCE_STARTERS or first_token in cls.VERB_STARTERS:
+            return False
+        if any(clean_lower.startswith(v + " ") for v in cls.VERB_STARTERS):
+            return False
+        if any(phrase in clean_lower for phrase in cls.NARRATIVE_PHRASES):
+            return False
+
+        # Must contain at least one alphabetic token with >= 2 characters
+        alpha_tokens = [re.sub(r"[^a-zA-Z]", "", t) for t in tokens]
+        if not any(len(t) >= 2 for t in alpha_tokens):
+            return False
+
+        # Must not be only common filler prepositions/conjunctions
+        stop_words = {"the", "a", "an", "and", "or", "to", "for", "in", "at", "by", "of", "with", "from", "on"}
+        if all(t.lower() in stop_words for t in tokens):
+            return False
+
+        return True
+
+    @classmethod
+    def resolve_latest_employment(cls, jobs: list[dict[str, Any]]) -> dict[str, Any]:
+        """
+        Identify the latest/most recent work experience entry from a candidate's work_experience list.
+        Prioritizes explicit current roles (is_current=True or dates containing 'Present/Current/Ongoing').
+        Otherwise selects the most recent position or first non-empty entry.
+        """
+        if not jobs:
+            return {}
+
+        valid_jobs = [j for j in jobs if isinstance(j, dict) and (j.get("job_title") or j.get("company"))]
+        if not valid_jobs:
+            return jobs[0] if isinstance(jobs[0], dict) else {}
+
+        # 1. Check for explicit current position
+        for job in valid_jobs:
+            if job.get("is_current") is True:
+                return job
+            dates_str = str(job.get("dates") or "").lower()
+            if any(kw in dates_str for kw in ("present", "current", "ongoing", "till date", "to date", "now", "active")):
+                return job
+
+        # 2. Check first entry if array is chronologically sorted (latest job first)
+        first_job = valid_jobs[0]
+        if first_job.get("job_title"):
+            return first_job
+
+        # 3. Check any valid job with a job_title
+        for job in valid_jobs:
+            if job.get("job_title"):
+                return job
+
+        # 4. Fallback to first non-empty entry
+        return valid_jobs[0]
+
+    @classmethod
+    def extract_title_from_summary_or_header(
+        cls,
+        summary_lines: list[str],
+        text_lines: list[str],
+        candidate_name: str | None = None,
+    ) -> str | None:
+        """Extract candidate target/aspiring job title from summary or header lines when experience list lacks titles."""
+        norm_cand_name = re.sub(r"[^a-zA-Z]", "", (candidate_name or "")).lower()
+        for line in text_lines[:8]:
+            clean_l = line.strip().lstrip("#*-• ").strip()
+            if not clean_l or len(clean_l) > 60:
+                continue
+            clean_lower = clean_l.lower()
+
+            # Skip candidate name and contact details
+            norm_line = re.sub(r"[^a-zA-Z]", "", clean_l).lower()
+            if norm_cand_name and (norm_line == norm_cand_name or norm_line in norm_cand_name):
+                continue
+            if "@" in clean_l or "http" in clean_lower or re.search(r"^\+?\d[\d\s.\-()]*$", clean_l):
+                continue
+            if clean_lower in _LABEL_PREFIX_DENYLIST or clean_lower in cls.GENERIC_SECTION_HEADERS:
+                continue
+            if cls._SECTION_HEADING.match(clean_l) or cls._SECTION_HEADING.match(line.strip()):
+                continue
+            if cls._looks_like_company(clean_l):
+                continue
+
+            if clean_lower in ("fresher", "entry level", "intern", "trainee"):
+                return clean_l.title()
+
+            # Check explicit title label prefix (e.g. "Designation: Senior Chemist", "Role: Billing Executive")
+            _desig_prefix = re.match(r"^(?:designation|job\s*title|role|position|profile)\s*[:\-]+\s*(.+)$", clean_l, re.IGNORECASE)
+            if _desig_prefix:
+                extracted = _desig_prefix.group(1).strip()
+                if "|" in extracted:
+                    extracted = extracted.split("|")[0].strip()
+                if cls.is_valid_job_title(extracted) and cls.is_structural_job_title_noun_phrase(extracted):
+                    return extracted.title()
+
+            # Handle pipe-delimited header lines like "Billing Executive | Vadodara"
+            title_candidate = clean_l.split("|")[0].strip() if "|" in clean_l else clean_l
+
+            # Check if line matches known role keywords or is a valid structural job title noun phrase
+            keywords = cls.JOB_TITLE_KEYWORDS
+            tokens = [t.upper() for t in re.split(r"[\s/\-&()]+", title_candidate) if t]
+            has_role_kw = keywords and any(t in keywords for t in tokens)
+
+            if has_role_kw or cls.is_structural_job_title_noun_phrase(title_candidate):
+                if cls.is_valid_job_title(title_candidate) and not cls._looks_like_company(title_candidate):
+                    return title_candidate.title()
+
+        search_text = " ".join(summary_lines[:5]) if summary_lines else " ".join(text_lines[:8])
+
+        # Match phrases like "aspiring laboratory technician", "experienced software engineer", "seeking role as developer"
+        match = re.search(
+            r"\b(?:aspiring|experienced|passionate|dedicated|senior|junior|lead|seeking\s+a?\s+role\s+as\s+a?|working\s+as\s+a?)\s+([a-zA-Z\s/-]{3,40}?)\s+(?:eager|with|bringing|to|in|for|\.|$)",
+            search_text,
+            re.IGNORECASE,
+        )
+        if match:
+            candidate_role = match.group(1).strip()
+            if cls.is_valid_job_title(candidate_role) and cls.is_structural_job_title_noun_phrase(candidate_role):
+                return candidate_role.title()
+
+        return None
 
     @classmethod
     def is_valid_company_name(cls, candidate: str) -> bool:
+        if not candidate:
+            return False
         max_chars = RuleConfigManager.get_field_config("company_name").downstream_gates.max_char_length or 70
-        clean_candidate = candidate.lower().strip(" #*-:•") if candidate else ""
-        return 2 <= len(candidate or "") <= max_chars and clean_candidate not in cls.GENERIC_SECTION_HEADERS
+        clean_candidate = candidate.lower().strip(" #*-:•")
+        if len(candidate) < 2 or len(candidate) > max_chars:
+            return False
+        if clean_candidate in cls.GENERIC_SECTION_HEADERS:
+            return False
+        if re.search(r"^\+?\d[\d\s\.\-\(\)]+$", candidate.strip()):
+            return False
+        if "@" in candidate or "http" in candidate.lower() or "www." in candidate.lower():
+            return False
+        tokens = clean_candidate.split()
+        if tokens and (tokens[0] in cls.VERB_STARTERS or tokens[0] in cls.PREPOSITION_AND_CONJUNCTION_STARTERS):
+            return False
+        return True
 
     @classmethod
     def extract(
@@ -398,6 +644,15 @@ class ResumeFieldExtractor:
         extracted_education = cls._extract_education(sections.get("education", []) or text_lines)
         cls._recover_orphan_employment_dates(text, extracted_exp, extracted_education)
 
+        latest_job = cls.resolve_latest_employment(extracted_exp)
+        extracted_job_title = latest_job.get("job_title")
+        extracted_company = latest_job.get("company")
+
+        if not extracted_job_title:
+            extracted_job_title = cls.extract_title_from_summary_or_header(
+                sections.get("summary", []), text_lines, candidate_name=name
+            )
+
         result = {
             "contact_info": {
                 "name": name,
@@ -406,6 +661,8 @@ class ResumeFieldExtractor:
                 "email": email,
                 "phone": phone,
                 "location": location,
+                "job_title": extracted_job_title,
+                "company_name": extracted_company,
                 "linkedin": cls._first_match(r"linkedin\.com/in/[\w-]+", text),
                 "github": cls._first_match(r"github\.com/[\w-]+", text),
                 "field_confidence": {
@@ -418,11 +675,13 @@ class ResumeFieldExtractor:
                 "name_confidence_level": confidence_level,
                 "extraction_source": name_source,
             },
+            "job_title": extracted_job_title,
+            "company_name": extracted_company,
             "summary": "\n".join(sections.get("summary", [])).strip(),
             "work_experience": extracted_exp,
             "education": extracted_education,
             "skills": cls._extract_skills(sections.get("skills", [])),
-            "projects": cls._extract_projects(sections.get("projects", [])),
+            "projects": cls._extract_projects(sections.get("projects", [])) or cls._extract_projects_from_text(text_lines),
             "certifications": [line.lstrip("-• ").strip() for line in sections.get("certifications", []) if line.strip()],
             "quality_metrics": metrics or {},
         }
@@ -472,19 +731,24 @@ class ResumeFieldExtractor:
         current = "general"
         for line in lines:
             stripped_line = line.strip()
+            # If line is an explicit field key-value pair, it belongs to the current section content
+            if re.match(r"^(?:company|organization|employer|designation|job\s*title|role|position|duration|period|tenure|location|responsibilities|languages?|frameworks?|tools?|databases?|technologies?|libraries?)\s*[:\-]+\s*\S+", stripped_line, re.IGNORECASE):
+                sections.setdefault(current, []).append(line)
+                continue
+
             match = cls._SECTION_HEADING.match(stripped_line)
             if not match:
                 sections.setdefault(current, []).append(line)
                 continue
             heading = match.group(1).upper()
-            if "EXPERIENCE" in heading or "EMPLOYMENT" in heading or "EXPOSURE" in heading or "CAREER" in heading or "WORK HISTORY" in heading:
-                current = "experience"
-            elif "EDUCATION" in heading or "ACADEMIC" in heading:
-                current = "education"
-            elif "SKILL" in heading or "COMPETENC" in heading:
-                current = "skills"
-            elif "PROJECT" in heading:
+            if "PROJECT" in heading:
                 current = "projects"
+            elif any(k in heading for k in ("EXPERIENCE", "EMPLOYMENT", "EXPOSURE", "CAREER", "WORK HISTORY", "BACKGROUND", "WORK RECORD", "RECORD")) and "ACADEMIC" not in heading and "EDUCATION" not in heading:
+                current = "experience"
+            elif any(k in heading for k in ("EDUCATION", "ACADEMIC", "ACADEMICS", "QUALIFICATION")):
+                current = "education"
+            elif any(k in heading for k in ("SKILL", "COMPETENC")):
+                current = "skills"
             elif "SUMMARY" in heading or "PROFILE" in heading or "OBJECTIVE" in heading:
                 current = "summary"
             elif "CERTIFICATION" in heading or "CERTIFICATE" in heading:
@@ -497,37 +761,69 @@ class ResumeFieldExtractor:
                 sections[current].append(inline_content)
         return sections
 
-    @staticmethod
-    def _looks_like_company(text: str) -> bool:
-        """Return True if text looks like a company name rather than a job title."""
+    @classmethod
+    def _looks_like_company(cls, text: str) -> bool:
+        """Return True if text looks like a company name using dynamic config suffixes and standard company indicators."""
         if not text:
             return False
-        return bool(_COMPANY_SUFFIXES.search(text))
 
-    @staticmethod
-    def _looks_like_title(text: str) -> bool:
+        clean = text.strip().lower()
+        first_token = clean.split()[0] if clean else ""
+        if first_token in cls.VERB_STARTERS or first_token in cls.PREPOSITION_AND_CONJUNCTION_STARTERS:
+            return False
+
+        all_suffixes = cls.COMPANY_SUFFIXES | cls.COMMON_COMPANY_WORDS
+        pattern = r"\b(" + "|".join(re.escape(s) for s in all_suffixes) + r")\b"
+        return bool(re.search(pattern, text, re.IGNORECASE))
+
+    @classmethod
+    def _looks_like_title(cls, text: str) -> bool:
         """Return True if text looks like a job title rather than a company name."""
         if not text:
             return False
-        title_keywords = re.compile(
-            r"\b(engineer|developer|manager|executive|analyst|officer|consultant|director|lead|specialist|inspector|administrator|technician|incharge|in\s*charge|operator|assistant|chemist|scientist|programmer|architect|designer|coordinator|supervisor|head|sr\.|jr\.)\b",
-            re.IGNORECASE,
-        )
-        return bool(title_keywords.search(text))
+        keywords = cls.JOB_TITLE_KEYWORDS
+        if not keywords:
+            return False
+
+        return any(k.lower() in text.lower() for k in keywords)
 
     @classmethod
     def _fix_company_title_swap(cls, current: dict[str, Any]) -> None:
-        """Detect and correct company↔title swap."""
-        company = current.get("company") or ""
-        title = current.get("job_title") or ""
-        # Case 1: company field contains a job title, title field contains a company
+        """Detect and correct company↔title swap and split joined 'Company - Title' strings."""
+        company = str(current.get("company") or "").strip()
+        title = str(current.get("job_title") or "").strip()
+
+        # Case 1: Joined company and title string separated by hyphen, dash, or 'at'
+        for target_field, val in (("company", company), ("job_title", title)):
+            if val and (" - " in val or " – " in val or " at " in val.lower()):
+                parts = re.split(r"\s+[-–—]\s+|\s+at\s+", val, maxsplit=1, flags=re.IGNORECASE)
+                if len(parts) == 2:
+                    p1, p2 = parts[0].strip(), parts[1].strip()
+                    if cls._looks_like_company(p1) or any(w in p1.lower() for w in ("pvt", "ltd", "inc", "corp", "industries", "lab", "technologies", "llc")):
+                        current["company"] = p1
+                        current["job_title"] = p2
+                        return
+                    elif cls._looks_like_company(p2) or any(w in p2.lower() for w in ("pvt", "ltd", "inc", "corp", "industries", "lab", "technologies", "llc")):
+                        current["job_title"] = p1
+                        current["company"] = p2
+                        return
+                    elif target_field == "company":
+                        current["company"] = p1
+                        current["job_title"] = p2
+                        return
+                    else:
+                        current["job_title"] = p1
+                        current["company"] = p2
+                        return
+
+        # Case 2: company field contains a job title, title field contains a company
         if company and title and cls._looks_like_title(company) and cls._looks_like_company(title):
             current["company"], current["job_title"] = title, company
-        # Case 2: company field contains a job title and title is empty
+        # Case 3: company field contains a job title and title is empty
         elif company and not title and cls._looks_like_title(company) and not cls._looks_like_company(company):
             current["job_title"] = company
             current["company"] = ""
-        # Case 3: title field contains a company name and company is empty
+        # Case 4: title field contains a company name and company is empty
         elif title and not company and cls._looks_like_company(title) and not cls._looks_like_title(title):
             current["company"] = title
             current["job_title"] = ""
@@ -540,57 +836,43 @@ class ResumeFieldExtractor:
         def commit() -> None:
             nonlocal current
             has_dates = bool(current.get("dates"))
-            has_title = bool(current.get("job_title") and cls.is_valid_job_title(str(current.get("job_title"))))
-            has_company = bool(current.get("company") and (cls.is_valid_company_name(str(current.get("company"))) or cls._looks_like_company(str(current.get("company")))))
-            
-            if has_dates or (has_title and has_company) or (has_title and current.get("responsibilities")):
+            has_title = bool(current.get("job_title"))
+            has_company = bool(current.get("company"))
+            has_resp = bool(current.get("responsibilities"))
+
+            if has_dates or (has_title and has_company) or (has_title and has_resp):
                 cls._fix_company_title_swap(current)
                 jobs.append(current)
             current = {}
+
+        def resolve_unresolved() -> None:
+            if not current.get("unresolved_header"):
+                return
+            for line in current["unresolved_header"]:
+                if not current.get("company") and cls._looks_like_company(line):
+                    current["company"] = line
+                elif not current.get("job_title") and cls.is_valid_job_title(line):
+                    current["job_title"] = line
+                else:
+                    current.setdefault("responsibilities", []).append(line)
+            current.pop("unresolved_header", None)
 
         for raw_line in lines:
             line = raw_line.strip()
             if not line:
                 continue
+
             date_match = cls._DATE_RANGE.search(line)
-            if line.startswith("|") and line.endswith("|"):
-                cells = [cell.strip() for cell in line.strip("|").split("|")]
-                if len(cells) >= 4:
-                    from app.services.date_interval_parser import DateIntervalParser
+            clean_line = line.lstrip("-• \uf0b7").strip()
 
-                    start_date, _ = DateIntervalParser.parse_date_point(cells[-2], is_end_date=False)
-                    end_date, _ = DateIntervalParser.parse_date_point(cells[-1], is_end_date=True)
-                    if start_date and (end_date or DateIntervalParser.is_present(cells[-1])):
-                        commit()
-                        current["job_title"] = cells[0] or "Position"
-                        current["company"] = cells[1] or "Organization"
-                        current["dates"] = f"{cells[-2]} - {cells[-1]}"
-                    continue
-                # Two-cell tables: "| Company + Title | June 2018 - April 2025 |"
-                if len(cells) == 2:
-                    from app.services.date_interval_parser import DateIntervalParser
-
-                    d_match = cls._DATE_RANGE.search(cells[1])
-                    if d_match and cells[0] and cells[0] != "---":
-                        commit()
-                        combined = cells[0]
-                        split = _TITLE_KEYWORD_SPLIT_RE.split(combined, maxsplit=1)
-                        if len(split) == 2:
-                            company, title = split[0].strip(" -|–—"), split[1].strip(" -|–—")
-                        else:
-                            company, title = combined, "Position"
-                        current["company"] = company or "Organization"
-                        current["job_title"] = title
-                        current["dates"] = d_match.group(0).strip(" ()")
-                    continue
-            # Handle merged heading lines like "## IT Executive , BODAL CHEMICALS LTD, SAYKHA"
+            # Handle Markdown headings
             if line.startswith(("##", "###")):
+                resolve_unresolved()
                 commit()
                 heading_text = line.replace("#", "").strip()
                 if date_match:
                     current["dates"] = date_match.group(0).strip(" ()")
                     heading_text = cls._DATE_RANGE.sub("", heading_text).strip(" ()-|–—")
-                # Try to split "Title , Company" or "Title, Company" in heading
                 comma_parts = [p.strip() for p in heading_text.split(",", 1) if p.strip()]
                 if len(comma_parts) >= 2 and cls._looks_like_company(comma_parts[1]):
                     current["job_title"] = comma_parts[0]
@@ -599,88 +881,243 @@ class ResumeFieldExtractor:
                     current["job_title"] = heading_text
                 elif cls.is_valid_company_name(heading_text):
                     current["company"] = heading_text
+                else:
+                    current.setdefault("unresolved_header", []).append(heading_text)
                 continue
-            if date_match:
-                if current.get("dates"):
-                    commit()
-                current["dates"] = date_match.group(0).strip(" ()")
-                possible_title = cls._DATE_RANGE.sub("", line).strip(" ()-|–—")
-                title_company_match = re.match(r"(.+?)\s+at\s+(.+)$", possible_title, re.IGNORECASE)
-                if title_company_match:
-                    possible_title = title_company_match.group(1).strip()
-                    possible_company = title_company_match.group(2).strip()
-                    if possible_company and cls.is_valid_company_name(possible_company):
-                        current["company"] = possible_company
-                if possible_title:
-                    if cls._looks_like_company(possible_title) and not current.get("company"):
-                        current["company"] = possible_title
-                    elif cls.is_valid_job_title(possible_title):
-                        current["job_title"] = possible_title
-                continue
-            if line.startswith(("-", "•")):
-                clean_bullet = line.lstrip("-• \uf0b7").strip()
-                # Handle structured bullet CVs: "Duration :- dd/mm/yyyy to dd/mm/yyyy"
-                # Also handles "Duration :- Fitter Executive , July 2021 - Present"
-                duration_match = re.search(r"(?:duration|period|tenure)\s*[:\-]+\s*(.+)$", clean_bullet, re.IGNORECASE)
-                if duration_match:
+
+            # Special structured tables
+            if line.startswith("|") and line.endswith("|"):
+                cells = [cell.strip() for cell in line.strip("|").split("|")]
+                if all(re.match(r"^:?-+:?$", c) or not c for c in cells):
+                    # Table markdown separator row like |---|---|
+                    continue
+                # Check for table header row
+                header_tokens = [c.lower() for c in cells]
+                if any(h in ("company", "organization", "employer", "designation", "role", "position", "job title", "duration", "period", "dates", "from", "to", "experience", "s.no", "sr no") for h in header_tokens):
+                    continue
+
+                if len(cells) >= 4:
                     from app.services.date_interval_parser import DateIntervalParser
-                    remainder = duration_match.group(1).strip()
-                    d_match = cls._DATE_RANGE.search(remainder)
-                    if d_match:
-                        if current.get("dates") and (current.get("company") or current.get("job_title")):
-                            commit()
-                        current["dates"] = d_match.group(0).strip(" ()")
-                        # Try to extract a title from the text before the date
-                        pre_date = remainder[: remainder.index(d_match.group(0))].strip(", :-")
-                        if pre_date and not current.get("job_title") and cls.is_valid_job_title(pre_date):
-                            current["job_title"] = pre_date
+                    start_date, _ = DateIntervalParser.parse_date_point(cells[-2], is_end_date=False)
+                    end_date, _ = DateIntervalParser.parse_date_point(cells[-1], is_end_date=True)
+                    if start_date and (end_date or DateIntervalParser.is_present(cells[-1])):
+                        resolve_unresolved()
+                        commit()
+                        title_cell = cells[0]
+                        comp_cell = cells[1]
+                        if cls._looks_like_company(title_cell) or (cls.is_valid_job_title(comp_cell) and not cls._looks_like_company(comp_cell)):
+                            title_cell, comp_cell = comp_cell, title_cell
+                        current["job_title"] = title_cell or "Position"
+                        current["company"] = comp_cell or "Organization"
+                        current["dates"] = f"{cells[-2]} - {cells[-1]}"
                         continue
-                # Handle "Organization :- XYZ Ltd" bullets
-                org_match = re.search(r"(?:organization|company|employer)\s*[:\-]+\s*(.+)$", clean_bullet, re.IGNORECASE)
-                if org_match and org_match.group(1).strip():
-                    current["company"] = org_match.group(1).strip()
-                    continue
-                # Handle "Designation :- Senior Engineer" bullets
-                desig_match = re.search(r"(?:designation|job\s+title|role|position)\s*[:\-]+\s*(.+)$", clean_bullet, re.IGNORECASE)
-                if desig_match and desig_match.group(1).strip():
-                    current["job_title"] = desig_match.group(1).strip()
-                    continue
-                # Check if bullet itself has a date range (e.g. bulleted date lines)
-                bullet_date = cls._DATE_RANGE.search(clean_bullet)
+
+                    # Dynamic date index detection in 4+ cell tables
+                    date_indices = [idx for idx, c in enumerate(cells) if cls._DATE_RANGE.search(c)]
+                    if date_indices:
+                        resolve_unresolved()
+                        commit()
+                        d_idx = date_indices[0]
+                        current["dates"] = cls._DATE_RANGE.search(cells[d_idx]).group(0).strip(" ()")
+                        non_date = [c for idx, c in enumerate(cells) if idx != d_idx and c and c != "---" and not re.match(r"^\d+$", c)]
+                        if len(non_date) >= 2:
+                            c0, c1 = non_date[0], non_date[1]
+                            c0_is_title = cls._looks_like_title(c0) or (cls.is_valid_job_title(c0) and not cls._looks_like_company(c0))
+                            c1_is_title = cls._looks_like_title(c1) or (cls.is_valid_job_title(c1) and not cls._looks_like_company(c1))
+                            if c1_is_title and not c0_is_title:
+                                current["job_title"] = c1
+                                current["company"] = c0
+                            else:
+                                current["job_title"] = c0
+                                current["company"] = c1
+                        elif len(non_date) == 1:
+                            if cls._looks_like_title(non_date[0]):
+                                current["job_title"] = non_date[0]
+                            else:
+                                current["company"] = non_date[0]
+                        continue
+
+                elif len(cells) == 3:
+                    date_indices = [idx for idx, c in enumerate(cells) if cls._DATE_RANGE.search(c)]
+                    if date_indices:
+                        resolve_unresolved()
+                        commit()
+                        d_idx = date_indices[0]
+                        current["dates"] = cls._DATE_RANGE.search(cells[d_idx]).group(0).strip(" ()")
+                        other_cells = [c for idx, c in enumerate(cells) if idx != d_idx and c and c != "---" and not re.match(r"^\d+$", c)]
+                        if len(other_cells) >= 2:
+                            c0, c1 = other_cells[0], other_cells[1]
+                            c0_is_title = cls._looks_like_title(c0) or (cls.is_valid_job_title(c0) and not cls._looks_like_company(c0))
+                            c1_is_title = cls._looks_like_title(c1) or (cls.is_valid_job_title(c1) and not cls._looks_like_company(c1))
+                            c0_is_comp = cls._looks_like_company(c0) or cls.is_valid_company_name(c0)
+                            c1_is_comp = cls._looks_like_company(c1) or cls.is_valid_company_name(c1)
+
+                            if c0_is_title and not c1_is_title:
+                                current["job_title"] = c0
+                                current["company"] = c1
+                            elif c1_is_title and not c0_is_title:
+                                current["job_title"] = c1
+                                current["company"] = c0
+                            elif c0_is_comp and not c1_is_comp:
+                                current["company"] = c0
+                                current["job_title"] = c1
+                            elif c1_is_comp and not c0_is_comp:
+                                current["company"] = c1
+                                current["job_title"] = c0
+                            else:
+                                current["company"] = c0
+                                current["job_title"] = c1
+                        elif len(other_cells) == 1:
+                            if cls._looks_like_title(other_cells[0]):
+                                current["job_title"] = other_cells[0]
+                            else:
+                                current["company"] = other_cells[0]
+                        continue
+
+                elif len(cells) == 2:
+                    d_match = cls._DATE_RANGE.search(cells[1])
+                    if d_match and cells[0] and cells[0] != "---":
+                        resolve_unresolved()
+                        commit()
+                        combined = cells[0]
+                        keywords = cls.JOB_TITLE_KEYWORDS
+                        if keywords:
+                            pattern = r"\s+(?=(?:" + "|".join(re.escape(k) for k in keywords) + r")\b)"
+                            split = re.split(pattern, combined, maxsplit=1, flags=re.IGNORECASE)
+                        else:
+                            split = [combined]
+                        if len(split) == 2:
+                            company, title = split[0].strip(" -|–—"), split[1].strip(" -|–—")
+                        else:
+                            company, title = combined, "Position"
+                        current["company"] = company or "Organization"
+                        current["job_title"] = title
+                        current["dates"] = d_match.group(0).strip(" ()")
+                        continue
+
+            # Explicit key-value lines (both bulleted and unbulleted)
+            desig_match = re.search(r"^(?:designation|job\s*title|role|position|post\s*held|profile)\s*[:\-]+\s*(.+)$", clean_line, re.IGNORECASE)
+            org_match = re.search(r"^(?:organization|company(?:\s*name)?|employer|client|firm)\s*[:\-]+\s*(.+)$", clean_line, re.IGNORECASE)
+            duration_match = re.search(r"^(?:duration|period|tenure|dates?|time\s*period|working\s*period)\s*[:\-]+\s*(.+)$", clean_line, re.IGNORECASE)
+            loc_match = re.search(r"^(?:location|city|place|base\s*location|address)\s*[:\-]+\s*(.+)$", clean_line, re.IGNORECASE)
+            resp_match = re.search(r"^(?:responsibilities|duties|roles?\s*and\s*responsibilities|key\s*deliverables|job\s*summary|job\s*profile)\s*[:\-]+\s*(.+)$", clean_line, re.IGNORECASE)
+
+            if desig_match:
+                clean_desig = desig_match.group(1).strip()
+                if current.get("job_title") and (current.get("company") or current.get("dates") or current.get("responsibilities")):
+                    resolve_unresolved()
+                    commit()
+                current["job_title"] = clean_desig
+                continue
+
+            if org_match:
+                clean_org = org_match.group(1).strip()
+                if current.get("company") and (current.get("job_title") or current.get("dates") or current.get("responsibilities")):
+                    resolve_unresolved()
+                    commit()
+                current["company"] = clean_org
+                continue
+
+            if duration_match:
+                remainder = duration_match.group(1).strip()
+                d_match = cls._DATE_RANGE.search(remainder)
+                if d_match:
+                    current["dates"] = d_match.group(0).strip(" ()")
+                    pre_date = remainder[: remainder.index(d_match.group(0))].strip(", :-")
+                    if pre_date and not current.get("job_title") and cls.is_valid_job_title(pre_date):
+                        current["job_title"] = pre_date
+                else:
+                    current["dates"] = remainder
+                continue
+
+            if loc_match:
+                current["location"] = loc_match.group(1).strip()
+                continue
+
+            if resp_match:
+                current.setdefault("responsibilities", []).append(resp_match.group(1).strip())
+                continue
+
+            has_date_match = bool(date_match)
+            _desig_prefix_re = re.compile(r"^(?:designation|job\s+title|role|position)\s*[:\-]+\s*", re.IGNORECASE)
+            is_explicit_title = bool(_desig_prefix_re.match(clean_line))
+            clean_val = _desig_prefix_re.sub("", clean_line).strip() if is_explicit_title else clean_line
+
+            is_title = is_explicit_title or cls.is_valid_job_title(clean_val) or cls.is_structural_job_title_noun_phrase(clean_val)
+            is_strict_company = cls._looks_like_company(clean_val)
+            is_greedy_company = is_strict_company or cls.is_valid_company_name(clean_val)
+            is_bullet = line.startswith(("-", "•"))
+
+            state_has_title = bool(current.get("job_title"))
+            state_has_company = bool(current.get("company"))
+            state_has_date = bool(current.get("dates"))
+            state_has_resp = bool(current.get("responsibilities"))
+
+            incoming_is_strong_boundary = False
+            if not is_bullet:
+                if has_date_match and state_has_date:
+                    incoming_is_strong_boundary = True
+                elif is_explicit_title and state_has_title:
+                    incoming_is_strong_boundary = True
+                elif is_strict_company and state_has_company:
+                    incoming_is_strong_boundary = True
+                elif is_title and not is_strict_company and state_has_title and (state_has_company or state_has_resp):
+                    incoming_is_strong_boundary = True
+
+            if incoming_is_strong_boundary:
+                resolve_unresolved()
+                commit()
+
+            if is_bullet:
+                bullet_date = cls._DATE_RANGE.search(clean_line)
                 if bullet_date:
-                    remaining = cls._DATE_RANGE.sub("", clean_bullet).strip(" ()-|–—")
+                    remaining = cls._DATE_RANGE.sub("", clean_line).strip(" ()-|–—")
                     if not remaining or len(remaining) < 5:
-                        # Pure date bullet — assign to current entry
                         if not current.get("dates"):
                             current["dates"] = bullet_date.group(0).strip(" ()")
                         continue
-                current.setdefault("responsibilities", []).append(clean_bullet)
-            else:
-                if current.get("dates") and (cls.is_valid_job_title(line) or cls._looks_like_company(line) or cls.is_valid_company_name(line)):
-                    commit()
 
-                if not current.get("job_title") and cls.is_valid_job_title(line):
-                    # Strip label prefix if line is formatted as "Designation: Fitter Executive"
-                    _desig_prefix_re = re.compile(
-                        r"^(?:designation|job\s+title|role|position)\s*[:\-]+\s*",
-                        re.IGNORECASE,
-                    )
-                    clean_line = _desig_prefix_re.sub("", line).strip()
-                    if clean_line and clean_line != line:
-                        # Use the stripped value; validate it is still a valid title
-                        if cls.is_valid_job_title(clean_line):
-                            line = clean_line
-                    if cls._looks_like_company(line) and not cls._looks_like_title(line):
-                        if not current.get("company"):
-                            current["company"] = line
+                current.setdefault("responsibilities", []).append(clean_line)
+            else:
+                if has_date_match:
+                    if not current.get("dates"):
+                        current["dates"] = date_match.group(0).strip(" ()")
+                    possible_header = cls._DATE_RANGE.sub("", clean_line).strip(" ()-|–—")
+                    if possible_header:
+                        title_company_match = re.match(r"(.+?)\s+at\s+(.+)$", possible_header, re.IGNORECASE)
+                        if title_company_match:
+                            possible_title = title_company_match.group(1).strip()
+                            possible_company = title_company_match.group(2).strip()
+                            if not current.get("company") and cls.is_valid_company_name(possible_company):
+                                current["company"] = possible_company
+                            if not current.get("job_title") and cls.is_valid_job_title(possible_title):
+                                current["job_title"] = possible_title
                         else:
-                            current["job_title"] = line
-                    else:
-                        current["job_title"] = line
-                elif not current.get("company") and (cls._looks_like_company(line) or cls.is_valid_company_name(line)):
-                    current["company"] = line
+                            if cls._looks_like_company(possible_header) and not current.get("company"):
+                                current["company"] = possible_header
+                            elif cls.is_valid_job_title(possible_header) and not current.get("job_title"):
+                                current["job_title"] = possible_header
+                            elif not current.get("job_title") and not current.get("company"):
+                                current.setdefault("unresolved_header", []).append(possible_header)
                 else:
-                    current["description"] = " ".join(filter(None, (current.get("description"), line)))
+                    if is_explicit_title:
+                        if not current.get("job_title"):
+                            current["job_title"] = clean_val
+                        else:
+                            current.setdefault("responsibilities", []).append(clean_val)
+                    elif is_title and not current.get("job_title"):
+                        if is_strict_company and not current.get("company") and not cls._looks_like_title(clean_val):
+                            current["company"] = clean_val
+                        else:
+                            current["job_title"] = clean_val
+                    elif is_greedy_company and not current.get("company"):
+                        current["company"] = clean_val
+                    elif not current.get("company") and not current.get("job_title") and len(clean_line) < 70 and not current.get("dates"):
+                        current.setdefault("unresolved_header", []).append(clean_line)
+                    else:
+                        current.setdefault("responsibilities", []).append(clean_line)
+
+        resolve_unresolved()
         commit()
         return jobs
 
@@ -688,10 +1125,7 @@ class ResumeFieldExtractor:
     def _extract_education(cls, lines: list[str]) -> list[dict[str, Any]]:
         education: list[dict[str, Any]] = []
         current: dict[str, Any] = {}
-        degree_pattern = re.compile(
-            r"\b(B\.?\s*Tech|B\.?E\.?|B\.?Sc\.?|Bachelor|M\.?\s*Tech|M\.?Sc\.?|Master|MBA|Ph\.?D|Diploma|Degree)\b",
-            re.IGNORECASE,
-        )
+        degree_pattern = cls.DEGREE_PATTERN
 
         def commit() -> None:
             nonlocal current
@@ -816,22 +1250,113 @@ class ResumeFieldExtractor:
     def _extract_projects(lines: list[str]) -> list[dict[str, Any]]:
         projects: list[dict[str, Any]] = []
         current: dict[str, Any] = {}
+
+        def commit() -> None:
+            nonlocal current
+            raw_name = (current.get("name") or "").strip()
+            has_details = bool(current.get("bullet_points") or current.get("description") or current.get("technologies"))
+            if raw_name and has_details:
+                parts = [p.strip() for p in raw_name.split("|") if p.strip()]
+                clean_title = parts[0] if parts else raw_name
+                current["title"] = clean_title
+                current["name"] = clean_title
+                if len(parts) > 1 and not current.get("description"):
+                    current["description"] = " | ".join(parts[1:])
+                projects.append(current)
+            current = {}
+
         for raw_line in lines:
             line = raw_line.strip()
             if not line:
                 continue
             if line.startswith(("##", "###")):
-                if current.get("name"):
-                    projects.append(current)
+                commit()
                 current = {"name": line.replace("#", "").strip()}
-            elif "|" in line and not line.startswith("-"):
+            elif line.lower().startswith("tech:") or line.lower().startswith("technologies:"):
+                tech_str = line.split(":", 1)[1].strip()
+                current["technologies"] = [t.strip() for t in re.split(r"[,|]+", tech_str) if t.strip()]
+            elif "|" in line and not line.startswith(("-", "•", "·")):
                 current["technologies"] = [value.strip() for value in line.split("|") if value.strip()]
-            elif line.startswith(("-", "•")):
-                current.setdefault("bullet_points", []).append(line.lstrip("-• ").strip())
+            elif line.startswith(("-", "•", "·")):
+                current.setdefault("bullet_points", []).append(line.lstrip("-•· ").strip())
             else:
                 current["description"] = " ".join(filter(None, (current.get("description"), line)))
-        if current.get("name"):
-            projects.append(current)
+        commit()
+        return projects
+
+    @classmethod
+    def _extract_projects_from_text(cls, text_lines: list[str]) -> list[dict[str, Any]]:
+        """
+        Extract projects from CV text when a dedicated 'PROJECTS' section heading is absent
+        or when projects are embedded under 'WORK HISTORY' / 'EXPERIENCE' section blocks.
+        """
+        projects: list[dict[str, Any]] = []
+        current_proj: dict[str, Any] = {}
+
+        def commit_proj() -> None:
+            nonlocal current_proj
+            raw_title = str(current_proj.get("title") or current_proj.get("name") or "").strip()
+            if not raw_title or len(raw_title) < 2 or len(raw_title) > 90:
+                current_proj = {}
+                return
+            # Reject employment date lines, candidates' names, or section headers
+            if cls._DATE_RANGE.search(raw_title) or cls._SECTION_HEADING.match(raw_title):
+                current_proj = {}
+                return
+            if re.search(r"\b(?:present|current|\d{4})\b", raw_title, re.IGNORECASE):
+                current_proj = {}
+                return
+
+            has_details = bool(current_proj.get("bullet_points") or current_proj.get("description") or current_proj.get("technologies"))
+            if has_details:
+                current_proj["title"] = raw_title
+                current_proj["name"] = raw_title
+                projects.append(current_proj)
+            current_proj = {}
+
+        for i, line in enumerate(text_lines):
+            clean = line.strip()
+            if not clean:
+                continue
+
+            proj_highlight = re.search(r"(?:Project\s+Highlights?|Project\s+Title|Project\s+Name)\s*[:\-]*\s*(.*)", clean, re.IGNORECASE)
+            is_subheading = clean.startswith(("##", "###")) and not cls._SECTION_HEADING.match(clean)
+
+            if proj_highlight:
+                highlight_val = proj_highlight.group(1).strip()
+                if not current_proj:
+                    prev_line = text_lines[i - 1].strip().lstrip("#*-• ").strip() if i > 0 else ""
+                    title_candidate = prev_line if (prev_line and len(prev_line) < 60 and not cls._SECTION_HEADING.match(prev_line)) else "Project"
+                    current_proj = {
+                        "title": title_candidate,
+                        "name": title_candidate,
+                        "description": highlight_val,
+                        "bullet_points": [],
+                    }
+                else:
+                    if highlight_val:
+                        current_proj["description"] = " ".join(filter(None, (current_proj.get("description"), highlight_val)))
+            elif is_subheading:
+                commit_proj()
+                header_val = clean.lstrip("#* ").strip()
+                current_proj = {
+                    "title": header_val,
+                    "name": header_val,
+                    "description": "",
+                    "bullet_points": [],
+                }
+            elif current_proj:
+                if clean.lower().startswith("tech:") or clean.lower().startswith("technologies:"):
+                    tech_str = clean.split(":", 1)[1].strip()
+                    current_proj["technologies"] = [t.strip() for t in re.split(r"[,|]+", tech_str) if t.strip()]
+                elif clean.startswith(("-", "•", "·")):
+                    current_proj.setdefault("bullet_points", []).append(clean.lstrip("-•· ").strip())
+                elif not clean.startswith("#"):
+                    current_proj["description"] = " ".join(filter(None, (current_proj.get("description"), clean)))
+                else:
+                    commit_proj()
+
+        commit_proj()
         return projects
 
     @classmethod
@@ -852,7 +1377,7 @@ class ResumeFieldExtractor:
         if any(token.startswith(".") for token in tokens):
             return False
         normalized_candidate = re.sub(r"\s+", " ", candidate.lower().strip(" .:-"))
-        if normalized_candidate in _NON_NAME_FIELD_LABELS:
+        if normalized_candidate in cls.NON_NAME_FIELD_LABELS:
             return False
         if cls._SECTION_HEADING.fullmatch(candidate.strip(" #*:-")):
             return False
@@ -863,16 +1388,16 @@ class ResumeFieldExtractor:
         if normalized_candidate in normalized_headings:
             return False
         upper_tokens = [token.upper() for token in tokens]
-        denied = cls.JOB_TITLE_KEYWORDS | cls.RESUME_HEADER_KEYWORDS
+        denied = cls.JOB_TITLE_KEYWORDS | cls.RESUME_HEADER_KEYWORDS | cls.TECH_AND_ROLE_DENYLIST
         first_token = re.sub(r"[^A-Z]", "", upper_tokens[0])
-        field_labels = {label.upper() for label in _LABEL_PREFIX_DENYLIST} | {
+        field_labels = {label.upper() for label in cls.LABEL_PREFIX_DENYLIST} | {
             "STATE", "NATIONALITY", "GENDER", "DOB", "BIRTH", "MARITAL", "PIN", "PINCODE",
         }
         if first_token in field_labels:
             return False
-        if len(tokens) == 1 and upper_tokens[0] in denied:
+        if len(tokens) == 1 and (upper_tokens[0] in denied or len(tokens[0]) <= 2):
             return False
-        if sum(token in denied for token in upper_tokens) >= len(tokens) * 0.5:
+        if sum(token in denied for token in upper_tokens) >= len(tokens) * 0.35:
             return False
         # Reject configured role phrases without baking industries or technologies into extraction code.
         role_terms = cls._configured_job_title_terms()
@@ -880,8 +1405,7 @@ class ResumeFieldExtractor:
             role_pattern = r"\s+".join(re.escape(part) for part in term.split())
             if role_pattern and re.search(rf"\b{role_pattern}\b", candidate, re.IGNORECASE):
                 return False
-        # Reject names that look like company names
-        if _COMPANY_SUFFIXES.search(candidate):
+        if candidate.upper().strip() in cls.COUNTRY_NAMES or candidate.lower().strip() in cls.KNOWN_GAZETTEER:
             return False
         return not any(value and (candidate in value or value in candidate) for value in (email, phone, location))
 
@@ -990,6 +1514,9 @@ class ResumeFieldExtractor:
     def _configured_job_title_terms(cls) -> set[str]:
         """Build name-rejection role terms from governed config and active taxonomy."""
         terms = set(RuleConfigManager.get_keywords("name", "job_title_denylist"))
+        if cls.JOB_TITLE_KEYWORDS:
+            terms.update(k.lower() for k in cls.JOB_TITLE_KEYWORDS if k)
+        terms.update(cls.COMMON_ROLES)
         try:
             from app.repositories.department_domain import department_domain_repository
 
@@ -1013,14 +1540,34 @@ class ResumeFieldExtractor:
         local_part = re.sub(r"\d+", "", email.split("@", 1)[0].lower())
         return [token for token in re.split(r"[._\-\s]+", local_part) if len(token) >= 2]
 
-    @staticmethod
-    def _name_from_filename(filename: str | None) -> str | None:
+    _SYNTHETIC_NAME_DENYLIST: frozenset[str] = frozenset({
+        "candidatecvfilename", "candidatephotofilename", "candidatecv", "cv", "resume",
+        "document", "upload", "attachment", "file", "unknown candidate", "profile",
+        "candidatename", "filename", "candidate", "applicant",
+    })
+
+    @classmethod
+    def _name_from_filename(cls, filename: str | None) -> str | None:
         if not filename:
             return None
-        clean_name = re.sub(r"\.(pdf|docx)$", "", filename, flags=re.IGNORECASE)
+        clean_name = re.sub(r"\.(pdf|docx)$", "", str(filename).strip(), flags=re.IGNORECASE)
+        # Strip synthetic timestamp/ID patterns like 1761533883_CandidateCVFileName_13672 or cv_...
+        clean_name = re.sub(r"^cv_", "", clean_name, flags=re.IGNORECASE)
+        clean_name = re.sub(r"^\d{8,12}_", "", clean_name)
+        clean_name = re.sub(r"_\d+$", "", clean_name)
+
+        # Check against technical denylist
+        normalized_token = re.sub(r"[^a-zA-Z]", "", clean_name).lower()
+        if not normalized_token or normalized_token in cls._SYNTHETIC_NAME_DENYLIST:
+            return None
+
         clean_name = re.sub(r"[-_](cv|resume|updated|\d+)", "", clean_name, flags=re.IGNORECASE)
         clean_name = re.sub(r"[-_]+", " ", clean_name).strip()
-        return " ".join(word.capitalize() for word in clean_name.split()) or None
+        result = " ".join(word.capitalize() for word in clean_name.split())
+        final_token = re.sub(r"[^a-zA-Z]", "", result).lower()
+        if not result or final_token in cls._SYNTHETIC_NAME_DENYLIST:
+            return None
+        return result
 
     @staticmethod
     def _first_match(pattern: str, text: str) -> str | None:

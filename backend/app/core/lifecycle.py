@@ -123,14 +123,18 @@ def verify_ollama_models() -> None:
         if settings.EMBEDDING_ENABLED:
             configured_models.append(("embedding", settings.EMBEDDING_MODEL))
         for purpose, model in configured_models:
-            if any(model in available for available in models):
+            if OllamaLLMService.is_model_available(model, models):
                 logger.info(f"[STARTUP] Ollama {purpose} model '{model}' verified successfully.")
             else:
                 if settings.IS_PRODUCTION:
                     raise RuntimeError(f"Configured {purpose} model '{model}' is unavailable in production.")
                 logger.error(f"[STARTUP] Configured {purpose} model '{model}' is unavailable. Run: ollama pull {model}")
+    except RuntimeError:
+        if settings.IS_PRODUCTION:
+            raise
+        logger.warning("[STARTUP] Could not verify Ollama status: RuntimeError")
     except Exception as exc:
-        if settings.IS_PRODUCTION and not isinstance(exc, RuntimeError):
+        if settings.IS_PRODUCTION:
             raise RuntimeError(f"Could not verify Ollama status in production: {type(exc).__name__}") from exc
         logger.warning(f"[STARTUP] Could not verify Ollama status: {type(exc).__name__}")
 

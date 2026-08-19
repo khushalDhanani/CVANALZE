@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, cast
 
+from app.core.analysis_context import get_analysis_run_id
 from app.core.cache import CacheIndex, CacheKey, match_result_cache_manager
 from app.core.config import settings
 from app.core.cv_identity import normalize_source_candidate_id
@@ -24,9 +25,12 @@ from app.services.candidate_domain_service import CandidateDomainService
 from app.services.confidence_calibration import ConfidenceCalibrationService
 from app.services.document_parser import ResumeJsonExtractor
 from app.services.dynamic_taxonomy_service import DynamicTaxonomyService
+from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
 from app.services.llm_grounding_service import GroundingReport, LLMGroundingService
 from app.services.llm_service import OllamaLLMService
 from app.services.matching_quality_gate import MatchingQualityGate, MatchingReadiness
+from app.services.ollama_transport import OllamaError
+from app.services.prompt_service import PromptService
 from app.services.resume_normalizer import ResumeNormalizer
 from app.services.scoring_engine import ScoringEngine
 from app.services.vacancy_prefilter import VacancyPreFilter
@@ -49,6 +53,7 @@ class MatchService:
         resume_json: dict[str, Any] | None = None,
         normalized_resume: NormalizedResume | None = None,
         deterministic_experience: float | None = None,
+        force_reanalysis: bool = False,
         _shadow_run: bool = False,
     ) -> EnrichedCandidateAnalysis:
         profiler = PipelineProfiler()
@@ -65,6 +70,8 @@ class MatchService:
 
         document_hash = (document_hash or "").strip() or hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
         cv_key = str(cv_key or candidate_id).strip()
+        analysis_run_id = get_analysis_run_id()
+        logger.info(f"analysis_run_id={analysis_run_id} candidate={cv_key or 'not_available'} operation=match_analysis status=START")
         source_candidate_id = normalize_source_candidate_id(source_candidate_id)
         extraction_version = f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
         quality_gate = MatchingQualityGate()
@@ -130,14 +137,19 @@ class MatchService:
             profiler.log_summary()
             quality_gate.record("vacancy_retrieval", "PASSED_EMPTY", source_count=0, retrieved_count=0)
             quality_gate.record("final_classification", "PASSED", match_status="NO_ACTIVE_VACANCIES", final_score=None)
-            return MatchService._empty_analysis(cv_text=cv_text, normalized_resume=normalized_resume, quality_gate=quality_gate)
+            return MatchService._empty_analysis(cv_text=cv_text, resume_json=resume_json, normalized_resume=normalized_resume, quality_gate=quality_gate, is_global_empty=True)
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
         vacancy_ids = sorted(str(job.get("vacancy_id") or job.get("id") or "") for job in openings if job.get("vacancy_id") is not None or job.get("id") is not None)
         vacancy_version = JobRepository.compute_matching_vacancy_version(openings)
-        rule_version = RuleConfigManager.get_config().version
+        rule_config = RuleConfigManager.get_config()
+        rule_version = rule_config.version
+        hiring_risk_policy_version = HiringRiskAnalyzer.get_policy_version(rule_config)
         taxonomy_version = department_domain_repository.get_version()
+        hiring_risk_prompt_version = PromptService.get_active_prompt_version(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+        hiring_risk_prompt_identity = PromptService.get_active_prompt_identity(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+        match_prompt_version = f"optimized:{settings.OPTIMIZED_PROMPT_VERSION}|hiring-risk:{hiring_risk_prompt_identity}"
 
         # 4. Match Result Cache Check (instant repeat searches)
         t_cache_start = asyncio.get_event_loop().time()
@@ -146,15 +158,15 @@ class MatchService:
             candidate_id=cv_key,
             vacancy_version=vacancy_version,
             vacancy_ids=vacancy_ids,
-            prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
+            prompt_version=match_prompt_version,
             model_version=settings.OLLAMA_MODEL,
             extraction_version=extraction_version,
             matching_version=settings.MATCHING_VERSION,
-            rule_version=rule_version,
+            rule_version=f"{rule_version}|hiring-risk:{hiring_risk_policy_version}",
             taxonomy_version=taxonomy_version,
         ).to_key()
 
-        cached_result = match_result_cache_manager.get(match_cache_key)
+        cached_result = None if force_reanalysis else match_result_cache_manager.get(match_cache_key)
         if cached_result is not None:
             logger.info(f"[MATCH_CACHE_HIT] Returning cached match result for doc={document_hash[:12]}...")
             profiler.metrics.cache_hit = True
@@ -195,23 +207,35 @@ class MatchService:
             "PASSED" if candidate_context.cand_tax_domain not in ("", "Unknown") else "INSUFFICIENT_EVIDENCE",
             domain=candidate_context.cand_tax_domain or "Unknown",
             families=candidate_context.cand_families,
+            confidence=round(candidate_context.taxonomy_confidence, 4),
+            match_status=candidate_context.taxonomy_match_status,
+            source=candidate_context.taxonomy_match_source,
         )
-
+        from app.services.vacancy_prefilter import InsufficientEvidenceError, AnalysisUnavailableError
         # 5. Python Pre-filter stage (Stage 0 Taxonomy + Stage 1 Vector + Stage 2 RRF)
         with profiler.time_stage("prefilter"):
-            filtered_job_contexts = cast(
-                list[JobEvaluationContext],
-                VacancyPreFilter.filter_vacancies(
-                    cv_text=cv_text,
-                    openings=openings,
-                    candidate_experience=candidate_context.candidate_experience,
-                    top_k=settings.PREFILTER_TOP_K,
-                    cv_embedding=cv_embedding,
-                    resume_json=resume_json,
-                    analysis_context=candidate_context,
-                    return_contexts=True,
-                ),
-            )
+            try:
+                filtered_job_contexts = cast(
+                    list[JobEvaluationContext],
+                    VacancyPreFilter.filter_vacancies(
+                        cv_text=cv_text,
+                        openings=openings,
+                        candidate_experience=candidate_context.candidate_experience,
+                        top_k=settings.PREFILTER_TOP_K,
+                        cv_embedding=cv_embedding,
+                        resume_json=resume_json,
+                        analysis_context=candidate_context,
+                        return_contexts=True,
+                    ),
+                )
+            except InsufficientEvidenceError as exc:
+                logger.warning(f"Insufficient evidence for candidate match: {exc}")
+                readiness = MatchingReadiness(False, "INSUFFICIENT_EVIDENCE", str(exc))
+                return MatchService._unavailable_analysis(normalized_resume, readiness, quality_gate, status=MatchStatus.INSUFFICIENT_EVIDENCE)
+            except AnalysisUnavailableError as exc:
+                logger.error(f"Analysis unavailable: {exc}")
+                readiness = MatchingReadiness(False, "ANALYSIS_UNAVAILABLE", str(exc))
+                return MatchService._unavailable_analysis(normalized_resume, readiness, quality_gate, status=MatchStatus.ANALYSIS_UNAVAILABLE)
         filtered_vacancies = [job.raw_job for job in filtered_job_contexts]
         profiler.metrics.vacancies_after_filtering = len(filtered_job_contexts)
         quality_gate.record(
@@ -250,6 +274,8 @@ class MatchService:
                         cand_hierarchy=candidate_context.cand_hierarchy,
                     )
                     pre_llm_matches.append(pre_llm_match)
+                except OllamaError:
+                    raise
                 except Exception as e:
                     logger.error(f"Error in rule-based matching for job {job_context.job_id}: {e}", exc_info=True)
 
@@ -266,6 +292,8 @@ class MatchService:
         optimized_profile = None
         llm_matches_map = {}
         grounding_report = GroundingReport()
+        raw_llm_lineage: dict[str, dict[str, int]] = {}
+        grounded_llm_lineage: dict[str, dict[str, int]] = {}
 
         if not llm_skipped:
             # 4. Reduce LLM input to Top-N by deterministic score (full scoring already computed above).
@@ -287,6 +315,15 @@ class MatchService:
                     reverse=True,
                 )[:llm_top_n]
             llm_vacancy_dicts = [jc.raw_job for jc in llm_vacancies]
+            llm_vacancy_ids = {jc.job_id for jc in llm_vacancies}
+            pre_llm_score_by_id = {match.job_id: match.score for match in pre_llm_matches}
+            for job_context in filtered_job_contexts:
+                if job_context.job_id not in llm_vacancy_ids:
+                    logger.info(
+                        f"[PREFILTER_EXCLUSION] vacancy_id={job_context.job_id} stage=llm_selection "
+                        f"reason=DETERMINISTIC_LLM_TOP_N deterministic_score={pre_llm_score_by_id.get(job_context.job_id)} "
+                        f"llm_top_n={llm_top_n}"
+                    )
 
             # 5. Prompt Construction & Token Count
             with profiler.time_stage("prompt_construction"):
@@ -310,7 +347,7 @@ class MatchService:
             filtered_vacancy_ids = [str(j.get("vacancy_id") or j.get("id")) for j in llm_vacancy_dicts]
             cache_key = LLMCacheRepository.compute_composite_hash(
                 document_hash=document_hash,
-                candidate_id=cv_key,
+                candidate_id=f"{cv_key}:{analysis_run_id}" if force_reanalysis else cv_key,
                 vacancy_ids=filtered_vacancy_ids,
                 vacancy_version=vacancy_version,
                 prompt_version=settings.OPTIMIZED_PROMPT_VERSION,
@@ -331,10 +368,36 @@ class MatchService:
             )
 
             if optimized_response:
+                raw_llm_lineage = {
+                    str(match.vacancy_id): {
+                        "matched_skills": len(match.matched_skills),
+                        "inferred_skills": len(match.inferred_skills),
+                        "requirements": len(match.classified_requirements),
+                        "evidence": len(match.evidence_snippets),
+                        "requirement_assessments": len(match.requirement_assessments),
+                    }
+                    for match in optimized_response.matched_vacancies
+                }
                 optimized_response, grounding_report = LLMGroundingService.validate_optimized_response(
                     optimized_response,
                     cv_text=cv_text,
                     vacancies=llm_vacancy_dicts,
+                )
+                grounded_llm_lineage = {
+                    str(match.vacancy_id): {
+                        "matched_skills": len(match.matched_skills),
+                        "inferred_skills": len(match.inferred_skills),
+                        "requirements": len(match.classified_requirements),
+                        "evidence": len(match.evidence_snippets),
+                        "requirement_assessments": len(match.requirement_assessments),
+                    }
+                    for match in optimized_response.matched_vacancies
+                }
+                logger.debug(
+                    f"[LLM_LINEAGE] raw_vacancies={len(raw_llm_lineage)} grounded_vacancies={len(grounded_llm_lineage)} "
+                    f"invalid_vacancy_ids={len(grounding_report.invalid_vacancy_ids)} "
+                    f"missing_vacancy_ids={len(grounding_report.missing_vacancy_ids)} "
+                    f"unsupported_claims={len(grounding_report.unsupported_claims)}"
                 )
                 OllamaLLMService.record_quality_trace(
                     operation="optimized_match_grounding",
@@ -346,8 +409,14 @@ class MatchService:
                         "assertions": grounding_report.assertions,
                         "grounded_assertions": grounding_report.grounded_assertions,
                         "invalid_vacancy_ids": len(grounding_report.invalid_vacancy_ids),
+                        "missing_vacancy_ids": len(grounding_report.missing_vacancy_ids),
                         "unsupported_claims": len(grounding_report.unsupported_claims),
                     },
+                )
+            else:
+                logger.warning(
+                    f"[OLLAMA] operation=optimized_match model='{settings.OLLAMA_MODEL}' "
+                    "status=DETERMINISTIC_FALLBACK reason=NO_VALID_LLM_RESPONSE"
                 )
 
             optimized_profile = optimized_response.candidate_profile if optimized_response else None
@@ -390,7 +459,7 @@ class MatchService:
                         evidence_coverage=job_match.coverage,
                         grounding_ratio=grounding_report.ratio,
                         rule_llm_agreement=agreement,
-                        validation_passed=llm_skipped or optimized_response is not None,
+                        validation_passed=llm_skipped or (optimized_response is not None and llm_match is not None),
                     )
                     retrieval_provenance = dict(job.get("_rrf_details") or {})
                     has_lexical = retrieval_provenance.get("lexical_rank") is not None
@@ -401,6 +470,8 @@ class MatchService:
                         quality_flags.append("LOW_CALIBRATED_CONFIDENCE")
                     if grounding_report.unsupported_claims:
                         quality_flags.append("UNSUPPORTED_LLM_CLAIMS_REMOVED")
+                    if optimized_response is not None and llm_match is None:
+                        quality_flags.append("LLM_VACANCY_EVALUATION_MISSING")
 
                     enriched_match = EnrichedJobMatchResult(
                         job_id=job_match.job_id,
@@ -451,13 +522,28 @@ class MatchService:
                         career_transition_detected=job_match.career_transition_detected,
                         career_transition_note=job_match.career_transition_note,
                         llm_reason=llm_reason,
+                        top_strength=llm_match.top_strength if llm_match else "",
+                        main_concern=llm_match.main_concern if llm_match else "",
+                        ai_match_explanation=llm_match.ai_match_explanation if llm_match else llm_reason,
                         inferred_skills=inferred_skills,
                         calibrated_confidence=calibration.score,
                         calibration_version=calibration.calibration_version,
                         quality_flags=quality_flags,
                         retrieval_provenance=retrieval_provenance,
+                        llm_classified_requirements=llm_match.classified_requirements if llm_match else [],
+                        llm_evidence_snippets=llm_match.evidence_snippets if llm_match else {},
+                        llm_requirement_assessments=llm_match.requirement_assessments if llm_match else [],
                     )
                     evaluated_matches.append(enriched_match)
+                    raw_counts = raw_llm_lineage.get(vac_id_str, {})
+                    grounded_counts = grounded_llm_lineage.get(vac_id_str, {})
+                    logger.debug(
+                        f"[LLM_POST_PROCESS] vacancy_id={vac_id_str} raw_counts={raw_counts} grounded_counts={grounded_counts} "
+                        f"deterministic_evidence={len(job_match.evidence)} mandatory_failures={len(job_match.mandatory_failures)} "
+                        f"final_score={job_match.vacancy_fit_score}"
+                    )
+                except OllamaError:
+                    raise
                 except Exception as e:
                     logger.error(f"Error in LLM-enriched matching for job {job_context.job_id}: {e}", exc_info=True)
 
@@ -473,6 +559,9 @@ class MatchService:
                             f"Ranked #{i + 1} due to lower fit score ({m.vacancy_fit_score or m.score}% vs top "
                             f"{evaluated_matches[0].vacancy_fit_score or evaluated_matches[0].score}%)."
                         )
+                    
+                    is_h_valid = getattr(m.score_breakdown, "is_hierarchy_valid", None) if m.score_breakdown else None
+                    logger.debug(f"Vacancy {m.vacancy_id} Validity -> domain_validity={not m.domain_mismatch_capped}, hierarchy_validity={is_h_valid}, match_status={m.vacancy_match_status}")
 
                     evidence_snippet = "; ".join(f"{ev.cv_evidence}" for ev in m.evidence.values())
                     if len(evidence_snippet) > 150:
@@ -561,7 +650,8 @@ class MatchService:
                 f"• Suitable Job Roles: {roles_str}"
             )
 
-        logger.info(f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}', has_genuine_match={has_genuine_match}")
+        logger.info(f"Candidate Domain Analysis: dept='{recommended_dept}', domain='{professional_domain}'")
+        logger.info(f"Final Genuine-Match Decision: has_genuine_match={has_genuine_match}")
 
         suitable_matches = eligible_matches
         unsuitable_matches = [m for m in evaluated_matches if m not in eligible_matches]
@@ -686,6 +776,8 @@ class MatchService:
         gap_analysis = ExperienceGapService.analyze_timeline(resume_json or {}, cv_text)
 
         result = EnrichedCandidateAnalysis(
+            analysis_run_id=analysis_run_id,
+            analysis_version=analysis_run_id,
             match_status=top_level_match_status,
             primary_department=recommended_dept,
             recommended_department=recommended_dept,
@@ -717,11 +809,23 @@ class MatchService:
                 "grounded_assertions": grounding_report.grounded_assertions,
                 "grounding_assertions": grounding_report.assertions,
                 "invalid_vacancy_ids_removed": len(grounding_report.invalid_vacancy_ids),
+                "missing_llm_vacancy_ids": len(grounding_report.missing_vacancy_ids),
                 "unsupported_claims_removed": len(grounding_report.unsupported_claims),
                 "quality_shadow_mode": settings.LLM_SHADOW_QUALITY_ENABLED,
                 "quality_gate": quality_gate.as_dict(),
                 "rule_version": rule_version,
                 "taxonomy_version": taxonomy_version,
+                "hiring_risk_prompt_version": hiring_risk_prompt_version,
+                "hiring_risk_prompt_identity": hiring_risk_prompt_identity,
+                "hiring_risk_policy_version": hiring_risk_policy_version,
+                "llm_lineage": {
+                    "raw_vacancy_count": len(raw_llm_lineage),
+                    "grounded_vacancy_count": len(grounded_llm_lineage),
+                    "raw_requirement_count": sum(item.get("requirements", 0) for item in raw_llm_lineage.values()),
+                    "grounded_requirement_count": sum(item.get("requirements", 0) for item in grounded_llm_lineage.values()),
+                    "raw_evidence_count": sum(item.get("evidence", 0) for item in raw_llm_lineage.values()),
+                    "grounded_evidence_count": sum(item.get("evidence", 0) for item in grounded_llm_lineage.values()),
+                },
             },
         )
 
@@ -750,6 +854,7 @@ class MatchService:
         normalized_resume: NormalizedResume,
         readiness: MatchingReadiness,
         quality_gate: MatchingQualityGate,
+        status: MatchStatus = MatchStatus.ANALYSIS_UNAVAILABLE,
     ) -> EnrichedCandidateAnalysis:
         quality_gate.record("final_classification", "BLOCKED", reason_code=readiness.reason_code)
         try:
@@ -757,11 +862,13 @@ class MatchService:
         except Exception:
             config_version = None
         return EnrichedCandidateAnalysis(
-            status=MatchStatus.ANALYSIS_UNAVAILABLE.value,
+            analysis_run_id=get_analysis_run_id(),
+            analysis_version=get_analysis_run_id(),
+            status=status.value,
             stage="matching_quality_gate",
-            match_status=MatchStatus.ANALYSIS_UNAVAILABLE,
+            match_status=status,
             has_genuine_match=False,
-            active_vacancy_summary=f"ANALYSIS_UNAVAILABLE: {readiness.reason}",
+            active_vacancy_summary=f"{status.value}: {readiness.reason}",
             suitable_openings=[],
             unsuitable_openings=[],
             normalized_resume=normalized_resume,
@@ -840,13 +947,15 @@ class MatchService:
     @staticmethod
     def _empty_analysis(
         cv_text: str = "",
+        resume_json: dict[str, Any] | None = None,
         normalized_resume: NormalizedResume | None = None,
         quality_gate: MatchingQualityGate | None = None,
+        is_global_empty: bool = False,
     ) -> EnrichedCandidateAnalysis:
         from app.schemas.scoring_config import ScoringConfig
 
         scoring_config = ScoringConfig.load()
-        cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
+        cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text, resume_json=resume_json) if (cv_text or resume_json) else {}
         industry_dept = cand_profile.get("recommended_department", "")
         industry_domain = cand_profile.get("professional_domain", "")
         strengths = cand_profile.get("strengths", [])
@@ -890,15 +999,20 @@ class MatchService:
             cv_text=cv_text,
         )
 
+        status = MatchStatus.NO_ACTIVE_VACANCIES if is_global_empty else MatchStatus.NO_SUITABLE_MATCH
+        summary = "NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation." if is_global_empty else "NO_SUITABLE_MATCH: No compatible active vacancies found for this candidate profile."
+        
         return EnrichedCandidateAnalysis(
-            match_status=MatchStatus.NO_ACTIVE_VACANCIES,
+            analysis_run_id=get_analysis_run_id(),
+            analysis_version=get_analysis_run_id(),
+            match_status=status,
             primary_department=industry_dept or None,
             recommended_department=industry_dept or None,
             professional_domain=industry_domain or None,
             strengths=strengths,
             suitable_job_roles=roles,
             has_genuine_match=False,
-            active_vacancy_summary="NO_ACTIVE_VACANCIES: No active vacancies available in system for evaluation.",
+            active_vacancy_summary=summary,
             scoring_profile_code=scoring_config.profile_code,
             scoring_profile_version=scoring_config.profile_version,
             config_version=RuleConfigManager.get_config().version,
@@ -925,7 +1039,9 @@ class MatchService:
 
     @staticmethod
     async def analyze_from_result_file(result_json_path: str | Path) -> dict[str, Any]:
-        data = ResultRepository.read_result(result_json_path)
+        source_data = ResultRepository.read_result(result_json_path)
+        candidate_key = str(source_data.get("id") or source_data.get("scan_id") or Path(result_json_path).stem)
+        data = ResultRepository.resolve_result(candidate_key) or source_data
 
         cv_text = data.get("markdown")
         if not cv_text:
@@ -943,16 +1059,19 @@ class MatchService:
             resume_json=data.get("resume_json"),
             normalized_resume=stored_normalized_resume,
             deterministic_experience=(stored_normalized_resume.experience.authoritative_years if stored_normalized_resume else ((data.get("quality_metrics") or {}).get("experience_years") or None)),
+            force_reanalysis=True,
         )
 
-        # Merge back into data
-        data["enriched_match_analysis"] = enriched_analysis.model_dump()
+        analysis_payload = enriched_analysis.model_dump()
+        data["match_analysis"] = analysis_payload
+        data["enriched_match_analysis"] = analysis_payload
+        data["analysis_run_id"] = get_analysis_run_id()
+        data["analysis_version"] = data["analysis_run_id"]
 
-        # Save back or save as new
-        path = Path(result_json_path)
-        new_filename = f"{path.stem}_enriched.json"
-
-        new_path = ResultRepository.save_result(new_filename, data)
-
-        data["enriched_result_file_path"] = str(new_path)
+        canonical_filename = ResultRepository.canonical_filename(data, result_json_path)
+        ResultRepository.atomic_save_result(canonical_filename, data)
+        logger.info(
+            f"analysis_run_id={data['analysis_run_id']} candidate={cv_key} canonical_result_updated=true "
+            f"candidate_api_result_version={data['analysis_version']}"
+        )
         return data

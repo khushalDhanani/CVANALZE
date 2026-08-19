@@ -1,8 +1,9 @@
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Optional, Set
+from urllib.parse import urlsplit
 
-from typing import List, Set, Dict, Optional
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -36,7 +37,7 @@ class Settings(BaseSettings):
     CV_PROCESSING_CONCURRENCY: int = 1
     CV_QUEUE_MAX_SIZE: int = 1000
     RQ_WORKER_MAX_JOBS: int = 0
-    RQ_JOB_TIMEOUT_SECONDS: int = 900
+    RQ_JOB_TIMEOUT_SECONDS: int = 2400
     RQ_RESULT_TTL_SECONDS: int = 604800
     RQ_MAX_RETRIES: int = 2
     RQ_RETRY_INTERVAL_SECONDS: int = 30
@@ -104,13 +105,15 @@ class Settings(BaseSettings):
     CACHE_TTL_MASTER_DATA_SECONDS: int = 3600
     PERFORMANCE_L1_CACHE_MAX_SIZE: int = 5000
     PERFORMANCE_L1_CACHE_TTL_SECONDS: float = 3600.0
-    EXTRACTION_TIMEOUT_SECONDS: float = 300.0
-    SCANNED_EXTRACTION_TIMEOUT_SECONDS: float = 600.0
+    EXTRACTION_TIMEOUT_SECONDS: float = 900.0
+    SCANNED_EXTRACTION_TIMEOUT_SECONDS: float = 1800.0
     EXTRACTION_PARSER_VERSION: str = "1.0.0"
     EXTRACTION_SCHEMA_VERSION: str = "2.0.0"
     EXPERIENCE_CALCULATOR_VERSION: str = "2.0.0"
     TAXONOMY_VERSION: str = "1.5.0"
-    MATCHING_VERSION: str = "3.0.6"
+    MATCHING_VERSION: str = "3.0.7"
+    PARSING_VERSION: str = "1.5.0"
+    CV_SCHEMA_VERSION: str = "2.1"
     AUTO_OCR_MIN_TEXT_CHARS: int = 100
 
     DOCUMENT_PARSER_WORKERS: int = 1
@@ -119,25 +122,25 @@ class Settings(BaseSettings):
 
     # LLM & Semantic Match Configuration
     LLM_ENABLED: bool = True
-    OLLAMA_BASE_URL: str = ""
-    OLLAMA_MODEL: str = "gemma3:4b"  # or qwen2.5:3b etc based on what's available
-    OLLAMA_REQUEST_TIMEOUT: float = 300.0
-    OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 3.0
-    OLLAMA_TAGS_TIMEOUT_SECONDS: float = 3.0
-    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 300.0
-    OLLAMA_EMBED_TIMEOUT_SECONDS: float = 30.0
-    OLLAMA_UNLOAD_TIMEOUT_SECONDS: float = 10.0
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2:3b"
+    OLLAMA_REQUEST_TIMEOUT: float = 900.0
+    OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 5.0
+    OLLAMA_TAGS_TIMEOUT_SECONDS: float = 5.0
+    OLLAMA_GENERATE_TIMEOUT_SECONDS: float = 1800.0
+    OLLAMA_EMBED_TIMEOUT_SECONDS: float = 60.0
+    OLLAMA_UNLOAD_TIMEOUT_SECONDS: float = 15.0
     OLLAMA_MAX_RETRIES: int = 0
     OLLAMA_RETRY_BACKOFF_SECONDS: float = 0.5
     OLLAMA_RETRY_JITTER_SECONDS: float = 0.1
-    OLLAMA_KEEP_ALIVE: str = "1m"
+    OLLAMA_KEEP_ALIVE: str = "30m"
     OLLAMA_RESIDENCY_ENABLED: bool = True
     OLLAMA_UNLOAD_ON_SHUTDOWN: bool = True
     OLLAMA_MAX_CONNECTIONS: int = 1
     OLLAMA_MAX_KEEPALIVE_CONNECTIONS: int = 1
     OLLAMA_MAX_RESPONSE_BYTES: int = 4 * 1024 * 1024
     OLLAMA_LOCK_FILE: Path = Path("uploads/.locks/ollama.lock")
-    OLLAMA_LOCK_TIMEOUT_SECONDS: float = 65.0
+    OLLAMA_LOCK_TIMEOUT_SECONDS: float = 1800.0
     OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 3
     OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS: float = 60.0
     OLLAMA_EMBED_BATCH_SIZE: int = 10
@@ -145,11 +148,12 @@ class Settings(BaseSettings):
     OLLAMA_EMBEDDING_EXPECTED_DIMENSION: int = 768
     OLLAMA_EMBEDDING_MAX_DIMENSION: int = 4096
     OLLAMA_LIVE_TESTS_ENABLED: bool = False
-    OLLAMA_GENERATION_NUM_CTX: int = 4096
-    OLLAMA_GENERATION_NUM_PREDICT: int = 1024
-    OLLAMA_OPTIMIZED_NUM_PREDICT: int = 2048
+    OLLAMA_GENERATION_NUM_CTX: int = 8192
+    OLLAMA_GENERATION_NUM_PREDICT: int = 1536
+    OLLAMA_OPTIMIZED_NUM_CTX: int = 16384
+    OLLAMA_OPTIMIZED_NUM_PREDICT: int = 3072
     PREFILTER_TOP_K: int = 60
-    LLM_TOP_N: int = 12
+    LLM_TOP_N: int = 6
     LLM_CV_MAX_CHARS: int = 4000          # Deprecated compatibility setting; token budgets are authoritative
     LLM_PROFILE_MAX_CHARS: int = 7500     # Deprecated compatibility setting; token budgets are authoritative
     LLM_CONTEXT_CV_TOKEN_BUDGET: int = 1200
@@ -162,19 +166,22 @@ class Settings(BaseSettings):
     LLM_TRACE_RETENTION_DAYS: int = 30
     LLM_SHADOW_QUALITY_ENABLED: bool = True
     LLM_CONFIDENCE_CALIBRATION_PATH: Path = Path("app/data/evaluations/confidence_calibration.json")
-    OPTIMIZED_PROMPT_VERSION: str = "3.5"
+    OPTIMIZED_PROMPT_VERSION: str = "4.0"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 
     # LLM Bypass Configuration
     LLM_SKIP_MARGIN_THRESHOLD: float = 15.0
     LLM_SKIP_COVERAGE_THRESHOLD: float = 0.50
 
-    # Embedding Configuration
+    # Embedding & Hybrid Search Configuration
     EMBEDDING_ENABLED: bool = True
     EMBEDDING_MODEL: str = "nomic-embed-text"
     SEMANTIC_RETRIEVAL_TOP_N: int = 150
     SIMILAR_CANDIDATE_THRESHOLD: float = 0.85
     SIMILAR_CANDIDATE_MAX_MATCHES: int = 5
+    HNSW_EF_SEARCH: int = 100
+    HYBRID_RETRIEVAL_ALPHA: float = 0.5
+    RRF_K_CONSTANT: float = 60.0
 
     # Recommendation Engine Configuration
     CAREER_TRANSITION_MIN_OVERLAP: float = 40.0
@@ -227,6 +234,44 @@ class Settings(BaseSettings):
             raise ValueError("CV_QUEUE_MAX_SIZE must be at least 1.")
         if self.RULE_CONFIG_RETRY_INTERVAL_SECONDS <= 0:
             raise ValueError("RULE_CONFIG_RETRY_INTERVAL_SECONDS must be greater than zero.")
+        if self.LLM_ENABLED or self.EMBEDDING_ENABLED:
+            parsed_ollama_url = urlsplit(self.OLLAMA_BASE_URL.strip())
+            if parsed_ollama_url.scheme not in {"http", "https"} or not parsed_ollama_url.netloc:
+                raise ValueError("OLLAMA_BASE_URL must be an absolute HTTP or HTTPS URL when Ollama features are enabled.")
+        if self.LLM_ENABLED and not self.OLLAMA_MODEL.strip():
+            raise ValueError("OLLAMA_MODEL must be configured when LLM generation is enabled.")
+        if self.EMBEDDING_ENABLED and not self.EMBEDDING_MODEL.strip():
+            raise ValueError("EMBEDDING_MODEL must be configured when embeddings are enabled.")
+        ollama_timeouts = (
+            self.OLLAMA_REQUEST_TIMEOUT,
+            self.OLLAMA_CONNECT_TIMEOUT_SECONDS,
+            self.OLLAMA_TAGS_TIMEOUT_SECONDS,
+            self.OLLAMA_GENERATE_TIMEOUT_SECONDS,
+            self.OLLAMA_EMBED_TIMEOUT_SECONDS,
+            self.OLLAMA_UNLOAD_TIMEOUT_SECONDS,
+            self.OLLAMA_LOCK_TIMEOUT_SECONDS,
+            self.OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS,
+        )
+        if min(ollama_timeouts) <= 0:
+            raise ValueError("Ollama request, operation, lock, and circuit-breaker timeouts must be greater than zero.")
+        if self.OLLAMA_MAX_RETRIES < 0 or self.OLLAMA_RETRY_BACKOFF_SECONDS < 0 or self.OLLAMA_RETRY_JITTER_SECONDS < 0:
+            raise ValueError("Ollama retry count, backoff, and jitter must not be negative.")
+        if min(self.OLLAMA_MAX_CONNECTIONS, self.OLLAMA_MAX_KEEPALIVE_CONNECTIONS, self.OLLAMA_MAX_RESPONSE_BYTES) <= 0:
+            raise ValueError("Ollama connection limits and maximum response size must be greater than zero.")
+        if self.OLLAMA_MAX_KEEPALIVE_CONNECTIONS > self.OLLAMA_MAX_CONNECTIONS:
+            raise ValueError("OLLAMA_MAX_KEEPALIVE_CONNECTIONS must not exceed OLLAMA_MAX_CONNECTIONS.")
+        if min(self.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD, self.OLLAMA_EMBED_BATCH_SIZE, self.OLLAMA_EMBED_MIN_SPLIT_SIZE) <= 0:
+            raise ValueError("Ollama circuit-breaker threshold and embedding batch limits must be greater than zero.")
+        if self.OLLAMA_EMBEDDING_EXPECTED_DIMENSION < 0 or self.OLLAMA_EMBEDDING_MAX_DIMENSION <= 0:
+            raise ValueError("Ollama embedding dimensions must use a non-negative expected value and a positive maximum.")
+        if self.OLLAMA_EMBEDDING_EXPECTED_DIMENSION > self.OLLAMA_EMBEDDING_MAX_DIMENSION:
+            raise ValueError("OLLAMA_EMBEDDING_EXPECTED_DIMENSION must not exceed OLLAMA_EMBEDDING_MAX_DIMENSION.")
+        if min(self.OLLAMA_GENERATION_NUM_CTX, self.OLLAMA_GENERATION_NUM_PREDICT, self.OLLAMA_OPTIMIZED_NUM_CTX, self.OLLAMA_OPTIMIZED_NUM_PREDICT) <= 0:
+            raise ValueError("Ollama generation context and output limits must be greater than zero.")
+        if self.OLLAMA_GENERATION_NUM_PREDICT >= self.OLLAMA_GENERATION_NUM_CTX:
+            raise ValueError("OLLAMA_GENERATION_NUM_PREDICT must be smaller than OLLAMA_GENERATION_NUM_CTX.")
+        if self.OLLAMA_OPTIMIZED_NUM_PREDICT >= self.OLLAMA_OPTIMIZED_NUM_CTX:
+            raise ValueError("OLLAMA_OPTIMIZED_NUM_PREDICT must be smaller than OLLAMA_OPTIMIZED_NUM_CTX.")
         if self.EXTRACTION_TIMEOUT_SECONDS <= 0 or self.SCANNED_EXTRACTION_TIMEOUT_SECONDS <= 0:
             raise ValueError("Document extraction timeouts must be greater than zero.")
         if max(self.EXTRACTION_TIMEOUT_SECONDS, self.SCANNED_EXTRACTION_TIMEOUT_SECONDS) >= self.RQ_JOB_TIMEOUT_SECONDS:

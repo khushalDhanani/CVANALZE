@@ -81,7 +81,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:4b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
     key2 = LLMCacheRepository.compute_composite_hash(
@@ -89,7 +89,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:4b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
     assert key1 == key2
@@ -100,7 +100,7 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:4b",
+        model_version="llama3.2:3b",
         matching_version="3.1",
     )
     assert key1 != key3
@@ -115,9 +115,15 @@ def test_composite_cache_hash_and_repository(tmp_path, monkeypatch):
             OptimizedVacancyMatch(
                 vacancy_id=101,
                 semantic_reason="Strong fit for Python Dev",
+                top_strength="The CV documents production Python work that directly matches the vacancy's Python requirement. This is the clearest role-specific strength in the supplied evidence.",
+                main_concern="The CV does not state the deployment scale expected by the vacancy. Recruiters should verify production ownership and traffic volume rather than infer them.",
+                ai_match_explanation="The high score reflects the explicit Python overlap between the CV and vacancy. The score remains limited by the missing deployment-scale evidence.",
                 semantic_fit_score=90.0,
+                requirement_assessments=[],
             )
         ],
+        active_vacancy_summary="Python vacancy evaluated.",
+        ai_career_summary="Backend engineering profile.",
     )
 
     LLMCacheRepository.save_cached_object(key1, sample_response)
@@ -140,7 +146,13 @@ def test_build_optimized_match_prompt():
             "title": "Backend Engineer",
             "department": "Engineering",
             "required_skills": ["Python", "FastAPI"],
+            "required_skills_are_mandatory": False,
             "education": "Configured Degree",
+            "technologies": ["Docker"],
+            "responsibilities": ["Build APIs"],
+            "description": "Own backend services",
+            "max_experience_years": 8,
+            "max_ctc": 25,
         }
     ]
 
@@ -150,10 +162,44 @@ def test_build_optimized_match_prompt():
         prompt, token_est, char_count = build_optimized_match_prompt(cv_text, vacancies)
     prompt_input = mock_get_prompt.call_args.args[1]["input_json"]
     assert '"education_req":["Configured Degree"]' in prompt_input
+    assert '"required_skills_are_mandatory":false' in prompt_input
+    assert '"technologies":["Docker"]' in prompt_input
+    assert '"responsibilities":["Build APIs"]' in prompt_input
+    assert '"description":"Own backend services"' in prompt_input
+    assert '"max_exp":8' in prompt_input
+    assert '"max_ctc":25' in prompt_input
     assert "John Doe" in prompt
     assert "Backend Engineer" in prompt
     assert token_est > 0
     assert char_count > 0
+
+
+def test_optimized_response_rejects_shallow_payloads():
+    with pytest.raises(ValueError):
+        OptimizedLLMMatchResponse.model_validate({})
+
+    with pytest.raises(ValueError):
+        OptimizedLLMMatchResponse.model_validate(
+            {
+                "candidate_profile": {},
+                "matched_vacancies": [{"vacancy_id": 1}],
+            }
+        )
+
+
+def test_optimized_vacancy_match_rejects_single_sentence_decision_narratives():
+    single_sentence = "The CV lists Python and the vacancy requires Python, but this single sentence is not detailed enough for a recruiter."
+
+    with pytest.raises(ValueError, match="two or three complete sentences"):
+        OptimizedVacancyMatch(
+            vacancy_id=101,
+            semantic_reason="Python overlap.",
+            top_strength=single_sentence,
+            main_concern="The CV does not state deployment scale. Recruiters should verify production ownership.",
+            ai_match_explanation="The score reflects the Python match. Missing deployment evidence limits confidence.",
+            semantic_fit_score=80.0,
+            requirement_assessments=[],
+        )
 
 
 @pytest.mark.asyncio
@@ -181,9 +227,15 @@ async def test_end_to_end_optimized_match_service(monkeypatch):
             OptimizedVacancyMatch(
                 vacancy_id=101,
                 semantic_reason="Strong React experience matches Frontend requirement.",
+                top_strength="The CV explicitly lists React experience, matching the vacancy's frontend framework requirement. This is the strongest documented role-specific overlap.",
+                main_concern="The CV does not quantify production ownership for the React work required by the vacancy. Recruiters should verify project scale and individual contribution.",
+                ai_match_explanation="The score is driven by the direct React match between the CV and vacancy. It is constrained by the absence of quantified delivery evidence in the CV.",
                 semantic_fit_score=85.0,
+                requirement_assessments=[],
             )
         ],
+        active_vacancy_summary="Frontend vacancy evaluated.",
+        ai_career_summary="Frontend engineering profile.",
     )
 
     monkeypatch.setattr(

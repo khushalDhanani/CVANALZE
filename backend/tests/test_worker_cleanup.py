@@ -16,6 +16,7 @@ def test_worker_uses_one_isolated_rq_worker_for_the_cv_queue():
         patch.object(start_worker.Redis, "from_url", return_value=redis_connection),
         patch.object(start_worker, "Queue", side_effect=lambda name, connection: (name, connection)),
         patch.object(start_worker, "RuntimeDependencyWorker", return_value=worker) as worker_class,
+        patch.object(start_worker, "build_rq_worker_name", return_value="cv-worker-unique") as worker_name,
         patch.object(start_worker, "wait_for_cv_runtime_dependencies") as wait_for_dependencies,
         patch.object(start_worker.settings, "CV_PROCESSING_CONCURRENCY", 1),
         patch.object(start_worker.settings, "RQ_WORKER_MAX_JOBS", 0),
@@ -25,7 +26,8 @@ def test_worker_uses_one_isolated_rq_worker_for_the_cv_queue():
     worker_class.assert_called_once()
     wait_for_dependencies.assert_called_once_with(process_name="CV_WORKER")
     assert worker_class.call_args.args[0] == [(start_worker.settings.RQ_QUEUE_NAME, redis_connection)]
-    assert worker_class.call_args.kwargs["name"] == "cv-processing-worker-1"
+    worker_name.assert_called_once_with(f"{start_worker.settings.RQ_QUEUE_NAME}-worker")
+    assert worker_class.call_args.kwargs["name"] == "cv-worker-unique"
     assert worker_class.call_args.kwargs["maintenance_interval"] == start_worker.settings.RQ_MAINTENANCE_INTERVAL_SECONDS
     assert worker_class.call_args.kwargs["work_horse_killed_handler"] is start_worker.handle_work_horse_killed
     worker.work.assert_called_once_with(with_scheduler=True)

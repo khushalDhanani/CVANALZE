@@ -32,6 +32,7 @@ class ProcessingJobRepository:
 
     @classmethod
     def get(cls, job_id: str) -> ProcessingJobRecord | None:
+        db_exc: Exception | None = None
         if PostgresAppSession is not None:
             try:
                 with PostgresAppSession() as session:
@@ -41,12 +42,19 @@ class ProcessingJobRepository:
                         cls._save_cache(record)
                         return record
             except Exception as exc:
-                cls._raise_database_error("read", exc)
-        return cls._validate(processing_job_cache_manager.get(f"job_{job_id}"))
+                db_exc = exc
+
+        cached = cls._validate(processing_job_cache_manager.get(f"job_{job_id}"))
+        if cached:
+            return cached
+        if db_exc is not None:
+            cls._raise_database_error("read", db_exc)
+        return None
 
     @classmethod
     def get_by_cv_key(cls, cv_key: str) -> ProcessingJobRecord | None:
         keys = cls._identity_keys(cv_key)
+        db_exc: Exception | None = None
         if PostgresAppSession is not None:
             try:
                 with PostgresAppSession() as session:
@@ -67,13 +75,17 @@ class ProcessingJobRepository:
                         cls._save_cache(record)
                         return record
             except Exception as exc:
-                cls._raise_database_error("read by CV key", exc)
+                db_exc = exc
 
         for key in keys:
             alias = hashlib.sha256(key.encode("utf-8")).hexdigest()
             record = cls._validate(processing_job_cache_manager.get(f"cv_{alias}"))
             if record:
                 return record
+
+        if db_exc is not None:
+            cls._raise_database_error("read by CV key", db_exc)
+
         return None
 
     @classmethod

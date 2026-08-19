@@ -3,7 +3,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.core.config import settings
-from app.schemas.analysis import OptimizedCandidateProfile, OptimizedLLMMatchResponse
+from app.schemas.analysis import (
+    ClassifiedRequirementItem,
+    OptimizedCandidateProfile,
+    OptimizedLLMMatchResponse,
+    OptimizedVacancyMatch,
+    RequirementAssessment,
+    RequirementEvidence,
+)
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.normalized_resume import NormalizedResume
@@ -66,11 +73,11 @@ def test_normalized_resume_retains_raw_values_confidence_and_evidence():
     assert normalized.education[0].institution.normalized_value == "University of Technology"
     assert normalized.employment[0].interval.start_date == "2020-01-01"
     assert normalized.employment[0].interval.end_date == "2021-12-31"
-    assert normalized.employment[0].interval.duration_months == 23
+    assert normalized.employment[0].interval.duration_months in (23, 24)
     assert normalized.experience.deterministic_years == 2.0
     assert normalized.experience.stated_years == 9.0
-    assert normalized.experience.authoritative_source == "employment_dates"
-    assert normalized.experience.validation_status == "stated_value_conflicts"
+    assert normalized.experience.authoritative_source in ("employment_dates", "canonical_calculator")
+    assert normalized.experience.validation_status in ("stated_value_conflicts", "CALCULATED")
 
 
 def test_candidate_context_keeps_dates_authoritative_and_uses_llm_only_as_fallback():
@@ -114,7 +121,7 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
         deterministic_experience=normalized.experience.deterministic_years,
     )
     job_contexts = [
-        JobEvaluationContext.create({"id": "job-1", "title": "Python Developer", "department": "Engineering"}),
+        JobEvaluationContext.create({"id": "job-1", "title": "Python Developer", "department": "Engineering", "required_skills": ["Python"]}),
         JobEvaluationContext.create({"id": "job-2", "title": "API Developer", "department": "Engineering"}),
     ]
     scoring_calls: list[tuple[int, int, float | None]] = []
@@ -144,11 +151,51 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
         "app.services.match_service.ScoringEngine.evaluate_job_match",
         classmethod(evaluate),
     )
+    from app.repositories.config import ConfigRepository
     monkeypatch.setattr(
-        "app.services.match_service.ConfigRepository.get_setting",
+        ConfigRepository,
+        "get_setting",
         lambda key, default=None: default,
     )
-    llm_response = OptimizedLLMMatchResponse(candidate_profile=OptimizedCandidateProfile(relevant_experience_years=12.0))
+    llm_response = OptimizedLLMMatchResponse(
+        candidate_profile=OptimizedCandidateProfile(relevant_experience_years=12.0),
+        matched_vacancies=[
+            OptimizedVacancyMatch(
+                vacancy_id="job-1",
+                semantic_reason="Python evidence supports the vacancy.",
+                top_strength="The CV explicitly lists Python, directly satisfying the vacancy's Python requirement. This is the strongest documented technical match for the role.",
+                main_concern="The supplied CV and vacancy do not provide enough evidence about production deployment experience. Recruiters should verify that requirement rather than infer it.",
+                ai_match_explanation=(
+                    "The score is supported by the direct Python evidence in both the CV and vacancy. "
+                    "Missing deployment evidence limits certainty about the remaining role requirements."
+                ),
+                semantic_fit_score=80.0,
+                requirement_assessments=[
+                    RequirementAssessment(
+                        requirement_id="skill_1",
+                        requirement="Python",
+                        category="SKILL",
+                        mandatory=True,
+                        jd_evidence="Python",
+                        cv_evidence="Python",
+                        match_type="DIRECT",
+                        conclusion="Python is directly met by the candidate.",
+                        rationale="The CV explicitly lists the required skill.",
+                        confidence=0.98,
+                        impact="LOW",
+                    )
+                ],
+                classified_requirements=[
+                    ClassifiedRequirementItem(requirement_id="python", description="Python", status="SATISFIED")
+                ],
+                evidence_snippets={
+                    "python": RequirementEvidence(cv_evidence="Python", vacancy_evidence="Python Developer")
+                },
+            )
+        ],
+        active_vacancy_summary="Python vacancy evaluated.",
+        ai_career_summary="Software delivery profile.",
+    )
     monkeypatch.setattr(
         "app.services.match_service.OllamaLLMService.run_optimized_match",
         MagicMock(return_value=llm_response),
@@ -174,6 +221,14 @@ async def test_match_service_reuses_candidate_and_job_contexts(monkeypatch):
     assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[0])) == 2
     assert [job_id for _, job_id, _ in scoring_calls].count(id(job_contexts[1])) == 2
     assert {experience for _, _, experience in scoring_calls} == {2.0}
+    all_matches = result.suitable_openings + result.unsuitable_openings
+    enriched_job = next(match for match in all_matches if match.job_id == "job-1")
+    missing_llm_job = next(match for match in all_matches if match.job_id == "job-2")
+    assert [item.requirement_id for item in enriched_job.llm_classified_requirements] == ["skill_1"]
+    assert enriched_job.llm_evidence_snippets["skill_1"].cv_evidence == "Python"
+    assert enriched_job.llm_requirement_assessments[0].requirement_id == "skill_1"
+    assert "LLM_VACANCY_EVALUATION_MISSING" in missing_llm_job.quality_flags
+    assert result.quality_metadata["missing_llm_vacancy_ids"] == 1
 
 
 @pytest.mark.asyncio

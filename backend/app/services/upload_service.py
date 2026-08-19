@@ -35,11 +35,24 @@ class UploadTooLargeError(UploadValidationError):
         )
 
 
+_WINDOWS_RESERVED_NAMES = frozenset({
+    "CON", "PRN", "AUX", "NUL",
+    *(f"COM{i}" for i in range(1, 10)),
+    *(f"LPT{i}" for i in range(1, 10)),
+})
+
+_SYNTHETIC_STORAGE_PATTERN = re.compile(
+    r"^(?:\d{8,12}_)?(?:CandidateCVFileName|CandidatePhotoFileName|[A-Za-z0-9]+_CandidateCV)_[0-9A-Za-z_]+$",
+    re.IGNORECASE,
+)
+
+
 @dataclass(frozen=True)
 class NormalizedFilename:
     original_filename: str
     safe_filename: str
     extension: str
+    display_filename: str = ""
 
 
 @dataclass(frozen=True)
@@ -54,6 +67,7 @@ class AcceptedUpload:
     content: bytes
     path: Path
     was_already_stored: bool
+    display_filename: str = ""
 
 
 @dataclass(frozen=True)
@@ -63,6 +77,8 @@ class StoredUpload:
     detected_content_type: str
     content: bytes
     path: Path
+    original_filename: str = ""
+    display_filename: str = ""
 
 
 class UploadService:
@@ -70,14 +86,40 @@ class UploadService:
     _REQUIRED_DOCX_ENTRIES = {"[Content_Types].xml", "_rels/.rels", "word/document.xml"}
 
     @classmethod
-    def normalize_filename(cls, filename: str | None) -> NormalizedFilename:
-        if not filename or not filename.strip():
-            raise UploadValidationError("Filename is required.", code="filename_required")
+    def sanitize_original_filename(cls, filename: str | None, default_stem: str = "CV") -> str:
+        """Sanitize raw client filename while preserving Unicode and human readability."""
+        if not filename or not str(filename).strip():
+            return f"{default_stem}.pdf"
 
-        basename = PurePosixPath(filename.replace("\\", "/")).name
+        # Remove null bytes and ASCII control characters
+        cleaned = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", str(filename).strip())
+        cleaned = cleaned.replace("\\", "/").split("/")[-1].strip()
+        cleaned = unicodedata.normalize("NFC", cleaned)
+
+        # Ensure non-empty base
+        if not cleaned or cleaned in {".", ".."}:
+            return f"{default_stem}.pdf"
+
+        return cleaned[:255]
+
+    @classmethod
+    def normalize_filename(cls, filename: str | None, *, default_name: str | None = None) -> NormalizedFilename:
+        if not filename or not str(filename).strip():
+            if default_name:
+                filename = default_name
+            else:
+                raise UploadValidationError("Filename is required.", code="filename_required")
+
+        clean_original = cls.sanitize_original_filename(filename, default_stem="document")
+        basename = PurePosixPath(clean_original.replace("\\", "/")).name
         extension = Path(basename).suffix.lower().lstrip(".")
         if not extension:
-            raise UploadValidationError("Filename must have a valid extension.", code="extension_required")
+            if clean_original.lower().endswith(".pdf"):
+                extension = "pdf"
+            elif clean_original.lower().endswith(".docx"):
+                extension = "docx"
+            else:
+                raise UploadValidationError("Filename must have a valid extension.", code="extension_required")
         if extension not in settings.ALLOWED_EXTENSIONS:
             allowed = ", ".join(sorted(settings.ALLOWED_EXTENSIONS))
             raise UploadValidationError(
@@ -85,15 +127,28 @@ class UploadService:
                 code="unsupported_extension",
             )
 
-        stem = Path(basename).stem
-        ascii_stem = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode("ascii")
+        raw_stem = Path(basename).stem
+        if raw_stem.upper() in _WINDOWS_RESERVED_NAMES:
+            raw_stem = f"doc_{raw_stem}"
+
+        ascii_stem = unicodedata.normalize("NFKD", raw_stem).encode("ascii", "ignore").decode("ascii")
         safe_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", ascii_stem).strip("._-")
         stem_limit = max(1, settings.UPLOAD_FILENAME_MAX_CHARS - len(extension) - 1)
         safe_stem = safe_stem[:stem_limit].rstrip("._-") or "document"
+
+        safe_filename = f"{safe_stem}.{extension}"
+
+        # Determine recruiter display filename
+        if _SYNTHETIC_STORAGE_PATTERN.match(raw_stem):
+            display_filename = f"Candidate_CV.{extension}"
+        else:
+            display_filename = clean_original
+
         return NormalizedFilename(
-            original_filename=filename,
-            safe_filename=f"{safe_stem}.{extension}",
+            original_filename=clean_original,
+            safe_filename=safe_filename,
             extension=extension,
+            display_filename=display_filename,
         )
 
     @classmethod
@@ -144,6 +199,7 @@ class UploadService:
             content=content,
             path=path,
             was_already_stored=was_already_stored,
+            display_filename=normalized.display_filename,
         )
 
     @classmethod
@@ -520,4 +576,6 @@ class UploadService:
             detected_content_type=detected_content_type,
             content=content,
             path=path,
+            original_filename=normalized.original_filename,
+            display_filename=normalized.display_filename,
         )

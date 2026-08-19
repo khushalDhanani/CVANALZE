@@ -69,13 +69,13 @@ def test_llm_cache_entry_excludes_sensitive_prompt_and_reasoning():
         processing_time_ms=1234.56,
         token_count=450,
         inference_time_ms=1200000,
-        model="gemma3:4b",
+        model="llama3.2:3b",
         prompt_version="3.0",
     )
 
     key = LLMCacheRepository.extraction_cache_key(
         prompt_version="3.0",
-        model_version="gemma3:4b",
+        model_version="llama3.2:3b",
         extraction_version="1.0.0",
     )
 
@@ -108,9 +108,15 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
             OptimizedVacancyMatch(
                 vacancy_id=101,
                 semantic_reason="Strong fit for Python Dev",
+                top_strength="The CV documents Python work that directly matches the vacancy's Python requirement. This is the strongest role-specific evidence in the supplied records.",
+                main_concern="The CV does not describe the production scale required by the vacancy. Recruiters should verify deployment ownership rather than assume it from the skill match.",
+                ai_match_explanation="The score reflects the explicit Python overlap between the CV and vacancy. Missing production-scale evidence prevents a fully supported assessment.",
                 semantic_fit_score=90.0,
+                requirement_assessments=[],
             )
         ],
+        active_vacancy_summary="Python vacancy evaluated.",
+        ai_career_summary="Backend engineering profile.",
     )
 
     entry = LLMCacheEntry(
@@ -121,7 +127,7 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
         processing_time_ms=500.0,
         token_count=200,
         inference_time_ms=450000,
-        model="gemma3:4b",
+        model="llama3.2:3b",
         prompt_version="3.0",
     )
 
@@ -130,7 +136,7 @@ def test_llm_cache_entry_roundtrip_reconstructs_validated_object():
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:4b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
 
@@ -154,9 +160,15 @@ def test_llm_cache_entry_backward_compatible():
             OptimizedVacancyMatch(
                 vacancy_id=101,
                 semantic_reason="Strong fit for Python Dev",
+                top_strength="The CV documents Python work that directly matches the vacancy's Python requirement. This is the strongest role-specific evidence in the supplied records.",
+                main_concern="The CV does not describe the production scale required by the vacancy. Recruiters should verify deployment ownership rather than assume it from the skill match.",
+                ai_match_explanation="The score reflects the explicit Python overlap between the CV and vacancy. Missing production-scale evidence prevents a fully supported assessment.",
                 semantic_fit_score=90.0,
+                requirement_assessments=[],
             )
         ],
+        active_vacancy_summary="Python vacancy evaluated.",
+        ai_career_summary="Backend engineering profile.",
     )
 
     key = LLMCacheRepository.compute_composite_hash(
@@ -164,7 +176,7 @@ def test_llm_cache_entry_backward_compatible():
         candidate_id="42",
         vacancy_ids=["101"],
         prompt_version="3.0",
-        model_version="gemma3:4b",
+        model_version="llama3.2:3b",
         matching_version="3.0",
     )
 

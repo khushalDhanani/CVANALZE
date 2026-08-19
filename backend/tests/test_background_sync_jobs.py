@@ -1,5 +1,6 @@
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from app.core import background_tasks
 from app.core.config import settings
@@ -36,6 +37,55 @@ def test_scheduler_preserves_unexpected_register_death_errors(monkeypatch):
 
     with pytest.raises(RuntimeError, match="unexpected"):
         scheduler.register_death()
+
+
+def test_scheduler_retries_after_redis_enqueue_timeout(monkeypatch):
+    scheduler = object.__new__(ResilientCronScheduler)
+    monkeypatch.setattr(
+        CronScheduler,
+        "enqueue_jobs",
+        lambda _self: (_ for _ in ()).throw(RedisTimeoutError("timed out")),
+    )
+    monkeypatch.setattr("start_scheduler.time.monotonic", lambda: 100.0)
+
+    assert scheduler.enqueue_jobs() == []
+    assert scheduler._redis_retry_after == 105.0
+
+
+def test_scheduler_delays_an_overdue_retry_after_redis_failure(monkeypatch):
+    scheduler = object.__new__(ResilientCronScheduler)
+    scheduler._redis_retry_after = 105.0
+    monkeypatch.setattr(CronScheduler, "calculate_sleep_interval", lambda _self: 0.0)
+    monkeypatch.setattr("start_scheduler.time.monotonic", lambda: 101.0)
+
+    assert scheduler.calculate_sleep_interval() == 4.0
+
+
+@pytest.mark.parametrize("operation", ["save_jobs_data", "heartbeat"])
+def test_scheduler_survives_redis_timeout_in_runtime_operations(monkeypatch, operation):
+    scheduler = object.__new__(ResilientCronScheduler)
+    monkeypatch.setattr(
+        CronScheduler,
+        operation,
+        lambda _self: (_ for _ in ()).throw(RedisTimeoutError("timed out")),
+    )
+    monkeypatch.setattr("start_scheduler.time.monotonic", lambda: 100.0)
+
+    getattr(scheduler, operation)()
+
+    assert scheduler._redis_retry_after == 105.0
+
+
+def test_scheduler_preserves_unexpected_enqueue_errors(monkeypatch):
+    scheduler = object.__new__(ResilientCronScheduler)
+    monkeypatch.setattr(
+        CronScheduler,
+        "enqueue_jobs",
+        lambda _self: (_ for _ in ()).throw(RuntimeError("unexpected")),
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        scheduler.enqueue_jobs()
 
 
 def test_scheduler_registers_reconciliation_sync_and_validation_snapshot_jobs(monkeypatch):

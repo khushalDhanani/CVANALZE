@@ -38,6 +38,9 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+filterwarnings = [
+    "ignore:.*httpx.*starlette.testclient.*:starlette.exceptions.StarletteDeprecationWarning",
+]
 markers = [
     "integration: requires explicitly provisioned external services",
     "ollama_live: requires explicit live Ollama authorization and runs serially",

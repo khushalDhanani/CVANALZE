@@ -13,6 +13,7 @@ import {
   DenseRow,
   ErrorBanner,
   EmptyState,
+  PageHeader,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
 import { SIMILARITY_CONFIG } from '@/constants/similarity';
@@ -105,22 +106,15 @@ export default function DomainExplorerScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Breadcrumbs items={[{ label: 'Domain Explorer' }]} />
 
-      {/* Sticky Header */}
-      <View className="flex-row items-center justify-between px-3 py-2.5 bg-surface border-b border-border">
-        <View className="flex-row items-center gap-2">
-          <BookOpen size={18} color={COLORS.primary} />
-          <View>
-            <Text className="text-base font-sans-bold text-text-primary">Domain Explorer</Text>
-            <Text className="text-[11px] font-sans text-text-muted">
-              Semantic Equivalents & Domain Knowledge Discovery
-            </Text>
-          </View>
-        </View>
-      </View>
+      <PageHeader
+        title="Domain Explorer"
+        subtitle="Semantic Equivalents & Domain Knowledge Discovery"
+        leading={<BookOpen size={18} color={COLORS.primary} />}
+      />
 
-      <ScrollView className="flex-1 px-3 py-4">
+      <ScrollView className="flex-1 px-3 py-3">
         {/* Search Panel */}
-        <Card className="gap-4 mb-4">
+        <Card className="gap-3 mb-3">
           <Text className="text-xs font-sans-bold text-text-primary uppercase tracking-wider">
             Semantic Equivalents Lookup
           </Text>

@@ -358,11 +358,17 @@ class DocumentConversionService:
             if remaining <= 0:
                 return None
             if receiver.poll(min(0.1, remaining)):
-                return receiver.recv()
+                try:
+                    return receiver.recv()
+                except EOFError:
+                    raise RuntimeError("Document extraction process closed pipe before sending result.")
             if not process.is_alive():
                 process.join(timeout=_PROCESS_SHUTDOWN_GRACE_SECONDS)
                 if receiver.poll():
-                    return receiver.recv()
+                    try:
+                        return receiver.recv()
+                    except EOFError:
+                        pass
                 raise RuntimeError(f"Document extraction process exited unexpectedly with code {process.exitcode}.")
 
     @staticmethod

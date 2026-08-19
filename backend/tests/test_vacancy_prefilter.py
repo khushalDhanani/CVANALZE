@@ -28,6 +28,7 @@ def test_candidate_search_context_creation():
     assert ctx.candidate_experience == 5.0
     assert ctx.cand_domain is not None
     assert isinstance(ctx.cand_families, list)
+    assert 0.0 <= ctx.taxonomy_confidence <= 1.0
 
 
 def test_reciprocal_rank_fusion_service():
@@ -69,22 +70,32 @@ def test_reciprocal_rank_fusion_service():
 
 
 def test_vacancy_prefilter_adaptive_retrieval_skip():
+    from unittest.mock import patch
+    from app.services.vacancy_prefilter import CandidateSearchContext
+    
     jobs = [
         {
             "id": f"job-{i}",
             "title": "Software Developer",
             "department": "Engineering",
+            "_precomputed_job_family": "Engineering",
+            "_precomputed_domain": "Engineering",
             "required_skills": ["Python"],
         }
         for i in range(5)
     ]
 
-    # Filter with top_k=10 (limit > len(jobs))
-    filtered = VacancyPreFilter.filter_vacancies(
-        cv_text="Software Developer with Python skills.",
-        openings=jobs,
-        top_k=10,
-    )
+    mock_ctx = CandidateSearchContext.create(cv_text="")
+    mock_ctx.cand_domain = "Engineering"
+    mock_ctx.cand_families = ["Engineering"]
+    mock_ctx.taxonomy_confidence = 1.0
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        # Filter with top_k=10 (limit > len(jobs))
+        filtered = VacancyPreFilter.filter_vacancies(
+            cv_text="Software Developer with Python skills.",
+            openings=jobs,
+            top_k=10,
+        )
 
     # Adaptive retrieval skips stages and returns all 5 jobs immediately
     assert len(filtered) == 5
@@ -92,6 +103,8 @@ def test_vacancy_prefilter_adaptive_retrieval_skip():
 
 
 def test_vacancy_prefilter_end_to_end_ranking():
+    from unittest.mock import patch
+    from app.services.vacancy_prefilter import CandidateSearchContext
     jobs = [
         {
             "id": "job-py",
@@ -118,12 +131,18 @@ def test_vacancy_prefilter_end_to_end_ranking():
 
     cv_text = "Senior Python Engineer with 5 years of experience in FastAPI and PostgreSQL backend development."
 
-    filtered = VacancyPreFilter.filter_vacancies(
-        cv_text=cv_text,
-        openings=jobs,
-        candidate_experience=5.0,
-        top_k=2,
-    )
+    mock_ctx = CandidateSearchContext.create(cv_text=cv_text)
+    mock_ctx.cand_domain = "Information Technology"
+    mock_ctx.cand_families = ["IT & Software Services"]
+    mock_ctx.taxonomy_confidence = 1.0
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        filtered = VacancyPreFilter.filter_vacancies(
+            cv_text=cv_text,
+            openings=jobs,
+            candidate_experience=5.0,
+            top_k=2,
+            cv_embedding=[0.1] * 384,  # Stub embedding for test
+        )
 
     assert len(filtered) <= 2
     # The Python job must be ranked first due to Stage 0 taxonomy + lexical token matching
@@ -144,3 +163,166 @@ def test_single_pgvector_query_cache():
     assert res1 is res2
     cache_info = PgVectorQueryCache.query_pgvector_cached.cache_info()
     assert cache_info.hits >= 1
+
+
+def test_stage_0_known_domain_compatible_vacancies():
+    from unittest.mock import patch
+    from app.services.vacancy_prefilter import CandidateSearchContext
+    jobs = [
+        {"id": "1", "department": "Information Technology", "_precomputed_job_family": "CIS Team", "_precomputed_domain": "Information Technology"},
+        {"id": "2", "department": "Finance", "_precomputed_job_family": "Finance Team", "_precomputed_domain": "Finance"},
+    ]
+    mock_ctx = CandidateSearchContext.create(cv_text="")
+    mock_ctx.cand_domain = "Information Technology"
+    mock_ctx.cand_families = ["CIS Team"]
+    mock_ctx.taxonomy_confidence = 1.0
+    
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        filtered = VacancyPreFilter.filter_vacancies(cv_text="", openings=jobs, top_k=5)
+        
+    assert len(filtered) == 1
+    assert filtered[0]["id"] == "1"
+
+
+def test_stage_0_known_domain_zero_compatible():
+    from unittest.mock import patch
+    from app.services.vacancy_prefilter import CandidateSearchContext
+    jobs = [{"id": "1", "_precomputed_job_family": "Finance Team", "_precomputed_domain": "Finance"}]
+    mock_ctx = CandidateSearchContext.create(cv_text="")
+    mock_ctx.cand_domain = "Information Technology"
+    mock_ctx.cand_families = ["Engineering"]
+    mock_ctx.taxonomy_confidence = 1.0
+    
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        filtered = VacancyPreFilter.filter_vacancies(cv_text="", openings=jobs, top_k=5)
+        
+    assert len(filtered) == 0
+
+
+def test_stage_0_unknown_domain():
+    from unittest.mock import patch
+    from app.services.vacancy_prefilter import CandidateSearchContext
+    jobs = [{"id": "1", "vac_family": "Finance Team", "vac_tax_domain": "Finance"}]
+    mock_ctx = CandidateSearchContext.create(cv_text="")
+    mock_ctx.cand_domain = "Unknown"
+    mock_ctx.cand_families = ["Unknown"]
+    mock_ctx.taxonomy_confidence = 0.0
+    
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        filtered = VacancyPreFilter.filter_vacancies(cv_text="", openings=jobs, top_k=5)
+
+    assert [job["id"] for job in filtered] == ["1"]
+
+
+def test_stage_0_low_confidence_domain_uses_broad_fallback():
+    from unittest.mock import patch
+
+    jobs = [
+        {"id": "1", "_precomputed_job_family": "CIS Team", "_precomputed_domain": "Information Technology"},
+        {"id": "2", "_precomputed_job_family": "Finance Team", "_precomputed_domain": "Finance"},
+    ]
+    mock_ctx = CandidateSearchContext(cv_text="", cv_lower="", cv_tokens=set())
+    mock_ctx.cand_domain = "Information Technology"
+    mock_ctx.cand_families = ["CIS Team"]
+    mock_ctx.taxonomy_confidence = 0.3
+
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        filtered = VacancyPreFilter.filter_vacancies(cv_text="", openings=jobs, top_k=5)
+
+    assert {job["id"] for job in filtered} == {"1", "2"}
+
+
+def test_ambiguous_cross_family_vacancy_survives_on_lexical_evidence():
+    from unittest.mock import patch
+
+    jobs = [
+        {
+            "id": "a-relevant",
+            "title": "Control Engineer",
+            "required_skills": ["SCADA"],
+            "_precomputed_job_family": "Control & Instrumentation",
+            "_precomputed_domain": "Plant Operations",
+        },
+        {
+            "id": "z-unrelated",
+            "title": "Accountant",
+            "required_skills": ["Ledger"],
+            "_precomputed_job_family": "Finance",
+            "_precomputed_domain": "Finance",
+        },
+    ]
+    mock_ctx = CandidateSearchContext(
+        cv_text="SCADA control systems",
+        cv_lower="scada control systems",
+        cv_tokens={"scada", "control", "systems"},
+        cand_domain="Engineering",
+        cand_families=["General Engineering"],
+        taxonomy_confidence=0.4,
+    )
+
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        filtered = VacancyPreFilter.filter_vacancies(cv_text=mock_ctx.cv_text, openings=jobs, top_k=1)
+
+    assert [job["id"] for job in filtered] == ["a-relevant"]
+
+
+def test_vector_top_n_does_not_permanently_exclude_lexical_candidate(monkeypatch):
+    from unittest.mock import patch
+
+    jobs = [
+        {
+            "id": "a-lexical",
+            "title": "Python Engineer",
+            "required_skills": ["Python"],
+            "_precomputed_job_family": "Engineering",
+            "_precomputed_domain": "Technology",
+        },
+        {
+            "id": "z-vector",
+            "title": "Accountant",
+            "required_skills": ["Ledger"],
+            "_precomputed_job_family": "Engineering",
+            "_precomputed_domain": "Technology",
+        },
+    ]
+    mock_ctx = CandidateSearchContext(
+        cv_text="Python",
+        cv_lower="python",
+        cv_tokens={"python"},
+        cv_embedding=[0.1, 0.2],
+        cand_domain="Technology",
+        cand_families=["Engineering"],
+        taxonomy_confidence=1.0,
+    )
+    monkeypatch.setattr("app.services.vacancy_prefilter.settings.EMBEDDING_ENABLED", True)
+    monkeypatch.setattr(
+        PgVectorQueryCache,
+        "query_pgvector_cached",
+        lambda *_args, **_kwargs: (("z-vector", 1, 0.1),),
+    )
+
+    with patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx):
+        filtered = VacancyPreFilter.filter_vacancies(cv_text="Python", openings=jobs, top_k=1)
+
+    assert [job["id"] for job in filtered] == ["a-lexical"]
+
+
+def test_stage_0_missing_taxonomy():
+    from unittest.mock import patch
+    import pytest
+    jobs = [{"id": "1", "vac_family": "Finance Team", "vac_tax_domain": "Finance"}]
+    
+    mock_ctx = CandidateSearchContext.create(cv_text="")
+    
+    class MockRules:
+        candidate_rules = []
+        canonical_domains = []
+        default_family = "Unknown"
+        semantic_match_threshold = 0.8
+        
+    with (
+        patch("app.services.vacancy_prefilter.CandidateSearchContext.create", return_value=mock_ctx),
+        patch("app.services.vacancy_prefilter.RuleConfigManager.get_taxonomy_rules", return_value=MockRules()),
+    ):
+        with pytest.raises(AnalysisUnavailableError, match="Taxonomy/configuration is unavailable"):
+            VacancyPreFilter.filter_vacancies(cv_text="", openings=jobs, top_k=5)

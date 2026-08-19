@@ -7,6 +7,7 @@ from typing import Any, TypeVar, cast
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from app.core.analysis_context import get_analysis_candidate, get_analysis_run_id
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.metrics import _metrics
@@ -24,9 +25,14 @@ from app.schemas.work_experience_llm import LLMWorkExperienceExtraction
 from app.services.ollama_transport import (
     OllamaError,
     OllamaGenerateEnvelope,
+    OllamaHTTPError,
     OllamaInvalidResponseError,
+    OllamaModelUnavailableError,
+    OllamaTimeoutError,
     OllamaTransport,
+    OllamaUnavailableError,
 )
+from app.services.tokenizer_service import TokenizerService
 from app.schemas.llm_trace import LLMExecutionTrace
 
 TModel = TypeVar("TModel", bound=BaseModel)
@@ -50,10 +56,23 @@ class _StructuredGeneration:
 
 class OllamaLLMService:
     _model_digests: dict[str, str] = {}
+    _thinking_model_families = frozenset({"deepseek-r1", "gpt-oss", "qwen3", "qwen3.5"})
 
     @staticmethod
     def _model_identifier_hash(model: str) -> str:
         return hashlib.sha256(model.strip().encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _supports_thinking(cls, model: str) -> bool:
+        model_family = model.strip().lower().split(":", 1)[0].rsplit("/", 1)[-1]
+        return model_family in cls._thinking_model_families
+
+    @staticmethod
+    def _remove_legacy_thinking_directive(prompt: str) -> tuple[str, bool]:
+        lines = prompt.splitlines()
+        if lines and lines[0].strip().lower() in {"/think", "/no_think"}:
+            return "\n".join(lines[1:]).lstrip(), True
+        return prompt, False
 
     @classmethod
     def _trace(
@@ -107,14 +126,39 @@ class OllamaLLMService:
 
     @classmethod
     def get_status(cls) -> tuple[bool, list[str]]:
-        """Return Ollama reachability and normalized models from one tags request."""
+        """Return configured-model readiness and installed models from one tags request."""
         try:
             result = OllamaTransport.get_tags()
             cls._model_digests = {model.name: model.digest for model in result.value.models if model.digest}
-            return True, [model.name for model in result.value.models]
+            model_names = [model.name for model in result.value.models]
+            missing_models: list[str] = []
+            if settings.LLM_ENABLED and not cls.is_model_available(settings.OLLAMA_MODEL, model_names):
+                missing_models.append(settings.OLLAMA_MODEL)
+            if settings.EMBEDDING_ENABLED and not cls.is_model_available(settings.EMBEDDING_MODEL, model_names):
+                missing_models.append(settings.EMBEDDING_MODEL)
+            if missing_models:
+                logger.error(
+                    f"[OLLAMA] operation=tags status=MODEL_MISSING missing_models={','.join(missing_models)} "
+                    f"available_model_count={len(model_names)}"
+                )
+            return not missing_models, model_names
         except OllamaError as exc:
-            logger.warning(f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__}")
+            logger.warning(
+                f"[OLLAMA] operation=tags status=FALLBACK error={type(exc).__name__} "
+                f"status_code={exc.status_code if exc.status_code is not None else 'none'} retryable={exc.retryable} detail={exc}"
+            )
             return False, []
+
+    @staticmethod
+    def is_model_available(configured_model: str, available_models: list[str]) -> bool:
+        return OllamaTransport.is_model_available(configured_model, available_models)
+
+    @staticmethod
+    def is_operational_failure(exc: OllamaError) -> bool:
+        return (
+            isinstance(exc, (OllamaInvalidResponseError, OllamaModelUnavailableError, OllamaTimeoutError, OllamaUnavailableError))
+            or isinstance(exc, OllamaHTTPError) and exc.retryable
+        )
 
     @classmethod
     def record_quality_trace(
@@ -203,7 +247,7 @@ class OllamaLLMService:
             prompt_version=prompt_version,
             cache_key=cache_key,
             response_model=DynamicMappingResponse,
-            think=True,
+            think=False,
             options={
                 "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
                 "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
@@ -228,7 +272,7 @@ class OllamaLLMService:
             think=True,
             options={
                 "num_predict": settings.OLLAMA_OPTIMIZED_NUM_PREDICT,
-                "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
+                "num_ctx": settings.OLLAMA_OPTIMIZED_NUM_CTX,
                 "temperature": 0.0,
                 "top_p": 0.9,
             },
@@ -258,8 +302,41 @@ class OllamaLLMService:
             },
         )
         if result is None:
-            raise OllamaError("Failed to generate work experience extraction")
+            raise OllamaError(
+                "Failed to generate work experience extraction",
+                operation="work_experience_extraction",
+            )
         return result
+
+    @classmethod
+    def generate_structured_json(
+        cls,
+        *,
+        operation: str,
+        prompt: str,
+        prompt_version: str,
+        cache_key: str,
+        response_model: type[TModel],
+        think: bool = False,
+        options: dict[str, Any] | None = None,
+        profiler: PipelineProfiler | None = None,
+    ) -> TModel | None:
+        """
+        Public contract for calling Ollama with a structured JSON response schema.
+        Handles caching, retries, parsing, and telemetry.
+        """
+        if options is None:
+            options = {"temperature": 0.0}
+        return cls._execute_structured_generation(
+            operation=operation,
+            prompt=prompt,
+            prompt_version=prompt_version,
+            cache_key=cache_key,
+            response_model=response_model,
+            think=think,
+            options=options,
+            profiler=profiler,
+        )
 
     @classmethod
     def _execute_structured_generation(
@@ -275,7 +352,10 @@ class OllamaLLMService:
         profiler: PipelineProfiler | None = None,
     ) -> TModel | None:
         model = settings.OLLAMA_MODEL
-        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        request_prompt, removed_legacy_directive = cls._remove_legacy_thinking_directive(prompt)
+        if removed_legacy_directive:
+            logger.warning(f"[OLLAMA] operation={operation} model='{model}' prompt_directive=REMOVED")
+        prompt_hash = hashlib.sha256(request_prompt.encode("utf-8")).hexdigest()
         if not settings.LLM_ENABLED:
             logger.info(f"[OLLAMA] operation={operation} model='{model}' status=DISABLED_FALLBACK")
             cls._trace(
@@ -292,7 +372,7 @@ class OllamaLLMService:
             return None
 
         resolved_cache_key = cache_key or LLMCacheRepository.extraction_cache_key(
-            document_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            document_hash=hashlib.sha256(request_prompt.encode("utf-8")).hexdigest(),
             prompt_version=prompt_version,
             model_version=model,
             extraction_version=f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}",
@@ -328,22 +408,49 @@ class OllamaLLMService:
         else:
             logger.info(f"[OLLAMA] operation={operation} model='{model}' cache=MISS")
 
-        directive = "/think" if think else "/no_think"
-        normalized_prompt = prompt if prompt.startswith(directive) else f"{directive}\n{prompt}"
+        supports_thinking = cls._supports_thinking(model)
+        resolved_think = think if supports_thinking else None
+        if think and not supports_thinking:
+            logger.info(f"[OLLAMA] operation={operation} model='{model}' thinking=UNSUPPORTED_OMITTED")
+
+        prompt_tokens = TokenizerService.count_tokens(request_prompt)
+        effective_options = dict(options) if options else {}
+        if "num_predict" in effective_options or "num_ctx" in effective_options:
+            default_predict = settings.OLLAMA_OPTIMIZED_NUM_PREDICT if operation == "optimized_match" else settings.OLLAMA_GENERATION_NUM_PREDICT
+            default_ctx = settings.OLLAMA_OPTIMIZED_NUM_CTX if operation == "optimized_match" else settings.OLLAMA_GENERATION_NUM_CTX
+            req_predict = int(effective_options.get("num_predict") or default_predict)
+            req_ctx = int(effective_options.get("num_ctx") or default_ctx)
+            safety_buffer = 512
+
+            # Ensure num_ctx accommodates prompt + predict + buffer (capped at 32768)
+            effective_num_ctx = min(32768, max(req_ctx, prompt_tokens + req_predict + safety_buffer))
+            # Cap num_predict dynamically so prompt_tokens + num_predict + buffer <= effective_num_ctx
+            max_available_predict = max(256, effective_num_ctx - prompt_tokens - safety_buffer)
+            effective_num_predict = min(req_predict, max_available_predict)
+
+            effective_options["num_ctx"] = effective_num_ctx
+            effective_options["num_predict"] = effective_num_predict
+
         payload = OllamaTransport.build_generation_payload(
             model=model,
-            prompt=normalized_prompt,
+            prompt=request_prompt,
             response_schema=response_model.model_json_schema(),
-            think=think,
-            options=options,
+            think=resolved_think,
+            options=effective_options,
         )
 
         def parse(data: dict[str, Any]) -> _StructuredGeneration:
             envelope = OllamaGenerateEnvelope.model_validate(data)
             if envelope.done_reason.lower() == "length":
+                logger.warning(
+                    f"[OLLAMA] operation={operation} model='{model}' status=OUTPUT_LIMIT "
+                    f"response_chars={len(envelope.response)} output_tokens={envelope.eval_count} "
+                    f"num_predict={effective_options.get('num_predict', 'default')} num_ctx={effective_options.get('num_ctx', 'default')}"
+                )
                 raise OllamaInvalidResponseError(
                     "Ollama generation reached the output limit and is incomplete.",
                     operation=operation,
+                    retryable=False,
                 )
             raw_response = envelope.response.strip() or envelope.thinking.strip()
             structured_data = OllamaTransport.extract_json(raw_response, operation=operation)
@@ -361,10 +468,13 @@ class OllamaLLMService:
                 validation_ms=validation_ms,
             )
 
-        prompt_chars = len(normalized_prompt)
+        prompt_chars = len(request_prompt)
+        analysis_run_id = get_analysis_run_id()
+        analysis_candidate = get_analysis_candidate()
         logger.info(
-            f"[OLLAMA] operation={operation} model='{model}' status=CALLING "
-            f"prompt_chars={prompt_chars} estimated_tokens={max(1, prompt_chars // 4)}"
+            f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} "
+            f"model='{model}' status=CALLING "
+            f"prompt_chars={prompt_chars} prompt_tokens={prompt_tokens}"
         )
         llm_started = time.perf_counter()
         try:
@@ -375,9 +485,12 @@ class OllamaLLMService:
             )
         except OllamaError as exc:
             duration_ms = round((time.perf_counter() - llm_started) * 1000.0, 2)
+            propagate_failure = cls.is_operational_failure(exc)
             logger.error(
-                f"[OLLAMA] operation={operation} model='{model}' status=FALLBACK "
-                f"error={type(exc).__name__} duration_ms={duration_ms} prompt_chars={prompt_chars}"
+                f"[OLLAMA] analysis_run_id={analysis_run_id} candidate={analysis_candidate} operation={operation} model='{model}' "
+                f"status={'PROPAGATED' if propagate_failure else 'FALLBACK'} "
+                f"error={type(exc).__name__} status_code={getattr(exc, 'status_code', 'none')} "
+                f"retryable={exc.retryable} duration_ms={duration_ms} prompt_chars={prompt_chars} detail={exc}"
             )
             if profiler:
                 profiler.metrics.ollama_request_ms = duration_ms
@@ -389,11 +502,13 @@ class OllamaLLMService:
                 source_hash=resolved_cache_key,
                 cache_status="MISS",
                 validation_status="INVALID" if "InvalidResponse" in type(exc).__name__ or "Schema" in type(exc).__name__ else "NOT_RUN",
-                fallback_used=True,
+                fallback_used=not propagate_failure,
                 duration_ms=duration_ms,
                 input_tokens=max(1, prompt_chars // 4),
                 error_class=type(exc).__name__,
             )
+            if propagate_failure:
+                raise
             return None
 
         generation = transport_result.value
@@ -406,11 +521,21 @@ class OllamaLLMService:
             profiler.metrics.prompt_output_tokens = generation.envelope.eval_count
             profiler.metrics.prompt_input_tokens = generation.envelope.prompt_eval_count or profiler.metrics.prompt_input_tokens
 
+        prompt_eval_dur_ns = generation.envelope.prompt_eval_duration or 0
+        eval_dur_ns = generation.envelope.eval_duration or 0
+        prompt_eval_tok_sec = round(generation.envelope.prompt_eval_count / (prompt_eval_dur_ns / 1e9), 2) if prompt_eval_dur_ns > 0 else 0.0
+        eval_tok_sec = round(generation.envelope.eval_count / (eval_dur_ns / 1e9), 2) if eval_dur_ns > 0 else 0.0
+
         logger.info(
             f"[OLLAMA] operation={operation} model='{model}' status=SUCCESS "
             f"duration_ms={transport_result.duration_ms} "
             f"input_tokens={generation.envelope.prompt_eval_count} "
             f"output_tokens={generation.envelope.eval_count} "
+            f"prompt_eval_tok_sec={prompt_eval_tok_sec} "
+            f"eval_tok_sec={eval_tok_sec} "
+            f"response_chars={len(generation.raw_response)} "
+            f"num_predict={options.get('num_predict', 'default')} "
+            f"num_ctx={options.get('num_ctx', 'default')} "
             f"inference_ms={inference_ms}"
         )
 
@@ -435,7 +560,7 @@ class OllamaLLMService:
         LLMCacheRepository.save_cached_entry(
             resolved_cache_key,
             LLMCacheEntry(
-                prompt=normalized_prompt,
+                prompt=request_prompt,
                 raw_response=generation.raw_response,
                 structured_data=generation.structured_data,
                 reasoning=generation.reasoning,

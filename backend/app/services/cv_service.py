@@ -6,11 +6,15 @@ from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 
+from app.core.analysis_context import async_analysis_run_context, new_analysis_run_id
 from app.core.cache import CacheIndex, CacheInvalidator, CacheKey, doc_cache_manager
 from app.core.config import settings
 from app.core.cv_identity import CVIdentityCollisionError, normalize_source_candidate_id, resolve_cv_identity
 from app.core.logging import logger
+from app.core.rule_config_manager import RuleConfigManager
+from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
+from app.schemas.contracts import JobState
 from app.schemas.normalized_resume import NormalizedResume
 from app.services.document_parser import (
     MarkdownGenerator,
@@ -19,6 +23,8 @@ from app.services.document_parser import (
     ResumeJsonExtractor,
 )
 from app.services.embedding_service import EmbeddingService
+from app.services.hiring_risk_analyzer import HiringRiskAnalyzer
+from app.services.prompt_service import PromptService
 from app.services.upload_service import UploadService
 
 _cv_locks: dict[str, asyncio.Lock] = {}
@@ -90,9 +96,14 @@ async def process_cv_file(
     cv_id: str | int | None = None,
     force_reprocess: bool = False,
     storage_filename: str | None = None,
+    original_filename: str | None = None,
+    display_filename: str | None = None,
+    analysis_run_id: str | None = None,
+    job_id: str | None = None,
 ) -> dict[str, Any]:
     identity = resolve_cv_identity(filename, candidate_id, cv_id)
     cv_key = identity.canonical_key
+    analysis_run_id = str(analysis_run_id or new_analysis_run_id())
     source_candidate_id = normalize_source_candidate_id(source_candidate_id if source_candidate_id is not None else identity.candidate_id)
     cv_hash = hashlib.sha256(content).hexdigest()
     result_filename = f"{cv_key}.json"
@@ -101,8 +112,15 @@ async def process_cv_file(
     run_now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
     result_generation_id = f"gen_{run_now_ts}_{cv_hash[:8]}"
     generation_sequence = ResultRepository.fetch_next_generation_sequence()
+    current_rule_config = RuleConfigManager.get_config()
+    current_rule_config_version = current_rule_config.version
+    current_hiring_risk_policy_version = HiringRiskAnalyzer.get_policy_version(current_rule_config)
+    current_hiring_risk_prompt_version = PromptService.get_active_prompt_version(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+    current_hiring_risk_prompt_identity = PromptService.get_active_prompt_identity(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
+    current_optimized_prompt_version = settings.OPTIMIZED_PROMPT_VERSION
+    current_llm_model_version = settings.OLLAMA_MODEL
 
-    async with get_cv_lock(cv_key):
+    async with async_analysis_run_context(analysis_run_id, cv_key), get_cv_lock(cv_key):
 
 
         current_stage = "initialization"
@@ -122,12 +140,39 @@ async def process_cv_file(
                 existing_hash = existing_data.get("cv_hash")
                 existing_parser_version = existing_data.get("parser_version")
                 existing_schema_version = existing_data.get("schema_version")
+                existing_rule_config_version = existing_data.get("rule_config_version")
+                existing_hiring_risk_policy_version = existing_data.get("hiring_risk_policy_version")
+                existing_hiring_risk_prompt_version = existing_data.get("hiring_risk_prompt_version")
+                existing_hiring_risk_prompt_identity = existing_data.get("hiring_risk_prompt_identity")
+                existing_optimized_prompt_version = existing_data.get("optimized_prompt_version")
+                existing_llm_model_version = existing_data.get("llm_model_version")
+                existing_matching_version = existing_data.get("matching_version")
 
                 hash_matches = existing_hash == cv_hash
                 parser_matches = existing_parser_version == settings.EXTRACTION_PARSER_VERSION
                 schema_matches = existing_schema_version == settings.EXTRACTION_SCHEMA_VERSION
+                rule_config_matches = existing_rule_config_version == current_rule_config_version
+                hiring_policy_matches = existing_hiring_risk_policy_version == current_hiring_risk_policy_version
+                hiring_prompt_matches = existing_hiring_risk_prompt_version == current_hiring_risk_prompt_version
+                hiring_prompt_identity_matches = existing_hiring_risk_prompt_identity == current_hiring_risk_prompt_identity
+                optimized_prompt_matches = existing_optimized_prompt_version == current_optimized_prompt_version
+                llm_model_matches = existing_llm_model_version == current_llm_model_version
+                matching_version_matches = existing_matching_version == settings.MATCHING_VERSION
 
-                if hash_matches and parser_matches and schema_matches:
+                if all(
+                    (
+                        hash_matches,
+                        parser_matches,
+                        schema_matches,
+                        rule_config_matches,
+                        hiring_policy_matches,
+                        hiring_prompt_matches,
+                        hiring_prompt_identity_matches,
+                        optimized_prompt_matches,
+                        llm_model_matches,
+                        matching_version_matches,
+                    )
+                ):
                     logger.info(f"[CACHE_HIT] Reusing existing JSON for '{cv_key}' ({result_filename}).")
                     existing_data["status"] = "COMPLETED"
                     existing_data["original_status"] = "CACHE_HIT"
@@ -135,9 +180,13 @@ async def process_cv_file(
                     existing_data["stage"] = "complete"
                     existing_data["is_complete"] = True
                     existing_data["storage_filename"] = storage_filename or existing_data.get("storage_filename")
+                    existing_data["original_filename"] = original_filename or existing_data.get("original_filename") or existing_data.get("filename")
+                    existing_data["display_filename"] = display_filename or existing_data.get("display_filename") or existing_data.get("filename")
                     existing_data["identity"] = identity_metadata
                     existing_data["source_candidate_id"] = source_candidate_id
                     existing_data["legacy_cv_keys"] = legacy_cv_keys
+                    existing_data["analysis_run_id"] = analysis_run_id
+                    existing_data["analysis_version"] = analysis_run_id
 
                     # 1. Disk/Cache Persistence Parity
                     saved_path = await asyncio.to_thread(
@@ -197,6 +246,8 @@ async def process_cv_file(
                     "id": cv_key,
                     "scan_id": cv_key,
                     "result_generation_id": result_generation_id,
+                    "analysis_run_id": analysis_run_id,
+                    "analysis_version": analysis_run_id,
                     "generation_sequence": generation_sequence,
                     "status": "processing",
 
@@ -223,6 +274,19 @@ async def process_cv_file(
                     )
                 except Exception as e:
                     logger.warning(f"Failed to save interim status for '{cv_key}': {e}")
+
+                if job_id:
+                    try:
+                        await asyncio.to_thread(
+                            ProcessingJobRepository.transition,
+                            job_id,
+                            JobState.PROCESSING,
+                            progress=progress,
+                            stage=stage,
+                            message=f"{progress}% - CV processing at stage {stage}.",
+                        )
+                    except Exception as e:
+                        logger.debug(f"Failed to update processing job progress for '{job_id}': {e}")
 
             await _save_interim_status(15, current_stage)
             stage_durations_ms["validation_ms"] = round((asyncio.get_event_loop().time() - t_stage_start) * 1000.0, 2)
@@ -289,18 +353,35 @@ async def process_cv_file(
 
             stage_durations_ms["resume_extraction_ms"] = round((asyncio.get_event_loop().time() - t_ext_start) * 1000.0, 2)
 
-            from app.services.embedding_service import save_candidate_embedding
+            from app.services.embedding_service import (
+                generate_candidate_multi_vector_embeddings,
+                save_candidate_embedding,
+            )
             from app.services.match_service import MatchService
 
             def _generate_and_store_embedding():
-                emb = EmbeddingService.generate_embedding(
+                multi_vecs = generate_candidate_multi_vector_embeddings(
+                    cv_key,
+                    extraction.markdown,
+                    resume_json=resume_json,
+                )
+                overall_emb = multi_vecs.get("overall") or EmbeddingService.generate_embedding(
                     extraction.markdown,
                     model_version=None,
                     identifier=cv_key,
                 )
-                if emb:
-                    save_candidate_embedding(cv_key, emb, cv_hash)
-                return emb
+                if overall_emb:
+                    save_candidate_embedding(
+                        cv_key,
+                        overall_emb,
+                        cv_hash,
+                        profile_embedding=multi_vecs.get("profile"),
+                        skills_embedding=multi_vecs.get("skills"),
+                        experience_embedding=multi_vecs.get("experience"),
+                        projects_embedding=multi_vecs.get("projects"),
+                        domain_embedding=multi_vecs.get("domain"),
+                    )
+                return overall_emb
 
             current_stage = "ai_analysis"
             await _save_interim_status(60, current_stage)
@@ -334,15 +415,15 @@ async def process_cv_file(
             name_extraction_source = contact_info.get("extraction_source")
 
             location_val = contact_info.get("location")
+            from app.services.resume_field_extractor import ResumeFieldExtractor
+
             work_exp = (resume_json or {}).get("work_experience") or []
-            top_exp = work_exp[0] if work_exp else {}
-            job_title_val = contact_info.get("job_title") or top_exp.get("job_title")
-            company_val = contact_info.get("company_name") or contact_info.get("company") or top_exp.get("company")
+            latest_exp = ResumeFieldExtractor.resolve_latest_employment(work_exp)
+            job_title_val = contact_info.get("job_title") or latest_exp.get("job_title")
+            company_val = contact_info.get("company_name") or contact_info.get("company") or latest_exp.get("company")
 
             raw_fc = contact_info.get("field_confidence") or {}
             raw_fct = contact_info.get("field_confidence_tiers") or {}
-
-            from app.core.rule_config_manager import RuleConfigManager
 
             name_tier = contact_info.get("name_confidence_level") or contact_info.get("name_confidence_tier") or raw_fct.get("name") or RuleConfigManager.get_confidence_tier("name", name_confidence)
             loc_tier = contact_info.get("location_confidence_tier") or raw_fct.get("location") or RuleConfigManager.get_confidence_tier("location", raw_fc.get("location"))
@@ -387,6 +468,8 @@ async def process_cv_file(
                 "id": cv_key,
                 "scan_id": cv_key,
                 "result_generation_id": result_generation_id,
+                "analysis_run_id": analysis_run_id,
+                "analysis_version": analysis_run_id,
                 "generation_sequence": generation_sequence,
                 "document_hash": cv_hash,
 
@@ -396,6 +479,8 @@ async def process_cv_file(
                 "source_candidate_id": source_candidate_id,
                 "cv_id": identity.cv_id,
                 "filename": filename,
+                "original_filename": original_filename or filename,
+                "display_filename": display_filename or filename,
                 "storage_filename": storage_filename,
                 "content_type": content_type,
                 "cv_hash": cv_hash,
@@ -421,6 +506,12 @@ async def process_cv_file(
                 "experience_version": getattr(settings, "EXPERIENCE_CALCULATOR_VERSION", "2.0.0"),
                 "taxonomy_version": getattr(settings, "TAXONOMY_VERSION", "1.5.0"),
                 "matching_version": getattr(settings, "MATCHING_VERSION", "2.1.0"),
+                "rule_config_version": current_rule_config_version,
+                "hiring_risk_policy_version": current_hiring_risk_policy_version,
+                "hiring_risk_prompt_version": current_hiring_risk_prompt_version,
+                "hiring_risk_prompt_identity": current_hiring_risk_prompt_identity,
+                "optimized_prompt_version": current_optimized_prompt_version,
+                "llm_model_version": current_llm_model_version,
                 "created_at": created_at,
                 "updated_at": updated_at,
 
@@ -492,6 +583,8 @@ async def process_cv_file(
             failure_data = {
                 "id": cv_key,
                 "scan_id": cv_key,
+                "analysis_run_id": analysis_run_id,
+                "analysis_version": analysis_run_id,
                 "filename": filename,
                 "storage_filename": storage_filename,
                 "content_type": content_type,

@@ -10,16 +10,18 @@ from app.core.rule_config_manager import (
     FallbackDefaults,
     FieldRuleConfig,
     GlobalTierBoundary,
+    HiringRiskConfig,
+    HiringRiskPolicy,
     LexicalWeights,
     MatchScoringRules,
     PrefilterRules,
     ResumeQualityRules,
     ScoringParameters,
     ScoringRules,
-    TermMatching,
     TaxonomyCondition,
     TaxonomyRuleBranch,
     TaxonomyRules,
+    TermMatching,
     TierThresholds,
     UnifiedRuleConfig,
     VacancyTaxonomyRule,
@@ -46,6 +48,17 @@ class SystemRuleConfigFactory:
             fields=cls._fields(),
             scoring=cls._scoring(),
             workflow=WorkflowRules(),
+            hiring_risks=HiringRiskConfig(
+                policies={
+                    "MIN_EXPERIENCE_FAILED": HiringRiskPolicy(severity="CRITICAL", manual_review=False, category="Experience"),
+                    "EXPERIENCE_UNKNOWN": HiringRiskPolicy(severity="UNKNOWN", manual_review=True, category="Experience"),
+                    "MISSING_MANDATORY_SKILL": HiringRiskPolicy(severity="CRITICAL", manual_review=False, category="Skills"),
+                    "MISSING_PREFERRED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=False, category="Skills"),
+                    "UNVERIFIED_SKILL": HiringRiskPolicy(severity="MEDIUM", manual_review=True, category="Skills"),
+                    "DOMAIN_MISMATCH": HiringRiskPolicy(severity="HIGH", manual_review=False, category="Domain", source="CrossDomainGuard"),
+                    "OVERQUALIFIED": HiringRiskPolicy(severity="LOW", manual_review=False, category="Experience"),
+                }
+            ),
         )
         return config
 
@@ -59,7 +72,25 @@ class SystemRuleConfigFactory:
                 confidence_scoring={"verified_header": 0.90, "email_username_fallback": 0.30},
                 tier_thresholds=common_tiers.model_copy(deep=True),
                 downstream_gates=DownstreamGates(min_acceptance_confidence=0.50, reject_email_fallback_as_unverified=True),
-                keywords={"header_denylist": ["resume", "curriculum vitae", "profile", "summary"]},
+                keywords={
+                    "header_denylist": ["resume", "curriculum vitae", "profile", "summary"],
+                    "job_title_denylist": [
+                        "IT", "EXECUTIVE", "DEVELOPER", "ENGINEER", "MANAGER", "LEAD", "ANALYST",
+                        "SPECIALIST", "CONSULTANT", "ARCHITECT", "OFFICER", "DIRECTOR",
+                    ],
+                    "tech_and_role_denylist": [
+                        "AI", "IT", "ML", "UI", "UX", "QA", "HR", "PR", "DBA", "SEO", "PMP", "API", "ETL", "ELT", "SRE",
+                        "REACT", "NATIVE", "ANDROID", "FLUTTER", "IONIC", "NODE", "NODEJS", "PYTHON", "ANGULAR", "VUE",
+                        "TYPESCRIPT", "JAVASCRIPT", "JAVA", "SPRING", "DOCKER", "AWS", "AZURE", "KUBERNETES",
+                        "DEVELOPER", "ENGINEER", "LEADER", "LEAD", "ARCHITECT", "INTEGRATION", "SERVICES",
+                        "FRONTEND", "BACKEND", "FULLSTACK", "STACK", "MOBILE", "SOFTWARE", "SENIOR", "JUNIOR",
+                    ],
+                    "non_name_field_labels": [
+                        "subject", "contact", "phone", "mobile", "email", "language", "address",
+                        "gender", "sex", "state", "nationality", "marital status", "marital", "date of birth", "dob",
+                        "pin", "pin code", "pincode", "personal data", "personal details", "resume", "cv",
+                    ],
+                },
             ),
             "location": FieldRuleConfig(
                 field_name="location",
@@ -67,7 +98,11 @@ class SystemRuleConfigFactory:
                 confidence_scoring={"explicit_contact_location": 0.90, "unverified_location": 0.30},
                 tier_thresholds=common_tiers.model_copy(deep=True),
                 downstream_gates=DownstreamGates(min_acceptance_confidence=0.50, require_gazetteer_for_high=False),
-                keywords={"gazetteer": [], "blacklist": ["dear", "sir", "madam", "salutation"]},
+                keywords={
+                    "gazetteer": [],
+                    "blacklist": ["dear", "sir", "madam", "salutation"],
+                    "country_names": ["INDIA", "USA", "UNITED STATES", "UK", "UNITED KINGDOM", "CANADA", "GERMANY", "FRANCE", "AUSTRALIA", "SINGAPORE", "UAE"],
+                },
             ),
             "job_title": FieldRuleConfig(
                 field_name="job_title",
@@ -75,7 +110,40 @@ class SystemRuleConfigFactory:
                 confidence_scoring={"explicit_title": 0.90, "inferred_title": 0.50},
                 tier_thresholds=common_tiers.model_copy(deep=True),
                 downstream_gates=DownstreamGates(min_acceptance_confidence=0.50, max_word_count=10, max_char_length=100),
-                keywords={"narrative_starters": ["graduated", "worked"], "narrative_phrases": []},
+                keywords={
+                    "narrative_starters": ["graduated", "worked", "responsible", "handled", "managed", "developed", "building", "seeking"],
+                    "narrative_phrases": ["in 19", "in 20", "at 19", "at 20", "since 19", "since 20", "from 19", "from 20"],
+                    "verb_starters": [
+                        "did", "done", "do", "was", "were", "is", "are", "have", "had", "has",
+                        "built", "made", "helped", "tested", "coded", "wrote", "learned",
+                    ],
+                    "preposition_starters": [
+                        "to", "for", "with", "by", "from", "in", "on", "at", "about", "into", "through", "during", "and", "or", "but", "the", "a", "an"
+                    ],
+                    "allowed_compound": [
+                        "sales and marketing", "research and development", "learning and development",
+                        "compensation and benefits", "strategy and operations", "qa and qc", "quality and compliance"
+                    ],
+                    "common_roles": [
+                        "product manager", "project manager", "program manager", "general manager", "senior officer",
+                        "marketing executive", "sales executive", "billing executive", "operations manager",
+                        "plant operator", "site engineer", "civil engineer", "mechanical engineer", "electrical engineer",
+                        "software engineer", "full stack developer", "frontend developer", "backend developer",
+                        "data analyst", "data scientist", "store incharge", "qc chemist", "lab technician", "machine operator",
+                        "accounts executive", "support specialist"
+                    ],
+                    "label_prefixes": [
+                        "duration", "period", "tenure", "date", "organization", "company", "employer",
+                        "designation", "position", "role", "department", "location", "address", "qualification",
+                        "education", "degree", "marital status", "nationality", "date of birth", "dob", "languages"
+                    ],
+                    "keywords": [
+                        "ENGINEER", "DEVELOPER", "MANAGER", "EXECUTIVE", "ANALYST", "OFFICER", "CONSULTANT", "DIRECTOR", 
+                        "LEAD", "SPECIALIST", "INSPECTOR", "ADMINISTRATOR", "TECHNICIAN", "INCHARGE", "IN CHARGE", 
+                        "OPERATOR", "ASSISTANT", "CHEMIST", "SCIENTIST", "PROGRAMMER", "ARCHITECT", "DESIGNER", 
+                        "COORDINATOR", "SUPERVISOR", "HEAD", "SR.", "JR."
+                    ],
+                },
             ),
             "company_name": FieldRuleConfig(
                 field_name="company_name",
@@ -83,7 +151,40 @@ class SystemRuleConfigFactory:
                 confidence_scoring={"explicit_company": 0.90, "inferred_company": 0.50},
                 tier_thresholds=common_tiers.model_copy(deep=True),
                 downstream_gates=DownstreamGates(min_acceptance_confidence=0.50, max_char_length=120),
-                keywords={"generic_section_headers": ["experience", "education", "skills", "projects"]},
+                keywords={
+                    "generic_section_headers": ["experience", "education", "skills", "projects"],
+                    "suffixes": [
+                        "ltd", "limited", "pvt", "private", "inc", "incorporated", "llc", "llp", "corp", 
+                        "corporation", "industries", "solutions", "enterprises", "infosys", "infotech", 
+                        "technologies", "technology", "pharma", "chemicals", "remedies", "generics", "organics", "techno lab", "techno labs"
+                    ],
+                    "common_company_words": [
+                        "solutions", "services", "technologies", "technology", "industries", "consultancy",
+                        "consulting", "enterprises", "corporation", "corp", "pvt", "ltd", "limited", "llc",
+                        "inc", "systems", "labs", "group", "bank", "hospital", "motors", "power", "infotech",
+                        "pharma", "chemicals", "holdings", "ventures", "agency", "firm", "studio", "associates", "logistics"
+                    ],
+                    "verb_starters": [
+                        "to", "for", "with", "by", "from", "in", "on", "at", "about", "into", "through",
+                        "during", "and", "or", "but", "the", "a", "an", "did", "done", "do", "was", "were",
+                        "is", "are", "have", "had", "has", "built", "made", "helped", "tested", "coded", "wrote", "learned"
+                    ],
+                },
+            ),
+            "education": FieldRuleConfig(
+                field_name="education",
+                description="Conservative education and degree validation rules.",
+                confidence_scoring={"explicit_degree": 0.90, "inferred_degree": 0.50},
+                tier_thresholds=common_tiers.model_copy(deep=True),
+                downstream_gates=DownstreamGates(min_acceptance_confidence=0.50, max_char_length=120),
+                keywords={
+                    "degrees": [
+                        "B.Tech", "BTech", "B.E.", "B.Sc.", "BCA", "BBA", "B.Com.", "B.A.", "B.Pharm.",
+                        "B.Arch.", "B.Des.", "B.Ed.", "LLB", "M.Tech", "M.E.", "M.Sc.", "MCA", "MBA",
+                        "M.Com.", "M.A.", "M.Pharm.", "M.Arch.", "M.Des.", "M.Ed.", "LLM", "Ph.D.",
+                        "Diploma", "PGDM", "PGDCA", "ITI", "CA", "CS", "ICWA", "CMA", "Bachelor", "Master", "Degree"
+                    ],
+                },
             ),
         }
 
@@ -103,6 +204,8 @@ class SystemRuleConfigFactory:
                         "programming", "language", "framework", "the", "systems", "principles",
                         "write", "integrating", "with", "services", "backend", "of", "work",
                         "working", "job", "service", "task", "role", "duty", "item", "helper",
+                        "general", "knowledge", "basic", "advanced", "good", "excellent",
+                        "understanding", "hands-on", "familiarity", "experience", "skills", "ability",
                     ],
                     aliases={
                         "widgets": ["widget", "widgets", "ui"],
@@ -137,6 +240,7 @@ class SystemRuleConfigFactory:
                     domain_default_match_score=50.0,
                     low_coverage_threshold=0.50,
                     false_positive_score_cap=80.0,
+                    zero_skills_score_cap=40.0,
                     match_high_threshold=80.0,
                     match_medium_threshold=50.0,
                     mandatory_failure_penalty=20.0,

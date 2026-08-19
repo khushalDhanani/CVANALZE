@@ -104,8 +104,8 @@ export function AuthenticationGate({ children }: React.PropsWithChildren) {
   if (!session) {
     return (
       <View className="flex-1 items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md p-6">
-          <View className="items-center gap-3 mb-5">
+        <Card className="w-full max-w-md p-5">
+          <View className="items-center gap-2 mb-4">
             <View className="w-12 h-12 rounded-full bg-danger/10 items-center justify-center">
               <ServerOff size={24} color={COLORS.danger} />
             </View>
@@ -125,8 +125,8 @@ export function AuthenticationGate({ children }: React.PropsWithChildren) {
   if (!session?.authenticated) {
     return (
       <View className="flex-1 items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md p-6">
-          <View className="items-center gap-3 mb-5">
+        <Card className="w-full max-w-md p-5">
+          <View className="items-center gap-2 mb-4">
             <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center">
               <LockKeyhole size={24} color={COLORS.primary} />
             </View>
@@ -137,7 +137,7 @@ export function AuthenticationGate({ children }: React.PropsWithChildren) {
               </Text>
             </View>
           </View>
-          <View className="gap-4">
+          <View className="gap-3">
             <TextField
               label="Access key"
               value={apiKey}

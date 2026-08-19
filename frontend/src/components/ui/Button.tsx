@@ -30,8 +30,8 @@ const SPINNER_COLORS: Record<ButtonVariant, string> = {
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: "px-3 py-1.5 min-h-[36px]",
-  md: "px-3.5 py-2 min-h-[40px]",
+  sm: "px-3 py-1.5 min-h-[44px] sm:min-h-[36px]",
+  md: "px-3.5 py-2 min-h-[44px] sm:min-h-[40px]",
   lg: "px-4 py-2.5 min-h-[44px]",
 };
 
@@ -80,7 +80,7 @@ export function Button({
         <View className="flex-row items-center gap-1.5">
           <ActivityIndicator size="small" color={SPINNER_COLORS[variant]} />
           {!!label && (
-            <Text className={`font-sans-semibold text-xs ${TEXT_CLASSES[variant]}`}>
+            <Text className={`font-sans-semibold text-sm ${TEXT_CLASSES[variant]}`}>
               {label}
             </Text>
           )}
@@ -89,7 +89,7 @@ export function Button({
         <>
           {icon}
           {!!label && (
-            <Text className={`font-sans-semibold text-xs ${TEXT_CLASSES[variant]}`}>
+            <Text className={`font-sans-semibold text-sm ${TEXT_CLASSES[variant]}`}>
               {label}
             </Text>
           )}
