@@ -13,7 +13,7 @@ administrator workflows. PDF and DOCX uploads are processed asynchronously throu
 | TXT | Not supported | Plain text has no dependable file signature and is accepted only by the bounded raw-text analysis APIs, not as an uploaded file. |
 
 Both upload aliases read files in bounded chunks, reject over-limit files with HTTP 413, and persist accepted content atomically under a server-generated name. The
-default compressed upload limit is 15 MiB. See [Phase 1](backend/docs/phase1-secure-uploads.md) for the complete acceptance and retention policy.
+default compressed upload limit is 15 MiB.
 
 ## Architecture
 
@@ -68,9 +68,6 @@ The frontend does not embed either API key. A recruiter or administrator enters 
 signed `HttpOnly`, `Secure` (in production), `SameSite=Strict` session cookie. The browser discards the entered key after that exchange and sends only the cookie on
 subsequent requests. `GET /api/auth/session` checks the current session, and `DELETE /api/auth/session` signs out. Deploy the frontend and API on HTTPS origins within
 the same site, list the exact frontend origin in `ALLOWED_ORIGINS`, and keep credentialed CORS enabled.
-
-The characterized endpoint inventory and successful response shapes are in [Phase 0 API contracts](backend/docs/phase0-api-contracts.md). The enforced policy is
-documented in [Phase 6](backend/docs/phase6-api-operational-reliability.md).
 
 ## Upload and background-job flow
 
@@ -471,36 +468,6 @@ error envelopes, configured rate limits, and Ollama-disabled fallback.
 - API and worker require shared raw/result storage. The current Compose volume is host-local and needs shared durable storage for multi-host deployments.
 - Jobs interrupted by a full Redis/worker outage may need an operational stale-job reconciler; automatic stale-record recovery is not yet provided.
 
-See [Phase 7](backend/docs/phase7-documentation-and-final-verification.md) for the final changed-file map, compatibility assessment, verification status, and residual
-risk register.
-
-## Implementation change map
-
-| Phase | Primary areas changed | Compatibility result |
-| --- | --- | --- |
-| 0 | Contracts, endpoint policy, stale tests, secret/data containment | Characterized existing paths and adapters before production changes. |
-| 1 | Shared upload service, validation, retention, Docker packages | Kept both upload paths; intentionally limited file uploads to PDF/DOCX. |
-| 2 | CV identity, repositories, cache keys, collision tests | Kept filename aliases when unambiguous; added collision protection. |
-| 3 | Parser facade, extraction internals, normalized schemas, match contexts | Kept legacy fields/imports; added normalized data and removed duplicate work. |
-| 4 | Processing records, queue service, RQ worker, job contracts | Kept polling/status adapters; added durable canonical job states. |
-| 5 | Shared Ollama transport, generation/embedding services, lifecycle | Kept legacy generation methods; centralized network behavior. |
-| 6 | Request/errors/auth/rate/CORS/lifespan, migrations, Docker | Kept success fields and error `detail`; intentionally enforced production controls. |
-| 7 | README, final change/compatibility/limitations record, work status | Documentation-only; no runtime or API behavior changes. |
-
-The exact per-phase file lists and decisions are retained in [workstatus.md](workstatus.md) and the phase documents below.
-
-## Phase documentation
-
-- [Phase 0 API contracts](backend/docs/phase0-api-contracts.md)
-- [Phase 0 security containment](backend/docs/phase0-security-containment.md)
-- [Phase 1 secure uploads](backend/docs/phase1-secure-uploads.md)
-- [Phase 2 identity and caching](backend/docs/phase2-identity-and-caching.md)
-- [Phase 3 structured CV processing](backend/docs/phase3-structured-cv-processing.md)
-- [Phase 4 reliable background processing](backend/docs/phase4-reliable-background-processing.md)
-- [Phase 5 standardized Ollama](backend/docs/phase5-standardize-ollama.md)
-- [Phase 6 API and operational reliability](backend/docs/phase6-api-operational-reliability.md)
-- [Phase 7 documentation and final verification](backend/docs/phase7-documentation-and-final-verification.md)
-
 ## Repository layout
 
 ```text
@@ -516,7 +483,6 @@ cv-analyzer/
 │   │   ├── schemas/
 │   │   ├── services/
 │   │   └── main.py
-│   ├── docs/
 │   ├── scripts/
 │   │   └── migrations/
 │   ├── tests/
@@ -525,8 +491,10 @@ cv-analyzer/
 │   ├── Dockerfile
 │   ├── pyproject.toml
 │   └── uv.lock
+├── frontend/
+│   ├── src/
+│   └── package.json
 ├── docker-compose.yml
 ├── AGENTS.md
-├── README.md
-└── workstatus.md
+└── README.md
 ```

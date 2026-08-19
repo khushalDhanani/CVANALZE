@@ -10,6 +10,14 @@ Read the root `AGENTS.md` first.
 
 ---
 
+# Backend Work Logging (`workstats.md`)
+
+All backend modifications, features, bug fixes, database migrations, model updates, and configuration adjustments must be logged immediately upon completion into `workstats.md` at the repository root.
+
+Follow the append-only rule: never delete, overwrite, or edit past log entries; add each change as a new sequential entry (`### Entry #XXX`) at the bottom of the file.
+
+---
+
 # Backend Mission
 
 The backend is responsible for:
@@ -52,7 +60,6 @@ backend/
 │   ├── schemas/
 │   ├── services/
 │   └── main.py
-├── docs/
 ├── scripts/
 │   └── migrations/
 ├── tests/
@@ -885,6 +892,7 @@ Before considering backend work complete, confirm as applicable:
 - tests were updated;
 - authorized tests/lint were actually run;
 - no unrelated code was changed;
-- security/PII protections were preserved.
+- security/PII protections were preserved;
+- changes were logged immediately to root `workstats.md` (append-only).
 
 Never report a test, migration, or verification as successful unless it was actually executed.
