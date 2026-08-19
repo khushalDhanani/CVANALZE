@@ -35,28 +35,42 @@ def isolate_ollama_transport(monkeypatch):
 @pytest.fixture(autouse=True)
 def mock_rule_config_manager(monkeypatch):
     """Ensure tests always have a loaded rule config since the fallback was removed from runtime."""
-    from app.core.rule_config_manager import RuleConfigManager
-    from pathlib import Path
-    
-    original_load_config = RuleConfigManager.load_config
+
+    from app.core.rule_config_manager import RuleConfigManager, UnifiedRuleConfig
     
     def mocked_load_config(cls, candidate_dict=None, tenant_id=None):
+        from datetime import datetime, timezone
+        from types import MappingProxyType
+
         from tests.mock_rule_config import MOCK_RULE_CONFIG
-        
-        from app.core.cache import config_cache_manager
-        cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
-        
-        if candidate_dict is not None:
-            config_cache_manager.set(cache_key, candidate_dict)
-        else:
-            config_cache_manager.set(cache_key, MOCK_RULE_CONFIG)
-            
-        return original_load_config(tenant_id=tenant_id)
+
+        raw_data = candidate_dict if candidate_dict is not None else MOCK_RULE_CONFIG
+        candidate_config = UnifiedRuleConfig.model_validate(raw_data)
+        cls._run_synthetic_smoke_tests(candidate_config)
+        candidate_cache, compiled_pattern_count = cls._build_and_validate_all_caches(candidate_config)
+
+        with cls._lock:
+            tenant_key = tenant_id or 'GLOBAL'
+            cls._active_configs[tenant_key] = candidate_config
+            cls._caches[tenant_key] = candidate_cache
+            cls._load_counter += 1
+            cls._metrics = MappingProxyType(
+                {
+                    "config_version": candidate_config.version,
+                    "config_load_count": cls._load_counter,
+                    "config_load_time_ms": 1.0,
+                    "cache_build_time_ms": 1.0,
+                    "compiled_pattern_count": compiled_pattern_count,
+                    "configuration_size_bytes": len(str(raw_data)),
+                    "last_loaded_timestamp": datetime.now(timezone.utc).isoformat(),
+                    "file_hash": getattr(candidate_config, "version", "mock"),
+                }
+            )
+        return candidate_config
 
     monkeypatch.setattr(RuleConfigManager, "load_config", classmethod(mocked_load_config))
     
-    if not RuleConfigManager._active_configs:
-        RuleConfigManager.load_config()
+    RuleConfigManager.load_config()
 
 @pytest.fixture(autouse=True)
 def mock_department_domain_repo(monkeypatch):
@@ -122,9 +136,9 @@ def cleanup_test_cv_results():
     """Ensure test runs do not leave mock candidate records (Jane Doe/John Doe/test keys) in the active database or cache."""
     yield
     try:
+        from app.core.cache import cv_result_cache_manager
         from app.core.database import PostgresAppSession
         from app.models.result import CVResult
-        from app.core.cache import cv_result_cache_manager
         if PostgresAppSession is not None:
             with PostgresAppSession() as db:
                 test_rows = db.query(CVResult).filter(

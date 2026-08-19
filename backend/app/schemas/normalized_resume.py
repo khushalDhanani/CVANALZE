@@ -8,6 +8,14 @@ class NormalizedStringField(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     evidence: list[str] = Field(default_factory=list)
 
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            return self.raw_value == other or self.normalized_value == other
+        return super().__eq__(other)
+
+    def __str__(self) -> str:
+        return self.normalized_value or self.raw_value or ""
+
 
 class NormalizedSkill(NormalizedStringField):
     aliases: list[str] = Field(default_factory=list)

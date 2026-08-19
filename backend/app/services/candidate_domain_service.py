@@ -475,7 +475,10 @@ class CandidateDomainService:
             if ResumeFieldExtractor._looks_like_company(role):
                 continue
             has_occupation_type = cls._matches_vocabulary(role, occupation_vocabulary, require_role=True)
-            if not has_occupation_type or not ResumeFieldExtractor.is_valid_job_title(role):
+            is_valid_structural_title = ResumeFieldExtractor.is_structural_job_title_noun_phrase(role)
+            if not has_occupation_type and not is_valid_structural_title:
+                continue
+            if not ResumeFieldExtractor.is_valid_job_title(role):
                 continue
             if taxonomy_inferred:
                 score = 0.85
@@ -484,7 +487,10 @@ class CandidateDomainService:
                 in_cv = cls._contains_entity(cv_text, role)
                 if not in_cv:
                     continue
-                score = source_scores.get(key, 0.50) + 0.25 + (0.20 if in_experience else 0.05)
+                base_score = source_scores.get(key, 0.50 if has_occupation_type else 0.40)
+                boost = 0.25 if has_occupation_type else 0.15
+                exp_boost = 0.20 if in_experience else 0.05
+                score = base_score + boost + exp_boost
             if score >= cls._ENTITY_CONFIDENCE_THRESHOLD:
                 seen.add(key)
                 accepted.append(role)

@@ -132,8 +132,8 @@ export default function ConfigScreen() {
       : undefined;
 
   const maxBoostError =
-    isNaN(maxBoostNum) || maxBoostNum < 0 || maxBoostNum > 50
-      ? 'Must be between 0.0 and 50.0 points'
+    isNaN(maxBoostNum) || maxBoostNum < 0 || maxBoostNum > 100
+      ? 'Must be between 0.0 and 100.0 points'
       : undefined;
 
   const penaltyError =
@@ -316,7 +316,7 @@ export default function ConfigScreen() {
                     onChangeText={setMaxLlmBoost}
                     keyboardType="numeric"
                     error={maxBoostError}
-                    helperText="Maximum score uplift from LLM evaluation"
+                    helperText="Maximum score uplift from LLM evaluation (0.0 to 100.0)"
                   />
                 </View>
               </View>

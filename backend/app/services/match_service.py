@@ -137,7 +137,7 @@ class MatchService:
             profiler.log_summary()
             quality_gate.record("vacancy_retrieval", "PASSED_EMPTY", source_count=0, retrieved_count=0)
             quality_gate.record("final_classification", "PASSED", match_status="NO_ACTIVE_VACANCIES", final_score=None)
-            return MatchService._empty_analysis(cv_text=cv_text, normalized_resume=normalized_resume, quality_gate=quality_gate, is_global_empty=True)
+            return MatchService._empty_analysis(cv_text=cv_text, resume_json=resume_json, normalized_resume=normalized_resume, quality_gate=quality_gate, is_global_empty=True)
 
         profiler.metrics.vacancies_before_filtering = len(openings)
 
@@ -947,6 +947,7 @@ class MatchService:
     @staticmethod
     def _empty_analysis(
         cv_text: str = "",
+        resume_json: dict[str, Any] | None = None,
         normalized_resume: NormalizedResume | None = None,
         quality_gate: MatchingQualityGate | None = None,
         is_global_empty: bool = False,
@@ -954,7 +955,7 @@ class MatchService:
         from app.schemas.scoring_config import ScoringConfig
 
         scoring_config = ScoringConfig.load()
-        cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text) if cv_text else {}
+        cand_profile = ScoringEngine.extract_candidate_domain_profile(cv_text=cv_text, resume_json=resume_json) if (cv_text or resume_json) else {}
         industry_dept = cand_profile.get("recommended_department", "")
         industry_domain = cand_profile.get("professional_domain", "")
         strengths = cand_profile.get("strengths", [])

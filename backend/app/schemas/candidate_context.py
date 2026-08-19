@@ -76,6 +76,10 @@ class CandidateAnalysisContext:
                 except (ValueError, TypeError):
                     pass
 
+        if exp_years is None or (exp_years == 0.0 and normalized_resume and normalized_resume.experience.deterministic_years is None):
+            if optimized_profile and optimized_profile.relevant_experience_years is not None:
+                exp_years = float(optimized_profile.relevant_experience_years)
+
         if optimized_profile:
             optimized_profile = CandidateDomainService.validate_optimized_profile(
                 optimized_profile, cv_text, resume_json, domain_repository
@@ -109,6 +113,12 @@ class CandidateAnalysisContext:
         if not current_role and normalized_resume and normalized_resume.employment:
             current_role = normalized_resume.employment[0].job_title.normalized_value
 
+        if not current_role and resume_json:
+            work_exp = resume_json.get("work_experience") or resume_json.get("experience") or []
+            from app.services.resume_field_extractor import ResumeFieldExtractor
+            latest = ResumeFieldExtractor.resolve_latest_employment(work_exp)
+            current_role = latest.get("job_title") or resume_json.get("job_title") or (resume_json.get("contact_info") or {}).get("job_title")
+
         if current_role:
             validated_roles = CandidateDomainService.validate_job_roles(
                 [current_role], cv_text, resume_json, domain_repository
@@ -117,13 +127,25 @@ class CandidateAnalysisContext:
 
         if not current_role:
             m = re.search(
-                r"(?:current\s*role|position|designation|job\s*title)\s*:\s*([^\n]+)",
+                r"(?:current\s*role|position|designation|job\s*title|post\s*held|profile)\s*:\s*([^\n]+)",
                 cv_text,
                 re.IGNORECASE,
             )
             if m:
                 validated_roles = CandidateDomainService.validate_job_roles(
                     [m.group(1)], cv_text, resume_json, domain_repository
+                )
+                current_role = validated_roles[0] if validated_roles else None
+
+        if not current_role and cv_text:
+            from app.services.resume_field_extractor import ResumeFieldExtractor
+            sections = ResumeFieldExtractor._split_sections(cv_text.splitlines())
+            header_role = ResumeFieldExtractor.extract_title_from_summary_or_header(
+                sections.get("summary", []), cv_text.splitlines()
+            )
+            if header_role:
+                validated_roles = CandidateDomainService.validate_job_roles(
+                    [header_role], cv_text, resume_json, domain_repository
                 )
                 current_role = validated_roles[0] if validated_roles else None
 

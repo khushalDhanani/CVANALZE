@@ -279,10 +279,13 @@ export default function CandidateDetailScreen() {
           errorCount = 0;
         } catch (err: any) {
           errorCount++;
-          if (errorCount >= 3) {
+          console.warn(`[REPROCESS_POLL] Transient status check error (${errorCount}/10):`, err?.message);
+          if (errorCount >= 10) {
             stopTimers();
             setIsReprocessing(false);
             setReprocessError(err.message || 'Connection lost during polling (CONNECTION_LOST).');
+          } else {
+            setReprocessStatusMsg('Connecting to processing worker...');
           }
         }
       }, 1500);
@@ -689,7 +692,7 @@ export default function CandidateDetailScreen() {
     const provenanceRows = getProcessingProvenanceRows(data);
     const technicalMatchRows = [
       ['Calibration Version', bestMatch?.calibration_version],
-      ['Scoring Profile', bestMatch?.scoring_profile_code],
+      ['Scoring Profile', bestMatch?.scoring_profile_code === 'FALLBACK' ? 'FALLBACK (Degraded Defaults)' : bestMatch?.scoring_profile_code],
       ['RRF Score', bestMatch?.rrf_score],
       ['Stage 0 Compatible', bestMatch?.stage0_compatible],
       ['Stage 1 Compatible', bestMatch?.stage1_compatible],

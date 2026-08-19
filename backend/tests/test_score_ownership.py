@@ -1,8 +1,8 @@
-import pytest
-from app.services.match_evaluators import VacancyFitEvaluator, VacancyMatchStatus, ScoringConfig
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.schemas.match import MandatoryFailureDetails
+from app.services.match_evaluators import ScoringConfig, VacancyFitEvaluator
+
 
 def test_canonical_score_and_status_no_recalculation():
     opening = {
@@ -63,3 +63,8 @@ def test_legacy_contradictory_results_normalized():
     # Should resolve to 49.9 (medium threshold - 0.1) instead of 89.0
     resolved_score = VacancyFitEvaluator.resolve_opening_score(opening_failed)
     assert resolved_score == 49.9
+
+    # Custom scoring config with different medium threshold and epsilon
+    custom_cfg = ScoringConfig(match_medium_threshold=55.0, rejection_score_epsilon=0.5)
+    custom_resolved = VacancyFitEvaluator.resolve_opening_score(opening_failed, scoring_config=custom_cfg)
+    assert custom_resolved == 54.5

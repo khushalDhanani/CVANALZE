@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.core.error_handlers import SystemConfigurationError
 from app.core.logging import logger
+from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,

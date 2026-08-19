@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 # backend/app/core/rule_config_manager.py
 import json
 import logging
 import re
 import threading
 import time
-from datetime import timezone, datetime
+from datetime import datetime, timezone
 from re import Pattern
 from types import MappingProxyType
 from typing import Any, Literal
@@ -97,6 +98,7 @@ class ScoringParameters(BaseModel):
     domain_default_match_score: float = Field(..., ge=0.0, le=100.0)
     low_coverage_threshold: float = Field(..., ge=0.0, le=1.0)
     false_positive_score_cap: float = Field(..., ge=0.0, le=100.0)
+    zero_skills_score_cap: float = Field(default=40.0, ge=0.0, le=100.0)
     
     experience_relevance_threshold: float = Field(default=7.0, ge=0.0)
     experience_partial_threshold: float = Field(default=5.5, ge=0.0)
@@ -394,9 +396,10 @@ class RuleConfigManager:
         config_size_bytes = 0
 
         try:
-            from app.core.database import PostgresAppSession
-            from app.models.rules import RuleConfigProfile, RuleComponent, SystemRule, RuleCondition
             from sqlalchemy.orm import selectinload
+
+            from app.core.database import PostgresAppSession
+            from app.models.rules import RuleComponent, RuleCondition, RuleConfigProfile, SystemRule
             
             with PostgresAppSession() as db:
                 query = db.query(RuleConfigProfile).options(
@@ -885,21 +888,27 @@ class RuleConfigManager:
         return cls._active_configs[tenant_key]
 
     @classmethod
-    def get_field_config(cls, field_name: str) -> FieldRuleConfig:
-        cfg = cls.get_config()
+    def get_field_config(cls, field_name: str, tenant_id: str | None = None) -> FieldRuleConfig:
+        cfg = cls.get_config(tenant_id=tenant_id)
         if field_name not in cfg.fields:
             raise KeyError(f"Field '{field_name}' not configured in UnifiedRuleConfig")
         return cfg.fields[field_name]
 
     @classmethod
-    def get_keywords(cls, field_name: str, key: str) -> set[str]:
-        field_cfg = cls.get_field_config(field_name)
-        return field_cfg.get_keyword_set(key)
+    def get_keywords(cls, field_name: str, key: str, tenant_id: str | None = None) -> set[str]:
+        try:
+            field_cfg = cls.get_field_config(field_name, tenant_id=tenant_id)
+            return field_cfg.get_keyword_set(key)
+        except Exception:
+            return set()
 
     @classmethod
-    def get_upper_keywords(cls, field_name: str, key: str) -> set[str]:
-        field_cfg = cls.get_field_config(field_name)
-        return field_cfg.get_upper_keyword_set(key)
+    def get_upper_keywords(cls, field_name: str, key: str, tenant_id: str | None = None) -> set[str]:
+        try:
+            field_cfg = cls.get_field_config(field_name, tenant_id=tenant_id)
+            return field_cfg.get_upper_keyword_set(key)
+        except Exception:
+            return set()
 
     @classmethod
     def get_confidence_tier(cls, field_name: str, score: float | None) -> str:
@@ -984,9 +993,10 @@ class RuleConfigManager:
     def _run_synthetic_smoke_tests(cls, candidate_config: UnifiedRuleConfig) -> None:
         """Execute in-memory synthetic smoke tests against candidate config before activation."""
         try:
+            import json
+
             from app.core.database import PostgresAppSession
             from app.models.rules import RuleValidationTestCase
-            import json
             
             with PostgresAppSession() as db:
                 tests = db.query(RuleValidationTestCase).filter(RuleValidationTestCase.is_active == True).all()

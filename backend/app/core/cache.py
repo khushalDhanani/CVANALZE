@@ -299,7 +299,7 @@ class RedisCache(CacheProvider):
             payload = json.dumps(value, ensure_ascii=False)
             prefixed = self._prefixed(key)
             if ttl is not None:
-                client.setex(prefixed, ttl, payload)
+                client.set(prefixed, payload, ex=ttl)
             else:
                 client.set(prefixed, payload)
         except Exception as exc:

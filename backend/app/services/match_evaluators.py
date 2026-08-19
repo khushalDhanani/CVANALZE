@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,14 +25,8 @@ _EXPERIENCE_CLAUSE_RE = re.compile(
     r"\b\d+\s*\+?\s*(?:to\s*\d+\s*)?years?\b", re.IGNORECASE
 )
 
-_stop_phrases_cache: frozenset[str] | None = None
-
-
 def _stop_phrases() -> frozenset[str]:
-    global _stop_phrases_cache
-    if _stop_phrases_cache is None:
-        _stop_phrases_cache = RuleConfigManager.get_term_matching_assets()["stop_phrases"]
-    return _stop_phrases_cache
+    return RuleConfigManager.get_term_matching_assets().get("stop_phrases", frozenset())
 
 
 def is_ignorable_requirement(term: str | None) -> bool:
@@ -130,15 +125,14 @@ def _calculate_relevant_experience(
     if not context.normalized_resume or not context.normalized_resume.employment:
         return 0.0
 
+    from datetime import datetime
+
     from app.core.rule_config_manager import RuleConfigManager
     from app.services.experience_calculator import ExperienceCalculator
-    from datetime import datetime
     config = RuleConfigManager.get_config()
     noise_words = set(w.lower() for w in config.scoring.match.term_matching.noise_words)
     if not noise_words:
         noise_words = {"manager", "senior", "lead", "associate", "analyst", "specialist", "executive", "director", "engineer", "developer", "consultant"}
-        
-    tax_rules = config.scoring.taxonomy
     sp = config.scoring.match.scoring_parameters
     threshold_relevant = sp.experience_relevance_threshold # e.g. 7.0
     threshold_partial = sp.experience_partial_threshold # e.g. 5.5
@@ -899,9 +893,10 @@ class ComponentScoreEvaluator:
                 reason_str += f" | Education mismatch requires HR review: vacancy requires '{education_req}'."
 
         # Penalty for keyword-only matches (0% skills match but high domain/other scores)
-        if skills_score is not None and skills_score == 0.0 and final_score > 40.0:
-            final_score = min(final_score, 40.0)
-            reason_str += " | Capped score due to 0% skills match (keyword-only match)."
+        zero_skills_cap = getattr(typed_config, "zero_skills_score_cap", getattr(params, "zero_skills_score_cap", 40.0))
+        if skills_score is not None and skills_score == 0.0 and final_score > zero_skills_cap:
+            final_score = min(final_score, zero_skills_cap)
+            reason_str += f" | Capped score due to 0% skills match (keyword-only match, cap: {zero_skills_cap}%)."
 
         return ComponentScoreResults(
             role_score=role_score,
@@ -1284,7 +1279,7 @@ class VacancyFitEvaluator:
                     "reason": f"Candidate has {cand_exp:.1f} years; vacancy requires {min_exp:.1f} years.",
                 }
             )
-        rejection_cap = max(0.0, typed_config.match_medium_threshold - 0.1)
+        rejection_cap = typed_config.calculate_rejection_cap()
         if hard_failures:
             final_fit_score = round(min(rejection_cap, max(0.0, raw_fit_score)), 1)
             match_status = "NO_STRONG_VACANCY_MATCH"
@@ -1339,7 +1334,11 @@ class VacancyFitEvaluator:
         return None
 
     @classmethod
-    def resolve_opening_score(cls, opening: dict[str, Any] | Any) -> float:
+    def resolve_opening_score(
+        cls,
+        opening: dict[str, Any] | Any,
+        scoring_config: ScoringConfig | None = None,
+    ) -> float:
         """Resolve the canonical score while remaining compatible with legacy persisted matches."""
         if isinstance(opening, dict):
             fit_score = cls._parse_score_value(opening.get("vacancy_fit_score"))
@@ -1363,8 +1362,8 @@ class VacancyFitEvaluator:
         # Normalize legacy contradictory results (high score + rejection status)
         status = cls.classify_opening_fit(opening)
         if status == VacancyMatchStatus.NO_STRONG_MATCH.value:
-            scoring_config = ScoringConfig.load()
-            cap = max(0.0, scoring_config.match_medium_threshold - 0.1)
+            cfg = scoring_config if isinstance(scoring_config, ScoringConfig) else ScoringConfig.load()
+            cap = cfg.calculate_rejection_cap()
             if final_resolved_score > cap:
                 return float(cap)
                 
@@ -1390,9 +1389,29 @@ class VacancyFitEvaluator:
         else:
             status = str(getattr(opening, "vacancy_match_status", getattr(opening, "match_status", ""))).upper()
 
-        if status in {"MATCHED", "POTENTIAL_MATCH"}:
+        if status in {"MATCHED", "POTENTIAL_MATCH", "NO_STRONG_MATCH"}:
             return status
-            
+
+        # Legacy compatibility fallback for historical records / test fixtures without canonical status
+        if isinstance(opening, dict):
+            classification = str(opening.get("classification") or "").upper()
+            recommendation = str(opening.get("recommendation") or "").upper()
+            score_val = cls._parse_score_value(opening.get("score") or opening.get("overall_score") or opening.get("vacancy_fit_score"))
+        else:
+            classification = str(getattr(opening, "classification", "") or "").upper()
+            recommendation = str(getattr(opening, "recommendation", "") or "").upper()
+            score_val = cls._parse_score_value(getattr(opening, "score", None) or getattr(opening, "overall_score", None) or getattr(opening, "vacancy_fit_score", None))
+
+        if high_threshold is not None and score_val is not None and score_val < high_threshold:
+            if potential_threshold is not None and score_val >= potential_threshold:
+                return VacancyMatchStatus.POTENTIAL_MATCH.value
+            return VacancyMatchStatus.NO_STRONG_MATCH.value
+
+        if classification == "HIGH" or recommendation in {"STRONG_MATCH", "HIGH_MATCH"}:
+            return VacancyMatchStatus.MATCHED.value
+        if classification == "MEDIUM" or recommendation in {"POTENTIAL_MATCH", "MEDIUM_MATCH"}:
+            return VacancyMatchStatus.POTENTIAL_MATCH.value
+
         return VacancyMatchStatus.NO_STRONG_MATCH.value
 
     @classmethod

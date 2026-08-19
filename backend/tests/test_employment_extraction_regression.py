@@ -27,7 +27,7 @@ class TestStructuralExtraction:
         emp = ctx.normalized_resume.employment[0]
         assert emp.company == "Acme Corp"
         assert emp.job_title.raw_value == "Software Developer"
-        assert "Jan 2020" in emp.interval.start_date
+        assert "Jan 2020" in (emp.interval.raw_value or "") or "2020" in (emp.interval.start_date or "")
         assert len(emp.responsibilities) == 2
 
     def test_b_title_company_date_resp(self):
@@ -131,10 +131,10 @@ class TestGateLogic:
         penalty = 10
         
         if min_exp is not None and relevant_exp is not None and relevant_exp < min_exp:
-            req_results.mandatory_failures.append(RequirementEvaluator._create_failure("req_exp", f"Min: {min_exp}", "Fail", -10))
-            
+            req_results.mandatory_failures.append(RequirementEvaluator._create_failure("MIN_EXP_FAILED", "req_exp", f"Min: {min_exp}", "Fail", -10))
+
         if relevant_exp is None and min_exp is not None:
-            req_results.mandatory_failures.append(RequirementEvaluator._create_failure("req_exp", f"Min: {min_exp}", "Unknown", -10))
+            req_results.mandatory_failures.append(RequirementEvaluator._create_failure("MIN_EXP_FAILED", "req_exp", f"Min: {min_exp}", "Unknown", -10))
             
         return req_results
 

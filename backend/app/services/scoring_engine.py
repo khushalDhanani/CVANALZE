@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import functools
 import re
 from typing import Any
@@ -143,10 +144,8 @@ class ScoringEngine:
         missing = []
 
         assets = RuleConfigManager.get_term_matching_assets()
-        noise_words = set(assets.get("noise_words", []))
-        noise_words.update(["general", "knowledge", "basic", "advanced", "good", "excellent", "working", "understanding", "hands-on", "familiarity", "experience", "skills", "ability"])
-        noise_words = list(noise_words)
-        aliases = assets["aliases"]
+        noise_words = set(assets.get("noise_words") or [])
+        aliases = assets.get("aliases") or {}
 
         def normalize_token(token: str) -> str:
             if len(token) > 4 and token.endswith("ies"):
@@ -335,7 +334,7 @@ class ScoringEngine:
             missing_criteria=req_results.missing_criteria,
         )
 
-        return JobMatchResult(
+        match_result = JobMatchResult(
             job_id=job_ctx.job_id,
             job_title=job_ctx.title,
             department=job_ctx.department,
