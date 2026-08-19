@@ -489,6 +489,45 @@ export function useCvUpload() {
     }
   }, [startTimer, stopTimer]);
 
+  const stopProcessing = useCallback(() => {
+    stopPollTimer();
+    stopTimer();
+    setUploading(false);
+    setIsComplete(false);
+    setError('Processing stopped by user.');
+    setStatusMessage('CV analysis halted.');
+    setStepStates((prev) => {
+      const next = [...prev];
+      next[currentStepIndexRef.current] = 'failed';
+      return next;
+    });
+  }, [stopPollTimer, stopTimer]);
+
+  const resetUpload = useCallback(() => {
+    stopPollTimer();
+    stopTimer();
+    setUploading(false);
+    setIsComplete(false);
+    setStatusMessage(null);
+    setError(null);
+    setErrorDetails(null);
+    setFailedStepName(null);
+    setBasicResult(null);
+    setEnrichedResult(null);
+    setElapsedSeconds(0);
+    setCurrentStepIndex(0);
+    setStepStates([
+      'pending',
+      'pending',
+      'pending',
+      'pending',
+      'pending',
+      'pending',
+      'pending',
+      'pending',
+    ]);
+  }, [stopPollTimer, stopTimer, setCurrentStepIndex]);
+
   return {
     uploading,
     isComplete,
@@ -503,5 +542,7 @@ export function useCvUpload() {
     stepStates,
     uploadAndProcess,
     forceReanalyze,
+    stopProcessing,
+    resetUpload,
   };
 }

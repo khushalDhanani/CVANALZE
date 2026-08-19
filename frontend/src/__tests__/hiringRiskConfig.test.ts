@@ -52,7 +52,7 @@ const activeConfig = {
       },
     },
   },
-} as UnifiedRuleConfig;
+} as unknown as UnifiedRuleConfig;
 
 assertEquals(toMatchEngineConfig(activeConfig).HIRING_RISK_POLICIES, activeConfig.hiring_risks.policies);
 

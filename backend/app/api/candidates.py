@@ -51,6 +51,7 @@ def list_candidates(
     education: str | None = Query(None, description="Filter by education background"),
     status: str | None = Query(None, description="Filter candidate status"),
     min_similarity: float | None = Query(None, ge=0.0, le=1.0, description="Minimum vector similarity threshold"),
+    include_incomplete: bool = Query(False, description="Include incomplete or in-flight scanning candidates"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """
@@ -69,6 +70,7 @@ def list_candidates(
             education=education,
             status=status,
             min_similarity=min_similarity,
+            include_incomplete=include_incomplete,
             limit=limit,
         )
         res = CandidateSearchService.search_candidates(req)
@@ -150,13 +152,15 @@ async def reprocess_candidate(candidate_id: str):
     cv_key = str(existing_result.get("id") or existing_result.get("scan_id") or requested_key)
     result_filename = f"{cv_key}.json"
 
-    # Prevent duplicate concurrent reprocessing jobs
-    if existing_result.get("status") == "processing":
+    # Prevent duplicate concurrent reprocessing jobs only if an active worker job is actually running
+    active_job = ProcessingJobRepository.get_by_cv_key(cv_key)
+    active_state = str(getattr(active_job.state, "value", active_job.state)) if active_job else ""
+    if active_job and active_state in ("QUEUED", "PROCESSING", "RETRYING"):
         return {
-            "message": existing_result.get("message") or "Analysis is already in progress for this candidate.",
+            "message": active_job.message or "Analysis is already in progress for this candidate.",
             "cv_key": cv_key,
             "status": "processing",
-            "progress": existing_result.get("progress", 20),
+            "progress": active_job.progress,
         }
 
     filename = existing_result.get("filename") or f"{cv_key}.pdf"

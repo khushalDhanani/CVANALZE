@@ -476,10 +476,10 @@ class ProcessingQueueService:
     ) -> bool:
         if existing is None:
             return False
-        if existing.state in (JobState.QUEUED, JobState.PROCESSING, JobState.RETRYING):
-            return existing.execution_mode != ProcessingExecutionMode.PENDING
         if force_reprocess:
             return False
+        if existing.state in (JobState.QUEUED, JobState.PROCESSING, JobState.RETRYING):
+            return existing.execution_mode != ProcessingExecutionMode.PENDING
         if existing.state in (JobState.COMPLETED, JobState.COMPLETED_DEGRADED):
             return ResultRepository.resolve_result(existing.cv_key) is not None
         return False

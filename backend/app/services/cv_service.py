@@ -353,18 +353,35 @@ async def process_cv_file(
 
             stage_durations_ms["resume_extraction_ms"] = round((asyncio.get_event_loop().time() - t_ext_start) * 1000.0, 2)
 
-            from app.services.embedding_service import save_candidate_embedding
+            from app.services.embedding_service import (
+                generate_candidate_multi_vector_embeddings,
+                save_candidate_embedding,
+            )
             from app.services.match_service import MatchService
 
             def _generate_and_store_embedding():
-                emb = EmbeddingService.generate_embedding(
+                multi_vecs = generate_candidate_multi_vector_embeddings(
+                    cv_key,
+                    extraction.markdown,
+                    resume_json=resume_json,
+                )
+                overall_emb = multi_vecs.get("overall") or EmbeddingService.generate_embedding(
                     extraction.markdown,
                     model_version=None,
                     identifier=cv_key,
                 )
-                if emb:
-                    save_candidate_embedding(cv_key, emb, cv_hash)
-                return emb
+                if overall_emb:
+                    save_candidate_embedding(
+                        cv_key,
+                        overall_emb,
+                        cv_hash,
+                        profile_embedding=multi_vecs.get("profile"),
+                        skills_embedding=multi_vecs.get("skills"),
+                        experience_embedding=multi_vecs.get("experience"),
+                        projects_embedding=multi_vecs.get("projects"),
+                        domain_embedding=multi_vecs.get("domain"),
+                    )
+                return overall_emb
 
             current_stage = "ai_analysis"
             await _save_interim_status(60, current_stage)
@@ -398,10 +415,12 @@ async def process_cv_file(
             name_extraction_source = contact_info.get("extraction_source")
 
             location_val = contact_info.get("location")
+            from app.services.resume_field_extractor import ResumeFieldExtractor
+
             work_exp = (resume_json or {}).get("work_experience") or []
-            top_exp = work_exp[0] if work_exp else {}
-            job_title_val = contact_info.get("job_title") or top_exp.get("job_title")
-            company_val = contact_info.get("company_name") or contact_info.get("company") or top_exp.get("company")
+            latest_exp = ResumeFieldExtractor.resolve_latest_employment(work_exp)
+            job_title_val = contact_info.get("job_title") or latest_exp.get("job_title")
+            company_val = contact_info.get("company_name") or contact_info.get("company") or latest_exp.get("company")
 
             raw_fc = contact_info.get("field_confidence") or {}
             raw_fct = contact_info.get("field_confidence_tiers") or {}

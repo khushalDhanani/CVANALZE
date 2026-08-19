@@ -26,7 +26,7 @@ const response = {
   ...renderedCandidate,
   analysis_run_id: 'analysis_fresh',
   match_analysis: { best_match: freshOpening, suitable_openings: [freshOpening], unsuitable_openings: [] },
-} as CVUploadResponse;
+} as unknown as CVUploadResponse;
 
 async function run(): Promise<void> {
   await reanalyzeCandidateAndCommit({

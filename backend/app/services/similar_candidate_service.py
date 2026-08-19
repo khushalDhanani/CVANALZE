@@ -29,18 +29,28 @@ class SimilarCandidateService:
                     stmt = (
                         select(
                             CandidateEmbedding.cv_key,
-                            CandidateEmbedding.embedding.cosine_distance(cv_embedding).label("distance"),
+                            CandidateEmbedding.embedding.cosine_distance(cv_embedding).label("overall_dist"),
+                            CandidateEmbedding.skills_embedding.cosine_distance(cv_embedding).label("skills_dist"),
+                            CandidateEmbedding.experience_embedding.cosine_distance(cv_embedding).label("experience_dist"),
                         )
                         .where(CandidateEmbedding.cv_key != target_cv_key)
-                        .order_by("distance")
+                        .order_by("overall_dist")
                         .limit(limit)
                     )
                     rows = session.execute(stmt).all()
                     for r in rows:
                         other_key = str(r.cv_key)
-                        dist = float(r.distance) if r.distance is not None else 1.0
-                        sim = round(max(0.0, 1.0 - dist), 4)
-                        scores[other_key] = sim
+                        dist_o = float(r.overall_dist) if r.overall_dist is not None else 1.0
+                        dist_s = float(r.skills_dist) if r.skills_dist is not None else dist_o
+                        dist_e = float(r.experience_dist) if r.experience_dist is not None else dist_o
+
+                        sim_o = max(0.0, 1.0 - dist_o)
+                        sim_s = max(0.0, 1.0 - dist_s)
+                        sim_e = max(0.0, 1.0 - dist_e)
+
+                        # Weighted multi-vector similarity: 40% overall + 30% skills + 30% experience
+                        comp_sim = round(0.40 * sim_o + 0.30 * sim_s + 0.30 * sim_e, 4)
+                        scores[other_key] = comp_sim
         except Exception as exc:
             logger.warning(f"[SIMILAR_CANDIDATES] pgvector search failed: {exc}")
 

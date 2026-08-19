@@ -19,6 +19,18 @@ class CandidateSearchRequest(BaseModel):
     status: str | None = Field(None, description="Filter candidate status")
     limit: int = Field(50, ge=1, le=200, description="Maximum number of candidate results to return")
     min_similarity: float | None = Field(None, ge=0.0, le=1.0, description="Minimum vector similarity threshold")
+    include_incomplete: bool = Field(
+        False,
+        description="Whether to include in-flight scanning or processing candidates (default: False)",
+    )
+    search_section: str | None = Field(
+        None,
+        description="Target vector section for semantic search ('profile', 'skills', 'experience', 'projects', 'domain', 'all', 'weighted')",
+    )
+    section_weights: dict[str, float] | None = Field(
+        None,
+        description="Custom weights dictionary for multi-vector scoring (e.g. {'skills': 0.4, 'experience': 0.4, 'profile': 0.2})",
+    )
 
 
 class CandidateSearchResultItem(BaseModel):
@@ -42,6 +54,8 @@ class CandidateSearchResultItem(BaseModel):
     page_count: int = Field(1, description="Page count of parsed CV")
     is_scanned: bool = Field(False, description="Whether document was scanned PDF")
     ocr_applied: bool = Field(False, description="Whether OCR was applied")
+    is_complete: bool = Field(True, description="Whether candidate scan and processing is fully completed")
+    processing_stage: str | None = Field(None, description="Current background processing stage label")
     primary_department: str | None = Field(None, description="Primary matching department")
     experience_years: float | None = Field(None, description="Total experience in years")
     gross_display: str | None = Field(None, description="Formatted gross experience text")
@@ -49,6 +63,10 @@ class CandidateSearchResultItem(BaseModel):
     similarity_score: float | None = Field(
         None,
         description="Semantic vector similarity score (0.0 to 1.0) when query is supplied",
+    )
+    vector_scores: dict[str, float] | None = Field(
+        None,
+        description="Per-section vector similarity scores ('profile', 'skills', 'experience', 'projects', 'domain', 'overall')",
     )
 
     search_mode: str = Field("keyword", description="Search execution mode: 'semantic' or 'keyword'")

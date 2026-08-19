@@ -176,6 +176,54 @@ export function useCvQueueUploads() {
     setItems((current) => current.filter((item) => !TERMINAL_STATES.has(item.state)));
   }, []);
 
+  const stopItem = useCallback((clientId: string) => {
+    stopPolling(clientId);
+    updateItem(clientId, {
+      state: 'FAILED',
+      message: 'Processing stopped by user.',
+      error: 'Processing stopped by user.',
+    });
+  }, [stopPolling, updateItem]);
+
+  const stopAll = useCallback(() => {
+    items.forEach((item) => {
+      if (!TERMINAL_STATES.has(item.state)) {
+        stopItem(item.clientId);
+      }
+    });
+  }, [items, stopItem]);
+
+  const clearAll = useCallback(() => {
+    timersRef.current.forEach((timer) => clearTimeout(timer));
+    timersRef.current.clear();
+    setItems([]);
+  }, []);
+
+  const removeItem = useCallback((clientId: string) => {
+    stopPolling(clientId);
+    setItems((current) => current.filter((item) => item.clientId !== clientId));
+  }, [stopPolling]);
+
+  const reprocessItem = useCallback((clientId: string) => {
+    const item = items.find((i) => i.clientId === clientId);
+    if (!item || !item.cvKey) return;
+    updateItem(clientId, {
+      state: 'PROCESSING',
+      progress: 10,
+      message: 'Re-submitting CV for match analysis...',
+      error: undefined,
+      errorCode: undefined,
+      syncError: undefined,
+    });
+    pollItem(clientId, item.cvKey, true);
+  }, [items, pollItem, updateItem]);
+
+  const reprocessFailed = useCallback(() => {
+    items.filter((i) => i.state === 'FAILED' && i.cvKey).forEach((item) => {
+      reprocessItem(item.clientId);
+    });
+  }, [items, reprocessItem]);
+
   useEffect(() => {
     mountedRef.current = true;
     void hydrateQueue();
@@ -192,6 +240,12 @@ export function useCvQueueUploads() {
     isActive: items.some((item) => !TERMINAL_STATES.has(item.state)),
     uploadFiles,
     clearFinished,
+    clearAll,
+    stopItem,
+    stopAll,
+    removeItem,
+    reprocessItem,
+    reprocessFailed,
     hydrationError,
     refreshQueue: hydrateQueue,
   };

@@ -94,7 +94,14 @@ def register_recurring_jobs(scheduler: CronScheduler) -> int:
 
 def main() -> None:
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
-    scheduler = ResilientCronScheduler(connection=Redis.from_url(redis_url), logging_level="INFO")
+    redis_conn = Redis.from_url(
+        redis_url,
+        socket_timeout=10.0,
+        socket_connect_timeout=5.0,
+        retry_on_timeout=True,
+        health_check_interval=30,
+    )
+    scheduler = ResilientCronScheduler(connection=redis_conn, logging_level="INFO")
     registered = register_recurring_jobs(scheduler)
     if registered == 0:
         logger.warning("No recurring background jobs are enabled; scheduler will not start.")

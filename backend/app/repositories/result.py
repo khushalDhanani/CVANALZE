@@ -608,7 +608,45 @@ class ResultRepository:
         return True
 
     @classmethod
-    def list_all_results(cls) -> list[dict[str, Any]]:
+    def is_completed_result(cls, data: dict[str, Any]) -> bool:
+        """
+        Return True if candidate record represents a fully completed scan/analysis.
+        Excludes in-flight scanning, processing, queued, pending, or failed interim records.
+        """
+        if not data or not isinstance(data, dict):
+            return False
+
+        status = str(data.get("status") or "").strip().upper()
+        if status in {"PROCESSING", "SCANNING", "QUEUED", "PENDING", "FAILED"}:
+            return False
+
+        if data.get("is_complete") is False:
+            return False
+
+        if data.get("persistence_status") == "interim":
+            return False
+
+        progress = data.get("progress")
+        if progress is not None and isinstance(progress, (int, float)) and progress < 100:
+            if status not in {"COMPLETED", "COMPLETED_DEGRADED", "NEW_CV", "REPROCESSED", "CACHE_HIT"}:
+                return False
+
+        # Reject empty/corrupted shell records lacking basic candidate identity or parsed content
+        has_content = bool(
+            data.get("full_name")
+            or data.get("candidate_name")
+            or data.get("filename")
+            or data.get("resume_json")
+            or data.get("markdown")
+            or data.get("text")
+        )
+        if not has_content:
+            return False
+
+        return True
+
+    @classmethod
+    def list_all_results(cls, include_incomplete: bool = False) -> list[dict[str, Any]]:
         results_by_id: dict[str, dict[str, Any]] = {}
 
         if _REDIS_CLIENT:
@@ -650,7 +688,35 @@ class ResultRepository:
         except Exception as exc:
             logger.warning(f"Failed to query DB in list_all_results: {exc}")
 
-
         items = list(results_by_id.values())
-        items.sort(key=lambda x: str(x.get("created_at") or x.get("parsed_at") or ""), reverse=True)
+        if not include_incomplete:
+            items = [item for item in items if cls.is_completed_result(item)]
+
+        def _parse_ts(val: Any) -> float:
+            if not val:
+                return 0.0
+            if isinstance(val, (int, float)):
+                return float(val)
+            if isinstance(val, str):
+                v = val.strip()
+                if not v:
+                    return 0.0
+                try:
+                    from datetime import datetime
+                    return datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    try:
+                        return float(v)
+                    except Exception:
+                        return 0.0
+            return 0.0
+
+        def _get_ts(x: dict[str, Any]) -> float:
+            for k in ("parsed_at", "created_at", "scanned_at", "updated_at"):
+                t = _parse_ts(x.get(k))
+                if t > 0:
+                    return t
+            return 0.0
+
+        items.sort(key=_get_ts, reverse=True)
         return items

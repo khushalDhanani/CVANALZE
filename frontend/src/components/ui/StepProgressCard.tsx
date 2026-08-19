@@ -33,6 +33,8 @@ export interface StepProgressCardProps {
   failedStepName?: string | null;
   useLlmEnrichment?: boolean;
   onRetry?: () => void;
+  onStop?: () => void;
+  onClear?: () => void;
   isProcessing?: boolean;
   isComplete?: boolean;
   className?: string;
@@ -55,6 +57,8 @@ export function StepProgressCard({
   failedStepName,
   useLlmEnrichment = true,
   onRetry,
+  onStop,
+  onClear,
   isProcessing = false,
   isComplete = false,
   className = '',
@@ -74,7 +78,7 @@ export function StepProgressCard({
 
   return (
     <View className={`bg-surface border border-border rounded-md p-3 shadow-sm ${className}`}>
-      {/* Header Row: Title, Status Badge, Elapsed Time */}
+      {/* Header Row: Title, Status Badge, Action Buttons, Elapsed Time */}
       <View className="flex-row items-center justify-between mb-2.5 border-b border-border/60 pb-2">
         <View className="flex-row items-center gap-2">
           {isProcessing ? (
@@ -97,12 +101,32 @@ export function StepProgressCard({
           </Text>
         </View>
 
-        {/* Elapsed Timer Badge */}
-        <View className="flex-row items-center gap-1.5 bg-background border border-border px-2.5 py-1 rounded-full">
-          <Clock size={13} color={isProcessing ? COLORS.primary : COLORS.textMuted} />
-          <Text className="text-xs font-sans-mono font-medium text-text-primary">
-            {formatElapsedTime(elapsedSeconds)}
-          </Text>
+        <View className="flex-row items-center gap-2">
+          {/* Action Buttons: Stop or Clear */}
+          {isProcessing && onStop && (
+            <Button
+              label="Stop"
+              variant="destructive"
+              size="sm"
+              onPress={onStop}
+            />
+          )}
+          {(isComplete || !!error) && onClear && (
+            <Button
+              label="Clear"
+              variant="secondary"
+              size="sm"
+              onPress={onClear}
+            />
+          )}
+
+          {/* Elapsed Timer Badge */}
+          <View className="flex-row items-center gap-1.5 bg-background border border-border px-2.5 py-1 rounded-full">
+            <Clock size={13} color={isProcessing ? COLORS.primary : COLORS.textMuted} />
+            <Text className="text-xs font-sans-mono font-medium text-text-primary">
+              {formatElapsedTime(elapsedSeconds)}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -159,7 +183,7 @@ export function StepProgressCard({
           {onRetry && (
             <View className="self-start mt-1">
               <Button
-                label="Retry Upload"
+                label="Re-process CV"
                 variant="destructive"
                 size="sm"
                 icon={<RefreshCw size={12} color={COLORS.textInverse} />}

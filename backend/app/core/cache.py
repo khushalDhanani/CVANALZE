@@ -20,7 +20,14 @@ if settings.REDIS_URL:
     try:
         import redis as redis_module
 
-        _REDIS_CLIENT = redis_module.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        _REDIS_CLIENT = redis_module.Redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            socket_timeout=10.0,
+            socket_connect_timeout=5.0,
+            retry_on_timeout=True,
+            health_check_interval=30,
+        )
         _REDIS_CLIENT.ping()
     except Exception:
         _REDIS_CLIENT = None

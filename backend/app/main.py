@@ -114,6 +114,8 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/health")
+@app.get("/api/health")
+@app.get("/api/v1/health")
 async def health() -> JSONResponse:
     dependency_checks = [
         asyncio.to_thread(_database_health, mssql_read_engine, "MSSQL"),

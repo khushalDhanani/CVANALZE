@@ -72,6 +72,8 @@ export default function CvMatchScreen() {
     stepStates,
     uploadAndProcess,
     forceReanalyze,
+    stopProcessing,
+    resetUpload,
   } = useCvUpload();
   const {
     items: queuedUploads,
@@ -79,6 +81,12 @@ export default function CvMatchScreen() {
     isActive: queueIsActive,
     uploadFiles,
     clearFinished,
+    clearAll,
+    stopItem,
+    stopAll,
+    removeItem,
+    reprocessItem,
+    reprocessFailed,
     hydrationError: queueHydrationError,
   } = useCvQueueUploads();
 
@@ -306,9 +314,18 @@ export default function CvMatchScreen() {
                       <Text className="text-sm font-sans-bold text-text-primary">CV Processing Queue</Text>
                       <Text className="text-xs font-sans text-text-muted">Execution order is controlled exclusively by the backend FIFO worker.</Text>
                     </View>
-                    {!queueIsActive && (
-                      <Button label="Clear Finished" variant="secondary" size="sm" onPress={clearFinished} />
-                    )}
+                    <View className="flex-row items-center gap-1.5">
+                      {queueIsActive && (
+                        <Button label="Stop Queue" variant="destructive" size="sm" onPress={stopAll} />
+                      )}
+                      {queueSummary.FAILED > 0 && (
+                        <Button label="Re-process Failed CVs" variant="destructive" size="sm" onPress={reprocessFailed} />
+                      )}
+                      {!queueIsActive && (
+                        <Button label="Clear Finished" variant="secondary" size="sm" onPress={clearFinished} />
+                      )}
+                      <Button label="Clear All" variant="secondary" size="sm" onPress={clearAll} />
+                    </View>
                   </View>
                   <View className="flex-row flex-wrap gap-1.5">
                     <Badge label={`${queueSummary.PROCESSING} Processing`} tone="info" />
@@ -321,12 +338,24 @@ export default function CvMatchScreen() {
                     {queuedUploads.map((item) => {
                       const stateMeta = getCvQueueStateMeta(item.state);
                       const tracking = item.jobId ? `Job ${item.jobId}` : 'Preparing upload';
+                      const isItemActive = item.state === 'PROCESSING' || item.state === 'PENDING' || item.state === 'RETRYING';
                       return (
                         <DenseRow
                           key={item.clientId}
                           title={item.filename}
                           subtitle={`${tracking} · ${item.progress}% · ${item.errorCode ? `${item.errorCode}: ` : ''}${item.message}${item.syncError ? ` · Refresh error: ${item.syncError}` : ''}`}
-                          trailing={<Badge label={stateMeta.label} tone={stateMeta.tone} />}
+                          trailing={
+                            <View className="flex-row items-center gap-1.5">
+                              {isItemActive && (
+                                <Button label="Stop" variant="destructive" size="sm" onPress={() => stopItem(item.clientId)} />
+                              )}
+                              {item.state === 'FAILED' && (
+                                <Button label="Re-process" variant="destructive" size="sm" onPress={() => reprocessItem(item.clientId)} />
+                              )}
+                              <Button label="Remove" variant="secondary" size="sm" onPress={() => removeItem(item.clientId)} />
+                              <Badge label={stateMeta.label} tone={stateMeta.tone} />
+                            </View>
+                          }
                         />
                       );
                     })}
@@ -344,6 +373,8 @@ export default function CvMatchScreen() {
                   error={uploadError}
                   useLlmEnrichment={useLlmEnrichment}
                   onRetry={handleRetry}
+                  onStop={stopProcessing}
+                  onClear={resetUpload}
                   isProcessing={uploading}
                   isComplete={isComplete}
                 />

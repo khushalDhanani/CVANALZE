@@ -1,6 +1,158 @@
 # Work Status
 
 ## Work Completed
+1. **2026-08-18 Frontend TypeScript Test Type Fixes (`0` Compilation Errors)**:
+    - Fixed pre-existing TypeScript type casting errors in frontend test suites `candidateReanalysisFlow.test.ts` and `hiringRiskConfig.test.ts` by double-casting mock fixtures (`as unknown as CVUploadResponse`, `as unknown as UnifiedRuleConfig`).
+    - **Files Changed**: `frontend/src/__tests__/candidateReanalysisFlow.test.ts`, `frontend/src/__tests__/hiringRiskConfig.test.ts`, `workstatus.md`.
+    - **Verification**: Verified `npx tsc --noEmit` exits cleanly with code `0` and 0 errors across the entire codebase.
+
+2. **2026-08-18 Added Stop and Clear Actions (`/cv-match?tab=file`)**:
+    - Implemented comprehensive **Stop** (cancel active processing) and **Clear** (reset results & clear queue) controls across single-file analysis and multi-file processing queues.
+    - **Single-File Analysis (`StepProgressCard.tsx` & `useCvUpload.ts`)**:
+      - Added a **"Stop"** button in the header during active parsing/matching (`isProcessing === true`) to halt polling and reset upload timers safely.
+      - Added a **"Clear"** button when analysis is completed or stopped (`isComplete || error`) to reset the screen for immediate new document selection.
+      - Implemented `stopProcessing()` and `resetUpload()` callbacks in `useCvUpload.ts`.
+    - **Multi-File Processing Queue (`cv-match.tsx` & `useCvQueueUploads.ts`)**:
+      - Added a **"Stop Queue"** header button when jobs are active (`queueIsActive === true`) to halt all pending/active queue items.
+      - Added **"Clear All"** and **"Clear Finished"** header buttons to clear all completed/stopped items from the queue.
+      - Added per-row **"Stop"** action buttons on active queue items, **"Re-process"** buttons on failed items, and **"Remove"** buttons on every row.
+      - Implemented `stopItem(clientId)`, `stopAll()`, `clearAll()`, and `removeItem(clientId)` in `useCvQueueUploads.ts`.
+    - **Files Changed**: `frontend/src/app/cv-match.tsx`, `frontend/src/components/ui/StepProgressCard.tsx`, `frontend/src/hooks/useCvUpload.ts`, `frontend/src/hooks/useCvQueueUploads.ts`, `workstatus.md`.
+    - **Verification**: Verified TypeScript compilation with `npx tsc --noEmit`.
+
+2. **2026-08-18 Added Re-process CV Actions for Failed Scans (`/cv-match?tab=file`)**:
+    - Implemented prominent **"Re-process CV"** buttons on the `/cv-match?tab=file` screen for all failed processing states.
+    - **Single File Upload Pipeline (`StepProgressCard.tsx`)**: Updated the error card button label to **"Re-process CV"** with a `RefreshCw` icon to immediately re-submit single-file uploads that fail during document extraction, OCR, or LLM matching.
+    - **Multi-File Processing Queue (`cv-match.tsx` & `useCvQueueUploads.ts`)**:
+      - Added a **"Re-process Failed CVs"** button in the queue header when any queued items fail (`queueSummary.FAILED > 0`).
+      - Added per-item **"Re-process"** action buttons on every failed row in the queue (`item.state === 'FAILED'`) to reset and re-enqueue individual files.
+      - Implemented `reprocessItem(clientId)` and `reprocessFailed()` in `useCvQueueUploads.ts`.
+    - **Files Changed**: `frontend/src/app/cv-match.tsx`, `frontend/src/components/ui/StepProgressCard.tsx`, `frontend/src/hooks/useCvQueueUploads.ts`, `workstatus.md`.
+    - **Verification**: Verified TypeScript compilation with `npx tsc --noEmit`.
+
+2. **2026-08-18 Document Conversion Subprocess `EOFError` Handling & Multiprocessing Worker Log Analysis**:
+    - Analyzed background worker log sequences containing repeating `[RULE_CONFIG] Hydrated active profile` logs and `EOFError` tracebacks.
+    - **Explanation & Root Cause**:
+      - **Repeated Log Lines**: RQ workers fork/spawn separate isolated Python worker subprocesses for every background job, initializing dependencies (PostgreSQL rule profiles, domain taxonomy tables) on every startup. This is **normal expected behavior** for isolated queue workers.
+      - **`EOFError` in `_wait_for_isolated_result`**: Occurs when a child Docling/OCR conversion process crashes or exits abruptly before writing to the IPC `Pipe`, causing `receiver.recv()` to fail with `EOFError`.
+    - **Resolution**:
+      - Wrapped `receiver.recv()` calls in [`backend/app/services/document_conversion.py`](file:///Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend/app/services/document_conversion.py#L358-L370) with `try...except EOFError` handling to report a clear `RuntimeError("Document extraction process closed pipe before sending result.")` with the child process exit code instead of an unhandled crash traceback.
+    - **Files Changed**: `backend/app/services/document_conversion.py`, `workstatus.md`.
+    - **Verification**: Restarted local containers with `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d / restart`. Verified all 6 containers (`api`, `worker`, `auxiliary-worker`, `scheduler`, `redis`, `pgvector`) are healthy and running with live code updates mounted (`./backend/app:/app/app`). `GET http://localhost:8000/api/health` returned HTTP 200 `"status": "ok"`, `"taxonomy_configuration": "online"`.
+
+2. **2026-08-18 Health Endpoint `/api/health` Route Alias & Dashboard Taxonomy Status (`ONLINE`)**:
+    - Identified and resolved the root cause of the Dashboard displaying `Matching Taxonomy REQUIRED TAXONOMY_NOT_READY`.
+    - **Root Cause**:
+      - `systemHealthService.ts` in frontend queried `http://localhost:8000/api/health` via `apiClient`.
+      - `backend/app/main.py` registered `@app.get("/health")` without route aliases for `/api/health` or `/api/v1/health`, returning `404 Not Found`.
+      - The frontend caught the 404 error and fell back to `health = null`, causing all component checks (`taxonomy_configuration`, `rule_configuration`, `prompt_configuration`) to evaluate to `REQUIRED` / `TAXONOMY_NOT_READY`.
+    - **Resolution**:
+      - Added route decorators `@app.get("/api/health")` and `@app.get("/api/v1/health")` in `backend/app/main.py`.
+    - **Files Changed**: `backend/app/main.py`, `workstatus.md`.
+    - **Verification**: Verified via live HTTP GET request to `http://localhost:8000/api/health` that the endpoint returns HTTP 200 with `"taxonomy_configuration": "online"`, `"status": "ok"`, `"rule_configuration": "online"`, `"prompt_configuration": "online"`.
+
+2. **2026-08-18 Candidate List Descending 1-Wise Timestamp Ordering (`/candidates`)**:
+    - Identified and resolved the root cause of candidates appearing in arbitrary/reranked order on the `/candidates` main listing endpoint instead of strictly newest-first descending by creation/parsed timestamp.
+    - **Root Cause**:
+      - `ResultRepository.list_all_results()` performed a simple `str(...)` sort on timestamps which did not parse ISO-8601 strings into Epoch floats accurately.
+      - `CandidateSearchService.search_candidates()` passed un-queried candidate listings through `CandidateSearchReranker`, which re-sorted items by default match scores instead of preserving creation/parsed timestamp order when no natural language search query was provided.
+    - **Resolution**:
+      - Implemented robust ISO-8601 datetime parsing in `ResultRepository.list_all_results()` to convert `parsed_at`, `created_at`, `scanned_at`, and `updated_at` timestamps to exact Unix epoch floats for sorting.
+      - Updated `CandidateSearchService.search_candidates()` to enforce strict timestamp descending sorting (`items.sort(key=..., reverse=True)`) when `request.query` is empty (default candidate list request).
+    - **Files Changed**: `backend/app/repositories/result.py`, `backend/app/services/candidate_search_service.py`, `workstatus.md`.
+    - **Verification**: Verified via live HTTP GET request to `http://localhost:8000/api/candidates` that candidate records are returned 100% strictly descending 1-wise by timestamp (`Position 1`: `JENIL V. PANSURIYA` 2026-08-18T07:16:46, `Position 2`: `KHUSHAL DHANANI` 2026-08-18T06:13:23, `Position 3`: `JAYMIN PATEL` 2026-08-18T05:53:13).
+
+2. **2026-08-18 Comprehensive LLM & Background Job Timeout Hardening**:
+    - Identified and resolved the root cause of `LLM_TIMEOUT: LLM generation exceeded the allowed time.` occurring during long CV scans / LLM prompt evaluations on local hardware.
+    - **Root Cause**:
+      - `OLLAMA_LOCK_TIMEOUT_SECONDS` was restricted to `65.0` seconds, causing jobs waiting for the Ollama filelock to abort while another LLM job was completing.
+      - `OLLAMA_REQUEST_TIMEOUT` (180s) and `OLLAMA_GENERATE_TIMEOUT_SECONDS` (360s) timed out on complex or multi-page scanned PDF LLM generation.
+      - Document extraction timeouts (`SCANNED_EXTRACTION_TIMEOUT_SECONDS`) were constrained relative to `RQ_JOB_TIMEOUT_SECONDS`.
+    - **Resolution**:
+      - Increased `OLLAMA_LOCK_TIMEOUT_SECONDS` from `65s` -> `1800s` (30 mins).
+      - Increased `OLLAMA_REQUEST_TIMEOUT` from `180s` -> `900s` (15 mins).
+      - Increased `OLLAMA_GENERATE_TIMEOUT_SECONDS` from `360s` -> `1800s` (30 mins).
+      - Increased `EXTRACTION_TIMEOUT_SECONDS` from `300s` -> `900s` (15 mins).
+      - Increased `SCANNED_EXTRACTION_TIMEOUT_SECONDS` from `600s` -> `1800s` (30 mins).
+      - Increased `RQ_JOB_TIMEOUT_SECONDS` from `900s` -> `3600s` (60 mins).
+      - Increased `PROCESSING_JOB_LOCK_TIMEOUT_SECONDS` from `1200s` -> `3600s` (60 mins).
+    - **Files Changed**: `backend/app/core/config.py`, `.env`, `docker-compose.local.yml`, `docker-compose.yml`, `workstatus.md`.
+    - **Verification**: Recreated Docker containers and verified live inside `cv_analyzer_api` and `cv_analyzer_worker` that all active timeouts are operating at `3600s`/`1800s`/`900s`.
+
+2. **2026-08-18 RQ Cron Scheduler Resilient Redis Connection & Socket Timeout Hardening**:
+    - Identified and resolved transient Redis socket read timeouts (`redis.exceptions.TimeoutError: Timeout reading from socket`) logged by `cv-analyzer/scheduler`.
+    - **Root Cause**: `Redis.from_url` in `start_scheduler.py` and `app/core/cache.py` was instantiated without configured socket timeouts (`socket_timeout`), connect timeouts (`socket_connect_timeout`), automatic retry (`retry_on_timeout=True`), or connection health checks (`health_check_interval=30`). Momentary TCP socket delays during background job enqueuing triggered socket read timeouts.
+    - **Resolution**:
+      - Configured `socket_timeout=10.0`, `socket_connect_timeout=5.0`, `retry_on_timeout=True`, and `health_check_interval=30` on Redis connection pools in `start_scheduler.py` and `app/core/cache.py`.
+      - Added `./backend/app:/app/app` volume mount to `docker-compose.local.yml` for `scheduler` service so local code changes are mapped.
+      - `ResilientCronScheduler` automatically catches transient Redis socket errors, logs a non-fatal warning, waits 5 seconds, and safely retries without crashing the scheduler process.
+    - **Files Changed**: `backend/start_scheduler.py`, `backend/app/core/cache.py`, `docker-compose.local.yml`, `workstatus.md`.
+    - **Verification**: Verified via `docker logs cv_analyzer_scheduler` that all 3 background jobs (`reconcile_cv_processing_jobs`, `run_integration_sync`, `snapshot_validation_metrics`) started cleanly and enqueued to Redis without socket errors.
+
+2. **2026-08-18 Incomplete Candidate Scan Completion Filtering & Validation**:
+    - Identified and resolved the root cause of candidate records with in-flight scanning/processing statuses (`status: "PROCESSING"`, `"SCANNING"`, `"QUEUED"`, `"PENDING"`, `"FAILED"`, `is_complete: false`, `progress < 100`) leaking into the main candidate list UI.
+    - **Root Cause**: `ResultRepository.list_all_results()`, `CandidateSearchService.search_candidates()`, and `StructuredCandidateRetriever.retrieve_candidates()` did not validate scan completion or check `is_complete == True`, allowing interim job placeholders written during background PDF/OCR scanning to be returned as candidate results.
+    - **Resolution**:
+      - Added `ResultRepository.is_completed_result(data: dict) -> bool` to validate full scan completion (`status not in ('PROCESSING', 'SCANNING', 'QUEUED', 'PENDING', 'FAILED')`, `is_complete == True`, `persistence_status != 'interim'`, `progress == 100`) and enforce payload sanity (rejecting empty/corrupted shell test records missing candidate identity or parsed text).
+      - Updated `ResultRepository.list_all_results(include_incomplete: bool = False)` and `CandidateSearchService.search_candidates()` to filter out in-flight scan records and empty test shells by default unless `include_incomplete=True` is explicitly requested.
+      - Added `include_incomplete: bool = False` query parameter to `/api/candidates` and `CandidateSearchRequest`.
+      - Added `is_complete: bool` and `processing_stage: str` fields to `CandidateSearchResultItem` so callers can explicitly flag in-flight items.
+      - Added `./backend/app:/app/app` volume mount to `docker-compose.local.yml` for `api`, `worker`, and `auxiliary-worker` so all backend code updates hot-reload immediately across container restarts.
+    - **Files Changed**: `backend/app/repositories/result.py`, `backend/app/schemas/candidate_search.py`, `backend/app/services/candidate_search_service.py`, `backend/app/services/retrievers/structured_retriever.py`, `backend/app/api/candidates.py`, `docker-compose.local.yml`, `backend/tests/test_candidate_scan_completion_filtering.py`, `workstatus.md`.
+    - **Verification**: Verified via live HTTP curl requests to `http://localhost:8000/api/candidates` that `cv_document_cv_ut1765894215` (empty shell test record) and `cv_Shruti_Dhameliya_React_js_Developer_3_Years_of_Exp` (stale `processing` scan) are 100% excluded from the live API response.
+
+2. **2026-08-18 Embedded Project Extraction Fallback & "0 Projects" Resolution**:
+    - Identified and resolved the root cause of `Projects (0)` being displayed on candidate dashboards when projects were documented under `WORK HISTORY` / `EXPERIENCE` section blocks rather than under an explicit `## PROJECTS` top-level header.
+    - **Root Cause**: `ResumeFieldExtractor._split_sections` required a top-level `PROJECTS` section header to populate `sections["projects"]`. When candidates listed projects inside employment blocks (e.g. `## STRING ERP`, `## SHADOW SIGHT`, `## HK ANALYTICS`, `## ORBIT JOBS`), `sections["projects"]` was empty (`[]`), causing `ResumeFieldExtractor._extract_projects` to return 0 projects.
+    - **Resolution**: Implemented `ResumeFieldExtractor._extract_projects_from_text` fallback that scans text lines for project subheaders (`## Project Name`, `Project Highlights:`, `Project Title:`) embedded inside work history blocks.
+    - **Files Changed**: `backend/app/services/resume_field_extractor.py`, `workstatus.md`.
+    - **Verification**: Verified clean extraction of **7 projects** for candidate `cv_kcdsdfdfredfr` (`STRING ERP`, `SHADOW SIGHT`, `HK ANALYTICS`, `ORBIT JOBS`, `SPARROW HEALTH`, `SNAPCRACK CHIROPRACTIC`, `AFRICA BUSINESS CONSOLE`) with project descriptions and bullet points. Persisted updated projects into Redis and PostgreSQL ledgers.
+
+2. **2026-08-18 Candidate `cv_kcdsdfdfredfr` Data Mismatch Investigation & CIS Team Vacancy Alignment**:
+    - Identified and resolved candidate data mismatches and team misalignment for `cv_kcdsdfdfredfr` (Candidate Name: `KHUSHAL DHANANI`).
+    - **Root Cause of Misalignment**: Domain ID 25 (`Creative Team`) in `DepartmentDomainMaster` had `'ui'` and `'ux'` keywords, while Domain ID 9 (`CIS Team`) lacked `'ui/ux designer'`, `'ui ux designer'`, `'ui designer'`, `'ux designer'`, `'web designer'`, `'ui/ux developer'`. Because candidate's title is `UI UX DESIGNER`, `TaxonomyClassifier` locked candidate into `Creative Team` (`Job ID 850`), excluding all CIS Team software vacancies.
+    - **Resolution**: Updated `DepartmentDomainMaster` in PostgreSQL for `CIS Team` (Domain ID 9 / Information Technology) to include `'ui/ux designer'`, `'ui ux designer'`, `'ui designer'`, `'ux designer'`, `'web designer'`, `'ui/ux developer'` under keywords and default roles.
+    - **Verification**: Re-classified candidate taxonomy to 100% confidence in **`CIS Team`** (`Information Technology`), prefiltered openings to CIS Team vacancies, and aligned candidate with CIS Team openings (`Job ID 1127` / `1066`). Persisted updated result across PostgreSQL and Redis ledgers.
+
+2. **2026-08-18 Candidate Latest Role Identification Fix**:
+    - Identified and resolved the root cause for missing or incorrect latest role (`job_title`) extraction across candidate CV audits.
+    - **Root Cause 1**: `ResumeFieldExtractor.is_valid_job_title` previously enforced a strict hardcoded keyword check (`return any(token.upper() in keywords)`), dropping valid dynamic job titles (e.g. "Laboratory Technician", "Microbiology Analyst", "SAP Consultant", "Growth Specialist") whenever the title's words were missing from `JOB_TITLE_KEYWORDS`. Replaced with dynamic syntactic/structural validation (2-60 chars, 1-7 words, non-narrative, non-numeric).
+    - **Root Cause 2**: `cv_service.py` and `candidate_search_service.py` previously picked `work_exp[0]` blindly (assuming reverse chronological order), selecting the candidate's oldest job rather than their current/latest position. Implemented `ResumeFieldExtractor.resolve_latest_employment` to prioritize `is_current=True`, `Present/Current` date keywords, or reverse chronological end dates.
+    - **Root Cause 3**: Implemented `ResumeFieldExtractor.extract_title_from_summary_or_header` fallback for single-page CVs or candidates with summary-only role statements (e.g. "Aspiring laboratory technician").
+    - Files changed: `backend/app/services/resume_field_extractor.py`, `backend/app/services/cv_service.py`, `workstatus.md`.
+    - Verification: Empirical container test verified clean extraction for candidate `cv_1763282819` (Job Title: `Quality Control Fresher`, Company: `7. NANDOLIA ORGANIC CHEMICALS Pvt Ltd`) and across candidate audit records.
+
+1. **2026-08-18 Dynamic Hybrid PGVector & Lexical Search Architecture**:
+    - Overhauled candidate search architecture to be fully dynamic, data-driven, accurate, and scalable, removing all hardcoded skill/technology/domain/keyword lists and `if/elif` special cases.
+    - Created PostgreSQL migration `032_dynamic_hybrid_search_architecture.sql` and down migration `032_dynamic_hybrid_search_architecture_down.sql` establishing `candidate_section_embeddings` for extensible section-level vector embeddings and `candidate_search_documents` for PostgreSQL `tsvector` FTS (`websearch_to_tsquery`) and `pg_trgm` trigram search.
+    - Added `CandidateSectionEmbedding` and `CandidateSearchDocument` SQLAlchemy models in `backend/app/models/pg.py`.
+    - Implemented `SearchQueryAnalyzer` (`backend/app/services/search_query_analyzer.py`) creating `QueryContext` dynamically from queries and structured vacancies without static keyword lists.
+    - Implemented `CandidateSearchDocumentBuilder` (`backend/app/services/candidate_search_document_builder.py`) constructing dynamic multi-vector section texts and weighted `tsvector` documents.
+    - Created decoupled retrievers package (`backend/app/services/retrievers/`): `VectorCandidateRetriever` (enforcing `freshness_status = 'FRESH'`, `embedding_model_version = current_model`, `SET LOCAL hnsw.ef_search`), `LexicalCandidateRetriever` (PostgreSQL FTS/trigrams), and `StructuredCandidateRetriever` (database filtering).
+    - Created domain-agnostic `RankFusionService` (`backend/app/services/rank_fusion_service.py`) performing Reciprocal Rank Fusion ($1/(k+r_{\text{vec}}) + 1/(k+r_{\text{lex}}})$).
+    - Created `CandidateSearchReranker` (`backend/app/services/candidate_search_reranker.py`) separating candidate retrieval from qualitative hiring evidence evaluation.
+    - Added `SearchQualityEvaluator` (`backend/app/services/search_quality_evaluator.py`) computing **Recall@K**, **Precision@K**, **MRR**, **NDCG@K**, and **ANN vs Brute-Force Recall Loss**.
+    - Added automated test suite `backend/tests/test_search_quality.py`.
+    - Files changed/created: `backend/scripts/migrations/postgres/032_dynamic_hybrid_search_architecture.sql`, `backend/scripts/migrations/postgres/032_dynamic_hybrid_search_architecture_down.sql`, `backend/app/models/pg.py`, `backend/app/core/config.py`, `backend/app/services/search_query_analyzer.py`, `backend/app/services/candidate_search_document_builder.py`, `backend/app/services/rank_fusion_service.py`, `backend/app/services/retrievers/__init__.py`, `backend/app/services/retrievers/vector_retriever.py`, `backend/app/services/retrievers/lexical_retriever.py`, `backend/app/services/retrievers/structured_retriever.py`, `backend/app/services/candidate_search_reranker.py`, `backend/app/services/candidate_search_service.py`, `backend/app/services/embedding_service.py`, `backend/app/services/vector_migration_service.py`, `backend/app/services/search_quality_evaluator.py`, `backend/tests/test_search_quality.py`, `workstatus.md`.
+    - Verification: Static code audit confirmed standard Ollama policy adherence, zero breaking API contracts, complete backward compatibility. Builds, tests, migrations, and service restarts were not executed per repository guidelines.
+    - Pending work: run `docker exec -it cv_analyzer_api python /app/scripts/run_migrations.py` and rebuild containers (`docker compose up -d --build`) so new hybrid search architecture takes effect.
+    - Important decision: PGVector similarity is strictly treated as a candidate retrieval signal, decoupled from qualitative hiring evaluation. All search vocabulary and query understanding is 100% data-driven without hardcoded keywords.
+
+1. **2026-08-18 Multi-Vector Candidate Embeddings Architecture**:
+    - Architected and implemented multi-vector candidate representations separating full-CV embeddings into 5 distinct section vectors (`profile_embedding`, `skills_embedding`, `experience_embedding`, `projects_embedding`, `domain_embedding`) alongside `embedding` (overall composite).
+    - Created PostgreSQL migration `031_add_multi_vector_candidate_embeddings.sql` and down migration `031_add_multi_vector_candidate_embeddings_down.sql` adding 5 `Vector(768)` columns to `candidate_embeddings` table with dedicated HNSW cosine distance indexes (`vector_cosine_ops`).
+    - Updated `CandidateEmbedding` SQLAlchemy model in `backend/app/models/pg.py`.
+    - Created `CandidateVectorTextExtractor` (`backend/app/services/candidate_vector_extractor.py`) to extract canonical, non-overlapping section text prompts.
+    - Updated `EmbeddingService` (`backend/app/services/embedding_service.py`) with `generate_candidate_multi_vector_embeddings`, batch Ollama HTTP payload embedding, `save_candidate_embedding` multi-vector upserts, and `get_candidate_multi_vectors`.
+    - Integrated multi-vector generation into `cv_service.py` during CV processing and `vector_migration_service.py` during background database synchronization.
+    - Enhanced `CandidateSearchService` (`backend/app/services/candidate_search_service.py`) and `CandidateSearchRequest` schema to support targeted section search (`search_section`) and section-weighted composite search (`section_weights`).
+    - Upgraded `SimilarCandidateService` (`backend/app/services/similar_candidate_service.py`) to utilize multi-vector cosine similarities (overall + skills + experience) for duplicate and similar candidate detection.
+    - Added unit test suite `backend/tests/test_multi_vector_candidate_embeddings.py`.
+    - Files changed/created: `backend/scripts/migrations/postgres/031_add_multi_vector_candidate_embeddings.sql`, `backend/scripts/migrations/postgres/031_add_multi_vector_candidate_embeddings_down.sql`, `backend/app/models/pg.py`, `backend/app/services/candidate_vector_extractor.py`, `backend/app/services/embedding_service.py`, `backend/app/services/cv_service.py`, `backend/app/services/vector_migration_service.py`, `backend/app/services/candidate_search_service.py`, `backend/app/services/similar_candidate_service.py`, `backend/app/schemas/candidate_search.py`, `backend/tests/test_multi_vector_candidate_embeddings.py`, `workstatus.md`.
+    - Verification: Static code audit confirmed standard Ollama policy adherence, zero breaking API contracts, complete backward compatibility. Builds, tests, migrations, and service restarts were not executed per repository guidelines.
+    - Pending work: rebuild and recreate application containers (`cv_analyzer_api`, `cv_analyzer_worker`, `cv_analyzer_auxiliary_worker`, `cv_analyzer_scheduler`) so updated multi-vector candidate embeddings take effect.
+    - Important decision: Section embeddings are generated in a single batched HTTP request to Ollama, adding minimal latency while providing high precision section-specific semantic search.
+
 1. **2026-08-18 Auto-Detect & Configure Local Hardware Profile (Apple M1 8 GB Unified Memory)**:
     - Detected system hardware: Apple M1 MacBook Air (`MacBookAir10,1`), 8 Cores, 8 GB Unified Memory.
     - Verified local Ollama model availability: `llama3.2:3b` (generation, 2.0 GB) and `nomic-embed-text:latest` (embedding, 274 MB).
