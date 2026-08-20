@@ -262,14 +262,20 @@ class EmbeddingService:
 
     @classmethod
     def _is_model_throttled(cls, model: str) -> bool:
-        """Check if model failed recently (within 60 seconds)."""
+        """Check whether the configured Ollama recovery window is still active."""
         last_failure = cls._failed_models_cache.get(model)
-        return bool(last_failure and time.time() - last_failure < 60)
+        return bool(
+            last_failure
+            and time.time() - last_failure < settings.OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS
+        )
 
     @classmethod
     def _call_ollama_embed(cls, model: str, text: str) -> list[float] | None:
         if cls._is_model_throttled(model):
-            logger.warning(f"[EMBEDDING] request=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE retry_window_seconds=60")
+            logger.warning(
+                f"[EMBEDDING] request=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE "
+                f"retry_window_seconds={settings.OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS}"
+            )
             return None
 
         try:
@@ -294,7 +300,10 @@ class EmbeddingService:
     @classmethod
     def _call_ollama_batch_embed(cls, model: str, texts: list[str]) -> list[list[float]] | None:
         if cls._is_model_throttled(model):
-            logger.warning(f"[EMBEDDING] batch=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE retry_window_seconds=60")
+            logger.warning(
+                f"[EMBEDDING] batch=SKIPPED model='{model}' reason=RECENT_MODEL_FAILURE "
+                f"retry_window_seconds={settings.OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS}"
+            )
             return None
 
         try:

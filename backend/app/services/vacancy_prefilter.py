@@ -8,7 +8,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.rule_config_manager import PrefilterRules, RuleConfigManager
+from app.core.rule_config_manager import PolicyRegistry, PrefilterRules, RuleConfigManager
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.job_context import JobEvaluationContext
 from app.services.dynamic_scoring_prefilter_service import (
@@ -99,12 +99,15 @@ class PgVectorQueryCache:
     """Caches pgvector similarity queries to ensure PostgreSQL is queried ONLY ONCE per embedding."""
 
     @staticmethod
-    @functools.lru_cache(maxsize=128)
-    def query_pgvector_cached(embedding_tuple: tuple[float, ...], top_limit: int = 200) -> tuple[tuple[str, int, float], ...]:
+    @functools.lru_cache(maxsize=settings.CACHE_LRU_CAPACITY)
+    def query_pgvector_cached(
+        embedding_tuple: tuple[float, ...], top_limit: int | None = None
+    ) -> tuple[tuple[str, int, float], ...]:
         """
         Queries pgvector ONCE for candidate embedding, returning tuple of (vacancy_id, rank, distance).
         Thread-safe under CPython GIL atomic LRU cache operations.
         """
+        top_limit = top_limit or PolicyRegistry.resolve_snapshot().retrieval.vector_candidate_pool
         results_list: list[tuple[str, int, float]] = []
         try:
             from sqlalchemy import select
@@ -134,12 +137,13 @@ class ReciprocalRankFusionService:
         stage1_jobs: list[JobEvaluationContext],
         lex_ranks: dict[str, int],
         vec_ranks: dict[str, int],
-        k_constant: float = 60.0,
+        k_constant: float | None = None,
     ) -> list[tuple[float, dict[str, Any], JobEvaluationContext]]:
         """
         Fuses lexical ranks and vector ranks using RRF formula score = 1/(k + r_lex) + 1/(k + r_vec).
         Returns list of (fused_score, rrf_details_dict, job_context) sorted descending.
         """
+        k_constant = k_constant or PolicyRegistry.resolve_snapshot().retrieval.rrf_k_constant
         rrf_scored = []
         for job in stage1_jobs:
             vid = job.job_id
@@ -169,27 +173,41 @@ class VacancyPreFilter:
     """
 
     @classmethod
-    def semantic_vector_search(cls, candidate_embedding: list[float], top_n: int = 50) -> list[str]:
+    def semantic_vector_search(
+        cls, candidate_embedding: list[float], top_n: int | None = None
+    ) -> list[str]:
         """
         Performs vector similarity search against active vacancy embeddings.
         Uses PgVectorQueryCache to ensure pgvector is queried ONLY ONCE.
         Returns a list of vacancy_id strings ordered by proximity.
         """
+        retrieval_policy = PolicyRegistry.resolve_snapshot().retrieval
+        top_n = top_n or retrieval_policy.stage_1_vector_top_n
         if not candidate_embedding:
             return []
-        cached_results = PgVectorQueryCache.query_pgvector_cached(tuple(candidate_embedding), top_limit=max(top_n, 200))
+        cached_results = PgVectorQueryCache.query_pgvector_cached(
+            tuple(candidate_embedding),
+            top_limit=max(top_n, retrieval_policy.vector_candidate_pool),
+        )
         return [vid for vid, rank, dist in cached_results[:top_n]]
 
     @classmethod
-    def vector_prefilter(cls, candidate_embedding: list[float], top_k: int = 200) -> dict[str, int]:
+    def vector_prefilter(
+        cls, candidate_embedding: list[float], top_k: int | None = None
+    ) -> dict[str, int]:
         """
         Executes a pgvector cosine distance query against PostgreSQL.
         Uses PgVectorQueryCache to ensure pgvector is queried ONLY ONCE.
         Returns a dict mapping vacancy_id (str) to its vector rank (1-indexed).
         """
+        retrieval_policy = PolicyRegistry.resolve_snapshot().retrieval
+        top_k = top_k or retrieval_policy.vector_candidate_pool
         if not candidate_embedding:
             return {}
-        cached_results = PgVectorQueryCache.query_pgvector_cached(tuple(candidate_embedding), top_limit=max(top_k, 200))
+        cached_results = PgVectorQueryCache.query_pgvector_cached(
+            tuple(candidate_embedding),
+            top_limit=max(top_k, retrieval_policy.vector_candidate_pool),
+        )
         return {vid: rank for vid, rank, dist in cached_results[:top_k]}
 
     @classmethod
@@ -241,10 +259,14 @@ class VacancyPreFilter:
         )
         candidate_taxonomy_confident = candidate_taxonomy_resolved and cand_ctx.taxonomy_confidence >= taxonomy_rules.semantic_match_threshold
 
-        top_n = getattr(settings, "SEMANTIC_RETRIEVAL_TOP_N", 50)
+        retrieval_policy = PolicyRegistry.resolve_snapshot().retrieval
+        top_n = retrieval_policy.stage_1_vector_top_n
         vector_results_tuple: tuple[tuple[str, int, float], ...] = ()
         if cand_ctx.cv_embedding and settings.EMBEDDING_ENABLED:
-            vector_results_tuple = PgVectorQueryCache.query_pgvector_cached(tuple(cand_ctx.cv_embedding), top_limit=max(top_n, 200))
+            vector_results_tuple = PgVectorQueryCache.query_pgvector_cached(
+                tuple(cand_ctx.cv_embedding),
+                top_limit=max(top_n, retrieval_policy.vector_candidate_pool),
+            )
         semantic_top_ids = {vid for vid, _rank, _dist in vector_results_tuple[:top_n]}
 
         if candidate_taxonomy_confident:

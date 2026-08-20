@@ -251,7 +251,7 @@ class ShadowValidationService:
                 return False
 
             connection = Redis.from_url(settings.REDIS_URL)
-            queue = Queue("shadow_validation", connection=connection)
+            queue = Queue(settings.RQ_SHADOW_QUEUE_NAME, connection=connection)
             payload_hash = hashlib.sha256(
                 json.dumps(prod_result_dict, sort_keys=True, default=str).encode("utf-8")
             ).hexdigest()[:16]
@@ -262,8 +262,11 @@ class ShadowValidationService:
                 vacancy_id=vacancy_id,
                 prod_result_dict=prod_result_dict,
                 cv_text=cv_text,
-                retry=Retry(max=3, interval=60),
-                job_timeout=600,
+                retry=Retry(
+                    max=settings.SHADOW_VALIDATION_MAX_RETRIES,
+                    interval=settings.SHADOW_VALIDATION_RETRY_INTERVAL_SECONDS,
+                ),
+                job_timeout=settings.SHADOW_VALIDATION_JOB_TIMEOUT_SECONDS,
                 result_ttl=settings.RQ_RESULT_TTL_SECONDS,
                 job_id=job_id,
                 unique=True,

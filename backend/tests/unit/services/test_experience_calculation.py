@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from app.core.rule_config_manager import ExperiencePolicy
 from app.services.date_interval_parser import DateIntervalParser
 from app.services.experience_calculator import ExperienceCalculator, ExperienceState
+from app.services.experience_gap_service import ExperienceGapService
 
 
 def test_date_interval_parser_fixed_dates() -> None:
@@ -48,3 +52,30 @@ def test_experience_calculator_empty_cv_yields_unknown_or_zero() -> None:
     empty_resume: dict = {"work_experience": []}
     result = ExperienceCalculator.calculate_canonical_experience(empty_resume, cv_text="Fresh graduate with no prior experience.")
     assert result["experience_state"] in (ExperienceState.ZERO_CONFIRMED, ExperienceState.UNKNOWN)
+
+
+def test_experience_gap_analysis_uses_policy_thresholds_and_vocabulary() -> None:
+    policy = ExperiencePolicy(
+        gap_threshold_days=10,
+        hr_review_gap_months=0.25,
+        extended_gap_indicator_months=0.4,
+        job_title_keywords=["wizard"],
+    )
+    snapshot = SimpleNamespace(experience=policy)
+    resume_json = {
+        "work_experience": [
+            {"job_title": "Engineer", "company": "Alpha", "dates": "Jan 2024 - Jan 2024"},
+            {"job_title": "Engineer", "company": "Beta", "dates": "Mar 2024 - Apr 2024"},
+        ]
+    }
+
+    with patch("app.core.rule_config_manager.PolicyRegistry.resolve_snapshot", return_value=snapshot):
+        result = ExperienceGapService.analyze_timeline(
+            resume_json,
+            reference_date=datetime(2024, 5, 1).date(),
+        )
+        is_title = ExperienceGapService._is_job_title_string("Platform Wizard")
+
+    assert len(result.detected_gaps) == 1
+    assert result.detected_gaps[0].hr_review_indicator is True
+    assert is_title is True

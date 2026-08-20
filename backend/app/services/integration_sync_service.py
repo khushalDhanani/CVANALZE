@@ -5,6 +5,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy import func
 
+from app.core.config import settings
 from app.core.database import MssqlReadSession, PostgresAppSession
 from app.models.integration import (
     SyncRun, SyncWatermark, SyncError,
@@ -201,7 +202,7 @@ class BaseSyncService:
                     coalesced_dt = func.coalesce(cls.MSSQL_UPDATED_COL, cls.MSSQL_CREATED_COL)
                     query = query.order_by(coalesced_dt.asc())
 
-                    source_records = query.yield_per(1000)
+                    source_records = query.yield_per(settings.INTEGRATION_SYNC_BATCH_SIZE)
                     lowest_failed_timestamp = None
 
                     for record in source_records:
@@ -268,7 +269,7 @@ class BaseSyncService:
                         pg_active_ids = pg_db.query(cls.SNAPSHOT_MODEL.source_id).filter(cls.SNAPSHOT_MODEL.is_active == True).all()
                         pg_ids = [pg_id for (pg_id,) in pg_active_ids]
                         
-                        batch_size = 1000
+                        batch_size = settings.INTEGRATION_SYNC_BATCH_SIZE
                         deactivated_count = 0
                         for i in range(0, len(pg_ids), batch_size):
                             batch = pg_ids[i:i + batch_size]
@@ -399,8 +400,9 @@ class VacancySyncService(BaseSyncService):
 
 class SourceFreshnessService:
     @classmethod
-    def check_freshness(cls, entity_type: str, max_age_seconds: int = 3600) -> dict:
+    def check_freshness(cls, entity_type: str, max_age_seconds: int | None = None) -> dict:
         """Returns warnings or SOURCE_DATA_UNAVAILABLE if the data is stale."""
+        max_age_seconds = max_age_seconds or settings.SOURCE_FRESHNESS_MAX_AGE_SECONDS
         with PostgresAppSession() as pg_db:
             wm = pg_db.query(SyncWatermark).filter(SyncWatermark.entity_type == entity_type).first()
             if not wm:

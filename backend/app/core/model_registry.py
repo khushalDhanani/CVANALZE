@@ -52,6 +52,17 @@ class ModelRegistry:
     _lock = threading.RLock()
     _models: dict[str, ModelMetadata] = {}
 
+    @staticmethod
+    def supports_thinking(model_name: str) -> bool:
+        """Return configured generation capability for a normalized model family."""
+        model_family = model_name.strip().lower().split(":", 1)[0].rsplit("/", 1)[-1]
+        configured_families = {
+            family.strip().lower()
+            for family in settings.OLLAMA_THINKING_MODEL_FAMILIES
+            if family.strip()
+        }
+        return model_family in configured_families
+
     @classmethod
     def initialize_defaults(cls) -> None:
         """Register default models configured in application settings."""

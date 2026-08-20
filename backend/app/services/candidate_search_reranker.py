@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.logging import logger
+from app.core.rule_config_manager import PolicyRegistry
 from app.repositories.result import ResultRepository
 from app.services.match_evaluators import VacancyFitEvaluator, VacancyMatchStatus
 from app.services.rank_fusion_service import CandidateRankItem
@@ -18,14 +19,22 @@ class CandidateSearchReranker:
     def rerank_retrieved_candidates(
         cls,
         rank_items: list[CandidateRankItem],
-        high_threshold: float = 85.0,
-        potential_threshold: float = 70.0,
-        limit: int = 50,
+        high_threshold: float | None = None,
+        potential_threshold: float | None = None,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
         """
         Rerank retrieved CandidateRankItems by merging RRF retrieval scores with qualitative evidence metrics.
         Returns a list of structured candidate result objects ready for API responses.
         """
+        snapshot = PolicyRegistry.resolve_snapshot()
+        high_threshold = high_threshold if high_threshold is not None else snapshot.scoring.match_high_threshold
+        potential_threshold = (
+            potential_threshold
+            if potential_threshold is not None
+            else snapshot.scoring.match_medium_threshold
+        )
+        limit = limit if limit is not None else snapshot.retrieval.rerank_top_n
         final_results: list[dict[str, Any]] = []
 
         for item in rank_items:
@@ -58,8 +67,16 @@ class CandidateSearchReranker:
             best_match_score = VacancyFitEvaluator.resolve_opening_score(best_match) if best_match else None
 
             # Calculate composite final score (RRF retrieval score + qualitative evidence score)
-            qualitative_score = (best_match_score / 100.0) if best_match_score is not None else 0.5
-            final_composite_score = round(0.50 * item.rrf_score + 0.50 * qualitative_score, 4)
+            qualitative_score = (
+                best_match_score / 100.0
+                if best_match_score is not None
+                else snapshot.retrieval.missing_qualitative_score
+            )
+            final_composite_score = round(
+                snapshot.retrieval.rerank_retrieval_weight * item.rrf_score
+                + snapshot.retrieval.rerank_qualitative_weight * qualitative_score,
+                4,
+            )
 
             enhanced_record = dict(record)
             enhanced_record["_rrf_score"] = item.rrf_score

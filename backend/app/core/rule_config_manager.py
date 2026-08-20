@@ -221,6 +221,8 @@ class ResumeQualityRules(BaseModel):
 class DomainEmbeddingRules(BaseModel):
     categories: list[str] = Field(default_factory=list)
     canonical_equivalents: dict[str, dict[str, str]] = Field(default_factory=dict)
+    semantic_equivalence_threshold: float = Field(default=0.82, ge=0.0, le=1.0)
+    max_equivalents: int = Field(default=5, ge=1)
 
 
 class WorkflowRules(BaseModel):
@@ -1085,6 +1087,17 @@ class ExtractionPolicy(BaseModel):
     heading_compact_denylist: list[str] = Field(default_factory=list)
     heading_substring_denylist: list[str] = Field(default_factory=list)
     location_acceptance_min_confidence: float = Field(default=0.70, ge=0.0, le=1.0)
+    default_skill_source_confidence: float = Field(default=0.45, ge=0.0, le=1.0)
+    inferred_skill_source_confidence: float = Field(default=0.35, ge=0.0, le=1.0)
+    domain_keyword_min_matches: int = Field(default=2, ge=1)
+    inferred_role_limit: int = Field(default=4, ge=1)
+    garbage_skill_terms: list[str] = Field(
+        default_factory=lambda: [
+            "-", ".", "yes", "no", "n/a", "na", "nil", "none", "test", "1", "0",
+            "ok", "good", "e.g", "e.g.", "i.e", "i.e.", "job overview",
+            "key responsibilities", "responsibilities", "requirements",
+        ]
+    )
 
 
 class ExperiencePolicy(BaseModel):
@@ -1092,6 +1105,31 @@ class ExperiencePolicy(BaseModel):
     allow_overlapping_intervals: bool = True
     unknown_date_handling: str = Field(default="UNKNOWN", description="Keep as UNKNOWN, zero addition")
     current_role_recency_days: int = Field(default=365, ge=0)
+    gap_threshold_days: int = Field(default=60, ge=1)
+    hr_review_gap_months: float = Field(default=3.0, ge=0.0)
+    extended_gap_indicator_months: float = Field(default=6.0, ge=0.0)
+    minimum_analysis_confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    default_analysis_confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    placeholder_companies: list[str] = Field(
+        default_factory=lambda: ["organization", "company", "n/a", "none", "null", "position", "job title", ""]
+    )
+    placeholder_titles: list[str] = Field(
+        default_factory=lambda: ["position", "job title", "n/a", "none", "null", "organization", "company", ""]
+    )
+    deputation_keywords: list[str] = Field(default_factory=lambda: ["deputation", "deputed", "secondment"])
+    promotion_transfer_keywords: list[str] = Field(
+        default_factory=lambda: ["promotion", "promoted", "transfer", "transferred", "rotation"]
+    )
+    internal_assignment_keywords: list[str] = Field(
+        default_factory=lambda: ["sub-role", "internal assignment", "project posting", "project assignment"]
+    )
+    job_title_keywords: list[str] = Field(
+        default_factory=lambda: [
+            "sr. executive", "senior executive", "junior executive", "jr. executive", "executive",
+            "manager", "developer", "engineer", "analyst", "consultant", "inspector", "director",
+            "lead", "officer", "specialist", "qa operations", "field operations", "position",
+        ]
+    )
     seniority_experience_thresholds: dict[str, float] = Field(
         default_factory=lambda: {"JUNIOR": 1.0, "MID": 3.0, "SENIOR": 5.0, "LEAD": 8.0}
     )
@@ -1154,12 +1192,99 @@ class TaxonomyResolutionPolicy(BaseModel):
 
 class QualificationPolicy(BaseModel):
     degree_level_hierarchy: dict[str, int] = Field(
-        default_factory=lambda: {"HIGH_SCHOOL": 1, "BACHELOR": 2, "MASTER": 3, "DOCTORATE": 4}
+        default_factory=lambda: {
+            "HIGH_SCHOOL": 1,
+            "BACHELOR": 2,
+            "MASTER": 3,
+            "DOCTORATE": 4,
+        }
     )
-    certification_aliases: dict[str, list[str]] = Field(default_factory=dict)
+    degree_aliases: dict[str, str] = Field(
+        default_factory=lambda: {
+            "ph.d": "DOCTORATE", "phd": "DOCTORATE", "doctorate": "DOCTORATE",
+            "m.tech": "MASTERS", "mtech": "MASTERS", "m.s": "MASTERS", "ms": "MASTERS",
+            "m.sc": "MASTERS", "msc": "MASTERS", "master": "MASTERS", "masters": "MASTERS",
+            "mba": "MASTERS", "m.e": "MASTERS", "me": "MASTERS",
+            "b.tech": "BACHELORS", "btech": "BACHELORS", "b.e": "BACHELORS",
+            "be": "BACHELORS", "b.s": "BACHELORS", "bs": "BACHELORS",
+            "b.sc": "BACHELORS", "bsc": "BACHELORS", "bachelor": "BACHELORS",
+            "bachelors": "BACHELORS", "b.a": "BACHELORS", "ba": "BACHELORS",
+            "b.com": "BACHELORS", "bcom": "BACHELORS", "diploma": "DIPLOMA",
+            "high school": "HIGH_SCHOOL", "secondary": "HIGH_SCHOOL",
+        }
+    )
+    discipline_keywords: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "COMPUTER_SCIENCE": ["computer science", "cs", "computer engineering", "software engineering", "computing"],
+            "INFORMATION_TECHNOLOGY": ["information technology", "it", "information systems", "software systems"],
+            "FINANCE": ["finance", "accounting", "economics", "financial", "valuation"],
+            "BUSINESS": ["business", "management", "administration", "mba"],
+            "HUMANITIES": ["history", "arts", "literature", "english", "philosophy", "sociology"],
+            "SCIENCE": ["physics", "chemistry", "biology", "mathematics", "stats", "statistics"],
+            "ENGINEERING": ["engineering", "engg"],
+        }
+    )
+    discipline_equivalences: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "COMPUTER_SCIENCE": ["COMPUTER_SCIENCE", "INFORMATION_TECHNOLOGY", "ENGINEERING"],
+            "INFORMATION_TECHNOLOGY": ["INFORMATION_TECHNOLOGY", "COMPUTER_SCIENCE", "ENGINEERING"],
+            "ENGINEERING": ["ENGINEERING", "COMPUTER_SCIENCE", "INFORMATION_TECHNOLOGY"],
+            "FINANCE": ["FINANCE", "BUSINESS"],
+            "BUSINESS": ["BUSINESS", "FINANCE"],
+        }
+    )
+    certification_aliases: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "AWS Certified Solutions Architect - Professional": [
+                "aws certified solutions architect professional",
+                "aws solutions architect professional",
+                "aws professional solutions architect",
+                "aws architect pro",
+            ],
+            "AWS Certified Solutions Architect - Associate": [
+                "aws certified solutions architect associate",
+                "aws solutions architect associate",
+                "aws architect associate",
+                "aws csa associate",
+            ],
+            "Project Management Professional (PMP)": [
+                "project management professional", "pmp", "pmp certified", "pmi pmp",
+            ],
+            "Certified Kubernetes Application Developer (CKAD)": [
+                "ckad", "certified kubernetes application developer",
+            ],
+            "Certified Kubernetes Administrator (CKA)": [
+                "cka", "certified kubernetes administrator",
+            ],
+            "Certified Information Systems Security Professional (CISSP)": [
+                "cissp", "certified information systems security professional",
+            ],
+        }
+    )
     accepted_degree_equivalences: dict[str, list[str]] = Field(default_factory=dict)
-    certification_equivalences: list[CertificationEquivalence] = Field(default_factory=list)
+    certification_equivalences: list[CertificationEquivalence] = Field(
+        default_factory=lambda: [
+            CertificationEquivalence(
+                required_id="AWS Certified Solutions Architect - Professional",
+                accepted_id="AWS Certified Solutions Architect - Associate",
+            ),
+            CertificationEquivalence(
+                required_id="Project Management Professional (PMP)",
+                accepted_id="PRINCE2 Practitioner",
+            ),
+            CertificationEquivalence(
+                required_id="Certified Kubernetes Application Developer (CKAD)",
+                accepted_id="Certified Kubernetes Administrator (CKA)",
+            ),
+            CertificationEquivalence(
+                required_id="Certified Information Systems Security Professional (CISSP)",
+                accepted_id="CISM",
+            ),
+        ]
+    )
     education_equivalences: list[EducationEquivalence] = Field(default_factory=list)
+    exact_match_confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    equivalent_match_confidence: float = Field(default=0.85, ge=0.0, le=1.0)
 
 
 class MatchingPolicy(BaseModel):
@@ -1192,6 +1317,8 @@ class ScoringPolicy(BaseModel):
     failure_cap: float = Field(default=49.9, ge=0.0, le=100.0)
     llm_semantic_weight: float = Field(default=0.20, ge=0.0, le=1.0)
     max_llm_boost: float = Field(default=10.0, ge=0.0, le=100.0)
+    zero_skills_score_cap: float = Field(default=40.0, ge=0.0, le=100.0)
+    rejection_score_epsilon: float = Field(default=0.1, gt=0.0, le=100.0)
 
 
 class RetrievalPolicy(BaseModel):
@@ -1202,10 +1329,34 @@ class RetrievalPolicy(BaseModel):
     score_decay_stop_threshold: float = Field(default=0.10, ge=0.0, le=1.0)
     vector_candidate_pool: int = Field(default=200, ge=1)
     rerank_top_n: int = Field(default=50, ge=1)
+    search_quality_top_k: int = Field(default=10, ge=1)
     rrf_k: float = Field(default=60.0, gt=0.0)
     cache_capacity: int = Field(default=128, ge=1)
     score_floor: float = Field(default=0.05, ge=0.0, le=1.0)
+    rerank_retrieval_weight: float = Field(default=0.50, ge=0.0, le=1.0)
+    rerank_qualitative_weight: float = Field(default=0.50, ge=0.0, le=1.0)
+    missing_qualitative_score: float = Field(default=0.50, ge=0.0, le=1.0)
+    section_weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "skills": 0.30,
+            "experience": 0.30,
+            "profile": 0.20,
+            "projects": 0.10,
+            "domain": 0.10,
+        }
+    )
     adaptive_strategy: str = "STAGE_0_BYPASS"
+
+    @model_validator(mode="after")
+    def validate_weights(self) -> "RetrievalPolicy":
+        rerank_total = self.rerank_retrieval_weight + self.rerank_qualitative_weight
+        if abs(rerank_total - 1.0) > 1e-6:
+            raise ValueError("Retrieval rerank weights must sum to 1.0.")
+        if not self.section_weights or sum(self.section_weights.values()) <= 0.0:
+            raise ValueError("Retrieval section weights must have a positive total.")
+        if any(weight < 0.0 for weight in self.section_weights.values()):
+            raise ValueError("Retrieval section weights must not be negative.")
+        return self
 
 
 class RecommendationPolicy(BaseModel):
@@ -1340,6 +1491,7 @@ class PolicyRegistry:
                     failure_cap=scoring_params.max_score_on_failure,
                     llm_semantic_weight=scoring_params.llm_semantic_weight,
                     max_llm_boost=scoring_params.max_llm_boost,
+                    zero_skills_score_cap=scoring_params.zero_skills_score_cap,
                 ),
                 retrieval=RetrievalPolicy(),
                 recommendation=RecommendationPolicy(),
@@ -1378,4 +1530,3 @@ class PolicyRegistry:
             similarity=SimilarityPolicy(),
             version_digest=digest,
         )
-

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any
 
+from app.core.rule_config_manager import PolicyRegistry
 from app.repositories.result import ResultRepository
 
 
@@ -15,12 +16,13 @@ class StructuredCandidateRetriever:
     def retrieve_candidates(
         cls,
         filters: dict[str, Any],
-        top_k: int = 200,
+        top_k: int | None = None,
     ) -> dict[str, int]:
         """
         Filter candidate results based on structured filter constraints.
         Returns a dict mapping cv_key (str) to structured rank (1-indexed).
         """
+        top_k = top_k or PolicyRegistry.resolve_snapshot().retrieval.vector_candidate_pool
         ranks: dict[str, int] = {}
         if not filters:
             return ranks

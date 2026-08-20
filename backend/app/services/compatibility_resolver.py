@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.rule_config_manager import PolicyRegistry
 from app.schemas.classification_types import TaxonomyRelationType
 
 
@@ -17,14 +18,6 @@ class CompatibilityResolver:
     returning structured relation types (EXACT, ALLOWED, RELATED, DISALLOWED, UNKNOWN)
     and single-authority ranking weights.
     """
-
-    DEFAULT_RANKING_WEIGHTS: dict[TaxonomyRelationType, float] = {
-        TaxonomyRelationType.EXACT: 1.0,
-        TaxonomyRelationType.ALLOWED: 0.85,
-        TaxonomyRelationType.RELATED: 0.60,
-        TaxonomyRelationType.DISALLOWED: 0.0,
-        TaxonomyRelationType.UNKNOWN: 0.0,
-    }
 
     @classmethod
     def resolve_relation(
@@ -61,4 +54,5 @@ class CompatibilityResolver:
     @classmethod
     def get_ranking_weight(cls, relation_type: TaxonomyRelationType) -> float:
         """Return the authoritative ranking weight for a given relation type."""
-        return cls.DEFAULT_RANKING_WEIGHTS.get(relation_type, 0.0)
+        relation_scores = PolicyRegistry.resolve_snapshot().taxonomy.relation_scores
+        return float(relation_scores.get(relation_type.value, 0.0))

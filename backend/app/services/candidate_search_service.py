@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.rule_config_manager import RuleConfigManager
+from app.core.rule_config_manager import PolicyRegistry, RuleConfigManager
 from app.repositories.result import ResultRepository
 from app.schemas.candidate_search import (
     CandidateSearchRequest,
@@ -26,7 +26,7 @@ class CandidateSearchService:
     def _vector_search_pg(
         cls,
         query_embedding: list[float],
-        top_k: int = 200,
+        top_k: int | None = None,
         search_section: str | None = None,
         section_weights: dict[str, float] | None = None,
     ) -> dict[str, float]:
@@ -34,6 +34,8 @@ class CandidateSearchService:
         Query PostgreSQL candidate_embeddings table using cosine distance across overall or multi-vector section columns.
         Returns a dict mapping cv_key (str) to composite similarity score (0.0 to 1.0).
         """
+        retrieval_policy = PolicyRegistry.resolve_snapshot().retrieval
+        top_k = top_k if top_k is not None else retrieval_policy.vector_candidate_pool
         scores: dict[str, float] = {}
         try:
             from app.core.database import PostgresAppSession
@@ -68,13 +70,7 @@ class CandidateSearchService:
                             dist_val = float(dist) if dist is not None else 1.0
                             scores[cv_key] = round(max(0.0, 1.0 - dist_val), 4)
                     elif section in ("weighted", "all") or section_weights:
-                        weights = section_weights or {
-                            "skills": 0.30,
-                            "experience": 0.30,
-                            "profile": 0.20,
-                            "projects": 0.10,
-                            "domain": 0.10,
-                        }
+                        weights = section_weights or retrieval_policy.section_weights
                         w_total = sum(weights.values()) or 1.0
                         norm_weights = {k: v / w_total for k, v in weights.items()}
 
@@ -142,6 +138,8 @@ class CandidateSearchService:
         )
         from app.services.search_query_analyzer import SearchQueryAnalyzer
 
+        retrieval_policy = PolicyRegistry.resolve_snapshot().retrieval
+
         explicit_filters = {
             "department": request.department,
             "min_experience": request.min_experience,
@@ -176,7 +174,7 @@ class CandidateSearchService:
         if query_embedding:
             vec_ranks, vec_sims = VectorCandidateRetriever.retrieve_candidates(
                 query_embedding=query_embedding,
-                top_k=200,
+                top_k=retrieval_policy.vector_candidate_pool,
                 section_type=request.search_section,
                 model_version=settings.EMBEDDING_MODEL,
             )
@@ -187,7 +185,7 @@ class CandidateSearchService:
         if query_ctx.raw_query:
             lex_ranks, lex_scores = LexicalCandidateRetriever.retrieve_candidates(
                 query_text=query_ctx.raw_query,
-                top_k=200,
+                top_k=retrieval_policy.vector_candidate_pool,
             )
 
         # 3. Structured Candidate Retrieval
@@ -195,7 +193,7 @@ class CandidateSearchService:
         if any(v is not None for v in query_ctx.filters.values()):
             struct_ranks = StructuredCandidateRetriever.retrieve_candidates(
                 filters=query_ctx.filters,
-                top_k=200,
+                top_k=retrieval_policy.vector_candidate_pool,
             )
 
         # 4. Domain-Agnostic Reciprocal Rank Fusion (RRF)
@@ -205,7 +203,7 @@ class CandidateSearchService:
             structured_ranks=struct_ranks,
             vector_similarities=vec_sims,
             lexical_scores=lex_scores,
-            k_constant=getattr(settings, "RRF_K_CONSTANT", 60.0),
+            k_constant=retrieval_policy.rrf_k,
         )
 
         # Fallback to direct file loading if DB retrievers returned empty set

@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     RQ_MAX_RETRIES: int = 2
     RQ_RETRY_INTERVAL_SECONDS: int = 30
     RQ_MAINTENANCE_INTERVAL_SECONDS: int = 60
+    SHADOW_VALIDATION_MAX_RETRIES: int = 3
+    SHADOW_VALIDATION_RETRY_INTERVAL_SECONDS: int = 60
+    SHADOW_VALIDATION_JOB_TIMEOUT_SECONDS: int = 600
     RULE_CONFIG_RETRY_INTERVAL_SECONDS: float = 5.0
     CV_JOB_RECONCILIATION_INTERVAL_SECONDS: int = 60
     CV_JOB_STALE_AFTER_SECONDS: int = 1200
@@ -54,12 +57,17 @@ class Settings(BaseSettings):
     BACKGROUND_SYNC_INTERVAL_SECONDS: int = 900
     BACKGROUND_SYNC_JOB_TIMEOUT_SECONDS: int = 1800
     BACKGROUND_SYNC_LOCK_TIMEOUT_SECONDS: int = 3600
+    INTEGRATION_SYNC_BATCH_SIZE: int = 1000
+    SOURCE_FRESHNESS_MAX_AGE_SECONDS: int = 3600
     VALIDATION_METRICS_SNAPSHOT_ENABLED: bool = True
     VALIDATION_METRICS_SNAPSHOT_INTERVAL_SECONDS: int = 86400
     PROCESSING_JOB_TTL_SECONDS: int = 604800
     PROCESSING_JOB_LOCK_TIMEOUT_SECONDS: int = 1200
+    PROCESSING_RECOVERY_LOCK_TIMEOUT_SECONDS: int = 30
+    PROCESSING_RECOVERY_LOCK_BLOCKING_TIMEOUT_SECONDS: int = 0
     REDIS_LOCK_TIMEOUT_SECONDS: int = 120
     REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS: int = 10
+    REDIS_AVAILABILITY_PROBE_TIMEOUT_SECONDS: float = 1.0
     JOB_NOT_FOUND_COMPATIBILITY_UNTIL: Optional[datetime] = None
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
     UPLOAD_READ_CHUNK_SIZE_BYTES: int = 1024 * 1024
@@ -132,6 +140,9 @@ class Settings(BaseSettings):
     LLM_ENABLED: bool = True
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:3b"
+    OLLAMA_THINKING_MODEL_FAMILIES: Set[str] = {"deepseek-r1", "gpt-oss", "qwen3", "qwen3.5"}
+    OLLAMA_GENERATION_TEMPERATURE: float = 0.0
+    OLLAMA_OPTIMIZED_TOP_P: float = 0.9
     OLLAMA_REQUEST_TIMEOUT: float = 900.0
     OLLAMA_CONNECT_TIMEOUT_SECONDS: float = 5.0
     OLLAMA_TAGS_TIMEOUT_SECONDS: float = 5.0
@@ -253,6 +264,19 @@ class Settings(BaseSettings):
             raise ValueError("CV_QUEUE_MAX_SIZE must be at least 1.")
         if self.RULE_CONFIG_RETRY_INTERVAL_SECONDS <= 0:
             raise ValueError("RULE_CONFIG_RETRY_INTERVAL_SECONDS must be greater than zero.")
+        if self.SHADOW_VALIDATION_MAX_RETRIES < 0:
+            raise ValueError("SHADOW_VALIDATION_MAX_RETRIES must not be negative.")
+        if min(
+            self.SHADOW_VALIDATION_RETRY_INTERVAL_SECONDS,
+            self.SHADOW_VALIDATION_JOB_TIMEOUT_SECONDS,
+            self.REDIS_AVAILABILITY_PROBE_TIMEOUT_SECONDS,
+            self.INTEGRATION_SYNC_BATCH_SIZE,
+            self.SOURCE_FRESHNESS_MAX_AGE_SECONDS,
+            self.PROCESSING_RECOVERY_LOCK_TIMEOUT_SECONDS,
+        ) <= 0:
+            raise ValueError("Queue, Redis, sync, freshness, and recovery controls must be greater than zero.")
+        if self.PROCESSING_RECOVERY_LOCK_BLOCKING_TIMEOUT_SECONDS < 0:
+            raise ValueError("PROCESSING_RECOVERY_LOCK_BLOCKING_TIMEOUT_SECONDS must not be negative.")
         if self.LLM_ENABLED or self.EMBEDDING_ENABLED:
             parsed_ollama_url = urlsplit(self.OLLAMA_BASE_URL.strip())
             if parsed_ollama_url.scheme not in {"http", "https"} or not parsed_ollama_url.netloc:
@@ -275,6 +299,10 @@ class Settings(BaseSettings):
             raise ValueError("Ollama request, operation, lock, and circuit-breaker timeouts must be greater than zero.")
         if self.OLLAMA_MAX_RETRIES < 0 or self.OLLAMA_RETRY_BACKOFF_SECONDS < 0 or self.OLLAMA_RETRY_JITTER_SECONDS < 0:
             raise ValueError("Ollama retry count, backoff, and jitter must not be negative.")
+        if not 0.0 <= self.OLLAMA_GENERATION_TEMPERATURE <= 2.0:
+            raise ValueError("OLLAMA_GENERATION_TEMPERATURE must be between 0 and 2.")
+        if not 0.0 < self.OLLAMA_OPTIMIZED_TOP_P <= 1.0:
+            raise ValueError("OLLAMA_OPTIMIZED_TOP_P must be greater than 0 and at most 1.")
         if min(self.OLLAMA_MAX_CONNECTIONS, self.OLLAMA_MAX_KEEPALIVE_CONNECTIONS, self.OLLAMA_MAX_RESPONSE_BYTES) <= 0:
             raise ValueError("Ollama connection limits and maximum response size must be greater than zero.")
         if self.OLLAMA_MAX_KEEPALIVE_CONNECTIONS > self.OLLAMA_MAX_CONNECTIONS:

@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.core.rule_config_manager import RuleConfigManager
+from app.core.rule_config_manager import PolicyRegistry, RuleConfigManager
 from app.repositories.department_domain import (
     DepartmentDomainRepository,
     department_domain_repository,
@@ -260,21 +260,22 @@ class CandidateDomainService:
         if not search_text.strip():
             return []
 
+        extraction_policy = PolicyRegistry.resolve_snapshot().extraction
         scored_roles: list[tuple[int, str]] = []
         seen_roles: set[str] = set()
 
         repository = repo or department_domain_repository
         for matcher in repository.get_domain_matchers():
             kw_matches = matcher.keyword_match_count(search_text)
-            if kw_matches >= 2:
+            if kw_matches >= extraction_policy.domain_keyword_min_matches:
                 for role in matcher.domain.default_roles:
                     if role not in seen_roles:
                         scored_roles.append((kw_matches, role))
                         seen_roles.add(role)
 
-        # Sort by match count descending and return top 4
+        # Sort by match count descending and apply the policy result cap.
         scored_roles.sort(key=lambda x: x[0], reverse=True)
-        inferred = [role for _, role in scored_roles[:4]]
+        inferred = [role for _, role in scored_roles[: extraction_policy.inferred_role_limit]]
         return cls.validate_job_roles(inferred, cv_text, resume_json, repository, taxonomy_inferred=True)
 
     @classmethod
@@ -284,8 +285,10 @@ class CandidateDomainService:
         cv_text: str,
         resume_json: dict[str, Any] | None = None,
         repo: DepartmentDomainRepository | None = None,
-        source_confidence: float = 0.45,
+        source_confidence: float | None = None,
     ) -> list[str]:
+        if source_confidence is None:
+            source_confidence = PolicyRegistry.resolve_snapshot().extraction.default_skill_source_confidence
         candidates = [(skill, source_confidence) for skill in skills]
         return cls._validate_skills(candidates, cv_text, resume_json, repo or department_domain_repository)
 

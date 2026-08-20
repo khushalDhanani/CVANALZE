@@ -336,7 +336,7 @@ class TalentKnowledgeGraphService:
         )
 
         # 1. Semantically Similar Skills (Discovered via Vector Embeddings)
-        equivalents = DomainEmbeddingService.find_semantic_equivalents(term=clean_skill, category="skills", limit=4)
+        equivalents = DomainEmbeddingService.find_semantic_equivalents(term=clean_skill, category="skills")
         for eq in equivalents:
             eq_term = eq["term"]
             eq_sim = float(eq["similarity_score"])

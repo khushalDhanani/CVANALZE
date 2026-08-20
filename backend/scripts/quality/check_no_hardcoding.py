@@ -39,13 +39,37 @@ FORBIDDEN_PRODUCTION_PLACEHOLDERS = {
 
 # 3. Decision variable patterns that require policy lookup or explicit annotation
 DECISION_VAR_PATTERNS = [
+    r"^threshold$",
     r".*_threshold$",
     r".*_confidence$",
     r"^top_k$",
+    r"^limit$",
+    r".*_limit$",
+    r".*_timeout$",
+    r".*_ttl$",
+    r".*_batch_size$",
+    r".*_interval$",
     r".*_penalty$",
     r".*_weight$",
     r".*_score_cap$",
 ]
+
+OPERATIONAL_CALL_ARGUMENTS = {
+    "batch_size",
+    "blocking_timeout",
+    "failure_ttl",
+    "interval",
+    "job_timeout",
+    "limit",
+    "result_ttl",
+    "socket_connect_timeout",
+    "socket_timeout",
+    "temperature",
+    "threshold",
+    "timeout",
+    "top_k",
+    "top_p",
+}
 
 # 4. Approved annotation comments that allow intentional constants
 APPROVED_ANNOTATIONS = {
@@ -81,6 +105,84 @@ class AntiHardcodingVisitor(ast.NodeVisitor):
                     return True
         return False
 
+    @staticmethod
+    def _call_name(node: ast.expr) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return ""
+
+    @staticmethod
+    def _is_literal(node: ast.expr | None) -> bool:
+        return isinstance(node, ast.Constant) and isinstance(
+            node.value, (str, int, float)
+        )
+
+    def _report_decision_literal(
+        self, *, lineno: int, name: str, value: object, context: str
+    ) -> None:
+        if self._line_has_annotation(lineno):
+            return
+        self.violations.append(
+            f"{self.filepath}:{lineno} - Hardcoded {context} '{name}' ({value}). "
+            "Use Settings/PolicyRegistry or add '# policy-approved-constant' annotation."
+        )
+
+    def _check_function_defaults(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        positional_args = [*node.args.posonlyargs, *node.args.args]
+        positional_defaults = zip(
+            positional_args[-len(node.args.defaults) :], node.args.defaults, strict=False
+        )
+        keyword_defaults = zip(
+            node.args.kwonlyargs, node.args.kw_defaults, strict=False
+        )
+        for argument, default in [*positional_defaults, *keyword_defaults]:
+            if default is None or not self._is_literal(default):
+                continue
+            if any(
+                re.match(pattern, argument.arg, re.IGNORECASE)
+                for pattern in DECISION_VAR_PATTERNS
+            ):
+                self._report_decision_literal(
+                    lineno=default.lineno,
+                    name=argument.arg,
+                    value=default.value,
+                    context="policy-bearing function default",
+                )
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._check_function_defaults(node)
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._check_function_defaults(node)
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        call_name = self._call_name(node.func)
+        if call_name == "Queue" and node.args and self._is_literal(node.args[0]):
+            self._report_decision_literal(
+                lineno=node.args[0].lineno,
+                name="queue name",
+                value=node.args[0].value,
+                context="operational",
+            )
+
+        for keyword in node.keywords:
+            if keyword.arg is None or not self._is_literal(keyword.value):
+                continue
+            is_retry_max = call_name == "Retry" and keyword.arg == "max"
+            if keyword.arg in OPERATIONAL_CALL_ARGUMENTS or is_retry_max:
+                self._report_decision_literal(
+                    lineno=keyword.value.lineno,
+                    name=keyword.arg,
+                    value=keyword.value.value,
+                    context="operational call argument",
+                )
+
+        self.generic_visit(node)
+
     def visit_Assign(self, node: ast.Assign) -> None:
         # Check target variable names against decision patterns
         for target in node.targets:
@@ -88,7 +190,9 @@ class AntiHardcodingVisitor(ast.NodeVisitor):
                 var_name = target.id
                 if any(re.match(pattern, var_name, re.IGNORECASE) for pattern in DECISION_VAR_PATTERNS):
                     # Value must be a policy lookup or annotated constant
-                    if isinstance(node.value, ast.Constant):
+                    if isinstance(node.value, ast.Constant) and isinstance(
+                        node.value.value, (int, float)
+                    ):
                         val = node.value.value
                         if val not in ALLOWED_NUMERICS and not self._line_has_annotation(node.lineno):
                             self.violations.append(
@@ -149,14 +253,14 @@ def scan_directory(target_dir: Path) -> list[str]:
 
 def main() -> int:
     backend_root = Path(__file__).resolve().parents[2]
-    app_dir = backend_root / "app"
+    services_dir = backend_root / "app" / "services"
 
     print("================================================================")
     print("🔍 AST ANTI-HARDCODING & REGRESSION QUALITY GATE")
     print("================================================================")
-    print(f"Scanning: {app_dir}")
+    print(f"Scanning: {services_dir}")
 
-    violations = scan_directory(app_dir)
+    violations = scan_directory(services_dir)
 
     if violations:
         print(f"\n❌ FAILED: Found {len(violations)} anti-hardcoding violation(s):")

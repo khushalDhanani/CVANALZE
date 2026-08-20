@@ -10,6 +10,9 @@ Verifies:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from app.core.rule_config_manager import UnifiedRuleConfig
 from app.schemas.classification_types import TaxonomyMatchType, TaxonomyRelationType, TaxonomyResolution
 from app.services.compatibility_resolver import CompatibilityResolver
@@ -57,6 +60,23 @@ def test_compatibility_resolver_exact_and_allowed_relations():
     # Unknown
     rel_unknown = CompatibilityResolver.resolve_relation("Software Engineering", "Finance")
     assert rel_unknown == TaxonomyRelationType.UNKNOWN
+
+
+def test_compatibility_ranking_weight_uses_policy_snapshot():
+    snapshot = SimpleNamespace(
+        taxonomy=SimpleNamespace(
+            relation_scores={
+                "EXACT": 1.0,
+                "ALLOWED": 0.73,
+                "RELATED": 0.42,
+                "DISALLOWED": 0.0,
+                "UNKNOWN": 0.0,
+            }
+        )
+    )
+
+    with patch("app.core.rule_config_manager.PolicyRegistry.resolve_snapshot", return_value=snapshot):
+        assert CompatibilityResolver.get_ranking_weight(TaxonomyRelationType.RELATED) == 0.42
 
 
 def test_unified_rule_config_metadata():

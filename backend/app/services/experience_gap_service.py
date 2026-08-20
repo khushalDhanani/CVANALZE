@@ -5,6 +5,7 @@ from typing import Any, Optional
 from dateutil.relativedelta import relativedelta
 
 from app.core.logging import logger
+from app.core.rule_config_manager import PolicyRegistry
 from app.schemas.experience_gap import (
     CanonicalJob,
     ChildAssignment,
@@ -38,51 +39,11 @@ class ExperienceGapService:
     4. Genuine Independent Concurrency (excludes internal sub-roles, deputations, and promotions).
     """
 
-    DEFAULT_GAP_THRESHOLD_DAYS = 60
-    PLACEHOLDER_COMPANIES = {"organization", "company", "n/a", "none", "null", "position", "job title", ""}
-    PLACEHOLDER_TITLES = {"position", "job title", "n/a", "none", "null", "organization", "company", ""}
-    SUB_ROLE_KEYWORDS = {
-        "deputation",
-        "deputed",
-        "secondment",
-        "internal assignment",
-        "sub-role",
-        "project assignment",
-        "project posting",
-        "assignment",
-        "promoted",
-        "promotion",
-        "transferred",
-        "internal transfer",
-        "rotation",
-        "role change",
-    }
-
-    JOB_TITLE_KEYWORDS = {
-        "sr. executive",
-        "senior executive",
-        "junior executive",
-        "jr. executive",
-        "executive",
-        "manager",
-        "developer",
-        "engineer",
-        "analyst",
-        "consultant",
-        "inspector",
-        "director",
-        "lead",
-        "officer",
-        "specialist",
-        "qa operations",
-        "field operations",
-        "position",
-    }
-
     @classmethod
     def _is_job_title_string(cls, text: str) -> bool:
         clean = text.lower().strip()
-        return any(kw in clean for kw in cls.JOB_TITLE_KEYWORDS)
+        keywords = PolicyRegistry.resolve_snapshot().experience.job_title_keywords
+        return any(keyword in clean for keyword in keywords)
 
     @classmethod
     def _sanitize_company_and_title(cls, company: str, title: str) -> tuple[str, str]:
@@ -92,7 +53,12 @@ class ExperienceGapService:
         if c_clean and cls._is_job_title_string(c_clean) and not t_clean:
             t_clean = c_clean
             c_clean = ""
-        elif c_clean and cls._is_job_title_string(c_clean) and t_clean and t_clean.lower() in ("position", "job title", "n/a", "none"):
+        elif (
+            c_clean
+            and cls._is_job_title_string(c_clean)
+            and t_clean
+            and t_clean.lower() in PolicyRegistry.resolve_snapshot().experience.placeholder_titles
+        ):
             t_clean = c_clean
             c_clean = ""
 
@@ -149,7 +115,8 @@ class ExperienceGapService:
         gap_threshold_days: Optional[int] = None,
     ) -> ExperienceGapAnalysis:
         ref_date = reference_date or datetime.date.today()
-        threshold_days = gap_threshold_days or cls.DEFAULT_GAP_THRESHOLD_DAYS
+        experience_policy = PolicyRegistry.resolve_snapshot().experience
+        threshold_days = gap_threshold_days or experience_policy.gap_threshold_days
 
         raw_work_exp = (
             resume_json.get("work_experience")
@@ -369,7 +336,10 @@ class ExperienceGapService:
                     f"{prec_str} and {foll_str}."
                 )
 
-                hr_flag = coverage_status in ("UNEXPLAINED", "TIMELINE_UNCERTAINTY") and gap_months >= 3.0
+                hr_flag = (
+                    coverage_status in ("UNEXPLAINED", "TIMELINE_UNCERTAINTY")
+                    and gap_months >= experience_policy.hr_review_gap_months
+                )
 
                 gap_obj = ExperienceGap(
                     gap_id=f"gap_{gap_counter}",
@@ -391,7 +361,7 @@ class ExperienceGapService:
 
                 if coverage_status == "UNEXPLAINED":
                     unexplained_gap_months_total += gap_months
-                    if gap_months >= 6.0:
+                    if gap_months >= experience_policy.extended_gap_indicator_months:
                         hr_indicators.append(
                             f"Unexplained {gap_months} month employment gap between {gap_start.strftime('%b %Y')} and {gap_end.strftime('%b %Y')}."
                         )
@@ -407,8 +377,8 @@ class ExperienceGapService:
             uncertainty_flags = sum(1 for p in resolved_entries if p["date_confidence"] in ("YEAR_ONLY", "UNKNOWN"))
             uncertainty_score = round(uncertainty_flags / len(resolved_entries), 2)
         else:
-            analysis_confidence = 0.5
-            uncertainty_score = 0.5
+            analysis_confidence = experience_policy.default_analysis_confidence
+            uncertainty_score = experience_policy.default_analysis_confidence
 
         total_months = int(round(total_verified_years * 12))
         years_part = total_months // 12
@@ -417,7 +387,11 @@ class ExperienceGapService:
 
         has_current = any(cj.is_current for cj in canonical_jobs)
         unexplained_gaps = [g for g in detected_gaps if g.coverage_status == "UNEXPLAINED"]
-        sig_gaps = [g for g in detected_gaps if g.duration_months >= 3.0]
+        sig_gaps = [
+            gap
+            for gap in detected_gaps
+            if gap.duration_months >= experience_policy.hr_review_gap_months
+        ]
 
         hr_obs: list[str] = []
         hr_obs.append(f"Total Employment Duration: {total_verified_years:.1f} years ({gross_display}).")
@@ -445,7 +419,10 @@ class ExperienceGapService:
             total_gap_duration_months=round(unexplained_gap_months_total, 1),
             analysis_confidence=analysis_confidence,
             timeline_uncertainty_score=uncertainty_score,
-            hr_review_required=bool(hr_indicators) or analysis_confidence < 0.5,
+            hr_review_required=(
+                bool(hr_indicators)
+                or analysis_confidence < experience_policy.minimum_analysis_confidence
+            ),
             hr_observations=hr_obs,
         )
 
@@ -477,16 +454,21 @@ class ExperienceGapService:
         has_dates = bool(raw_dates and raw_dates != "N/A")
         has_resps = bool(resps)
 
+        experience_policy = PolicyRegistry.resolve_snapshot().experience
+
         if not has_dates and not has_resps:
-            if c_clean in cls.PLACEHOLDER_COMPANIES or t_clean in cls.PLACEHOLDER_TITLES:
+            if (
+                c_clean in experience_policy.placeholder_companies
+                or t_clean in experience_policy.placeholder_titles
+            ):
                 return "INVALID_HEADING"
 
         combined_text = f"{company} {title} {' '.join(str(r) for r in resps)}".lower()
 
-        if any(kw in combined_text for kw in ("deputation", "deputed", "secondment")):
+        if any(keyword in combined_text for keyword in experience_policy.deputation_keywords):
             return "DEPUTATION"
 
-        if any(kw in combined_text for kw in ("promotion", "promoted", "transfer", "transferred", "rotation")):
+        if any(keyword in combined_text for keyword in experience_policy.promotion_transfer_keywords):
             return "PROMOTION_TRANSFER"
 
         parent_key = cls._get_parent_company_key(company)
@@ -494,7 +476,7 @@ class ExperienceGapService:
             if cls._are_same_employer(parent_key, existing):
                 return "INTERNAL_ROLE"
 
-        if any(kw in combined_text for kw in ("sub-role", "internal assignment", "project posting", "project assignment")):
+        if any(keyword in combined_text for keyword in experience_policy.internal_assignment_keywords):
             return "INTERNAL_ROLE"
 
         return "PARENT_EMPLOYMENT"

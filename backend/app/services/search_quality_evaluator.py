@@ -3,6 +3,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.core.rule_config_manager import PolicyRegistry
 from app.services.embedding_service import EmbeddingService
 
 
@@ -32,11 +33,12 @@ class SearchQualityEvaluator:
         cls,
         retrieved_ids: list[str],
         relevant_ground_truth_ids: list[str],
-        top_k: int = 10,
+        top_k: int | None = None,
     ) -> SearchEvaluationMetrics:
         """
         Compute Recall@K, Precision@K, MRR, and NDCG@K for a retrieved candidate ID list against ground truth.
         """
+        top_k = top_k or PolicyRegistry.resolve_snapshot().retrieval.search_quality_top_k
         top_retrieved = retrieved_ids[:top_k]
         truth_set = set(relevant_ground_truth_ids)
 
@@ -83,11 +85,12 @@ class SearchQualityEvaluator:
         ann_retrieved_ids: list[str],
         candidate_embeddings_map: dict[str, list[float]],
         query_embedding: list[float],
-        top_k: int = 10,
+        top_k: int | None = None,
     ) -> float:
         """
         Compare ANN (HNSW) retrieval candidate list against exact brute-force cosine distance ranking to measure HNSW recall loss percentage.
         """
+        top_k = top_k or PolicyRegistry.resolve_snapshot().retrieval.search_quality_top_k
         if not candidate_embeddings_map or not query_embedding:
             return 0.0
 

@@ -11,6 +11,7 @@ from app.core.analysis_context import get_analysis_candidate, get_analysis_run_i
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.metrics import _metrics
+from app.core.model_registry import ModelRegistry
 from app.core.profiler import PipelineProfiler
 from app.core.request_context import get_request_context_ids
 from app.repositories.llm_cache import LLMCacheEntry, LLMCacheRepository
@@ -56,7 +57,6 @@ class _StructuredGeneration:
 
 class OllamaLLMService:
     _model_digests: dict[str, str] = {}
-    _thinking_model_families = frozenset({"deepseek-r1", "gpt-oss", "qwen3", "qwen3.5"})
 
     @staticmethod
     def _model_identifier_hash(model: str) -> str:
@@ -64,8 +64,7 @@ class OllamaLLMService:
 
     @classmethod
     def _supports_thinking(cls, model: str) -> bool:
-        model_family = model.strip().lower().split(":", 1)[0].rsplit("/", 1)[-1]
-        return model_family in cls._thinking_model_families
+        return ModelRegistry.supports_thinking(model)
 
     @staticmethod
     def _remove_legacy_thinking_directive(prompt: str) -> tuple[str, bool]:
@@ -209,7 +208,7 @@ class OllamaLLMService:
             options={
                 "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
                 "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
-                "temperature": 0.0,
+                "temperature": settings.OLLAMA_GENERATION_TEMPERATURE,
             },
         )
 
@@ -230,7 +229,7 @@ class OllamaLLMService:
             options={
                 "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
                 "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
-                "temperature": 0.0,
+                "temperature": settings.OLLAMA_GENERATION_TEMPERATURE,
             },
         )
 
@@ -251,7 +250,7 @@ class OllamaLLMService:
             options={
                 "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
                 "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
-                "temperature": 0.0,
+                "temperature": settings.OLLAMA_GENERATION_TEMPERATURE,
             },
         )
 
@@ -273,8 +272,8 @@ class OllamaLLMService:
             options={
                 "num_predict": settings.OLLAMA_OPTIMIZED_NUM_PREDICT,
                 "num_ctx": settings.OLLAMA_OPTIMIZED_NUM_CTX,
-                "temperature": 0.0,
-                "top_p": 0.9,
+                "temperature": settings.OLLAMA_GENERATION_TEMPERATURE,
+                "top_p": settings.OLLAMA_OPTIMIZED_TOP_P,
             },
             profiler=profiler,
         )
@@ -298,7 +297,7 @@ class OllamaLLMService:
             options={
                 "num_predict": settings.OLLAMA_GENERATION_NUM_PREDICT,
                 "num_ctx": settings.OLLAMA_GENERATION_NUM_CTX,
-                "temperature": 0.0,
+                "temperature": settings.OLLAMA_GENERATION_TEMPERATURE,
             },
         )
         if result is None:
@@ -326,7 +325,7 @@ class OllamaLLMService:
         Handles caching, retries, parsing, and telemetry.
         """
         if options is None:
-            options = {"temperature": 0.0}
+            options = {"temperature": settings.OLLAMA_GENERATION_TEMPERATURE}
         return cls._execute_structured_generation(
             operation=operation,
             prompt=prompt,

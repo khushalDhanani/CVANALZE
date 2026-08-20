@@ -2131,3 +2131,33 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Decomposed the work into independently testable backend settings, Redis/queue, storage compatibility, scoring policy, Compose, frontend, governance, and documentation tasks.
   - Defined exact interfaces, test-first steps, verification commands, compatibility constraints, and commit boundaries.
   - Recorded that test, lint, Docker, and release-gate execution remains subject to explicit user authorization.
+
+---
+
+### Entry #060
+- **Timestamp**: 2026-08-20T11:21:35+0530
+- **Scope**: Backend services hardcoding remediation and regression governance
+- **Category**: Configuration, Policy, Prompts & Tests
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/.env.example`
+  - `backend/app/core/config.py`
+  - `backend/app/core/model_registry.py`
+  - `backend/app/core/rule_config_manager.py`
+  - `backend/app/prompts/hiring_risk.py`
+  - `backend/app/schemas/scoring_config.py`
+  - `backend/app/services/`
+  - `backend/scripts/quality/check_no_hardcoding.py`
+  - `backend/tests/unit/core/test_hardcoding_regression_gate.py`
+  - `backend/tests/unit/core/test_phase3_cache_tuning_and_diagnostics.py`
+  - `backend/tests/unit/services/`
+  - `workstats.md`
+- **Summary**: Replaced material service-level runtime and business-policy literals with validated settings, active typed policy snapshots, database/config-backed vocabularies, and centralized prompt/model registries while preserving existing contracts and fallback semantics.
+- **Details**:
+  - Centralized queue names, retries, job and Redis timeouts, locks, sync batch/freshness controls, cache TTLs, and Ollama generation capabilities in validated `Settings` fields documented in `.env.example`.
+  - Moved retrieval pools, rerank controls, section weights, scoring caps, qualification equivalences, experience rules, taxonomy limits, and extraction vocabulary into typed policy models resolved at runtime.
+  - Reused PostgreSQL/config-backed stop-word and taxonomy services; no MSSQL write behavior was introduced.
+  - Extracted the hiring-risk emergency prompt into the prompt package without changing its name, version, or text, so prompt/cache compatibility remains intact.
+  - Strengthened the AST hardcoding gate to detect operational call literals and policy-bearing defaults while allowing protocol constants and documented emergency fallbacks.
+  - Added targeted regression tests for configuration resolution, policy validation, queue behavior, scoring, qualifications, taxonomies, experience, prompts, and hardcoding detection.
+  - Verified 73 focused unit/integration tests, 9 policy/config compatibility tests, and 22 additional affected-area tests passed; one unrelated pre-existing database-dependent unit test remains failing identically on the baseline branch when PostgreSQL is unavailable.

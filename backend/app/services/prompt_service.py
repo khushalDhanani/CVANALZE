@@ -14,6 +14,11 @@ from app.core.database import PostgresAppSession
 from app.core.error_handlers import PromptError
 from app.core.logging import logger
 from app.models.prompts import PromptTemplateMaster
+from app.prompts.hiring_risk import (
+    HIRING_RISK_PROMPT_NAME as BUNDLED_HIRING_RISK_PROMPT_NAME,
+    HIRING_RISK_PROMPT_TEMPLATE as BUNDLED_HIRING_RISK_PROMPT_TEMPLATE,
+    HIRING_RISK_PROMPT_VERSION as BUNDLED_HIRING_RISK_PROMPT_VERSION,
+)
 
 
 class PromptReadiness(NamedTuple):
@@ -63,18 +68,9 @@ class PromptService:
     OPTIMIZED_MATCH_REQUIRED_INSTRUCTION = "VACANCY COVERAGE:"
     OPTIMIZED_MATCH_NARRATIVE_INSTRUCTION = "DECISION NARRATIVES:"
     OPTIMIZED_MATCH_REQUIREMENT_INSTRUCTION = "REQUIREMENT ASSESSMENTS:"
-    HIRING_RISK_PROMPT_NAME = "hiring_risk_explanation"
-    HIRING_RISK_DEFAULT_VERSION = "default-1.0.0"
-    HIRING_RISK_DEFAULT_TEMPLATE = """You explain deterministic hiring risks to recruiters.
-
-INPUT:
-{prompt_payload}
-
-Return only the structured JSON required by the response schema.
-You may write only title and explanation text for the supplied risk_code values.
-Do not add risks or change risk codes, categories, severity, evidence, source, scores, match status, or manual-review decisions.
-Use only the supplied evidence. Do not infer personal or protected attributes.
-"""
+    HIRING_RISK_PROMPT_NAME = BUNDLED_HIRING_RISK_PROMPT_NAME
+    HIRING_RISK_DEFAULT_VERSION = BUNDLED_HIRING_RISK_PROMPT_VERSION
+    HIRING_RISK_DEFAULT_TEMPLATE = BUNDLED_HIRING_RISK_PROMPT_TEMPLATE
 
     @classmethod
     def _get_default_prompt(cls, prompt_name: str) -> ResolvedPrompt | None:

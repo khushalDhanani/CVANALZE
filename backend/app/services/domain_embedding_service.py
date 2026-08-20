@@ -143,8 +143,8 @@ class DomainEmbeddingService:
         cls,
         term: str,
         category: str = "skills",
-        threshold: float = 0.82,
-        limit: int = 5,
+        threshold: float | None = None,
+        limit: int | None = None,
         allow_live_generation: bool = True,
     ) -> list[dict[str, Any]]:
         if not term or not term.strip():
@@ -152,6 +152,9 @@ class DomainEmbeddingService:
 
         clean_term = term.strip().lower()
         cat = category.strip().lower()
+        rules = RuleConfigManager.get_domain_embedding_rules()
+        threshold = rules.semantic_equivalence_threshold if threshold is None else threshold
+        limit = rules.max_equivalents if limit is None else limit
 
         equivalents: list[dict[str, Any]] = []
 
@@ -221,7 +224,11 @@ class DomainEmbeddingService:
         return equivalents[:limit]
 
     @classmethod
-    def expand_skills_with_semantic_equivalents(cls, skills: list[str], threshold: float = 0.82) -> set[str]:
+    def expand_skills_with_semantic_equivalents(
+        cls,
+        skills: list[str],
+        threshold: float | None = None,
+    ) -> set[str]:
         """
         Expands a list of skill strings into a set containing all original skills plus their semantic equivalents.
         """

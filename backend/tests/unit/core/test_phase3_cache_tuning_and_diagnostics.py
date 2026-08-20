@@ -9,8 +9,11 @@ Verifies:
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from app.core.cache import CacheManager, MemoryCache
 from app.core.config import settings
+from app.services.performance_service import EnterprisePerformanceService
 
 
 def test_cache_settings_configured():
@@ -43,3 +46,12 @@ def test_cache_manager_get_with_diagnostics_hit_and_miss():
     assert diag_hit["cache_namespace"] == "test_diag_ns"
     assert diag_hit["cache_version"] == settings.CACHE_VERSION
     assert "lookup_time_ms" in diag_hit
+
+
+def test_performance_cache_default_ttl_uses_runtime_setting(monkeypatch):
+    monkeypatch.setattr(settings, "PERFORMANCE_L1_CACHE_TTL_SECONDS", 17.0)
+
+    with patch.object(EnterprisePerformanceService._l1_cache, "set") as cache_set:
+        EnterprisePerformanceService.set_multilevel_cache("candidate", [0.1, 0.2])
+
+    cache_set.assert_called_once_with("candidate", [0.1, 0.2], ttl=17.0)
