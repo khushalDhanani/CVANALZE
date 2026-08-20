@@ -20,12 +20,12 @@ def _redis_connection() -> Redis:
     if current_job is not None:
         return current_job.connection
     return Redis.from_url(
-        settings.REDIS_URL or "redis://localhost:6379/0",
-        socket_timeout=30.0,
-        socket_connect_timeout=10.0,
+        settings.REDIS_URL,
+        socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+        socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
         socket_keepalive=True,
         retry_on_timeout=True,
-        health_check_interval=30,
+        health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
     )
 
 

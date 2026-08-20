@@ -109,7 +109,6 @@ class JobRepository:
     _VACANCY_CACHE_KEY = VACANCY_CACHE_KEY
     _VERSION_CACHE_KEY = "all_jobs_version"
     _STALENESS_CACHE: ClassVar[dict[str, tuple[float, bool]]] = {}
-    _STALENESS_TTL = 30.0
     _VACANCY_EMBEDDINGS_CACHED = False
 
     @classmethod
@@ -260,7 +259,7 @@ class JobRepository:
         now = time.monotonic()
         if stored_version in cls._STALENESS_CACHE:
             cached_time, cached_result = cls._STALENESS_CACHE[stored_version]
-            if now - cached_time < cls._STALENESS_TTL:
+            if now - cached_time < settings.JOB_CACHE_STALENESS_TTL_SECONDS:
                 return cached_result
 
         close_session = False

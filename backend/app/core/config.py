@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import os
 from datetime import datetime
 from pathlib import Path
@@ -13,9 +14,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     PROJECT_NAME: str = "CV Analyzer Enterprise"
-    VERSION: str = "3.0.0"
     APP_VERSION: str = "3.0.0"
-    GIT_SHA: str = "c6eb7f2"
+    GIT_SHA: str = ""
     ALLOWED_ORIGINS: List[str] = []
     CORS_ALLOW_CREDENTIALS: bool = False
     APP_ENVIRONMENT: str = "development"
@@ -67,9 +67,39 @@ class Settings(BaseSettings):
     PROCESSING_RECOVERY_LOCK_BLOCKING_TIMEOUT_SECONDS: int = 0
     REDIS_LOCK_TIMEOUT_SECONDS: int = 120
     REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS: int = 10
+    REDIS_SOCKET_TIMEOUT_SECONDS: float = 30.0
+    REDIS_CONNECT_TIMEOUT_SECONDS: float = 10.0
+    REDIS_HEALTH_CHECK_INTERVAL_SECONDS: int = 30
     REDIS_AVAILABILITY_PROBE_TIMEOUT_SECONDS: float = 1.0
+    REDIS_SCAN_COUNT: int = 1000
+    CACHE_FILE_LOCK_TIMEOUT_SECONDS: float = 5.0
+    SCHEDULER_REDIS_RETRY_DELAY_SECONDS: float = 5.0
+    API_STREAM_POLL_TIMEOUT_SECONDS: float = 1.0
+    API_STREAM_IDLE_SLEEP_SECONDS: float = 0.1
+    JOB_CACHE_STALENESS_TTL_SECONDS: float = 30.0
+    DEFAULT_BATCH_CANDIDATE_LIMIT: int = 10
+    DEFAULT_API_LIST_LIMIT: int = 100
+    DEFAULT_CANDIDATE_SEARCH_LIMIT: int = 50
+    BATCH_CANDIDATE_LIMIT_OPTIONS: List[int] = [5, 10, 20, 30]
+    RECOMMENDED_POLL_INTERVAL_MS: int = 3000
+    RECOMMENDED_MAX_POLL_ATTEMPTS: int = 1200
+    DOCUMENT_PARSER_DISPLAY_NAME: str = "Docling"
+    OCR_ENGINE_DISPLAY_NAME: str = "RapidOCR"
+    LLM_PROVIDER_DISPLAY_NAME: str = "Ollama local LLM"
+    VECTOR_STORE_DISPLAY_NAME: str = "PostgreSQL pgvector"
+    PROCESSING_PIPELINE_STAGES: List[Dict[str, str]] = [
+        {"id": "upload", "label": "Upload CV", "description": "Transferring document to processing server"},
+        {"id": "validation", "label": "Validation", "description": "Verifying file integrity and format compatibility"},
+        {"id": "parsing", "label": "Document Parsing", "description": "Extracting structured layout and OCR text elements"},
+        {"id": "extraction", "label": "Profile Extraction", "description": "Structuring candidate profile, skills, and work history"},
+        {"id": "ai_analysis", "label": "AI Reasoning", "description": "Performing semantic analysis and skill inference"},
+        {"id": "matching", "label": "Job Matching", "description": "Evaluating the candidate against active vacancies"},
+        {"id": "ranking", "label": "Score Ranking", "description": "Calculating configured component weights and penalties"},
+        {"id": "complete", "label": "Analysis Ready", "description": "Candidate evaluation and match scores are available"},
+    ]
     JOB_NOT_FOUND_COMPATIBILITY_UNTIL: Optional[datetime] = None
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
+    MAX_UPLOAD_FILES_PER_SELECTION: int = 10
     UPLOAD_READ_CHUNK_SIZE_BYTES: int = 1024 * 1024
     UPLOAD_FILENAME_MAX_CHARS: int = 120
     ALLOWED_EXTENSIONS: Set[str] = {"pdf", "docx"}
@@ -93,11 +123,13 @@ class Settings(BaseSettings):
     RAW_UPLOAD_RETENTION_DAYS: int = 30
     RAW_UPLOAD_DELETE_ON_SUCCESS: bool = False
     RAW_UPLOAD_DELETE_ON_FAILURE: bool = False
-    APP_DATA_ROOT: Path = Field(default_factory=lambda: Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))).resolve())
-    UPLOADS_DIR: Path = Field(default_factory=lambda: Path(os.getenv("UPLOADS_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "uploads"))).resolve())
-    RESULTS_DIR: Path = Field(default_factory=lambda: Path(os.getenv("RESULTS_DIR", str(Path(os.getenv("UPLOADS_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "uploads"))) / "results"))).resolve())
-    LOCK_DIR: Path = Field(default_factory=lambda: Path(os.getenv("LOCK_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "locks"))).resolve())
-    TRAINING_DATA_DIR: Path = Field(default_factory=lambda: Path(os.getenv("TRAINING_DATA_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "training_data"))).resolve())
+    APP_DATA_ROOT: Path = Field(
+        default_factory=lambda: (Path(__file__).resolve().parents[2] / "uploads").resolve()
+    )
+    UPLOADS_DIR: Path | None = None
+    RESULTS_DIR: Path | None = None
+    LOCK_DIR: Path | None = None
+    TRAINING_DATA_DIR: Path | None = None
 
     # Cutover Configuration
     MSSQL_CUTOVER_COMPLETE: bool = False
@@ -158,7 +190,7 @@ class Settings(BaseSettings):
     OLLAMA_MAX_CONNECTIONS: int = 1
     OLLAMA_MAX_KEEPALIVE_CONNECTIONS: int = 1
     OLLAMA_MAX_RESPONSE_BYTES: int = 4 * 1024 * 1024
-    OLLAMA_LOCK_FILE: Path = Field(default_factory=lambda: Path(os.getenv("OLLAMA_LOCK_FILE", str(Path(os.getenv("LOCK_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "locks"))) / "ollama.lock"))).resolve())
+    OLLAMA_LOCK_FILE: Path | None = None
     OLLAMA_LOCK_TIMEOUT_SECONDS: float = 1800.0
     OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 3
     OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS: float = 60.0
@@ -186,7 +218,6 @@ class Settings(BaseSettings):
     LLM_SHADOW_QUALITY_ENABLED: bool = True
     LLM_CONFIDENCE_CALIBRATION_PATH: Path = Field(default_factory=lambda: Path(os.getenv("LLM_CONFIDENCE_CALIBRATION_PATH", str(Path(__file__).resolve().parent.parent / "data" / "evaluations" / "confidence_calibration.json"))).resolve())
     OPTIMIZED_PROMPT_VERSION: str = "4.0"
-    MAX_CONCURRENT_LLM_WORKERS: int = 1
 
     # LLM Bypass Configuration
     LLM_SKIP_MARGIN_THRESHOLD: float = 15.0
@@ -216,9 +247,6 @@ class Settings(BaseSettings):
         "Junior": 0.0,
     }
 
-    # Training Data Configuration
-    TRAINING_DATA_DIR: Path = Field(default_factory=lambda: Path(os.getenv("TRAINING_DATA_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "training_data"))).resolve())
-
     # Database Configuration (MSSQL Read-Only)
     MSSQL_READ_ONLY_URL: str = ""
     MSSQL_READONLY_ENFORCEMENT: bool = True
@@ -233,10 +261,6 @@ class Settings(BaseSettings):
     POSTGRES_POOL_TIMEOUT: float = 30.0
     POSTGRES_SSL_MODE: str = "prefer"
 
-    # Frontend Lifecycle Polling Configuration
-    FRONTEND_POLL_INTERVAL_MS: int = 2000
-    FRONTEND_RETRY_AFTER_MS: int = 2000
-
     # Migration Configuration
     AUTO_MIGRATE: bool = False
 
@@ -249,15 +273,38 @@ class Settings(BaseSettings):
         return self.AUTH_ENABLED
 
     @property
+    def VERSION(self) -> str:
+        """Compatibility alias for the canonical application version."""
+        return self.APP_VERSION
+
+    @property
     def TRUSTED_ORIGINS(self) -> list[str]:
         return [origin.strip().rstrip("/") for origin in self.ALLOWED_ORIGINS if origin.strip() and origin.strip() != "*"]
+
+    @property
+    def LEGACY_UPLOADS_DIR(self) -> Path:
+        return (self.APP_DATA_ROOT / "uploads").resolve()
+
+    @property
+    def LEGACY_RESULTS_DIR(self) -> Path:
+        return (self.LEGACY_UPLOADS_DIR / "results").resolve()
 
 
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> "Settings":
-        if self.RQ_QUEUE_NAME != "cv-processing":
-            raise ValueError("RQ_QUEUE_NAME must be 'cv-processing' for the CV processing lane.")
+        self.GIT_SHA = self.GIT_SHA.strip() or "unknown"
+        self.APP_DATA_ROOT = self.APP_DATA_ROOT.resolve()
+        self.UPLOADS_DIR = (self.UPLOADS_DIR or self.APP_DATA_ROOT).resolve()
+        self.RESULTS_DIR = (self.RESULTS_DIR or self.UPLOADS_DIR / "results").resolve()
+        self.LOCK_DIR = (self.LOCK_DIR or self.APP_DATA_ROOT / ".locks").resolve()
+        self.TRAINING_DATA_DIR = (
+            self.TRAINING_DATA_DIR or self.APP_DATA_ROOT / "training_data"
+        ).resolve()
+        self.OLLAMA_LOCK_FILE = (
+            self.OLLAMA_LOCK_FILE or self.LOCK_DIR / "ollama.lock"
+        ).resolve()
+
         if self.CV_PROCESSING_CONCURRENCY != 1:
             raise ValueError("CV_PROCESSING_CONCURRENCY must be 1; parallel CV execution is not supported.")
         if self.CV_QUEUE_MAX_SIZE < 1:
@@ -270,6 +317,21 @@ class Settings(BaseSettings):
             self.SHADOW_VALIDATION_RETRY_INTERVAL_SECONDS,
             self.SHADOW_VALIDATION_JOB_TIMEOUT_SECONDS,
             self.REDIS_AVAILABILITY_PROBE_TIMEOUT_SECONDS,
+            self.REDIS_SOCKET_TIMEOUT_SECONDS,
+            self.REDIS_CONNECT_TIMEOUT_SECONDS,
+            self.REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
+            self.REDIS_SCAN_COUNT,
+            self.CACHE_FILE_LOCK_TIMEOUT_SECONDS,
+            self.SCHEDULER_REDIS_RETRY_DELAY_SECONDS,
+            self.API_STREAM_POLL_TIMEOUT_SECONDS,
+            self.API_STREAM_IDLE_SLEEP_SECONDS,
+            self.JOB_CACHE_STALENESS_TTL_SECONDS,
+            self.DEFAULT_BATCH_CANDIDATE_LIMIT,
+            self.DEFAULT_API_LIST_LIMIT,
+            self.DEFAULT_CANDIDATE_SEARCH_LIMIT,
+            self.RECOMMENDED_POLL_INTERVAL_MS,
+            self.RECOMMENDED_MAX_POLL_ATTEMPTS,
+            self.MAX_UPLOAD_FILES_PER_SELECTION,
             self.INTEGRATION_SYNC_BATCH_SIZE,
             self.SOURCE_FRESHNESS_MAX_AGE_SECONDS,
             self.PROCESSING_RECOVERY_LOCK_TIMEOUT_SECONDS,
@@ -324,6 +386,10 @@ class Settings(BaseSettings):
         if max(self.EXTRACTION_TIMEOUT_SECONDS, self.SCANNED_EXTRACTION_TIMEOUT_SECONDS) >= self.RQ_JOB_TIMEOUT_SECONDS:
             raise ValueError("Document extraction timeouts must remain below RQ_JOB_TIMEOUT_SECONDS.")
         if self.IS_PRODUCTION:
+            if not self.TRUSTED_ORIGINS:
+                raise ValueError("ALLOWED_ORIGINS must include at least one trusted origin in production.")
+            if self.GIT_SHA == "unknown":
+                raise ValueError("GIT_SHA must be injected in production environments.")
             if not self.MSSQL_READONLY_ENFORCEMENT:
                 raise ValueError("MSSQL_READONLY_ENFORCEMENT must be true in production environments.")
             if not self.REDIS_URL:
@@ -332,15 +398,18 @@ class Settings(BaseSettings):
                 raise ValueError("MSSQL_READ_ONLY_URL is required for enterprise source data.")
             if not self.POSTGRES_APP_URL:
                 raise ValueError("POSTGRES_APP_URL is required for CV Analyzer application data.")
+            if self.AUTH_ENABLED and not (
+                self.RECRUITER_API_KEYS or self.ADMINISTRATOR_API_KEYS
+            ):
+                raise ValueError("At least one recruiter or administrator API key is required when authentication is enabled.")
             if self.AUTH_ENABLED and (not self.AUTH_SESSION_SIGNING_KEY or self.AUTH_SESSION_SIGNING_KEY.strip().lower() in {"change_me", "default_secret_key", "secret", "123456"}):
                 raise ValueError("AUTH_SESSION_SIGNING_KEY must be configured with a secure non-default secret in production.")
 
-            insecure_patterns = {"postgres:postgres@localhost", "postgres:postgres@127.0.0.1", "redis://localhost:6379", "redis://127.0.0.1:6379"}
-            if any(p in self.POSTGRES_APP_URL for p in insecure_patterns):
+            if "postgres:postgres@" in self.POSTGRES_APP_URL.lower():
                 raise ValueError("POSTGRES_APP_URL must not use default local development credentials in production.")
-            if any(p in self.REDIS_URL for p in insecure_patterns):
+            if self.REDIS_URL.startswith(("redis://localhost", "redis://127.0.0.1")):
                 raise ValueError("REDIS_URL must not use default local development endpoint in production.")
-            if any(p in self.MSSQL_READ_ONLY_URL for p in insecure_patterns):
+            if "sa:sa@" in self.MSSQL_READ_ONLY_URL.lower():
                 raise ValueError("MSSQL_READ_ONLY_URL must not use default local development credentials in production.")
             if self.POSTGRES_SSL_MODE in {"disable", "allow"}:
                 raise ValueError("POSTGRES_SSL_MODE must require encryption (require, verify-ca, or verify-full) in production.")

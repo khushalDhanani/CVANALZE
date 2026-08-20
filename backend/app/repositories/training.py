@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 from app.core.database import PostgresAppSession
+from app.core.config import settings
 from app.core.logging import logger
 from app.models.training import HRFeedback
 from app.schemas.analysis import TrainingExample
@@ -24,10 +25,11 @@ class TrainingRepository:
             logger.error(f"Failed to append training example to DB: {e}")
 
     @classmethod
-    def load_examples(cls, limit: int = 100) -> list[dict]:
+    def load_examples(cls, limit: int | None = None) -> list[dict]:
+        resolved_limit = limit or settings.DEFAULT_API_LIST_LIMIT
         try:
             with PostgresAppSession() as db:
-                rows = db.query(HRFeedback).order_by(HRFeedback.created_at.desc()).limit(limit).all()
+                rows = db.query(HRFeedback).order_by(HRFeedback.created_at.desc()).limit(resolved_limit).all()
                 examples = []
                 for row in reversed(rows):  # Return chronological if desired
                     examples.append(json.loads(row.feedback_payload_json))

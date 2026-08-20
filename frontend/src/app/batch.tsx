@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,16 +13,23 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { BatchCandidateResult } from '@/types/api';
 import { Card, Button, SegmentedControl, EmptyState, Badge, Breadcrumbs, ErrorBanner, PageHeader } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
-import { BATCH_CANDIDATE_LIMITS } from '@/constants/limits';
 import { resolveVacancyFitScore } from '@/utils/candidateDetail';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 export default function BatchScreen() {
   usePageTitle('Batch Candidate Matching | AIRIS');
-  const [candidateLimit, setCandidateLimit] = useState<number>(10);
+  const [candidateLimit, setCandidateLimit] = useState<number | null>(null);
+  const { capabilities, loading: capabilitiesLoading, error: capabilitiesError } = useCapabilities();
   const { running, progress, result, error, startBatch } = useBatchProgress();
 
+  useEffect(() => {
+    if (candidateLimit === null && capabilities) {
+      setCandidateLimit(capabilities.batch.default_limit);
+    }
+  }, [candidateLimit, capabilities]);
+
   const handleStartBatch = () => {
-    startBatch(candidateLimit);
+    if (candidateLimit !== null) startBatch(candidateLimit);
   };
 
   const renderCandidateCard = ({ item }: { item: BatchCandidateResult }) => {
@@ -104,24 +111,28 @@ export default function BatchScreen() {
           Select Maximum Candidates to Process:
         </Text>
         <SegmentedControl
-          options={BATCH_CANDIDATE_LIMITS.map((num) => ({
+          options={(capabilities?.batch.limit_options ?? []).map((num) => ({
             value: num,
             label: String(num),
             accessibilityLabel: `Limit ${num}`,
           }))}
-          value={candidateLimit}
+          value={candidateLimit ?? ''}
           onChange={(val) => setCandidateLimit(val as number)}
-          disabled={running}
+          disabled={running || capabilitiesLoading || !capabilities}
         />
 
         <Button
           label={running ? 'Processing Batch Candidates...' : 'Start Batch Processing'}
           onPress={handleStartBatch}
           loading={running}
-          disabled={running}
+          disabled={running || capabilitiesLoading || candidateLimit === null}
           size="md"
         />
       </Card>
+
+      {capabilitiesError ? (
+        <ErrorBanner title="Configuration Unavailable" message={capabilitiesError} />
+      ) : null}
 
       {/* Standard Error Banner */}
       {error ? <ErrorBanner title="Batch Processing Error" message={error} /> : null}

@@ -250,7 +250,12 @@ class ShadowValidationService:
                 logger.warning("REDIS_URL not set. Shadow validation will not be queued.")
                 return False
 
-            connection = Redis.from_url(settings.REDIS_URL)
+            connection = Redis.from_url(
+                settings.REDIS_URL,
+                socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+                socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
+                health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
+            )
             queue = Queue(settings.RQ_SHADOW_QUEUE_NAME, connection=connection)
             payload_hash = hashlib.sha256(
                 json.dumps(prod_result_dict, sort_keys=True, default=str).encode("utf-8")

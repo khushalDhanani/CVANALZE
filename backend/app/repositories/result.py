@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import text
 from app.core.cache import _REDIS_CLIENT, CacheIndex, cv_result_cache_manager
 from app.core.cv_identity import CVIdentity, CVIdentityCollisionError
+from app.core.config import settings
 from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.result import CVResult
@@ -422,9 +423,7 @@ class ResultRepository:
 
 
         try:
-            from app.core.config import settings
-            if getattr(settings, "RESULTS_DIR", None):
-                disk_file = settings.RESULTS_DIR / (filename if filename.endswith(".json") else f"{filename}.json")
+            for disk_file in cls._disk_result_candidates(filename):
                 if disk_file.exists():
                     data = json.loads(disk_file.read_text(encoding="utf-8"))
                     cv_result_cache_manager.set(filename, data, ttl=cls.CACHE_TTL_SECONDS)
@@ -720,3 +719,11 @@ class ResultRepository:
 
         items.sort(key=_get_ts, reverse=True)
         return items
+    @staticmethod
+    def _disk_result_candidates(filename: str) -> tuple[Path, ...]:
+        result_name = filename if filename.endswith(".json") else f"{filename}.json"
+        candidates = (
+            settings.RESULTS_DIR / result_name,
+            settings.LEGACY_RESULTS_DIR / result_name,
+        )
+        return tuple(dict.fromkeys(path.resolve() for path in candidates))

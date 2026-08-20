@@ -23,10 +23,10 @@ if settings.REDIS_URL:
         _REDIS_CLIENT = redis_module.Redis.from_url(
             settings.REDIS_URL,
             decode_responses=True,
-            socket_timeout=10.0,
-            socket_connect_timeout=5.0,
+            socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+            socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
             retry_on_timeout=True,
-            health_check_interval=30,
+            health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
         )
         _REDIS_CLIENT.ping()
     except Exception:
@@ -331,7 +331,11 @@ class RedisCache(CacheProvider):
             cursor = 0
             prefixed = self._prefixed(pattern)
             while True:
-                cursor, keys = client.scan(cursor=cursor, match=prefixed, count=1000)
+                cursor, keys = client.scan(
+                    cursor=cursor,
+                    match=prefixed,
+                    count=settings.REDIS_SCAN_COUNT,
+                )
                 if keys:
                     client.delete(*keys)
                     count += len(keys)
@@ -408,7 +412,7 @@ class FileCache(CacheProvider):
             return None
         try:
             lock = FileLock(self._lock_path(key))
-            with lock.acquire(timeout=5.0):
+            with lock.acquire(timeout=settings.CACHE_FILE_LOCK_TIMEOUT_SECONDS):
                 return json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:
             logger.warning(f"FileCache.get({key}) failed: {exc}")
@@ -419,7 +423,7 @@ class FileCache(CacheProvider):
         try:
             payload = json.dumps(value, indent=2, ensure_ascii=False)
             lock = FileLock(self._lock_path(key))
-            with lock.acquire(timeout=5.0):
+            with lock.acquire(timeout=settings.CACHE_FILE_LOCK_TIMEOUT_SECONDS):
                 path.write_text(payload, encoding="utf-8")
         except Exception as exc:
             logger.warning(f"FileCache.set({key}) failed: {exc}")
@@ -807,7 +811,7 @@ class CacheInvalidator:
 
 
 _redis_cache = RedisCache(key_prefix="")
-_memory_cache = MemoryCache(max_size=5000)
+_memory_cache = MemoryCache(max_size=settings.PERFORMANCE_L1_CACHE_MAX_SIZE)
 
 _llm_file_cache = FileCache(settings.UPLOADS_DIR / ".llm_cache")
 _doc_cache_file_cache = FileCache(settings.UPLOADS_DIR / ".doc_cache")

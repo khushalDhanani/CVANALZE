@@ -13,8 +13,9 @@ router = APIRouter(prefix="/batch", tags=["Batch Processing"])
 
 
 @router.post("/match-candidates", status_code=status.HTTP_202_ACCEPTED)
-async def match_candidates_against_vacancies(limit: int = 10):
+async def match_candidates_against_vacancies(limit: int | None = None):
     """Create an asynchronous RQ batch coordinator without parsing CVs in the request."""
+    limit = limit or settings.DEFAULT_BATCH_CANDIDATE_LIMIT
     if limit <= 0 or limit > settings.MAX_BATCH_LIMIT:
         raise HTTPException(
             status_code=400,
@@ -46,12 +47,15 @@ async def websocket_progress_endpoint(websocket: WebSocket):
 
         while True:
             # Poll for new messages (we use get_message with timeout instead of listen() to check for disconnects)
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True,
+                timeout=settings.API_STREAM_POLL_TIMEOUT_SECONDS,
+            )
             if message:
                 await websocket.send_text(message["data"])
 
             # This small sleep allows checking if client disconnected
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(settings.API_STREAM_IDLE_SLEEP_SECONDS)
     except WebSocketDisconnect:
         logger.info("Client disconnected from /api/batch/ws/progress")
     except Exception as exc:

@@ -34,16 +34,16 @@ import {
   PageHeader,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
-import { SUPPORTED_RESUME_FORMATS } from '@/constants/upload';
 import { getCvQueueStateMeta } from '@/utils/cvQueueState';
 import { resolveVacancyFitScore } from '@/utils/candidateDetail';
-
-const MAX_FILES_PER_SELECTION = 10;
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 export default function CvMatchScreen() {
   usePageTitle('CV Match Analysis | AIRIS');
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: 'file' | 'text' }>();
+  const { capabilities, loading: capabilitiesLoading, error: capabilitiesError } = useCapabilities();
+  const uploadCapabilities = capabilities?.upload ?? null;
 
   const [activeTab, setActiveTab] = useState<'file' | 'text'>(params.tab || 'file');
 
@@ -98,9 +98,14 @@ export default function CvMatchScreen() {
 
   const triggerUpload = (file: FilePickerAsset & { size?: number }) => {
     setPickerError(null);
+    if (!uploadCapabilities) {
+      setPickerError('Upload configuration is unavailable.');
+      return;
+    }
     const size = file.size || (file.rawFile && file.rawFile.size) || 0;
-    if (size > SUPPORTED_RESUME_FORMATS.maxSizeBytes) {
-      setPickerError(`File exceeds maximum size of 10MB (${(size / (1024 * 1024)).toFixed(1)}MB).`);
+    if (size > uploadCapabilities.max_size_bytes) {
+      const maximumMb = uploadCapabilities.max_size_bytes / (1024 * 1024);
+      setPickerError(`File exceeds maximum size of ${maximumMb.toFixed(1)}MB (${(size / (1024 * 1024)).toFixed(1)}MB).`);
       return;
     }
     setSelectedFile(file);
@@ -109,13 +114,18 @@ export default function CvMatchScreen() {
 
   const triggerUploads = (files: CvQueueUploadFile[]) => {
     setPickerError(null);
-    if (files.length > MAX_FILES_PER_SELECTION) {
-      setPickerError(`Select up to ${MAX_FILES_PER_SELECTION} CVs at a time.`);
+    if (!uploadCapabilities) {
+      setPickerError('Upload configuration is unavailable.');
       return;
     }
-    const oversized = files.find((file) => (file.size || (file.rawFile && file.rawFile.size) || 0) > SUPPORTED_RESUME_FORMATS.maxSizeBytes);
+    if (files.length > uploadCapabilities.max_files_per_selection) {
+      setPickerError(`Select up to ${uploadCapabilities.max_files_per_selection} CVs at a time.`);
+      return;
+    }
+    const oversized = files.find((file) => (file.size || (file.rawFile && file.rawFile.size) || 0) > uploadCapabilities.max_size_bytes);
     if (oversized) {
-      setPickerError(`${oversized.name} exceeds the maximum size of 10MB.`);
+      const maximumMb = uploadCapabilities.max_size_bytes / (1024 * 1024);
+      setPickerError(`${oversized.name} exceeds the maximum size of ${maximumMb.toFixed(1)}MB.`);
       return;
     }
     if (files.length === 1) {
@@ -154,10 +164,21 @@ export default function CvMatchScreen() {
 
   const handlePickAndUploadFile = async () => {
     setPickerError(null);
+    if (!uploadCapabilities) {
+      setPickerError('Upload configuration is unavailable.');
+      return;
+    }
+    const acceptedExtensions = uploadCapabilities.extensions.map((extension) => `.${extension}`);
+    const acceptedMimeTypes = Object.values(uploadCapabilities.mime_types).flat();
+    if (acceptedExtensions.length === 0 || acceptedMimeTypes.length === 0) {
+      setPickerError('The server has no enabled upload formats.');
+      return;
+    }
+    const defaultMimeType = acceptedMimeTypes[0];
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = SUPPORTED_RESUME_FORMATS.accept;
+      input.accept = acceptedExtensions.join(',');
       input.multiple = true;
       input.onchange = (e: any) => {
         const selectedFiles = Array.from(e.target?.files || []) as File[];
@@ -165,7 +186,7 @@ export default function CvMatchScreen() {
           triggerUploads(selectedFiles.map((selected) => ({
             uri: URL.createObjectURL(selected),
             name: selected.name,
-            type: selected.type || 'application/pdf',
+            type: selected.type || defaultMimeType,
             rawFile: selected,
             size: selected.size,
           })));
@@ -175,7 +196,7 @@ export default function CvMatchScreen() {
     } else {
       try {
         const result = await DocumentPicker.getDocumentAsync({
-          type: SUPPORTED_RESUME_FORMATS.mimeTypes,
+          type: acceptedMimeTypes,
           copyToCacheDirectory: true,
           multiple: true,
         });
@@ -184,7 +205,7 @@ export default function CvMatchScreen() {
           triggerUploads(result.assets.map((picked) => ({
             uri: picked.uri,
             name: picked.name,
-            type: picked.mimeType || 'application/pdf',
+            type: picked.mimeType || defaultMimeType,
             rawFile: (picked as any).file,
             size: picked.size,
           })));
@@ -278,7 +299,9 @@ export default function CvMatchScreen() {
                   Select CV Documents to Match
                 </Text>
                 <Text className="text-xs font-sans text-text-muted text-center max-w-md">
-                  Select up to {MAX_FILES_PER_SELECTION} files. Supported formats: {SUPPORTED_RESUME_FORMATS.label}. Files are queued in selection order.
+                  {uploadCapabilities
+                    ? `Select up to ${uploadCapabilities.max_files_per_selection} files. Supported formats: ${uploadCapabilities.extensions.map((extension) => extension.toUpperCase()).join(', ')} (up to ${(uploadCapabilities.max_size_bytes / (1024 * 1024)).toFixed(1)}MB). Files are queued in selection order.`
+                    : 'Loading supported upload formats…'}
                 </Text>
 
                 <View className="mt-2">
@@ -286,7 +309,7 @@ export default function CvMatchScreen() {
                     label={isBusy ? 'CV Queue Active...' : 'Choose CVs & Match'}
                     onPress={handlePickAndUploadFile}
                     loading={uploading || queueIsActive}
-                    disabled={isBusy}
+                    disabled={isBusy || capabilitiesLoading || !uploadCapabilities}
                     size="md"
                   />
                 </View>
@@ -297,6 +320,13 @@ export default function CvMatchScreen() {
                 <ErrorBanner
                   title="Document Selection Error"
                   message={pickerError}
+                />
+              )}
+
+              {capabilitiesError && (
+                <ErrorBanner
+                  title="Configuration Unavailable"
+                  message={capabilitiesError}
                 />
               )}
 
