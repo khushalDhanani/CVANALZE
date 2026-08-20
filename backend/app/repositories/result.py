@@ -1,18 +1,18 @@
 from __future__ import annotations
+
 import copy
 import json
 from pathlib import Path
 from typing import Any
 
-
 from sqlalchemy import text
+
 from app.core.cache import _REDIS_CLIENT, CacheIndex, cv_result_cache_manager
-from app.core.cv_identity import CVIdentity, CVIdentityCollisionError
 from app.core.config import settings
+from app.core.cv_identity import CVIdentity, CVIdentityCollisionError
 from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.result import CVResult
-
 
 
 class ResultRepository:
@@ -29,7 +29,6 @@ class ResultRepository:
 
     @classmethod
     def _extract_canonical_business_payload(cls, data: dict[str, Any]) -> dict[str, Any]:
-        resume_json = data.get("resume_json") if isinstance(data.get("resume_json"), dict) else {}
         match_analysis = data.get("match_analysis") if isinstance(data.get("match_analysis"), dict) else {}
         exp_summary = data.get("experience_summary") if isinstance(data.get("experience_summary"), dict) else {}
         
@@ -140,8 +139,8 @@ class ResultRepository:
 
     @classmethod
     def ensure_canonical_metadata(cls, data: dict[str, Any], assign_generation_sequence: bool = False) -> dict[str, Any]:
-        import time
         from datetime import datetime, timezone
+
         from app.core.config import settings
         now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
         if "result_generation_id" not in data or not data["result_generation_id"]:

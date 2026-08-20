@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import json
-from app.core.database import PostgresAppSession
+
 from app.core.config import settings
+from app.core.database import PostgresAppSession
 from app.core.logging import logger
 from app.models.training import HRFeedback
 from app.schemas.analysis import TrainingExample

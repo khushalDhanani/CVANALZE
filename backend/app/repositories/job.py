@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # backend/app/repositories/job.py
 import hashlib
 import json
@@ -12,10 +13,10 @@ from typing import Any, ClassVar
 from sqlalchemy.orm import Session
 
 from app.core.cache import CacheInvalidator, vacancy_cache_manager
+from app.core.config import settings
 from app.core.database import MssqlReadSession
-
-from app.core.logging import logger
 from app.core.error_handlers import SystemConfigurationError
+from app.core.logging import logger
 from app.services.embedding_sync_service import EmbeddingSyncService
 from app.services.job_preprocessor import JobPreprocessor
 from app.services.vacancy_service import VacancyService
@@ -276,8 +277,9 @@ class JobRepository:
 
         try:
             from sqlalchemy import or_, select
-            from app.models.mssql.vacancy import RecruitVacancyRequest
+
             from app.models.mssql.taxonomy import TransactionStatusMst
+            from app.models.mssql.vacancy import RecruitVacancyRequest
 
             stmt = (
                 select(RecruitVacancyRequest.VacancyRequestID)
@@ -328,8 +330,8 @@ class JobRepository:
                 db.rollback()
                 from sqlalchemy import func, or_
 
-                from app.models.mssql.vacancy import RecruitVacancyRequest
                 from app.models.mssql.taxonomy import TransactionStatusMst
+                from app.models.mssql.vacancy import RecruitVacancyRequest
 
                 count = (
                     db.query(func.count(RecruitVacancyRequest.VacancyRequestID))
