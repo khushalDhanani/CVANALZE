@@ -2098,3 +2098,36 @@ Permanent, append-only work log for all frontend and backend work across the CV 
 }
 ```
 </details>
+
+---
+
+### Entry #058
+- **Timestamp**: 2026-08-20T10:25:24+0530
+- **Scope**: Repository-wide configuration remediation design
+- **Category**: Architecture & Documentation
+- **Author**: Codex
+- **Modified Files**:
+  - `docs/superpowers/specs/2026-08-20-hardcoded-configuration-remediation-design.md`
+  - `workstats.md`
+- **Summary**: Added the approved architecture design for eliminating material hardcoded deployment, runtime, queue, storage, scoring, frontend, and governance configuration conflicts.
+- **Details**:
+  - Defined secure production and local-development configuration boundaries.
+  - Specified canonical queue, storage-path, scoring-policy, polling, version-metadata, and Redis operational configuration flows.
+  - Documented compatibility requirements, error behavior, verification scope, and explicit non-goals.
+  - Preserved the append-only history; the historical duplicate `Entry #057` was not modified.
+
+---
+
+### Entry #059
+- **Timestamp**: 2026-08-20T10:25:24+0530
+- **Scope**: Repository-wide hardcoded configuration remediation planning
+- **Category**: Implementation Planning & Documentation
+- **Author**: Codex
+- **Modified Files**:
+  - `docs/superpowers/plans/2026-08-20-hardcoded-configuration-remediation.md`
+  - `workstats.md`
+- **Summary**: Added the approved task-by-task implementation plan for secure, authoritative runtime configuration and hardcoding remediation.
+- **Details**:
+  - Decomposed the work into independently testable backend settings, Redis/queue, storage compatibility, scoring policy, Compose, frontend, governance, and documentation tasks.
+  - Defined exact interfaces, test-first steps, verification commands, compatibility constraints, and commit boundaries.
+  - Recorded that test, lint, Docker, and release-gate execution remains subject to explicit user authorization.

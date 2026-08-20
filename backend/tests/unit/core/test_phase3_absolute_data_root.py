@@ -9,7 +9,6 @@ Verifies:
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from app.core.config import Settings, settings
@@ -26,23 +25,28 @@ def test_app_data_root_paths_are_absolute():
     assert settings.LLM_CONFIDENCE_CALIBRATION_PATH.is_absolute()
 
 
-def test_app_data_root_environment_override(tmp_path: Path):
-    """Verify setting APP_DATA_ROOT via env var dynamically updates derived paths."""
+def test_app_data_root_programmatic_override_derives_canonical_paths(tmp_path: Path):
+    """Programmatic overrides must derive paths identically to environment configuration."""
     test_root = tmp_path / "var_lib_cv_analyzer"
-    test_root.mkdir(parents=True, exist_ok=True)
+    custom_settings = Settings(APP_DATA_ROOT=test_root)
 
-    original_env = os.environ.get("APP_DATA_ROOT")
-    try:
-        os.environ["APP_DATA_ROOT"] = str(test_root)
-        custom_settings = Settings()
+    assert custom_settings.APP_DATA_ROOT == test_root.resolve()
+    assert custom_settings.UPLOADS_DIR == test_root.resolve()
+    assert custom_settings.RESULTS_DIR == (test_root / "results").resolve()
+    assert custom_settings.LOCK_DIR == (test_root / ".locks").resolve()
+    assert custom_settings.TRAINING_DATA_DIR == (test_root / "training_data").resolve()
+    assert custom_settings.LEGACY_UPLOADS_DIR == (test_root / "uploads").resolve()
+    assert custom_settings.LEGACY_RESULTS_DIR == (test_root / "uploads" / "results").resolve()
 
-        assert custom_settings.APP_DATA_ROOT == test_root.resolve()
-        assert str(custom_settings.UPLOADS_DIR).startswith(str(test_root.resolve()))
-        assert str(custom_settings.RESULTS_DIR).startswith(str(test_root.resolve()))
-        assert str(custom_settings.LOCK_DIR).startswith(str(test_root.resolve()))
-        assert str(custom_settings.TRAINING_DATA_DIR).startswith(str(test_root.resolve()))
-    finally:
-        if original_env is not None:
-            os.environ["APP_DATA_ROOT"] = original_env
-        else:
-            os.environ.pop("APP_DATA_ROOT", None)
+
+def test_explicit_dependent_path_overrides_are_preserved(tmp_path: Path):
+    custom_uploads = tmp_path / "custom-uploads"
+    custom_results = tmp_path / "custom-results"
+    custom_settings = Settings(
+        APP_DATA_ROOT=tmp_path / "data",
+        UPLOADS_DIR=custom_uploads,
+        RESULTS_DIR=custom_results,
+    )
+
+    assert custom_settings.UPLOADS_DIR == custom_uploads.resolve()
+    assert custom_settings.RESULTS_DIR == custom_results.resolve()

@@ -38,7 +38,8 @@ def test_phase4_criterion2_policies_independently_deployable_and_versioned() -> 
 def test_phase4_criterion3_release_artifacts_report_all_versions() -> None:
     """Phase 4 Criterion 3: Release artifacts report app version + git SHA + active policy/model/taxonomy versions."""
     assert settings.APP_VERSION == "3.0.0"
-    assert settings.GIT_SHA == "c6eb7f2"
+    assert settings.GIT_SHA
+    assert settings.GIT_SHA != "c6eb7f2"
 
     digest = PolicyRegistry.get_policy_digest()
     active_models = ModelRegistry.get_all_models()

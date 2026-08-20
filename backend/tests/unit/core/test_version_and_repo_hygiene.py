@@ -4,14 +4,21 @@ import json
 from pathlib import Path
 import tomllib
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 
 
 def test_app_version_and_git_sha_exposed() -> None:
-    """Verifies that APP_VERSION and GIT_SHA are exposed on core settings."""
+    """The compatibility version alias must use the canonical app version."""
     assert settings.APP_VERSION == "3.0.0"
-    assert settings.VERSION == "3.0.0"
-    assert settings.GIT_SHA == "c6eb7f2"
+    assert settings.VERSION == settings.APP_VERSION
+    assert settings.GIT_SHA != "c6eb7f2"
+
+
+def test_development_git_sha_uses_explicit_unknown_value() -> None:
+    configured = Settings(APP_ENVIRONMENT="development", APP_VERSION="4.2.1", GIT_SHA="")
+
+    assert configured.VERSION == "4.2.1"
+    assert configured.GIT_SHA == "unknown"
 
 
 def test_pyproject_toml_version_aligned() -> None:

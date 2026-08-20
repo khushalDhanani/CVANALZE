@@ -30,10 +30,12 @@ def test_production_profile_rejects_default_postgres_credentials():
     with pytest.raises((ValueError, ValidationError), match="default local development credentials"):
         Settings(
             APP_ENVIRONMENT="production",
-            POSTGRES_APP_URL="postgresql://postgres:postgres@localhost:5432/cv_analyzer",
+            POSTGRES_APP_URL="postgresql://postgres:postgres@pgvector:5432/cv_analyzer",
             REDIS_URL="redis://prod-redis.internal:6379/0",
             MSSQL_READ_ONLY_URL="mssql+pyodbc://prod_user:secret@prod-sql.internal:1433/db",
             AUTH_SESSION_SIGNING_KEY="secure_prod_key_1234567890",
+            ALLOWED_ORIGINS=["https://recruiting.example.com"],
+            GIT_SHA="abc1234",
             POSTGRES_SSL_MODE="require",
         )
 
@@ -47,6 +49,8 @@ def test_production_profile_rejects_default_redis_url():
             REDIS_URL="redis://localhost:6379/0",
             MSSQL_READ_ONLY_URL="mssql+pyodbc://prod_user:secret@prod-sql.internal:1433/db",
             AUTH_SESSION_SIGNING_KEY="secure_prod_key_1234567890",
+            ALLOWED_ORIGINS=["https://recruiting.example.com"],
+            GIT_SHA="abc1234",
             POSTGRES_SSL_MODE="require",
         )
 
@@ -60,5 +64,7 @@ def test_production_profile_rejects_unencrypted_ssl_mode():
             REDIS_URL="redis://prod-redis.internal:6379/0",
             MSSQL_READ_ONLY_URL="mssql+pyodbc://prod_user:secret@prod-sql.internal:1433/db",
             AUTH_SESSION_SIGNING_KEY="secure_prod_key_1234567890",
+            ALLOWED_ORIGINS=["https://recruiting.example.com"],
+            GIT_SHA="abc1234",
             POSTGRES_SSL_MODE="disable",
         )

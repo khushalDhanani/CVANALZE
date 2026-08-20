@@ -13,7 +13,8 @@ def test_app_data_root_derived_paths() -> None:
     assert settings.RESULTS_DIR.is_absolute()
     assert settings.TRAINING_DATA_DIR.is_absolute()
 
-    assert settings.APP_DATA_ROOT in settings.UPLOADS_DIR.parents or settings.UPLOADS_DIR == settings.APP_DATA_ROOT / "uploads"
+    assert settings.UPLOADS_DIR == settings.APP_DATA_ROOT
+    assert settings.RESULTS_DIR == settings.UPLOADS_DIR / "results"
 
 
 def test_production_secret_rejection() -> None:
@@ -23,9 +24,13 @@ def test_production_secret_rejection() -> None:
             APP_ENVIRONMENT="production",
             AUTH_ENABLED=True,
             AUTH_SESSION_SIGNING_KEY="change_me",
-            REDIS_URL="redis://localhost:6379/0",
-            MSSQL_READ_ONLY_URL="mssql+pyodbc://localhost/db",
-            POSTGRES_APP_URL="postgresql://localhost/db",
+            RECRUITER_API_KEYS=["recruiter-key"],
+            ALLOWED_ORIGINS=["https://recruiting.example.com"],
+            GIT_SHA="abc1234",
+            REDIS_URL="rediss://redis.internal/0",
+            MSSQL_READ_ONLY_URL="mssql+pyodbc://reader:secret@sql.internal/db",
+            POSTGRES_APP_URL="postgresql://app:secret@postgres.internal/db",
+            POSTGRES_SSL_MODE="require",
         )
 
 
@@ -39,7 +44,32 @@ def test_database_pool_settings() -> None:
     assert settings.MSSQL_MAX_OVERFLOW == 20
 
 
-def test_frontend_polling_metadata() -> None:
-    """Workstream 5.3: Backend config defines frontend lifecycle polling and retry metadata."""
-    assert settings.FRONTEND_POLL_INTERVAL_MS == 2000
-    assert settings.FRONTEND_RETRY_AFTER_MS == 2000
+def test_production_authentication_requires_an_api_key() -> None:
+    with pytest.raises(ValueError, match="API key"):
+        Settings(
+            APP_ENVIRONMENT="production",
+            AUTH_ENABLED=True,
+            AUTH_SESSION_SIGNING_KEY="secure-signing-key-with-more-than-32-characters",
+            RECRUITER_API_KEYS=[],
+            ADMINISTRATOR_API_KEYS=[],
+            ALLOWED_ORIGINS=["https://recruiting.example.com"],
+            GIT_SHA="abc1234",
+            REDIS_URL="rediss://redis.internal/0",
+            MSSQL_READ_ONLY_URL="mssql+pyodbc://reader:secret@sql.internal/db",
+            POSTGRES_APP_URL="postgresql://app:secret@postgres.internal/db",
+            POSTGRES_SSL_MODE="require",
+        )
+
+
+def test_production_requires_a_trusted_origin() -> None:
+    with pytest.raises(ValueError, match="ALLOWED_ORIGINS"):
+        Settings(
+            APP_ENVIRONMENT="production",
+            AUTH_ENABLED=False,
+            ALLOWED_ORIGINS=[],
+            GIT_SHA="abc1234",
+            REDIS_URL="rediss://redis.internal/0",
+            MSSQL_READ_ONLY_URL="mssql+pyodbc://reader:secret@sql.internal/db",
+            POSTGRES_APP_URL="postgresql://app:secret@postgres.internal/db",
+            POSTGRES_SSL_MODE="require",
+        )
