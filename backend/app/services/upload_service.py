@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import os
@@ -448,14 +449,26 @@ class UploadService:
 
     @classmethod
     def _contained_path(cls, filename: str) -> Path:
+        return cls._contained_path_in_root(filename, settings.UPLOADS_DIR)
+
+    @staticmethod
+    def _contained_path_in_root(filename: str, root: Path) -> Path:
         basename = PurePosixPath(filename.replace("\\", "/")).name
         if basename != filename or not basename:
             raise UploadValidationError("Unsafe storage filename.", code="unsafe_filename")
-        uploads_dir = settings.UPLOADS_DIR.resolve()
+        uploads_dir = root.resolve()
         candidate = (uploads_dir / basename).resolve()
         if candidate.parent != uploads_dir:
             raise UploadValidationError("Unsafe storage path.", code="unsafe_filename")
         return candidate
+
+    @classmethod
+    def _read_storage_roots(cls) -> tuple[Path, ...]:
+        roots = (
+            settings.UPLOADS_DIR.resolve(),
+            settings.LEGACY_UPLOADS_DIR.resolve(),
+        )
+        return tuple(dict.fromkeys(roots))
 
     @classmethod
     def remove_stored_upload(cls, storage_filename: str | None) -> None:
@@ -518,16 +531,18 @@ class UploadService:
         candidates.extend(f"{cv_key}.{extension}" for extension in sorted(settings.ALLOWED_EXTENSIONS))
 
         seen: set[str] = set()
-        for candidate in candidates:
-            if candidate in seen:
-                continue
-            seen.add(candidate)
-            try:
-                path = cls._contained_path(candidate)
-            except UploadValidationError:
-                continue
-            if path.is_file() and path.suffix.lower().lstrip(".") in settings.ALLOWED_EXTENSIONS:
-                return path
+        for root in cls._read_storage_roots():
+            for candidate in candidates:
+                candidate_identity = f"{root}:{candidate}"
+                if candidate_identity in seen:
+                    continue
+                seen.add(candidate_identity)
+                try:
+                    path = cls._contained_path_in_root(candidate, root)
+                except UploadValidationError:
+                    continue
+                if path.is_file() and path.suffix.lower().lstrip(".") in settings.ALLOWED_EXTENSIONS:
+                    return path
         return None
 
     @classmethod

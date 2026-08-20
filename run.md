@@ -6,13 +6,14 @@ This document outlines the steps required to run the CV Analyzer pipeline using 
 
 ## 1. Prerequisites & Environment Setup
 
-Ensure your `.env` file is present in the project root directory (and/or `backend/`). It should contain:
+Create ignored local environment files from the sanitized templates, then replace every placeholder with credentials and endpoints issued for your environment:
 
-```ini
-POSTGRES_APP_URL=postgresql://postgres:postgres@localhost:5432/cv_analyzer # policy-approved-constant
-MSSQL_READ_ONLY_URL=mssql+pyodbc://sa:your_password@172.25.1.160:1433/AIRIS_TEST?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
-REDIS_URL=redis://localhost:6379/0
+```bash
+cp backend/.env.example backend/.env
+cp .env.example .env
 ```
+
+Use a dedicated read-only MSSQL login. Never configure `sa`, an operator account, or a credential with write permissions.
 
 > **macOS Note**: Due to `PyTorch` (used by `docling`) fork-safety issues on macOS when running locally outside Docker, you **MUST** prefix commands that spawn workers or run ML models with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`.
 
@@ -251,5 +252,4 @@ curl -X POST "http://localhost:8000/api/cv/upload" \
 cd backend
 OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run python main.py
 ```
-
 

@@ -62,7 +62,6 @@ x-local-backend-environment: &local-backend-environment
   OLLAMA_GENERATION_NUM_PREDICT: '${OLLAMA_GENERATION_NUM_PREDICT:-1536}'
   OLLAMA_OPTIMIZED_NUM_CTX: '${OLLAMA_OPTIMIZED_NUM_CTX:?OLLAMA_OPTIMIZED_NUM_CTX must be set in the repository-root .env}'
   OLLAMA_OPTIMIZED_NUM_PREDICT: '${OLLAMA_OPTIMIZED_NUM_PREDICT:?OLLAMA_OPTIMIZED_NUM_PREDICT must be set in the repository-root .env}'
-  MAX_CONCURRENT_LLM_WORKERS: '${MAX_CONCURRENT_LLM_WORKERS:-1}'
   DOCUMENT_PARSER_WORKERS: '${DOCUMENT_PARSER_WORKERS:-1}'
   EXTRACTION_TIMEOUT_SECONDS: '${EXTRACTION_TIMEOUT_SECONDS:-900}'
   SCANNED_EXTRACTION_TIMEOUT_SECONDS: '${SCANNED_EXTRACTION_TIMEOUT_SECONDS:-1800}'
@@ -142,12 +141,20 @@ services:
     pids_limit: 64
 
   pgvector:
+    environment:
+      POSTGRES_USER: '${POSTGRES_USER:-postgres}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-postgres}'
+      POSTGRES_DB: '${POSTGRES_DB:-cv_analyzer}'
+    ports:
+      - '${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432'
     command: ["postgres", "-c", "shared_buffers=64MB", "-c", "work_mem=2MB", "-c", "maintenance_work_mem=32MB", "-c", "max_connections=20"]
     mem_limit: 384m
     cpus: 0.50
     pids_limit: 96
 
   redis:
+    ports:
+      - '${REDIS_BIND_ADDRESS:-127.0.0.1}:${REDIS_HOST_PORT:-6380}:6379'
     command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "yes", "--appendfsync", "always"]
     mem_limit: 96m
     cpus: 0.25

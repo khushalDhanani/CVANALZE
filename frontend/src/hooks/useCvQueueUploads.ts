@@ -6,6 +6,7 @@ import type { CVProcessingJobSummary, CVProcessingResponse } from '@/types/api';
 import { getCvQueueStateMeta, resolveCvQueueUiState } from '@/utils/cvQueueState';
 import type { CvQueueUiState } from '@/utils/cvQueueState';
 import type { FilePickerAsset } from './useCvUpload';
+import { nextPollingAttempt } from '@/utils/runtimeConfig';
 
 export interface CvQueueUploadFile extends FilePickerAsset {
   size?: number;
@@ -79,7 +80,17 @@ export function useCvQueueUploads() {
           syncError: undefined,
         });
         if (!meta.terminal) {
-          schedulePoll(clientId, cvKey, enrichWithLlm, (attempt + 1) % API_CONFIG.MAX_POLL_RETRIES, 0);
+          const nextAttempt = nextPollingAttempt(attempt, API_CONFIG.MAX_POLL_RETRIES);
+          if (nextAttempt === null) {
+            updateItem(clientId, {
+              state: 'FAILED',
+              message: 'Processing is taking longer than expected.',
+              error: 'Processing is taking longer than expected.',
+            });
+            timersRef.current.delete(clientId);
+          } else {
+            schedulePoll(clientId, cvKey, enrichWithLlm, nextAttempt, 0);
+          }
         } else {
           timersRef.current.delete(clientId);
         }
@@ -88,7 +99,17 @@ export function useCvQueueUploads() {
         updateItem(clientId, {
           syncError: nextErrorCount >= 5 ? error?.message || 'Unable to refresh backend status.' : undefined,
         });
-        schedulePoll(clientId, cvKey, enrichWithLlm, (attempt + 1) % API_CONFIG.MAX_POLL_RETRIES, nextErrorCount);
+        const nextAttempt = nextPollingAttempt(attempt, API_CONFIG.MAX_POLL_RETRIES);
+        if (nextAttempt === null) {
+          updateItem(clientId, {
+            state: 'FAILED',
+            message: 'Processing status could not be confirmed before the polling deadline.',
+            error: error?.message || 'Unable to refresh backend status.',
+          });
+          timersRef.current.delete(clientId);
+        } else {
+          schedulePoll(clientId, cvKey, enrichWithLlm, nextAttempt, nextErrorCount);
+        }
       }
     }, API_CONFIG.POLL_INTERVAL_MS);
     timersRef.current.set(clientId, timer);

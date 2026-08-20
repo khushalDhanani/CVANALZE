@@ -15,7 +15,7 @@ x-backend-environment: &backend-environment
   MAX_JSON_REQUEST_SIZE_BYTES: '${MAX_JSON_REQUEST_SIZE_BYTES:-1048576}'
   MAX_CV_TEXT_LENGTH_CHARS: '${MAX_CV_TEXT_LENGTH_CHARS:-500000}'
   MAX_HR_FEEDBACK_LENGTH_CHARS: '${MAX_HR_FEEDBACK_LENGTH_CHARS:-10000}'
-  ALLOWED_ORIGINS: '${ALLOWED_ORIGINS:-["http://localhost:8081"]}'
+  ALLOWED_ORIGINS: '${ALLOWED_ORIGINS:-[]}'
   CORS_ALLOW_CREDENTIALS: '${CORS_ALLOW_CREDENTIALS:-true}'
   MSSQL_READ_ONLY_URL: '${MSSQL_READ_ONLY_URL}'
   MSSQL_READONLY_ENFORCEMENT: "true"
@@ -24,8 +24,9 @@ x-backend-environment: &backend-environment
   EXTRACTION_TIMEOUT_SECONDS: '${EXTRACTION_TIMEOUT_SECONDS:-900}'
   SCANNED_EXTRACTION_TIMEOUT_SECONDS: '${SCANNED_EXTRACTION_TIMEOUT_SECONDS:-1800}'
   AUTO_MIGRATE: "false"
-  POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}' # policy-approved-constant
-  REDIS_URL: 'redis://redis:6379/0'
+  POSTGRES_APP_URL: '${POSTGRES_APP_URL:-}'
+  REDIS_URL: '${REDIS_URL:-}'
+  GIT_SHA: '${GIT_SHA:-unknown}'
   RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
   RQ_AUXILIARY_QUEUE_NAME: '${RQ_AUXILIARY_QUEUE_NAME:-default}'
   RQ_SHADOW_QUEUE_NAME: '${RQ_SHADOW_QUEUE_NAME:-shadow_validation}'
@@ -179,11 +180,9 @@ services:
     image: pgvector/pgvector:pg16
     container_name: cv_analyzer_pgvector
     environment:
-      POSTGRES_USER: '${POSTGRES_USER:-postgres}'
-      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-postgres}'
-      POSTGRES_DB: '${POSTGRES_DB:-cv_analyzer}'
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: '${POSTGRES_USER:-}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-}'
+      POSTGRES_DB: '${POSTGRES_DB:-}'
     volumes:
       - pg_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -198,8 +197,6 @@ services:
     image: redis:7-alpine
     container_name: cv_analyzer_redis
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
-    ports:
-      - "6380:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped

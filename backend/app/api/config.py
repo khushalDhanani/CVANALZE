@@ -1,20 +1,28 @@
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.core.database import get_postgres_app_db
 from app.core.logging import logger
+from app.core.rule_config_manager import UnifiedRuleConfig
+from app.schemas.capabilities import ApplicationCapabilities
+from app.services.capabilities_service import CapabilitiesService
 from app.services.configuration_service import ConfigurationService
 from app.services.system_rule_config_factory import SystemRuleConfigFactory
-from app.core.rule_config_manager import UnifiedRuleConfig
 
 router = APIRouter(prefix="/config", tags=["Configuration"])
 
 class ActivateProfileRequest(BaseModel):
     tenant_id: str | None = None
+
+
+@router.get("/capabilities", response_model=ApplicationCapabilities)
+async def get_application_capabilities() -> ApplicationCapabilities:
+    """Expose backend-owned operational limits and presentation capabilities."""
+    return CapabilitiesService.get_capabilities()
 
 
 @router.get("/schema")
@@ -149,8 +157,8 @@ async def get_active_rule_config(
 ):
     """Retrieve the currently active unified rule configuration for a tenant."""
     try:
-        from app.core.rule_config_manager import RuleConfigManager
         from app.core.error_handlers import SystemConfigurationError
+        from app.core.rule_config_manager import RuleConfigManager
         
         try:
             config = RuleConfigManager.get_config(tenant_id=tenant_id)

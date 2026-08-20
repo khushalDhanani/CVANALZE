@@ -4,8 +4,7 @@
 services:
   api:
     environment:
-      CV_PROCESSING_CONCURRENCY: '4'
-      MAX_CONCURRENT_LLM_WORKERS: '4'
+      CV_PROCESSING_CONCURRENCY: '1'
       DOCUMENT_PARSER_WORKERS: '4'
       OLLAMA_RESIDENCY_ENABLED: 'true'
       OLLAMA_KEEP_ALIVE: '-1'
@@ -20,8 +19,7 @@ services:
 
   worker:
     environment:
-      CV_PROCESSING_CONCURRENCY: '4'
-      MAX_CONCURRENT_LLM_WORKERS: '4'
+      CV_PROCESSING_CONCURRENCY: '1'
       DOCUMENT_PARSER_WORKERS: '4'
       OLLAMA_RESIDENCY_ENABLED: 'true'
       OLLAMA_KEEP_ALIVE: '-1'
@@ -36,8 +34,7 @@ services:
 
   auxiliary-worker:
     environment:
-      CV_PROCESSING_CONCURRENCY: '4'
-      MAX_CONCURRENT_LLM_WORKERS: '4'
+      CV_PROCESSING_CONCURRENCY: '1'
       DOCUMENT_PARSER_WORKERS: '4'
       DOCLING_NUM_THREADS: '4'
       OMP_NUM_THREADS: '4'

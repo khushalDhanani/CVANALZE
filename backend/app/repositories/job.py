@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # backend/app/repositories/job.py
 import hashlib
 import json
@@ -12,10 +13,10 @@ from typing import Any, ClassVar
 from sqlalchemy.orm import Session
 
 from app.core.cache import CacheInvalidator, vacancy_cache_manager
+from app.core.config import settings
 from app.core.database import MssqlReadSession
-
-from app.core.logging import logger
 from app.core.error_handlers import SystemConfigurationError
+from app.core.logging import logger
 from app.services.embedding_sync_service import EmbeddingSyncService
 from app.services.job_preprocessor import JobPreprocessor
 from app.services.vacancy_service import VacancyService
@@ -109,7 +110,6 @@ class JobRepository:
     _VACANCY_CACHE_KEY = VACANCY_CACHE_KEY
     _VERSION_CACHE_KEY = "all_jobs_version"
     _STALENESS_CACHE: ClassVar[dict[str, tuple[float, bool]]] = {}
-    _STALENESS_TTL = 30.0
     _VACANCY_EMBEDDINGS_CACHED = False
 
     @classmethod
@@ -260,7 +260,7 @@ class JobRepository:
         now = time.monotonic()
         if stored_version in cls._STALENESS_CACHE:
             cached_time, cached_result = cls._STALENESS_CACHE[stored_version]
-            if now - cached_time < cls._STALENESS_TTL:
+            if now - cached_time < settings.JOB_CACHE_STALENESS_TTL_SECONDS:
                 return cached_result
 
         close_session = False
@@ -277,8 +277,9 @@ class JobRepository:
 
         try:
             from sqlalchemy import or_, select
-            from app.models.mssql.vacancy import RecruitVacancyRequest
+
             from app.models.mssql.taxonomy import TransactionStatusMst
+            from app.models.mssql.vacancy import RecruitVacancyRequest
 
             stmt = (
                 select(RecruitVacancyRequest.VacancyRequestID)
@@ -329,8 +330,8 @@ class JobRepository:
                 db.rollback()
                 from sqlalchemy import func, or_
 
-                from app.models.mssql.vacancy import RecruitVacancyRequest
                 from app.models.mssql.taxonomy import TransactionStatusMst
+                from app.models.mssql.vacancy import RecruitVacancyRequest
 
                 count = (
                     db.query(func.count(RecruitVacancyRequest.VacancyRequestID))

@@ -15,10 +15,10 @@ _TRANSIENT_REDIS_ERRORS = (RedisConnectionError, RedisTimeoutError)
 class ResilientCronScheduler(CronScheduler):
     """Keep recurring scheduling alive through transient Redis failures."""
 
-    _REDIS_RETRY_DELAY_SECONDS = 5.0
-
     def _record_redis_failure(self, operation: str, exc: RedisConnectionError | RedisTimeoutError) -> None:
-        self._redis_retry_after = time.monotonic() + self._REDIS_RETRY_DELAY_SECONDS
+        self._redis_retry_after = (
+            time.monotonic() + settings.SCHEDULER_REDIS_RETRY_DELAY_SECONDS
+        )
         logger.warning("RQ cron scheduler could not %s because Redis is unavailable; retrying: %s", operation, exc)
 
     def enqueue_jobs(self) -> list[CronJob]:
@@ -93,14 +93,15 @@ def register_recurring_jobs(scheduler: CronScheduler) -> int:
 
 
 def main() -> None:
-    redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
+    if not settings.REDIS_URL:
+        raise RuntimeError("REDIS_URL is required to start the scheduler.")
     redis_conn = Redis.from_url(
-        redis_url,
-        socket_timeout=30.0,
-        socket_connect_timeout=10.0,
+        settings.REDIS_URL,
+        socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+        socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
         socket_keepalive=True,
         retry_on_timeout=True,
-        health_check_interval=30,
+        health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
     )
     scheduler = ResilientCronScheduler(connection=redis_conn, logging_level="INFO")
     registered = register_recurring_jobs(scheduler)

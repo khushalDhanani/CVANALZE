@@ -2161,3 +2161,180 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Strengthened the AST hardcoding gate to detect operational call literals and policy-bearing defaults while allowing protocol constants and documented emergency fallbacks.
   - Added targeted regression tests for configuration resolution, policy validation, queue behavior, scoring, qualifications, taxonomies, experience, prompts, and hardcoding detection.
   - Verified 73 focused unit/integration tests, 9 policy/config compatibility tests, and 22 additional affected-area tests passed; one unrelated pre-existing database-dependent unit test remains failing identically on the baseline branch when PostgreSQL is unavailable.
+
+---
+
+### Entry #061
+- **Timestamp**: 2026-08-20T11:30:59+0530
+- **Scope**: Repository JSON artifact cleanup
+- **Category**: Maintenance
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/coverage.json` (removed)
+  - `backend/hardcoding_findings.json` (removed)
+  - `docs/superpowers/plans/2026-08-20-hardcoded-configuration-remediation.md`
+  - `workstats.md`
+- **Summary**: Removed two stale backend-local scanner outputs that had no consumer and duplicated the canonical repository-root governance artifacts.
+- **Details**:
+  - Confirmed the active completeness scanner writes `coverage.json` and `hardcoding_findings.json` only at the repository root.
+  - Confirmed tests, release governance, scripts, and documentation reference the root outputs rather than the backend-local copies.
+  - Removed obsolete plan instructions that regenerated and staged the deleted backend-local findings artifact.
+  - Preserved runtime datasets, test fixtures, IDE/tool manifests, package metadata, Expo assets, and the required hardcoding baseline.
+
+---
+
+### Entry #062
+- **Timestamp**: 2026-08-20T11:49:58+0530
+- **Scope**: Full repository hardcoding-remediation design and plan extension
+- **Category**: Architecture & Implementation Planning
+- **Author**: Codex
+- **Modified Files**:
+  - `docs/superpowers/specs/2026-08-20-hardcoded-configuration-remediation-design.md`
+  - `docs/superpowers/plans/2026-08-20-hardcoded-configuration-remediation.md`
+  - `workstats.md`
+- **Summary**: Extended the approved remediation architecture and implementation plan to cover all material audit findings beyond deployment configuration.
+- **Details**:
+  - Added governed resume-extraction heuristics and vocabulary registries while preserving protocol grammar and response contracts.
+  - Added policy-backed backend operational caps, recruiter presentation policy, and an authoritative capabilities contract.
+  - Added frontend capability consumption and complete category-aware hardcoding governance tasks.
+  - Recorded the authorized test-first, lint, type-check, scanner, and Compose verification workflow; the full release gate remains outside this task's execution conditions.
+
+---
+
+### Entry #063
+- **Timestamp**: 2026-08-20T12:02:18+0530
+- **Scope**: Runtime, queue, storage, Compose, and frontend polling hardcoding remediation
+- **Category**: Configuration, Compatibility, Infrastructure & Tests
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/app/core/config.py`
+  - `backend/app/core/cache.py`
+  - `backend/app/core/background_tasks.py`
+  - `backend/app/api/analysis.py`
+  - `backend/app/api/batch.py`
+  - `backend/app/repositories/job.py`
+  - `backend/app/repositories/result.py`
+  - `backend/app/repositories/training.py`
+  - `backend/app/services/shadow_validation_service.py`
+  - `backend/app/services/upload_service.py`
+  - `backend/start_scheduler.py`
+  - `backend/tests/unit/core/test_compose_configuration_contract.py`
+  - `backend/tests/unit/repositories/test_legacy_storage_compatibility.py`
+  - `docker-compose.yml`
+  - `docker-compose.local.yml`
+  - `docker-compose.profile-8gb.yml`
+  - `docker-compose.profile-16gb.yml`
+  - `docker-compose.profile-32gb.yml`
+  - `.env.profile.8gb`
+  - `.env.profile.16gb`
+  - `.env.profile.32gb`
+  - `frontend/src/constants/config.ts`
+  - `frontend/src/hooks/useCvUpload.ts`
+  - `frontend/src/hooks/useCvQueueUploads.ts`
+  - `frontend/src/utils/runtimeConfig.ts`
+  - `frontend/src/__tests__/runtimeConfig.test.mjs`
+- **Summary**: Centralized material runtime limits and connection settings, separated secure production Compose from local defaults, preserved legacy stored-file reads, and made frontend API/polling behavior environment-driven and bounded.
+- **Details**:
+  - Derived canonical storage paths from one application data root and retained read-only legacy path candidates while keeping all new writes canonical.
+  - Added production validation for trusted origins, API keys, secure service URLs, and build metadata; retained the public version compatibility property.
+  - Replaced embedded Redis client, scan, lock, retry, stream, cache-staleness, and API list limits with validated settings.
+  - Removed production Compose credentials, localhost origins, published database/cache ports, and invalid multi-slot CV profiles; local-only defaults remain in the local override.
+  - Replaced wrapping frontend poll counters with deterministic exhaustion and made the API URL, request timeout, polling interval, and maximum attempts environment-configurable.
+  - Verified focused backend configuration/queue/cache/storage/scoring tests, three Compose contract tests, three rendered Compose variants, and the frontend runtime utility test; full frontend type checking is pending a worktree-local dependency installation.
+
+---
+
+### Entry #064
+- **Timestamp**: 2026-08-20T12:12:13+0530
+- **Scope**: Authoritative application capabilities and resume-extraction policy controls
+- **Category**: API Contract, Extraction Policy, Frontend Integration & Tests
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/app/api/config.py`
+  - `backend/app/core/config.py`
+  - `backend/app/core/rule_config_manager.py`
+  - `backend/app/schemas/capabilities.py`
+  - `backend/app/services/capabilities_service.py`
+  - `backend/app/services/resume_field_extractor.py`
+  - `backend/tests/unit/services/test_capabilities_service.py`
+  - `backend/tests/unit/services/test_resume_extraction_policy_controls.py`
+  - `frontend/src/app/batch.tsx`
+  - `frontend/src/app/cv-match.tsx`
+  - `frontend/src/constants/limits.ts` (removed)
+  - `frontend/src/constants/upload.ts` (removed)
+  - `frontend/src/hooks/useCapabilities.ts`
+  - `frontend/src/services/capabilitiesService.ts`
+  - `frontend/src/types/capabilities.ts`
+- **Summary**: Added an additive backend capabilities contract, made recruiter upload and batch controls consume it, and moved material resume-extraction heuristics into the versioned extraction policy.
+- **Details**:
+  - Exposed configured upload extensions/MIME types, file/page/selection limits, batch options, polling guidance, pipeline presentation, and implementation metadata at `/api/config/capabilities`.
+  - Removed conflicting frontend upload and batch constants; controls now remain unavailable if authoritative capabilities cannot be loaded instead of silently applying stale limits.
+  - Centralized name/location search windows, token and character bounds, structural ranking bonuses, title/skill/project limits, rejection ratios, and fallback presentation labels in `ExtractionPolicy`.
+  - Preserved date/email/document regex grammar as deterministic parsing protocol rather than treating syntax as deployment configuration.
+  - Verified 17 focused backend tests passed and Ruff import checks were corrected; TypeScript resolved all changed application files, with three pre-existing CSS declaration errors remaining elsewhere in the project.
+
+---
+
+### Entry #065
+- **Timestamp**: 2026-08-20T12:23:21+0530
+- **Scope**: Exact hardcoding governance, similarity capabilities, and operational documentation
+- **Category**: Governance, Policy, Frontend Contract, Security & Documentation
+- **Author**: Codex
+- **Modified Files**:
+  - `.env.example`
+  - `.vscode/settings.json`
+  - `README.md`
+  - `run.md`
+  - `backend/.env.example`
+  - `backend/app/api/domain_knowledge.py`
+  - `backend/app/core/config.py`
+  - `backend/app/core/config_listener.py`
+  - `backend/app/core/rule_config_manager.py`
+  - `backend/app/schemas/capabilities.py`
+  - `backend/app/services/capabilities_service.py`
+  - `backend/scripts/quality/hardcoding_audit.py`
+  - `backend/scripts/quality/scan_repository_completeness.py`
+  - `backend/tests/unit/api/test_domain_knowledge_policy.py`
+  - `backend/tests/unit/core/test_hardcoding_regression_gate.py`
+  - `backend/tests/unit/services/test_capabilities_service.py`
+  - `frontend/src/app/candidates/[id].tsx`
+  - `frontend/src/app/domain-explorer.tsx`
+  - `frontend/src/components/ui/StepProgressCard.tsx`
+  - `frontend/src/constants/capabilities.ts`
+  - `frontend/src/constants/similarity.ts` (removed)
+  - `frontend/src/hooks/useCapabilities.ts`
+  - `frontend/src/types/capabilities.ts`
+  - `hardcoding-baseline.json`
+- **Summary**: Replaced category-wide hardcoding exceptions with exact fingerprints, moved similarity UI/API controls into active policy, consumed backend pipeline and polling capabilities, and sanitized repository operational configuration.
+- **Details**:
+  - The hardcoding audit now requires stable file/category/snippet fingerprints with both owner and justification; broad file/category exceptions are ignored.
+  - Added category-aware exclusions for scanner source dictionaries, synthetic credential tests, and documentation examples while retaining complete tracked-file coverage.
+  - Moved Domain Explorer thresholds, limits, and badge bands into `SimilarityPolicy`; omitted backend request values now resolve from the active immutable policy and explicit values are bounded by it.
+  - Pipeline labels and polling guidance now flow through the capabilities contract; only the stable stage-to-icon presentation mapping remains frontend-owned.
+  - Removed user-specific absolute commands and sensitive/internal connection examples from editor/run documentation, added sanitized root and backend environment templates, and documented canonical paths and capabilities.
+  - Verified 15 focused similarity/capabilities/governance tests passed; the exact-baseline audit reported zero new unapproved findings before the final commit checkpoint.
+
+---
+
+### Entry #066
+- **Timestamp**: 2026-08-20T12:25:51+0530
+- **Scope**: Final remediation verification and changed-file quality cleanup
+- **Category**: Verification, Static Analysis & Type Safety
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/app/api/analysis.py`
+  - `backend/app/api/batch.py`
+  - `backend/app/core/cache.py`
+  - `backend/app/repositories/job.py`
+  - `backend/app/repositories/result.py`
+  - `backend/app/repositories/training.py`
+  - `backend/app/services/shadow_validation_service.py`
+  - `backend/app/services/upload_service.py`
+  - `backend/tests/unit/core/test_compose_configuration_contract.py`
+  - `frontend/src/types/styles.d.ts`
+- **Summary**: Completed changed-file static analysis, restored a missing settings import exposed by Ruff, removed dead locals in touched modules, and enabled a clean frontend TypeScript check with standard CSS declarations.
+- **Details**:
+  - Applied import-order formatting only to files changed by this remediation and fixed the `JobRepository` settings reference detected by static analysis.
+  - Removed three unused locals/imports in already-touched result and shadow-validation modules.
+  - Added a typed wildcard CSS declaration for Expo/NativeWind side-effect and CSS-module imports.
+  - Verified 64 focused backend tests passed, all changed Python files passed Ruff, the frontend runtime test and full TypeScript check passed, all three Compose resource profiles rendered, and `git diff --check` passed.

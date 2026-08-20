@@ -8,6 +8,7 @@ import {
   EnrichedCandidateAnalysis,
 } from '@/types/api';
 import { StepState } from '@/components/ui/StepProgressCard';
+import { nextPollingAttempt } from '@/utils/runtimeConfig';
 
 export interface FilePickerAsset {
   uri: string;
@@ -149,8 +150,8 @@ export function useCvUpload() {
 
       const scheduleNextPoll = () => {
         pollIntervalRef.current = setTimeout(async () => {
-          attempts++;
-          if (attempts > API_CONFIG.MAX_POLL_RETRIES) {
+          const nextAttempt = nextPollingAttempt(attempts, API_CONFIG.MAX_POLL_RETRIES);
+          if (nextAttempt === null) {
             stopPollTimer();
             stopTimer();
             setUploading(false);
@@ -162,6 +163,7 @@ export function useCvUpload() {
             });
             return;
           }
+          attempts = nextAttempt;
 
           let shouldScheduleNext = true;
 

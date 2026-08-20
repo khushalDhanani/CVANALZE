@@ -16,11 +16,13 @@ import {
   PageHeader,
 } from '@/components/ui';
 import { COLORS } from '@/constants/colors';
-import { SIMILARITY_CONFIG } from '@/constants/similarity';
 import { BookOpen, Search, Hash, RefreshCw } from 'lucide-react-native';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 export default function DomainExplorerScreen() {
   usePageTitle('Domain Explorer | AIRIS');
+  const { capabilities, loading: capabilitiesLoading, error: capabilitiesError } = useCapabilities();
+  const similarity = capabilities?.similarity ?? null;
 
   const [categories, setCategories] = useState<string[]>([]);
   const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
@@ -28,8 +30,8 @@ export default function DomainExplorerScreen() {
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [threshold, setThreshold] = useState<string>(String(SIMILARITY_CONFIG.defaultThreshold));
-  const [limit, setLimit] = useState<string>(String(SIMILARITY_CONFIG.defaultLimit));
+  const [threshold, setThreshold] = useState<string>('');
+  const [limit, setLimit] = useState<string>('');
 
   const [results, setResults] = useState<DomainEquivalentResponse | null>(null);
   const [loadingResults, setLoadingResults] = useState<boolean>(false);
@@ -55,23 +57,36 @@ export default function DomainExplorerScreen() {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    if (similarity) {
+      setThreshold((current) => current || String(similarity.default_threshold));
+      setLimit((current) => current || String(similarity.default_limit));
+    }
+  }, [similarity]);
+
   // Strict numeric validations
   const parsedThreshold = parseFloat(threshold);
   const thresholdError =
     isNaN(parsedThreshold) ||
     !Number.isFinite(parsedThreshold) ||
-    parsedThreshold < SIMILARITY_CONFIG.minThreshold ||
-    parsedThreshold > SIMILARITY_CONFIG.maxThreshold
-      ? 'Threshold must be between 0.00 and 1.00'
+    !similarity ||
+    parsedThreshold < similarity.minimum_threshold ||
+    parsedThreshold > similarity.maximum_threshold
+      ? similarity
+        ? `Threshold must be between ${similarity.minimum_threshold.toFixed(2)} and ${similarity.maximum_threshold.toFixed(2)}`
+        : 'Loading similarity policy…'
       : undefined;
 
   const parsedLimit = parseInt(limit, 10);
   const limitError =
     isNaN(parsedLimit) ||
     !Number.isFinite(parsedLimit) ||
-    parsedLimit < SIMILARITY_CONFIG.minLimit ||
-    parsedLimit > SIMILARITY_CONFIG.maxLimit
-      ? 'Limit must be an integer between 1 and 50'
+    parsedLimit < 1 ||
+    !similarity ||
+    parsedLimit > similarity.maximum_limit
+      ? similarity
+        ? `Limit must be an integer between 1 and ${similarity.maximum_limit}`
+        : 'Loading similarity policy…'
       : undefined;
 
   const isFormValid = Boolean(
@@ -79,6 +94,7 @@ export default function DomainExplorerScreen() {
       selectedCategory &&
       !thresholdError &&
       !limitError
+      && !capabilitiesLoading
   );
 
   const handleSearch = async () => {
@@ -220,6 +236,7 @@ export default function DomainExplorerScreen() {
             </View>
           )}
 
+          {capabilitiesError && <ErrorBanner title="Configuration Unavailable" message={capabilitiesError} />}
           {error && <ErrorBanner title="Query Error" message={error} />}
         </Card>
 
@@ -252,7 +269,13 @@ export default function DomainExplorerScreen() {
                     trailing={
                       <Badge
                         label={`${Math.round(eq.similarity_score * 100)}% Match`}
-                        tone={SIMILARITY_CONFIG.getTone(eq.similarity_score)}
+                        tone={
+                          eq.similarity_score >= (similarity?.high_band ?? Number.POSITIVE_INFINITY)
+                            ? 'success'
+                            : eq.similarity_score >= (similarity?.medium_band ?? Number.POSITIVE_INFINITY)
+                              ? 'info'
+                              : 'warning'
+                        }
                       />
                     }
                   />

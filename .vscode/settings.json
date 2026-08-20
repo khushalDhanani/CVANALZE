@@ -1,71 +1,11 @@
 {
-    "chat.tools.terminal.autoApprove": {
-        "uv": true,
-        "command": true,
-        "/^command -v pytest; python3 -m pytest backend/tests/test_generation_consistency\\.py -q$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^python3 -c \"import sqlalchemy; from sqlalchemy import Column, Integer, text; from sqlalchemy\\.orm import declarative_base; Base=declarative_base\\(\\); class Foo\\(Base\\): __tablename__='foo'; id=Column\\(Integer, primary_key=True\\); x=Column\\(Integer, server_default=text\\(\\\\\"nextval\\('x'\\)\\\\\"\\)\\); engine=sqlalchemy\\.create_engine\\('sqlite:///:memory:'\\); Base\\.metadata\\.create_all\\(engine\\); print\\('created'\\)\"$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^python3 -m py_compile backend/app/repositories/result\\.py backend/app/models/result\\.py backend/app/core/database\\.py backend/tests/test_generation_consistency\\.py$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^python3 -m pip install --user pytest pytest-asyncio -q$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^python3 -m pytest backend/tests/test_generation_consistency\\.py -q$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 -m pip install --user pgvector -q && python3 -m pip install --user pytest pytest-asyncio -q && python3 - <<'PY'\nimport sqlalchemy\nfrom sqlalchemy import Column, Integer, text\nfrom sqlalchemy\\.orm import declarative_base\nBase = declarative_base\\(\\)\nclass Foo\\(Base\\):\n    __tablename__ = 'foo'\n    id = Column\\(Integer, primary_key=True\\)\n    x = Column\\(Integer, server_default=text\\(\"nextval\\('x'\\)\"\\)\\)\nengine = sqlalchemy\\.create_engine\\('sqlite:///:memory:'\\)\nBase\\.metadata\\.create_all\\(engine\\)\nprint\\('sqlite create_all ok'\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer/backend && python3 -m pytest tests/test_generation_consistency\\.py -q$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^python3 -m pip install python-dateutil pytest$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^python3 -m pytest tests/test_generation_consistency\\.py -q$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python - <<'PY'\nimport json, os\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f: data=json\\.load\\(f\\)\nma=data\\['match_analysis'\\]\nuns=ma\\['unsuitable_openings'\\]\nprint\\('uns count', len\\(uns\\)\\)\nfor i,u in enumerate\\(uns\\[:5\\],1\\):\n    print\\(i, u\\['job_id'\\], u\\['score'\\], u\\['overall_score'\\], u\\['vacancy_fit_score'\\], u\\['vacancy_match_status'\\], u\\['classification'\\]\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 - <<'PY'\nimport json\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f:\n    data=json\\.load\\(f\\)\nopening=data\\['match_analysis'\\]\\['unsuitable_openings'\\]\\[0\\]\nprint\\('score',opening\\.get\\('vacancy_fit_score'\\) or opening\\.get\\('score'\\) or opening\\.get\\('overall_score'\\)\\)\nprint\\('status',opening\\.get\\('vacancy_match_status'\\), opening\\.get\\('match_status'\\)\\)\nprint\\('classification',opening\\.get\\('classification'\\)\\)\n# compute classification like code\nscore=float\\(opening\\.get\\('vacancy_fit_score'\\) or opening\\.get\\('score'\\) or opening\\.get\\('overall_score'\\) or 0\\.0\\)\nstatus=str\\(opening\\.get\\('vacancy_match_status'\\) or opening\\.get\\('match_status'\\) or ''\\)\\.upper\\(\\)\nclassification=str\\(opening\\.get\\('classification'\\) or ''\\)\\.upper\\(\\)\nprint\\('calc score',score,'status',status,'class',classification\\)\npotential = 'POTENTIAL_MATCH' if score>=50\\.0 else 'NO_STRONG_MATCH'\nprint\\('potential:',potential\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 - <<'PY'\nimport json\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f:\n    data=json\\.load\\(f\\)\nups = \\[o for o in data\\['match_analysis'\\]\\['unsuitable_openings'\\] if o\\.get\\('vacancy_fit_score'\\) == 0\\.0\\]\nprint\\('count zero fit', len\\(ups\\)\\)\nfor o in ups\\[:10\\]:\n    print\\(o\\['job_id'\\], o\\['score'\\], o\\['vacancy_fit_score'\\], o\\['vacancy_match_status'\\], o\\['classification'\\]\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 - <<'PY'\nimport sys, json, os\nsys\\.path\\.insert\\(0, 'backend'\\)\nfrom app\\.services\\.match_evaluators import VacancyFitEvaluator\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f:\n    data=json\\.load\\(f\\)\nopening=data\\['match_analysis'\\]\\['unsuitable_openings'\\]\\[0\\]\nprint\\('opening keys', list\\(opening\\.keys\\(\\)\\)\\[:20\\]\\)\nprint\\('score pref', opening\\.get\\('vacancy_fit_score'\\) or opening\\.get\\('score'\\) or opening\\.get\\('overall_score'\\)\\)\nprint\\('serialize', opening\\.get\\('vacancy_fit_score'\\), opening\\.get\\('score'\\), opening\\.get\\('overall_score'\\)\\)\nprint\\('classify', VacancyFitEvaluator\\.classify_opening_fit\\(opening, high_threshold=80\\.0, potential_threshold=50\\.0\\)\\)\nprint\\('classify lower', VacancyFitEvaluator\\.classify_opening_fit\\(opening, high_threshold=70\\.0, potential_threshold=50\\.0\\)\\)\nprint\\('score breakdown', opening\\.get\\('score_breakdown'\\)\\)\nprint\\('match_status', opening\\.get\\('vacancy_match_status'\\), opening\\.get\\('classification'\\)\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 - <<'PY'\nimport json\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f:\n    data=json\\.load\\(f\\)\nopening = data\\['match_analysis'\\]\\['unsuitable_openings'\\]\\[0\\]\nfor k in \\['job_id','vacancy_id','score','overall_score','vacancy_fit_score','vacancy_match_status','classification','recommendation','matched_skills','missing_skills','matched_keywords','missing_keywords','coverage','role_score','experience_score','education_score','domain_score','technology_score','certification_score','responsibilities_score','score_breakdown','reason','mandatory_failures'\\]:\n    print\\(k, opening\\.get\\(k\\)\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 - <<'PY'\nimport json\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f:\n    data=json\\.load\\(f\\)\nma=data\\['match_analysis'\\]\nprint\\('has_genuine_match', ma\\['has_genuine_match'\\]\\)\nprint\\('best_match', ma\\['best_match'\\]\\)\nprint\\('suitable', len\\(ma\\['suitable_openings'\\]\\)\\)\nprint\\('unsuitable', len\\(ma\\['unsuitable_openings'\\]\\)\\)\nprint\\('first unsuitable vacancy_fit_score', ma\\['unsuitable_openings'\\]\\[0\\]\\['vacancy_fit_score'\\]\\)\nprint\\('first unsuitable score', ma\\['unsuitable_openings'\\]\\[0\\]\\['score'\\]\\)\nprint\\('first unsuitable classification', ma\\['unsuitable_openings'\\]\\[0\\]\\['classification'\\]\\)\nprint\\('first suitable if any', ma\\['suitable_openings'\\]\\[:2\\]\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^cd /Users/khushaldhanani/Desktop/AETHERIND/cv-analyzer && python3 - <<'PY'\nimport json\nfrom app\\.services\\.match_evaluators import VacancyFitEvaluator\npath='backend/uploads/results/cv_13639_cv_pritesh_gohil_1_272276ffe2b776fafee05ef58113c957ed71b1edbd4ed1f1c80b44b5be7af7c2\\.json'\nwith open\\(path\\) as f:\n    data=json\\.load\\(f\\)\nopening=data\\['match_analysis'\\]\\['unsuitable_openings'\\]\\[0\\]\nprint\\('score extract', float\\(opening\\.get\\('vacancy_fit_score'\\) or opening\\.get\\('score'\\) or opening\\.get\\('overall_score'\\) or 0\\.0\\)\\)\nprint\\('classification', VacancyFitEvaluator\\.classify_opening_fit\\(opening, high_threshold=70\\.0, potential_threshold=50\\.0\\)\\)\nprint\\('status', opening\\.get\\('vacancy_match_status'\\)\\)\nprint\\('domain mismatch capped', opening\\.get\\('domain_mismatch_capped'\\)\\)\nPY$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "docker compose": true
-    }
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true
+  }
 }

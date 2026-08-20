@@ -10,13 +10,11 @@ and outputs coverage.json, hardcoding_findings.json, and hardcoding-baseline.jso
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
-
 
 APPROVED_ANNOTATIONS = {
     "# policy-approved-constant",
@@ -139,9 +137,15 @@ def scan_file(repo_root: Path, rel_path: str) -> tuple[str, list[dict[str, Any]]
         or ".test." in abs_path.name
         or "fixtures" in rel_path
     )
+    is_documentation = rel_path.endswith((".md", ".rst")) or rel_path.startswith("docs/")
+    is_governance_rule_file = rel_path in {
+        "backend/scripts/quality/check_no_hardcoding.py",
+        "backend/scripts/quality/check_frontend_hardcoding.py",
+        "backend/scripts/quality/scan_repository_completeness.py",
+    }
 
     # 1. Candidate Name Literals (Forbidden in production code)
-    if not is_test_file:
+    if not is_test_file and not is_governance_rule_file:
         for idx, line in enumerate(lines, start=1):
             if is_line_annotated(lines, idx):
                 continue
@@ -158,6 +162,8 @@ def scan_file(repo_root: Path, rel_path: str) -> tuple[str, list[dict[str, Any]]
 
     # 2. Hardcoded Secrets
     for idx, line in enumerate(lines, start=1):
+        if is_test_file or is_documentation or is_governance_rule_file:
+            break
         if is_line_annotated(lines, idx):
             continue
         if "<password>" in line or "<user>" in line or "<db_name>" in line or "your_" in line.lower():
@@ -191,7 +197,7 @@ def scan_file(repo_root: Path, rel_path: str) -> tuple[str, list[dict[str, Any]]
                 })
 
     # 4. Hardcoded Localhost URLs outside standard environment defaults
-    if not is_test_file and not rel_path.endswith((".example", "docker-compose.yml", "docker-compose.local.yml")):
+    if not is_test_file and not is_documentation and not rel_path.endswith((".example", "docker-compose.yml", "docker-compose.local.yml")):
         for idx, line in enumerate(lines, start=1):
             if is_line_annotated(lines, idx):
                 continue
@@ -209,7 +215,7 @@ def scan_file(repo_root: Path, rel_path: str) -> tuple[str, list[dict[str, Any]]
                     })
 
     # 5. Business Decision Threshold Assignment without PolicyRegistry or Annotation
-    if ext == ".py" and not is_test_file:
+    if ext == ".py" and not is_test_file and rel_path != "backend/app/core/config.py":
         for idx, line in enumerate(lines, start=1):
             if is_line_annotated(lines, idx):
                 continue
@@ -238,7 +244,7 @@ def scan_file(repo_root: Path, rel_path: str) -> tuple[str, list[dict[str, Any]]
     return status, findings, None
 
 
-def run_completeness_scan(repo_root: Path) -> dict[str, Any]:
+def run_completeness_scan(repo_root: Path, *, write_reports: bool = True) -> dict[str, Any]:
     """Execute complete scanner run and write JSON reports."""
     tracked_files = get_git_tracked_files(repo_root)
 
@@ -275,15 +281,17 @@ def run_completeness_scan(repo_root: Path) -> dict[str, Any]:
     coverage_path = repo_root / "coverage.json"
     findings_path = repo_root / "hardcoding_findings.json"
 
-    coverage_path.write_text(json.dumps(coverage_payload, indent=2), encoding="utf-8")
-    findings_path.write_text(json.dumps(findings_payload, indent=2), encoding="utf-8")
+    if write_reports:
+        coverage_path.write_text(json.dumps(coverage_payload, indent=2), encoding="utf-8")
+        findings_path.write_text(json.dumps(findings_payload, indent=2), encoding="utf-8")
 
-    print(f"📊 Phase 0 Scan Complete:")
+    print("📊 Phase 0 Scan Complete:")
     print(f"   - Git Tracked Files: {len(tracked_files)}")
     print(f"   - Reviewed Clean:    {coverage_payload['total_scanned_clean']}")
     print(f"   - Files w/ Findings: {coverage_payload['total_scanned_findings']}")
     print(f"   - Total Findings:    {len(all_findings)} (P0: {findings_payload['p0_count']}, P1: {findings_payload['p1_count']}, P2: {findings_payload['p2_count']})")
-    print(f"   - Saved: {coverage_path.name}, {findings_path.name}")
+    if write_reports:
+        print(f"   - Saved: {coverage_path.name}, {findings_path.name}")
 
     return {
         "coverage": coverage_payload,

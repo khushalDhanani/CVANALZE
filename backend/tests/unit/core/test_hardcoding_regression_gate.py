@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from scripts.quality.check_no_hardcoding import scan_directory
+
 from scripts.quality.check_frontend_hardcoding import scan_frontend_directory
+from scripts.quality.check_no_hardcoding import scan_directory
+from scripts.quality.hardcoding_audit import finding_fingerprint, load_approved_fingerprints
 
 
 def test_backend_scanner_catches_forbidden_candidate_fixtures() -> None:
@@ -101,3 +103,33 @@ def test_frontend_scanner_catches_forbidden_placeholders() -> None:
 
         violations = scan_frontend_directory(tmp_path)
         assert len(violations) >= 2
+
+
+def test_baseline_uses_exact_finding_fingerprints(tmp_path: Path) -> None:
+    finding = {
+        "file": "backend/app/service.py",
+        "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
+        "snippet": "threshold = 0.87",
+    }
+    fingerprint = finding_fingerprint(finding)
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        '{"allowlisted_findings": [{'
+        f'"fingerprint": "{fingerprint}", '
+        '"owner": "platform", "justification": "Approved fallback"}]}'
+    )
+
+    assert load_approved_fingerprints(baseline) == {fingerprint}
+    changed = {**finding, "snippet": "threshold = 0.88"}
+    assert finding_fingerprint(changed) not in load_approved_fingerprints(baseline)
+
+
+def test_category_only_baseline_entry_is_not_accepted(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        '{"allowlisted_findings": [{"file": "backend/app/service.py", '
+        '"category": "HARDCODED_BUSINESS_DECISION_CONSTANT", '
+        '"owner": "platform", "justification": "Too broad"}]}'
+    )
+
+    assert load_approved_fingerprints(baseline) == set()

@@ -1091,6 +1091,43 @@ class ExtractionPolicy(BaseModel):
     inferred_skill_source_confidence: float = Field(default=0.35, ge=0.0, le=1.0)
     domain_keyword_min_matches: int = Field(default=2, ge=1)
     inferred_role_limit: int = Field(default=4, ge=1)
+    header_search_line_limit: int = Field(default=10, ge=1)
+    contact_context_before_lines: int = Field(default=5, ge=0)
+    contact_context_after_lines: int = Field(default=5, ge=0)
+    location_context_before_lines: int = Field(default=3, ge=0)
+    location_context_after_lines: int = Field(default=3, ge=0)
+    email_token_match_min_chars: int = Field(default=3, ge=1)
+    email_name_token_min_chars: int = Field(default=2, ge=1)
+    combined_header_max_chars: int = Field(default=120, ge=1)
+    labeled_name_score_bonus: int = Field(default=8, ge=0)
+    combined_name_score_bonus: int = Field(default=10, ge=0)
+    name_min_chars: int = Field(default=2, ge=1)
+    name_max_chars: int = Field(default=45, ge=1)
+    name_max_tokens: int = Field(default=4, ge=1)
+    name_single_token_min_chars: int = Field(default=3, ge=1)
+    name_denied_token_ratio: float = Field(default=0.35, ge=0.0, le=1.0)
+    name_preferred_min_tokens: int = Field(default=2, ge=1)
+    name_preferred_max_tokens: int = Field(default=4, ge=1)
+    name_structure_base_score: int = Field(default=4, ge=0)
+    labeled_structure_score_bonus: int = Field(default=6, ge=0)
+    early_header_line_limit: int = Field(default=6, ge=1)
+    early_header_score_bonus: int = Field(default=2, ge=0)
+    structural_title_min_chars: int = Field(default=2, ge=1)
+    structural_title_max_chars: int = Field(default=60, ge=1)
+    structural_title_max_tokens: int = Field(default=6, ge=1)
+    structural_title_max_commas: int = Field(default=1, ge=0)
+    title_header_search_line_limit: int = Field(default=8, ge=1)
+    summary_search_line_limit: int = Field(default=5, ge=1)
+    skill_min_chars: int = Field(default=2, ge=1)
+    skill_max_chars: int = Field(default=80, ge=1)
+    skill_max_consecutive_dashes: int = Field(default=3, ge=1)
+    recovered_skill_min_chars: int = Field(default=4, ge=1)
+    project_title_min_chars: int = Field(default=2, ge=1)
+    project_title_max_chars: int = Field(default=90, ge=1)
+    project_previous_title_max_chars: int = Field(default=60, ge=1)
+    unknown_candidate_name: str = Field(default="Unknown Candidate", min_length=1)
+    recovered_skills_category: str = Field(default="Recovered Context Skills", min_length=1)
+    unnamed_project_title: str = Field(default="Project", min_length=1)
     garbage_skill_terms: list[str] = Field(
         default_factory=lambda: [
             "-", ".", "yes", "no", "n/a", "na", "nil", "none", "test", "1", "0",
@@ -1368,7 +1405,21 @@ class RecommendationPolicy(BaseModel):
 class SimilarityPolicy(BaseModel):
     expected_vector_dimension: int = Field(default=768, ge=1)
     min_similarity_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
+    domain_default_threshold: float = Field(default=0.82, ge=0.0, le=1.0)
+    role_resolution_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+    domain_default_limit: int = Field(default=5, ge=1)
+    domain_max_limit: int = Field(default=50, ge=1)
+    high_similarity_band: float = Field(default=0.90, ge=0.0, le=1.0)
+    medium_similarity_band: float = Field(default=0.80, ge=0.0, le=1.0)
     model_fallback_enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_similarity_controls(self) -> "SimilarityPolicy":
+        if self.domain_default_limit > self.domain_max_limit:
+            raise ValueError("Similarity default limit must not exceed its maximum.")
+        if self.medium_similarity_band > self.high_similarity_band:
+            raise ValueError("Medium similarity band must not exceed the high band.")
+        return self
 
 
 class PolicySnapshotMetadata(BaseModel):

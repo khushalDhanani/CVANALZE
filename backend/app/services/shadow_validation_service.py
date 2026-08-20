@@ -8,10 +8,8 @@ from typing import Any, Optional, cast
 from pydantic.json import pydantic_encoder
 
 from app.core.database import MssqlReadSession, PostgresAppSession
-from app.models.validation import (
-    ShadowValidationRun, ShadowValidationResult, ValidationMetricsSnapshot
-)
 from app.models.mssql.vacancy import RecruitVacancyCandidateList
+from app.models.validation import ShadowValidationResult, ShadowValidationRun, ValidationMetricsSnapshot
 from app.schemas.analysis import EnrichedCandidateAnalysis
 
 logger = logging.getLogger("cv_analyzer.shadow")
@@ -60,7 +58,6 @@ class ShadowEvaluator:
         score_delta = DeltaCalculator.calculate_score_delta(old_score, new_score)
 
         # 2. Compare Classification
-        old_rec = old_result.best_match.recommendation if old_result and old_result.best_match else "NO_MATCH"
         new_rec = new_result.best_match.recommendation if new_result and new_result.best_match else "NO_MATCH"
         
         old_status = str(old_result.match_status.value if hasattr(old_result.match_status, 'value') else old_result.match_status) if old_result else ""
@@ -140,9 +137,11 @@ class ShadowEvaluator:
 
 def execute_shadow_pipeline(source_candidate_id: int, vacancy_id: Optional[int], prod_result_dict: dict, cv_text: str):
     import asyncio
+
     from rq import get_current_job
-    from app.services.match_service import MatchService
+
     from app.schemas.analysis import EnrichedCandidateAnalysis
+    from app.services.match_service import MatchService
 
     current_job = get_current_job()
     run_id = int(current_job.meta.get("shadow_run_id")) if current_job and current_job.meta.get("shadow_run_id") else None
@@ -242,15 +241,21 @@ class ShadowValidationService:
         job_id = None
         connection = None
         try:
-            from rq import Queue, Retry
             from redis import Redis
+            from rq import Queue, Retry
+
             from app.core.config import settings
             
             if not settings.REDIS_URL:
                 logger.warning("REDIS_URL not set. Shadow validation will not be queued.")
                 return False
 
-            connection = Redis.from_url(settings.REDIS_URL)
+            connection = Redis.from_url(
+                settings.REDIS_URL,
+                socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+                socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
+                health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
+            )
             queue = Queue(settings.RQ_SHADOW_QUEUE_NAME, connection=connection)
             payload_hash = hashlib.sha256(
                 json.dumps(prod_result_dict, sort_keys=True, default=str).encode("utf-8")

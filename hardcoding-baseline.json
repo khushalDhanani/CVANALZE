@@ -1,64 +1,73 @@
 {
-  "version": "1.0.0",
-  "updated_at": "2026-08-19T16:44:00Z",
-  "owner": "antigravity-team",
-  "description": "Baseline allowlist of approved protocol constants, system defaults, and documented fallback boundaries for Phase 0 Repository Completeness Gate.",
+  "version": "2.0.0",
+  "updated_at": "2026-08-20T12:15:00+05:30",
+  "owner": "platform-team",
+  "description": "Exact fingerprints for reviewed local-development endpoints and versioned emergency policy defaults.",
   "allowlisted_findings": [
     {
-      "file": "README.md",
-      "category": "LOCALHOST_HTTP_URL",
-      "severity": "P2",
-      "owner": "antigravity-team",
-      "justification": "Documented example CORS origin URL for local web development."
+      "fingerprint": "47cf86f569849fc1fe29",
+      "owner": "platform-team",
+      "justification": "Local Ollama is the documented development fallback and remains environment-overridable."
     },
     {
-      "file": "backend/app/core/config.py",
-      "category": "LOCALHOST_HTTP_URL",
-      "severity": "P2",
-      "owner": "antigravity-team",
-      "justification": "Standard default local service endpoint for local Ollama daemon."
+      "fingerprint": "366c96ce9cfcfa1868ca",
+      "owner": "matching-team",
+      "justification": "Versioned emergency scoring-schema fallback used only before active policy hydration."
     },
     {
-      "file": "backend/app/core/config.py",
-      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
-      "severity": "P1",
-      "owner": "antigravity-team",
-      "justification": "System default fallback threshold when PolicyRegistry is uninitialized."
+      "fingerprint": "632104d408ee3b037286",
+      "owner": "matching-team",
+      "justification": "Versioned emergency scoring-schema fallback used only before active policy hydration."
     },
     {
-      "file": "backend/app/schemas/scoring_config.py",
-      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
-      "severity": "P1",
-      "owner": "antigravity-team",
-      "justification": "System default fallback threshold when PolicyRegistry is uninitialized."
+      "fingerprint": "be1fd0647321e2e57d03",
+      "owner": "matching-team",
+      "justification": "Versioned emergency scoring-schema fallback used only before active policy hydration."
     },
     {
-      "file": "backend/app/services/candidate_domain_service.py",
-      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
-      "severity": "P1",
-      "owner": "antigravity-team",
-      "justification": "System default fallback confidence when source metadata is unranked."
+      "fingerprint": "0c9e394430c48916741d",
+      "owner": "matching-team",
+      "justification": "Versioned emergency scoring-schema fallback used only before active policy hydration."
     },
     {
-      "file": "backend/app/services/candidate_search_reranker.py",
-      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
-      "severity": "P1",
-      "owner": "antigravity-team",
-      "justification": "System default fallback tier threshold for candidate search reranking."
+      "fingerprint": "15e63179a7fc6732ff8d",
+      "owner": "matching-team",
+      "justification": "Canonical system-profile seed; runtime decisions use the activated immutable policy snapshot."
     },
     {
-      "file": "backend/app/services/system_rule_config_factory.py",
-      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
-      "severity": "P1",
-      "owner": "antigravity-team",
-      "justification": "Canonical factory default seeding PolicyRegistry rule profile."
+      "fingerprint": "d5e480fb9204cce3ba53",
+      "owner": "matching-team",
+      "justification": "Canonical system-profile seed; runtime decisions use the activated immutable policy snapshot."
     },
     {
-      "file": "frontend/src/constants/config.ts",
-      "category": "LOCALHOST_HTTP_URL",
-      "severity": "P2",
-      "owner": "antigravity-team",
-      "justification": "Default local API URL for Expo web development environment."
+      "fingerprint": "fcfa3335506f9f51b7a7",
+      "owner": "matching-team",
+      "justification": "Canonical system-profile seed; runtime decisions use the activated immutable policy snapshot."
+    },
+    {
+      "fingerprint": "d8081c3091fff963e636",
+      "owner": "matching-team",
+      "justification": "Canonical system-profile seed; runtime decisions use the activated immutable policy snapshot."
+    },
+    {
+      "fingerprint": "49534fe939a4b6b9bfce",
+      "owner": "matching-team",
+      "justification": "Canonical system-profile seed; runtime decisions use the activated immutable policy snapshot."
+    },
+    {
+      "fingerprint": "2a9ae8b39eed5c2f8457",
+      "owner": "matching-team",
+      "justification": "Canonical system-profile seed; runtime decisions use the activated immutable policy snapshot."
+    },
+    {
+      "fingerprint": "255721e004cb7fdfdd13",
+      "owner": "matching-team",
+      "justification": "Canonical system-profile seed; runtime decisions use the activated immutable policy snapshot."
+    },
+    {
+      "fingerprint": "c2086b891172da9f289d",
+      "owner": "frontend-team",
+      "justification": "Expo emulator and browser development fallback; production builds require an explicit API URL."
     }
   ]
 }

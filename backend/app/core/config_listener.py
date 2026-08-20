@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import threading
 import time
 
+from app.core.config import settings
 from app.core.logging import logger
 from app.core.rule_config_manager import RuleConfigManager
 from app.services.configuration_service import ConfigurationService
@@ -14,7 +16,7 @@ def config_invalidation_worker():
             from app.core.cache import _REDIS_CLIENT
             client = _REDIS_CLIENT
             if not client:
-                time.sleep(5)
+                time.sleep(settings.CONFIG_INVALIDATION_RETRY_SECONDS)
                 continue
 
             pubsub = client.pubsub()
@@ -38,8 +40,12 @@ def config_invalidation_worker():
                         logger.error(f"[CONFIG] Failed to reload config for {tenant_or_global}: {e}")
                         
         except Exception as e:
-            logger.warning(f"[CONFIG] Invalidation listener error: {e}. Retrying in 5s...")
-            time.sleep(5)
+            logger.warning(
+                "[CONFIG] Invalidation listener error: %s. Retrying in %ss...",
+                e,
+                settings.CONFIG_INVALIDATION_RETRY_SECONDS,
+            )
+            time.sleep(settings.CONFIG_INVALIDATION_RETRY_SECONDS)
 
 
 def start_config_invalidation_listener():

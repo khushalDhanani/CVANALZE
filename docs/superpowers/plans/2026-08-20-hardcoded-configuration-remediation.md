@@ -568,7 +568,6 @@ git commit -m "fix: require production API configuration"
 - Modify: `backend/scripts/quality/hardcoding_audit.py`
 - Modify: `hardcoding-baseline.json`
 - Regenerate after authorization: `hardcoding_findings.json`
-- Regenerate after authorization: `backend/hardcoding_findings.json`
 
 **Interfaces:**
 - Produces: `snippet_fingerprint(snippet: str) -> str` using normalized snippet SHA-256.
@@ -630,7 +629,7 @@ Expected: targeted tests and all three audits pass with no broad baseline approv
 - [ ] **Step 5: Commit Task 7**
 
 ```bash
-git add backend/scripts/quality/hardcoding_audit.py backend/tests/unit/core/test_hardcoding_regression_gate.py hardcoding-baseline.json hardcoding_findings.json backend/hardcoding_findings.json
+git add backend/scripts/quality/hardcoding_audit.py backend/tests/unit/core/test_hardcoding_regression_gate.py hardcoding-baseline.json hardcoding_findings.json
 git commit -m "fix: scope hardcoding approvals to exact findings"
 ```
 
@@ -699,3 +698,120 @@ git commit -m "docs: align secure runtime configuration"
 ```
 
 Confirm only task-related hunks are staged because the repository began with substantial user-owned modifications.
+
+---
+
+### Task 9: Govern resume extraction heuristics and vocabularies
+
+**Files:**
+- Modify: `backend/app/core/rule_config_manager.py`
+- Modify: `backend/app/services/dynamic_geo_heading_service.py`
+- Modify: `backend/app/services/resume_field_extractor.py`
+- Modify: `backend/app/services/date_interval_parser.py`
+- Modify: `backend/tests/unit/services/test_resume_field_extractor.py`
+- Create: `backend/tests/unit/services/test_extraction_policy_governance.py`
+
+**Interfaces:**
+- Produces: expanded validated `ExtractionPolicy` fields for layout windows, length gates, confidence values, score bonuses, list caps, and filename inference.
+- Produces: governed vocabulary accessors in `DynamicGeoAndHeadingService` for section/field aliases, current-role terms, honorifics, seniority prefixes, identity labels, project labels, and synthetic filename terms.
+- Preserves: `ResumeFieldExtractor.extract(...)` and response field names.
+
+- [ ] Write tests that override extraction policy values and vocabularies and assert name, location, title, company, skill, project, and filename behavior changes without editing production code.
+- [ ] Run the focused extractor tests and confirm the new override tests fail for the expected embedded literals.
+- [ ] Resolve one policy snapshot per extraction and thread it through validators/helpers; remove duplicated local vocabulary tuples and numeric fallbacks.
+- [ ] Route date recognition through `DateIntervalParser`; keep only grammar primitives in code.
+- [ ] Replace fabricated entity fallbacks with nullable values and extraction provenance while preserving response keys.
+- [ ] Run focused extractor, normalization, experience, and pipeline regression tests.
+
+### Task 10: Govern backend operational caps and presentation policy
+
+**Files:**
+- Modify: `backend/app/core/config.py`
+- Modify: `backend/app/core/rule_config_manager.py`
+- Modify: `backend/app/core/cache.py`
+- Modify: `backend/app/services/dynamic_taxonomy_service.py`
+- Modify: `backend/app/services/candidate_domain_service.py`
+- Modify: `backend/app/services/recommendation_service.py`
+- Modify: `backend/app/services/talent_graph_service.py`
+- Modify: `backend/app/services/candidate_search_document_builder.py`
+- Modify: `backend/app/prompts/*.py`
+- Modify: `backend/tests/unit/core/test_phase3_cache_tuning_and_diagnostics.py`
+- Modify: `backend/tests/unit/services/test_dynamic_taxonomy_service.py`
+- Modify: `backend/tests/unit/services/test_candidate_domain_service.py`
+- Modify: `backend/tests/unit/services/test_recommendation_service.py`
+- Modify: `backend/tests/unit/services/test_talent_graph_service.py`
+- Modify: `backend/tests/unit/services/test_llm_and_prompt_service.py`
+
+**Interfaces:**
+- Expands: `ExtractionPolicy`, `RetrievalPolicy`, and `RecommendationPolicy` with typed caps and presentation templates.
+- Adds: settings for cache scan size and file-lock timeout.
+
+- [ ] Add failing tests proving custom policy/settings values control output counts, context budgets, cache behavior, recommendation thresholds, and display text.
+- [ ] Replace call-site slices, defaults, and thresholds with the resolved snapshot/settings.
+- [ ] Keep protocol, safety-bound, and emergency-policy constants centralized and annotated with exact governance identities.
+- [ ] Run focused taxonomy, recommendation, graph, cache, search, and prompt tests.
+
+### Task 11: Add authoritative backend capabilities
+
+**Files:**
+- Create: `backend/app/schemas/capabilities.py`
+- Create: `backend/app/services/capabilities_service.py`
+- Modify: `backend/app/api/config.py`
+- Modify: `backend/tests/api/test_config_endpoints.py`
+- Create: `backend/tests/unit/services/test_capabilities_service.py`
+
+**Interfaces:**
+- Produces: `GET /config/capabilities`, additive to existing routes.
+- Produces: typed upload, polling, similarity, batch, pipeline, implementation, SLO, and build metadata.
+
+- [ ] Write failing service and API contract tests using overridden settings/policy snapshots.
+- [ ] Implement typed capability schemas and a side-effect-free service that reads existing authorities.
+- [ ] Add the route without changing existing configuration responses.
+- [ ] Run focused API/service tests.
+
+### Task 12: Consume capabilities in the frontend
+
+**Files:**
+- Modify: `frontend/src/types/api.ts`
+- Modify: `frontend/src/services/configService.ts`
+- Create: `frontend/src/hooks/useCapabilities.ts`
+- Modify: `frontend/src/constants/config.ts`
+- Modify: `frontend/src/constants/upload.ts`
+- Modify: `frontend/src/constants/similarity.ts`
+- Modify: `frontend/src/constants/limits.ts`
+- Modify: `frontend/src/constants/capabilities.ts`
+- Modify: `frontend/src/hooks/useCvUpload.ts`
+- Modify: `frontend/src/hooks/useCvQueueUploads.ts`
+- Modify: `frontend/src/components/ui/StepProgressCard.tsx`
+- Modify: `frontend/src/__tests__/backendParity.test.ts`
+- Modify: `frontend/src/__tests__/cvQueueState.test.ts`
+- Create: `frontend/src/__tests__/capabilities.test.mjs`
+
+**Interfaces:**
+- Consumes: backend `CapabilitiesResponse`.
+- Preserves: explicit development fallback values only when the capabilities endpoint is unavailable.
+
+- [ ] Add failing tests for backend-driven upload formats/size, polling, similarity bands, batch choices, pipeline metadata, and production API URL rejection.
+- [ ] Add typed service/hook caching and use capabilities at validation/presentation call sites.
+- [ ] Remove duplicated production policy from frontend constants; retain stable route IDs and localized display defaults.
+- [ ] Run standalone frontend tests and `npx tsc --noEmit`.
+
+### Task 13: Complete governance, documentation, and compatibility review
+
+**Files:**
+- Modify: `backend/scripts/quality/check_no_hardcoding.py`
+- Modify: `backend/scripts/quality/check_frontend_hardcoding.py`
+- Modify: `backend/scripts/quality/scan_repository_completeness.py`
+- Modify: `backend/scripts/quality/hardcoding_audit.py`
+- Modify: `hardcoding-baseline.json`
+- Regenerate: `coverage.json`, `hardcoding_findings.json`
+- Modify: documentation and `workstats.md` append-only.
+
+**Interfaces:**
+- Scans production backend/frontend/deployment files and excludes exact intentional protocol/emergency-policy constants.
+
+- [ ] Add failing scanner tests for extractor vocabularies, embedded slice/count limits, Compose defaults, frontend policy constants, self-scan exclusions, and exact baseline identities.
+- [ ] Implement category-aware AST/text scanning using Python 3.12-compatible execution.
+- [ ] Regenerate governance artifacts and review every remaining finding.
+- [ ] Run all targeted tests accumulated in Tasks 1–13, backend Ruff on modified Python, frontend TypeScript checking, scanner gates, and Compose rendering.
+- [ ] Review `git diff --check`, public contract compatibility, cache/version implications, and append the final work log entry.

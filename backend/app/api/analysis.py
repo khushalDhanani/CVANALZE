@@ -1,6 +1,7 @@
 from __future__ import annotations
+
 import asyncio
-from datetime import timezone, datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
@@ -384,7 +385,9 @@ async def submit_hr_review(payload: HRReviewRequest):
 
 
 @router.get("/training-data")
-async def get_training_data(limit: int = 100):
+async def get_training_data(limit: int | None = None):
     """Retrieve collected training examples for inspection."""
-    examples = TrainingRepository.load_examples(limit=limit)
+    examples = TrainingRepository.load_examples(
+        limit=limit or settings.DEFAULT_API_LIST_LIMIT
+    )
     return {"count": len(examples), "examples": examples}
