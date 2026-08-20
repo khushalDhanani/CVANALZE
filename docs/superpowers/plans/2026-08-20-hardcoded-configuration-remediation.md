@@ -568,7 +568,6 @@ git commit -m "fix: require production API configuration"
 - Modify: `backend/scripts/quality/hardcoding_audit.py`
 - Modify: `hardcoding-baseline.json`
 - Regenerate after authorization: `hardcoding_findings.json`
-- Regenerate after authorization: `backend/hardcoding_findings.json`
 
 **Interfaces:**
 - Produces: `snippet_fingerprint(snippet: str) -> str` using normalized snippet SHA-256.
@@ -630,7 +629,7 @@ Expected: targeted tests and all three audits pass with no broad baseline approv
 - [ ] **Step 5: Commit Task 7**
 
 ```bash
-git add backend/scripts/quality/hardcoding_audit.py backend/tests/unit/core/test_hardcoding_regression_gate.py hardcoding-baseline.json hardcoding_findings.json backend/hardcoding_findings.json
+git add backend/scripts/quality/hardcoding_audit.py backend/tests/unit/core/test_hardcoding_regression_gate.py hardcoding-baseline.json hardcoding_findings.json
 git commit -m "fix: scope hardcoding approvals to exact findings"
 ```
 

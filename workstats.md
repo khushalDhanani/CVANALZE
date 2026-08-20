@@ -2161,3 +2161,22 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Strengthened the AST hardcoding gate to detect operational call literals and policy-bearing defaults while allowing protocol constants and documented emergency fallbacks.
   - Added targeted regression tests for configuration resolution, policy validation, queue behavior, scoring, qualifications, taxonomies, experience, prompts, and hardcoding detection.
   - Verified 73 focused unit/integration tests, 9 policy/config compatibility tests, and 22 additional affected-area tests passed; one unrelated pre-existing database-dependent unit test remains failing identically on the baseline branch when PostgreSQL is unavailable.
+
+---
+
+### Entry #061
+- **Timestamp**: 2026-08-20T11:30:59+0530
+- **Scope**: Repository JSON artifact cleanup
+- **Category**: Maintenance
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/coverage.json` (removed)
+  - `backend/hardcoding_findings.json` (removed)
+  - `docs/superpowers/plans/2026-08-20-hardcoded-configuration-remediation.md`
+  - `workstats.md`
+- **Summary**: Removed two stale backend-local scanner outputs that had no consumer and duplicated the canonical repository-root governance artifacts.
+- **Details**:
+  - Confirmed the active completeness scanner writes `coverage.json` and `hardcoding_findings.json` only at the repository root.
+  - Confirmed tests, release governance, scripts, and documentation reference the root outputs rather than the backend-local copies.
+  - Removed obsolete plan instructions that regenerated and staged the deleted backend-local findings artifact.
+  - Preserved runtime datasets, test fixtures, IDE/tool manifests, package metadata, Expo assets, and the required hardcoding baseline.
