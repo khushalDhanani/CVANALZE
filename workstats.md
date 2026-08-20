@@ -2386,3 +2386,21 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Removed the `.worktrees/` ignore rule from `.gitignore`.
   - Deleted the empty `.worktrees` directory after confirming no auxiliary Git worktrees remained.
   - Confirmed there were no other repository references to `.worktrees` or `worktrees/` requiring cleanup.
+
+---
+
+### Entry #070
+- **Timestamp**: 2026-08-20T12:37:07+0530
+- **Scope**: Completed planning-document cleanup
+- **Category**: Documentation Maintenance
+- **Author**: Codex
+- **Modified Files**:
+  - `docs/superpowers/plans/2026-08-20-hardcoded-configuration-remediation.md` (removed)
+  - `docs/superpowers/specs/2026-08-20-hardcoded-configuration-remediation-design.md` (removed)
+  - `workstats.md`
+- **Summary**: Removed the obsolete `docs/` directory after confirming it contained only completed remediation planning artifacts with no active consumers.
+- **Details**:
+  - Confirmed runtime code, CI, release scripts, setup documentation, and agent instructions did not reference either planning artifact.
+  - Removed the completed implementation plan and design specification.
+  - Removed the empty `docs/superpowers` and `docs` directory structure.
+  - Preserved historical append-only references in `workstats.md`.
