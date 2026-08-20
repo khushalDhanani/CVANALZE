@@ -2338,3 +2338,18 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Removed three unused locals/imports in already-touched result and shadow-validation modules.
   - Added a typed wildcard CSS declaration for Expo/NativeWind side-effect and CSS-module imports.
   - Verified 64 focused backend tests passed, all changed Python files passed Ruff, the frontend runtime test and full TypeScript check passed, all three Compose resource profiles rendered, and `git diff --check` passed.
+
+---
+
+### Entry #067
+- **Timestamp**: 2026-08-20T11:52:52+0530
+- **Scope**: Root JSON artifact cleanup
+- **Category**: Maintenance
+- **Author**: Antigravity
+- **Modified Files**:
+  - `coverage.json` (removed)
+  - `hardcoding_findings.json` (removed)
+  - `workstats.md`
+- **Summary**: Removed root-level duplicates of backend scanner outputs.
+- **Details**:
+  - Deleted `coverage.json` and `hardcoding_findings.json` from the repository root to complete the cleanup of redundant artifacts that were previously only removed from the `backend/` directory.
