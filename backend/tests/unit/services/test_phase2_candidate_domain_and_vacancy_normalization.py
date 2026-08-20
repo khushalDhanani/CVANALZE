@@ -10,6 +10,9 @@ Verifies:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from unittest.mock import MagicMock
 
 from app.services.evidence_ranker import EvidenceRanker
@@ -46,6 +49,22 @@ def test_stopword_registry_filters_garbage_skills():
     raw = ["Python", "FastAPI", "n/a", "yes", "test", "-", "Docker"]
     clean = StopwordRegistry.filter_valid_skills(raw)
     assert clean == ["Python", "FastAPI", "Docker"]
+
+
+def test_stopword_registry_uses_policy_and_database_registry():
+    snapshot = SimpleNamespace(
+        extraction=SimpleNamespace(garbage_skill_terms=["custom-noise"]),
+    )
+
+    with (
+        patch("app.core.rule_config_manager.PolicyRegistry.resolve_snapshot", return_value=snapshot),
+        patch(
+            "app.services.dynamic_scoring_prefilter_service.DynamicScoringAndPrefilterService.get_stop_words",
+            return_value={"database-noise"},
+        ),
+    ):
+        assert StopwordRegistry.is_garbage_skill("custom-noise") is True
+        assert StopwordRegistry.is_garbage_skill("database-noise") is True
 
 
 def test_vacancy_service_returns_none_for_missing_entities():

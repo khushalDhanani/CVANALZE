@@ -3,6 +3,7 @@ from sqlalchemy import func, select, text
 
 from app.core.database import PostgresAppSession
 from app.core.logging import logger
+from app.core.rule_config_manager import PolicyRegistry
 from app.models.pg import CandidateSearchDocument
 
 
@@ -17,12 +18,13 @@ class LexicalCandidateRetriever:
     def retrieve_candidates(
         cls,
         query_text: str,
-        top_k: int = 200,
+        top_k: int | None = None,
     ) -> tuple[dict[str, int], dict[str, float]]:
         """
         Execute PostgreSQL FTS and trigram matching on candidate_search_documents table.
         Returns a tuple of (lexical_ranks_dict, lexical_scores_dict).
         """
+        top_k = top_k or PolicyRegistry.resolve_snapshot().retrieval.vector_candidate_pool
         ranks: dict[str, int] = {}
         scores: dict[str, float] = {}
 

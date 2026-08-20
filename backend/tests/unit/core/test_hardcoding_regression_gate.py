@@ -45,6 +45,53 @@ def test_backend_scanner_respects_policy_annotations() -> None:
         assert len(violations) == 0
 
 
+def test_backend_scanner_catches_operational_call_literals() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        service_file = tmp_path / "queue_service.py"
+        service_file.write_text(
+            "queue = Queue('shadow_validation')\n"
+            "retry = Retry(max=3, interval=60)\n"
+            "client = Redis.from_url(url, socket_timeout=1.0)\n",
+            encoding="utf-8",
+        )
+
+        violations = scan_directory(tmp_path)
+
+        assert any("queue name" in violation.lower() for violation in violations)
+        assert any("interval" in violation.lower() for violation in violations)
+        assert any("socket_timeout" in violation.lower() for violation in violations)
+
+
+def test_backend_scanner_catches_policy_bearing_function_defaults() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        service_file = tmp_path / "search_service.py"
+        service_file.write_text(
+            "def search(top_k=200, threshold=0.82, limit=5):\n"
+            "    return top_k, threshold, limit\n",
+            encoding="utf-8",
+        )
+
+        violations = scan_directory(tmp_path)
+
+        assert any("top_k" in violation for violation in violations)
+        assert any("threshold" in violation for violation in violations)
+        assert any("limit" in violation for violation in violations)
+
+
+def test_backend_scanner_allows_protocol_status_constants() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        service_file = tmp_path / "protocol_service.py"
+        service_file.write_text(
+            "status_code = 200\ncontent_type = 'application/json'\n",
+            encoding="utf-8",
+        )
+
+        assert scan_directory(tmp_path) == []
+
+
 def test_frontend_scanner_catches_forbidden_placeholders() -> None:
     """Verifies that the frontend scanner catches forbidden placeholders in UI code."""
     with tempfile.TemporaryDirectory() as tmpdir:

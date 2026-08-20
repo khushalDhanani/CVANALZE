@@ -959,7 +959,7 @@ class ComponentScoreEvaluator:
                 reason_str += f" | Education mismatch requires HR review: vacancy requires '{education_req}'."
 
         # Penalty for keyword-only matches (0% skills match but high domain/other scores)
-        zero_skills_cap = getattr(typed_config, "zero_skills_score_cap", getattr(params, "zero_skills_score_cap", 40.0))
+        zero_skills_cap = typed_config.zero_skills_score_cap
         if skills_score is not None and skills_score == 0.0 and final_score > zero_skills_cap:
             final_score = min(final_score, zero_skills_cap)
             reason_str += f" | Capped score due to 0% skills match (keyword-only match, cap: {zero_skills_cap}%)."

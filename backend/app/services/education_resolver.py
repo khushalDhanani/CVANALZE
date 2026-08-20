@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.core.rule_config_manager import PolicyRegistry
+
 
 class DegreeLevel(int, Enum):
     DOCTORATE = 5
@@ -52,56 +54,18 @@ class EducationRequirementResolver:
     degrees (B.E. IT vs B.Tech CS) pass with EQUIVALENT.
     """
 
-    _DEGREE_LEVEL_MAP: dict[str, DegreeLevel] = {
-        "ph.d": DegreeLevel.DOCTORATE,
-        "phd": DegreeLevel.DOCTORATE,
-        "doctorate": DegreeLevel.DOCTORATE,
-        "m.tech": DegreeLevel.MASTERS,
-        "mtech": DegreeLevel.MASTERS,
-        "m.s": DegreeLevel.MASTERS,
-        "ms": DegreeLevel.MASTERS,
-        "m.sc": DegreeLevel.MASTERS,
-        "msc": DegreeLevel.MASTERS,
-        "master": DegreeLevel.MASTERS,
-        "masters": DegreeLevel.MASTERS,
-        "mba": DegreeLevel.MASTERS,
-        "m.e": DegreeLevel.MASTERS,
-        "me": DegreeLevel.MASTERS,
-        "b.tech": DegreeLevel.BACHELORS,
-        "btech": DegreeLevel.BACHELORS,
-        "b.e": DegreeLevel.BACHELORS,
-        "be": DegreeLevel.BACHELORS,
-        "b.s": DegreeLevel.BACHELORS,
-        "bs": DegreeLevel.BACHELORS,
-        "b.sc": DegreeLevel.BACHELORS,
-        "bsc": DegreeLevel.BACHELORS,
-        "bachelor": DegreeLevel.BACHELORS,
-        "bachelors": DegreeLevel.BACHELORS,
-        "b.a": DegreeLevel.BACHELORS,
-        "ba": DegreeLevel.BACHELORS,
-        "b.com": DegreeLevel.BACHELORS,
-        "bcom": DegreeLevel.BACHELORS,
-        "diploma": DegreeLevel.DIPLOMA,
-        "high school": DegreeLevel.HIGH_SCHOOL,
-        "secondary": DegreeLevel.HIGH_SCHOOL,
-    }
-
-    _DISCIPLINE_EQUIVALENTS: dict[DisciplineCategory, set[DisciplineCategory]] = {
-        DisciplineCategory.COMPUTER_SCIENCE: {DisciplineCategory.COMPUTER_SCIENCE, DisciplineCategory.INFORMATION_TECHNOLOGY, DisciplineCategory.ENGINEERING},
-        DisciplineCategory.INFORMATION_TECHNOLOGY: {DisciplineCategory.INFORMATION_TECHNOLOGY, DisciplineCategory.COMPUTER_SCIENCE, DisciplineCategory.ENGINEERING},
-        DisciplineCategory.ENGINEERING: {DisciplineCategory.ENGINEERING, DisciplineCategory.COMPUTER_SCIENCE, DisciplineCategory.INFORMATION_TECHNOLOGY},
-        DisciplineCategory.FINANCE: {DisciplineCategory.FINANCE, DisciplineCategory.BUSINESS},
-        DisciplineCategory.BUSINESS: {DisciplineCategory.BUSINESS, DisciplineCategory.FINANCE},
-    }
-
     @classmethod
     def resolve_degree_level(cls, text: str) -> DegreeLevel:
         if not text:
             return DegreeLevel.UNKNOWN
         clean = text.lower()
-        for token, level in cls._DEGREE_LEVEL_MAP.items():
+        aliases = PolicyRegistry.resolve_snapshot().qualification.degree_aliases
+        for token, level_name in aliases.items():
             if re.search(rf"\b{re.escape(token)}\b", clean):
-                return level
+                try:
+                    return DegreeLevel[level_name]
+                except KeyError:
+                    continue
         return DegreeLevel.UNKNOWN
 
     @classmethod
@@ -109,20 +73,13 @@ class EducationRequirementResolver:
         if not text:
             return DisciplineCategory.OTHER
         clean = text.lower()
-        if any(kw in clean for kw in ("computer science", "cs", "computer engineering", "software engineering", "computing")):
-            return DisciplineCategory.COMPUTER_SCIENCE
-        if any(kw in clean for kw in ("information technology", "it", "information systems", "software systems")):
-            return DisciplineCategory.INFORMATION_TECHNOLOGY
-        if any(kw in clean for kw in ("finance", "accounting", "economics", "financial", "valuation")):
-            return DisciplineCategory.FINANCE
-        if any(kw in clean for kw in ("business", "management", "administration", "mba")):
-            return DisciplineCategory.BUSINESS
-        if any(kw in clean for kw in ("history", "arts", "literature", "english", "philosophy", "sociology")):
-            return DisciplineCategory.HUMANITIES
-        if any(kw in clean for kw in ("physics", "chemistry", "biology", "mathematics", "stats", "statistics")):
-            return DisciplineCategory.SCIENCE
-        if "engineering" in clean or "engg" in clean:
-            return DisciplineCategory.ENGINEERING
+        keywords = PolicyRegistry.resolve_snapshot().qualification.discipline_keywords
+        for category_name, category_keywords in keywords.items():
+            if any(re.search(rf"\b{re.escape(keyword.lower())}\b", clean) for keyword in category_keywords):
+                try:
+                    return DisciplineCategory[category_name]
+                except KeyError:
+                    continue
         return DisciplineCategory.OTHER
 
     @classmethod
@@ -134,6 +91,7 @@ class EducationRequirementResolver:
 
         req_level = cls.resolve_degree_level(required_edu)
         req_discipline = cls.resolve_discipline(required_edu)
+        qualification_policy = PolicyRegistry.resolve_snapshot().qualification
 
         if not candidate_edu_entries:
             return EducationMatchOutcome(
@@ -166,7 +124,7 @@ class EducationRequirementResolver:
             if req_discipline != DisciplineCategory.OTHER:
                 if cand_discipline == req_discipline:
                     discipline_matched = True
-                elif cand_discipline in cls._DISCIPLINE_EQUIVALENTS.get(req_discipline, set()):
+                elif cand_discipline.name in qualification_policy.discipline_equivalences.get(req_discipline.name, []):
                     discipline_equivalent = True
 
         # Check degree level sufficiency
@@ -194,7 +152,11 @@ class EducationRequirementResolver:
             )
 
         match_status = EducationMatchStatus.EXACT if discipline_matched or req_discipline == DisciplineCategory.OTHER else EducationMatchStatus.EQUIVALENT
-        confidence = 1.0 if match_status == EducationMatchStatus.EXACT else 0.85
+        confidence = (
+            qualification_policy.exact_match_confidence
+            if match_status == EducationMatchStatus.EXACT
+            else qualification_policy.equivalent_match_confidence
+        )
 
         return EducationMatchOutcome(
             status=match_status,

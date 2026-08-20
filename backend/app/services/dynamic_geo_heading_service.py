@@ -277,11 +277,16 @@ class DynamicGeoAndHeadingService:
         if cls._degree_pattern_cache is None:
             cls.refresh_cache()
         if cls._degree_pattern_cache is None:
-            cls._degree_pattern_cache = re.compile(
-                r"\b(B\.?\s*Tech|B\.?E\.?|B\.?Sc\.?|BCA|BBA|B\.?\s*Com\.?|B\.?A\.?|B\.?\s*Pharm|B\.?\s*Arch|B\.?\s*Des|B\.?\s*Ed|L\.?L\.?B|Bachelor|M\.?\s*Tech|M\.?E\.?|M\.?Sc\.?|MCA|MBA|M\.?\s*Com\.?|M\.?\s*A\.?|M\.?\s*Pharm|M\.?\s*Arch|M\.?\s*Des|M\.?\s*Ed|L\.?L\.?M|Master|Ph\.?D|Doctorate|Diploma|PGDM|PGDCA|ITI|CA|CS|ICWA|CMA|Degree)\b",
-                re.IGNORECASE,
-            )
+            cls._degree_pattern_cache = cls._compile_degree_pattern(cls._DEFAULT_DEGREES)
         return cls._degree_pattern_cache
+
+    @staticmethod
+    def _compile_degree_pattern(degrees: set[str] | frozenset[str]) -> re.Pattern:
+        terms = []
+        for degree in sorted((value.strip() for value in degrees if value.strip()), key=len, reverse=True):
+            terms.append(re.escape(degree).replace(r"\ ", r"\s+"))
+        expression = "|".join(terms) if terms else r"(?!)"
+        return re.compile(rf"(?<!\w)(?:{expression})(?!\w)", re.IGNORECASE)
 
     @classmethod
     def refresh_cache(cls) -> None:
@@ -368,10 +373,7 @@ class DynamicGeoAndHeadingService:
         cls._degree_keywords_cache = degrees
 
         # Build dynamic degree pattern
-        cls._degree_pattern_cache = re.compile(
-            r"\b(B\.?\s*Tech|B\.?E\.?|B\.?Sc\.?|BCA|BBA|B\.?\s*Com\.?|B\.?A\.?|B\.?\s*Pharm|B\.?\s*Arch|B\.?\s*Des|B\.?\s*Ed|L\.?L\.?B|Bachelor|M\.?\s*Tech|M\.?E\.?|M\.?Sc\.?|MCA|MBA|M\.?\s*Com\.?|M\.?\s*A\.?|M\.?\s*Pharm|M\.?\s*Arch|M\.?\s*Des|M\.?\s*Ed|L\.?L\.?M|Master|Ph\.?D|Doctorate|Diploma|PGDM|PGDCA|ITI|CA|CS|ICWA|CMA|Degree)\b",
-            re.IGNORECASE,
-        )
+        cls._degree_pattern_cache = cls._compile_degree_pattern(degrees)
 
         logger.info(
             f"[DYNAMIC_GEO_HEADING] Cache refreshed: {len(cities)} gazetteer cities, {len(countries)} countries, "

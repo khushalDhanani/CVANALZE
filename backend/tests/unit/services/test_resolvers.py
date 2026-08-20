@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-import pytest
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from app.core.rule_config_manager import CertificationEquivalence, QualificationPolicy
 from app.services.certification_resolver import CertificationMatchStatus, CertificationResolver
-from app.services.education_resolver import EducationMatchStatus, EducationRequirementResolver
+from app.services.education_resolver import (
+    DegreeLevel,
+    DisciplineCategory,
+    EducationMatchStatus,
+    EducationRequirementResolver,
+)
 
 
 def test_certification_resolver_exact_match() -> None:
@@ -52,3 +59,42 @@ def test_education_resolver_equivalent_discipline_passes() -> None:
     outcome = EducationRequirementResolver.evaluate_education_requirement(candidate_edu, required_edu)
     assert outcome.status in (EducationMatchStatus.EXACT, EducationMatchStatus.EQUIVALENT)
     assert outcome.confidence >= 0.85
+
+
+def test_education_resolver_uses_qualification_policy_aliases() -> None:
+    qualification = QualificationPolicy(
+        degree_aliases={"licentiate": "BACHELORS"},
+        discipline_keywords={"ENGINEERING": ["robotics systems"]},
+        discipline_equivalences={"ENGINEERING": ["ENGINEERING"]},
+    )
+    snapshot = SimpleNamespace(qualification=qualification)
+
+    with patch("app.core.rule_config_manager.PolicyRegistry.resolve_snapshot", return_value=snapshot):
+        assert EducationRequirementResolver.resolve_degree_level("Licentiate in Robotics") == DegreeLevel.BACHELORS
+        assert (
+            EducationRequirementResolver.resolve_discipline("Licentiate in Robotics Systems")
+            == DisciplineCategory.ENGINEERING
+        )
+
+
+def test_certification_resolver_uses_qualification_policy_aliases() -> None:
+    qualification = QualificationPolicy(
+        certification_aliases={
+            "Terraform Associate": ["terraform associate", "iac-003"],
+            "Terraform Professional": ["terraform professional", "iac-004"],
+        },
+        certification_equivalences=[
+            CertificationEquivalence(
+                required_id="Terraform Associate",
+                accepted_id="Terraform Professional",
+            )
+        ],
+    )
+    snapshot = SimpleNamespace(qualification=qualification)
+
+    with patch("app.core.rule_config_manager.PolicyRegistry.resolve_snapshot", return_value=snapshot):
+        exact = CertificationResolver.match_certification(["IAC-003"], "Terraform Associate")
+        equivalent = CertificationResolver.match_certification(["IAC-004"], "Terraform Associate")
+
+    assert exact.status == CertificationMatchStatus.EXACT
+    assert equivalent.status == CertificationMatchStatus.EQUIVALENT

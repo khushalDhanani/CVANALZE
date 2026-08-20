@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from inspect import getsource
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.core.rule_config_manager import PolicyRegistry
 from app.schemas.match import JobMatchResult
 from app.schemas.scoring_config import ScoringConfig
+from app.services.match_evaluators import ComponentScoreEvaluator
 from app.services.scoring_engine import ScoringEngine
 
 
@@ -18,6 +21,34 @@ def test_scoring_config_loads_from_policy_snapshot() -> None:
     assert config.penalty_per_item == snapshot.matching.mandatory_failure_penalty
     assert config.max_score_on_failure == snapshot.matching.max_score_on_failure
     assert config.component_weights == dict(snapshot.scoring.component_weights)
+
+
+def test_scoring_config_preserves_policy_caps() -> None:
+    snapshot = SimpleNamespace(
+        metadata=SimpleNamespace(source="DATABASE", version="tenant-v3"),
+        matching=SimpleNamespace(mandatory_failure_penalty=22.0, max_score_on_failure=48.0),
+        scoring=SimpleNamespace(
+            llm_semantic_weight=0.12,
+            max_llm_boost=9.0,
+            match_high_threshold=77.0,
+            match_medium_threshold=48.0,
+            zero_skills_score_cap=17.0,
+            rejection_score_epsilon=0.25,
+            component_weights={"skills": 1.0},
+        ),
+    )
+
+    with patch("app.core.rule_config_manager.PolicyRegistry.resolve_snapshot", return_value=snapshot):
+        config = ScoringConfig.load(tenant_id="tenant-a")
+
+    assert config.zero_skills_score_cap == 17.0
+    assert config.rejection_score_epsilon == 0.25
+
+
+def test_component_scoring_has_no_literal_zero_skills_fallback() -> None:
+    source = getsource(ComponentScoreEvaluator.evaluate)
+
+    assert 'getattr(params, "zero_skills_score_cap", 40.0)' not in source
 
 
 def test_formula_excludes_not_assessable_components() -> None:

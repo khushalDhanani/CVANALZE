@@ -208,7 +208,7 @@ class HiringRiskAnalyzer:
                 cache_key=cache_key,
                 response_model=HiringRiskExplanationsOutput,
                 think=False,
-                options={"temperature": 0.0},
+                options={"temperature": settings.OLLAMA_GENERATION_TEMPERATURE},
             )
             if response is None:
                 return

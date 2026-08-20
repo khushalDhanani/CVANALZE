@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from inspect import getsource
+
+from app.core.config import settings
+from app.core.model_registry import ModelRegistry
+from app.services.llm_service import OllamaLLMService
 from app.services.prompt_service import PromptReadiness, PromptService, ResolvedPrompt
 
 
@@ -20,3 +25,24 @@ def test_prompt_service_schema_constants() -> None:
     assert "input_json" in PromptService.OPTIMIZED_MATCH_PLACEHOLDERS
     assert "candidate_profile" in PromptService.OPTIMIZED_MATCH_SCHEMA_FIELDS
     assert "vacancy_id" in PromptService.OPTIMIZED_MATCH_VACANCY_SCHEMA_FIELDS
+
+
+def test_llm_thinking_capability_uses_runtime_registry(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "OLLAMA_THINKING_MODEL_FAMILIES", ["custom-thinker"], raising=False)
+
+    assert ModelRegistry.supports_thinking("custom-thinker:7b") is True
+    assert ModelRegistry.supports_thinking("qwen3:8b") is False
+    assert OllamaLLMService._supports_thinking("custom-thinker:7b") is True
+
+
+def test_llm_generation_options_have_no_embedded_numeric_policy() -> None:
+    source = getsource(OllamaLLMService)
+
+    assert '"temperature": 0.0' not in source
+    assert '"top_p": 0.9' not in source
+
+
+def test_prompt_service_does_not_embed_hiring_risk_template() -> None:
+    source = getsource(PromptService)
+
+    assert "You explain deterministic hiring risks to recruiters." not in source

@@ -4,6 +4,7 @@ from sqlalchemy import select, text
 from app.core.config import settings
 from app.core.database import PostgresAppSession
 from app.core.logging import logger
+from app.core.rule_config_manager import PolicyRegistry
 from app.models.pg import CandidateEmbedding, CandidateSectionEmbedding
 
 
@@ -21,7 +22,7 @@ class VectorCandidateRetriever:
     def retrieve_candidates(
         cls,
         query_embedding: list[float],
-        top_k: int = 200,
+        top_k: int | None = None,
         section_type: str | None = None,
         model_version: str | None = None,
     ) -> tuple[dict[str, int], dict[str, float]]:
@@ -29,6 +30,7 @@ class VectorCandidateRetriever:
         Execute safe PGVector cosine distance search against candidate section vectors or composite vectors.
         Returns a tuple of (vector_ranks_dict, vector_similarities_dict).
         """
+        top_k = top_k or PolicyRegistry.resolve_snapshot().retrieval.vector_candidate_pool
         ranks: dict[str, int] = {}
         similarities: dict[str, float] = {}
 

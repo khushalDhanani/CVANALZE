@@ -101,8 +101,7 @@ class ScoringConfig:
             max_llm_boost=scoring.max_llm_boost,
             match_high_threshold=scoring.match_high_threshold,
             match_medium_threshold=scoring.match_medium_threshold,
-            zero_skills_score_cap=40.0,
-            rejection_score_epsilon=0.1,
+            zero_skills_score_cap=scoring.zero_skills_score_cap,
+            rejection_score_epsilon=scoring.rejection_score_epsilon,
             component_weights=dict(scoring.component_weights),
         )
-

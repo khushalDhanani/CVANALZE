@@ -387,7 +387,11 @@ class ProcessingQueueService:
 
     @classmethod
     def _recover_or_fail(cls, record: ProcessingJobRecord, connection: Redis, reason: ErrorCode) -> ProcessingJobRecord:
-        lock = connection.lock(f"lock:cv-processing:recovery:{record.job_id}", timeout=30, blocking_timeout=0)
+        lock = connection.lock(
+            f"lock:cv-processing:recovery:{record.job_id}",
+            timeout=settings.PROCESSING_RECOVERY_LOCK_TIMEOUT_SECONDS,
+            blocking_timeout=settings.PROCESSING_RECOVERY_LOCK_BLOCKING_TIMEOUT_SECONDS,
+        )
         if not lock.acquire(blocking=False):
             return ProcessingJobRepository.get(record.job_id) or record
         try:
@@ -491,8 +495,8 @@ class ProcessingQueueService:
         try:
             connection = Redis.from_url(
                 settings.REDIS_URL,
-                socket_connect_timeout=1.0,
-                socket_timeout=1.0,
+                socket_connect_timeout=settings.REDIS_AVAILABILITY_PROBE_TIMEOUT_SECONDS,
+                socket_timeout=settings.REDIS_AVAILABILITY_PROBE_TIMEOUT_SECONDS,
             )
             connection.ping()
             return connection
@@ -506,7 +510,7 @@ class ProcessingQueueService:
         lock = connection.lock(
             cls._SUBMISSION_LOCK_KEY,
             timeout=settings.PROCESSING_JOB_LOCK_TIMEOUT_SECONDS,
-            blocking_timeout=10,
+            blocking_timeout=settings.REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS,
         )
         try:
             acquired = lock.acquire(blocking=True)

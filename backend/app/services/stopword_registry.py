@@ -24,30 +24,6 @@ class StopwordRegistry:
     Replaces embedded inline sets with versioned, categorized token policies.
     """
 
-    GARBAGE_SKILLS: set[str] = {
-        "-",
-        ".",
-        "yes",
-        "no",
-        "n/a",
-        "na",
-        "nil",
-        "none",
-        "test",
-        "1",
-        "0",
-        "ok",
-        "good",
-        "e.g",
-        "e.g.",
-        "i.e",
-        "i.e.",
-        "job overview",
-        "key responsibilities",
-        "responsibilities",
-        "requirements",
-    }
-
     @classmethod
     def is_garbage_skill(cls, term: str | None) -> bool:
         """Return True if a given skill term is a known garbage or placeholder token."""
@@ -56,7 +32,17 @@ class StopwordRegistry:
         clean = term.strip().lower()
         if len(clean) <= 1:
             return True
-        return clean in cls.GARBAGE_SKILLS
+
+        from app.core.rule_config_manager import PolicyRegistry
+        from app.services.dynamic_scoring_prefilter_service import DynamicScoringAndPrefilterService
+
+        policy_terms = {
+            token.strip().lower()
+            for token in PolicyRegistry.resolve_snapshot().extraction.garbage_skill_terms
+            if token.strip()
+        }
+        database_terms = DynamicScoringAndPrefilterService.get_stop_words()
+        return clean in policy_terms or clean in database_terms
 
     @classmethod
     def filter_valid_skills(cls, raw_skills: list[str]) -> list[str]:

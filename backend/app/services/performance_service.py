@@ -12,10 +12,10 @@ from app.services.embedding_service import EmbeddingService
 class LRUMemoryCache:
     """Sub-millisecond L1 in-memory LRU cache."""
 
-    def __init__(self, maxsize: int = 5000, default_ttl: float = 3600.0):
+    def __init__(self, maxsize: int = 5000, default_ttl: float | None = None):
         self._cache: dict[str, tuple[Any, float]] = {}
         self._maxsize = maxsize
-        self._default_ttl = default_ttl
+        self._default_ttl = default_ttl or settings.PERFORMANCE_L1_CACHE_TTL_SECONDS
 
     def get(self, key: str) -> Any:
         item = self._cache.get(key)
@@ -104,13 +104,14 @@ class EnterprisePerformanceService:
         return None
 
     @classmethod
-    def set_multilevel_cache(cls, key: str, value: Any, ttl: float = 3600.0) -> None:
+    def set_multilevel_cache(cls, key: str, value: Any, ttl: float | None = None) -> None:
         """
         Multi-Level Cache Write:
         Writes value concurrently into L1 Memory and L2 Redis / Shared cache manager.
         """
         if value is None:
             return
+        ttl = settings.PERFORMANCE_L1_CACHE_TTL_SECONDS if ttl is None else ttl
         cls._l1_cache.set(key, value, ttl=ttl)
         embedding_cache_manager.set(key, value)
 

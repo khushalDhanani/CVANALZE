@@ -3,6 +3,7 @@ import logging
 from typing import Optional
 
 from app.core.database import PostgresAppSession
+from app.core.config import settings
 from app.core.rule_config_manager import RuleConfigManager
 from app.models.domain import DepartmentDomainMaster
 
@@ -21,8 +22,6 @@ class DepartmentNormalizer:
 
     _cache: dict[str, dict] = {}
     _last_refresh: float = 0.0
-    _refresh_interval_seconds: int = 300  # 5 minutes
-
     @classmethod
     def _load_mappings(cls) -> None:
         """Load alias mappings from the database into the in‑memory cache.
@@ -65,7 +64,7 @@ class DepartmentNormalizer:
     def _ensure_cache(cls) -> None:
         import time
         now = time.time()
-        if now - cls._last_refresh > cls._refresh_interval_seconds:
+        if now - cls._last_refresh > settings.CACHE_TTL_MASTER_DATA_SECONDS:
             cls._load_mappings()
             cls._last_refresh = now
 
