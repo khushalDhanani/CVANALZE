@@ -2353,3 +2353,20 @@ Permanent, append-only work log for all frontend and backend work across the CV 
 - **Summary**: Removed root-level duplicates of backend scanner outputs.
 - **Details**:
   - Deleted `coverage.json` and `hardcoding_findings.json` from the repository root to complete the cleanup of redundant artifacts that were previously only removed from the `backend/` directory.
+
+---
+
+### Entry #068
+- **Timestamp**: 2026-08-20T12:33:47+0530
+- **Scope**: Hardcoding remediation branch integration
+- **Category**: Version Control & Verification
+- **Author**: Codex
+- **Modified Files**:
+  - `workstats.md`
+- **Summary**: Integrated both hardcoding-remediation branches into `v_1.0.0_MJ01` and completed post-merge verification and local cleanup.
+- **Details**:
+  - Merged `codex/hardcoding-remediation-full` with merge commit `6efe902`.
+  - Merged `codex/hardcoding-remediation` with merge commit `263f7c8`.
+  - Preserved both append-only histories by recording the second branch's root-artifact cleanup as Entry #067.
+  - Verified both feature tips are ancestors of the target, 64 focused backend tests passed, the hardcoding audit reported zero new unapproved findings, and frontend runtime/type checks passed.
+  - Removed the clean owned worktree and fully merged local feature branches; remote branches were left unchanged.
