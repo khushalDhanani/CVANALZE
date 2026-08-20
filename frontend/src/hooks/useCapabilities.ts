@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { capabilitiesService } from '@/services/capabilitiesService';
 import type { ApplicationCapabilities } from '@/types/capabilities';
+import { applyServerPollingCapabilities } from '@/constants/config';
 
 let cachedCapabilities: ApplicationCapabilities | null = null;
 
@@ -14,6 +15,7 @@ export function useCapabilities() {
     let active = true;
     capabilitiesService.get()
       .then((result) => {
+        applyServerPollingCapabilities(result.polling.interval_ms, result.polling.max_attempts);
         cachedCapabilities = result;
         if (active) setCapabilities(result);
       })

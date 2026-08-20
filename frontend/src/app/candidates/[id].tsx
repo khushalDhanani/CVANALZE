@@ -26,6 +26,7 @@ import { VacancyMatchStatusBadge } from '@/components/ui/VacancyMatchStatusBadge
 import { HrReviewModal } from '@/components/ui/HrReviewModal';
 import { StepProgressCard, StepState } from '@/components/ui/StepProgressCard';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { COLORS } from '@/constants/colors';
 import { formatDateTime } from '@/utils/date';
 import { getCvQueueStateMeta, resolveCvQueueUiState } from '@/utils/cvQueueState';
@@ -63,6 +64,7 @@ const normalizeRecruiterLabels = (value: unknown, objectKeys: string[] = []): st
 };
 
 export default function CandidateDetailScreen() {
+  const { capabilities } = useCapabilities();
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string | string[]; query?: string; classification?: string; department?: string }>();
   const { id, query, classification, department } = params;
@@ -1058,6 +1060,7 @@ export default function CandidateDetailScreen() {
         {isReprocessing ? (
           <View className="mb-3">
             <StepProgressCard
+              pipelineStages={capabilities?.pipeline ?? []}
               currentStepIndex={currentStepIndex}
               stepStates={stepStates}
               statusMessage={reprocessStatusMsg}

@@ -1405,7 +1405,21 @@ class RecommendationPolicy(BaseModel):
 class SimilarityPolicy(BaseModel):
     expected_vector_dimension: int = Field(default=768, ge=1)
     min_similarity_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
+    domain_default_threshold: float = Field(default=0.82, ge=0.0, le=1.0)
+    role_resolution_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+    domain_default_limit: int = Field(default=5, ge=1)
+    domain_max_limit: int = Field(default=50, ge=1)
+    high_similarity_band: float = Field(default=0.90, ge=0.0, le=1.0)
+    medium_similarity_band: float = Field(default=0.80, ge=0.0, le=1.0)
     model_fallback_enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_similarity_controls(self) -> "SimilarityPolicy":
+        if self.domain_default_limit > self.domain_max_limit:
+            raise ValueError("Similarity default limit must not exceed its maximum.")
+        if self.medium_similarity_band > self.high_similarity_band:
+            raise ValueError("Medium similarity band must not exceed the high band.")
+        return self
 
 
 class PolicySnapshotMetadata(BaseModel):

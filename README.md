@@ -154,6 +154,8 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `APP_ENVIRONMENT` | `development` | Enables production/staging containment when set to `production`, `prod`, or `staging`. |
+| `APP_VERSION` | package version | Public application version. |
+| `GIT_SHA` | `unknown` locally | Build revision; production/staging requires an explicit non-unknown value. |
 | `AUTH_ENABLED` | `false` (`true` in Compose) | Enables the existing API-key/session authentication and recruiter/administrator authorization policy. |
 | `RECRUITER_API_KEYS` | `[]` | JSON array of recruiter secrets. |
 | `ADMINISTRATOR_API_KEYS` | `[]` | JSON array of administrator secrets. |
@@ -198,6 +200,10 @@ such as origins and API keys must be JSON arrays. Never commit real credentials.
 | `RQ_DEVELOPMENT_FALLBACK_ENABLED` | `true` | Allows the in-process fallback only in local/development/test environments. |
 | `PROCESSING_JOB_TTL_SECONDS` | `604800` | Redis/file compatibility-cache retention for PostgreSQL processing records. |
 | `PROCESSING_JOB_LOCK_TIMEOUT_SECONDS` | `1200` | Distributed execution-lock lease. |
+| `REDIS_SOCKET_TIMEOUT_SECONDS` | `30` | Redis command/read timeout. |
+| `REDIS_CONNECT_TIMEOUT_SECONDS` | `10` | Redis connection-establishment timeout. |
+| `REDIS_HEALTH_CHECK_INTERVAL_SECONDS` | `30` | Redis connection health-check interval. |
+| `REDIS_SCAN_COUNT` | `1000` | Requested cursor scan batch size for cache invalidation. |
 
 MSSQL must be configured with a dedicated application login, never `sa`, `db_owner`, or another shared operator account. Create a database user for that login, grant `CONNECT`, and grant `SELECT` only on the tables or views read by the MSSQL models. Do not grant broad roles such as `sysadmin`, `db_owner`, `db_datawriter`, or permissions such as `CONTROL`, `ALTER`, `CREATE`, `EXECUTE`, `INSERT`, `UPDATE`, or `DELETE`.
 
@@ -223,7 +229,9 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ALLOWED_EXTENSIONS` | `["pdf","docx"]` | Upload extension allowlist. The documented and tested support contract is PDF/DOCX only. |
+| `ALLOWED_MIME_TYPES` | JSON map | MIME allowlist keyed by configured extension. |
 | `MAX_FILE_SIZE_BYTES` | `15728640` | Maximum compressed upload size. |
+| `MAX_UPLOAD_FILES_PER_SELECTION` | `10` | Maximum files the recruiter UI permits in one selection. |
 | `UPLOAD_READ_CHUNK_SIZE_BYTES` | `1048576` | Maximum upload read size per iteration. |
 | `UPLOAD_FILENAME_MAX_CHARS` | `120` | Maximum normalized display filename length. |
 | `MAX_DOCX_EXPANDED_SIZE_BYTES` | `78643200` | Maximum combined uncompressed DOCX size. |
@@ -237,6 +245,13 @@ Keep `MSSQL_READONLY_ENFORCEMENT=true` in every deployed environment. An explici
 | `RAW_UPLOAD_RETENTION_DAYS` | `30` | Opportunistic raw-file age retention; negative disables age cleanup. |
 | `RAW_UPLOAD_DELETE_ON_SUCCESS` | `false` | Deletes accepted source files after success when enabled. |
 | `RAW_UPLOAD_DELETE_ON_FAILURE` | `false` | Deletes accepted source files after terminal failure when enabled. |
+| `APP_DATA_ROOT` | backend upload data root | Canonical root used to derive uploads, results, locks, and training-data paths. Explicit per-path overrides remain supported. |
+
+### Public capabilities and frontend runtime
+
+`GET /api/config/capabilities` is the authoritative frontend contract for upload formats and limits, batch choices, polling guidance, pipeline labels, and implementation display metadata. The recruiter UI disables affected actions when this contract cannot be loaded instead of applying stale duplicated constants.
+
+Production frontend builds must set `EXPO_PUBLIC_API_URL` to an absolute HTTP(S) API URL. `EXPO_PUBLIC_API_TIMEOUT_MS`, `EXPO_PUBLIC_POLL_INTERVAL_MS`, and `EXPO_PUBLIC_MAX_POLL_RETRIES` optionally override transport timing; local emulator/browser URLs are development-only fallbacks.
 
 ### Ollama and embeddings
 
@@ -329,7 +344,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 uv run python start_worker.py
 ```
 
-The worker reads `REDIS_URL` and `RQ_QUEUE_NAME` from the shared settings and consumes the primary CV queue, `shadow_validation`, and `default`. The in-process
+The worker reads `REDIS_URL`, `RQ_QUEUE_NAME`, and `RQ_SHADOW_QUEUE_NAME` from shared settings and consumes the configured primary, shadow, and auxiliary queues. The in-process
 fallback is a development containment path, not a substitute for a worker in deployed environments.
 
 The API exposes service discovery at `http://localhost:8000/`, dependency health at `http://localhost:8000/health`, and OpenAPI UI at

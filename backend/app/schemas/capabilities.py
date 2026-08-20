@@ -33,9 +33,20 @@ class PipelineStageCapability(BaseModel):
     description: str = Field(min_length=1)
 
 
+class SimilarityCapabilities(BaseModel):
+    default_threshold: float = Field(ge=0.0, le=1.0)
+    minimum_threshold: float = Field(ge=0.0, le=1.0)
+    maximum_threshold: float = Field(default=1.0, ge=0.0, le=1.0)
+    default_limit: int = Field(ge=1)
+    maximum_limit: int = Field(ge=1)
+    high_band: float = Field(ge=0.0, le=1.0)
+    medium_band: float = Field(ge=0.0, le=1.0)
+
+
 class ApplicationCapabilities(BaseModel):
     upload: UploadCapabilities
     batch: BatchCapabilities
     polling: PollingCapabilities
     implementation: ImplementationCapabilities
     pipeline: list[PipelineStageCapability]
+    similarity: SimilarityCapabilities

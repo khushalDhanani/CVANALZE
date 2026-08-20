@@ -2272,3 +2272,44 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Centralized name/location search windows, token and character bounds, structural ranking bonuses, title/skill/project limits, rejection ratios, and fallback presentation labels in `ExtractionPolicy`.
   - Preserved date/email/document regex grammar as deterministic parsing protocol rather than treating syntax as deployment configuration.
   - Verified 17 focused backend tests passed and Ruff import checks were corrected; TypeScript resolved all changed application files, with three pre-existing CSS declaration errors remaining elsewhere in the project.
+
+---
+
+### Entry #065
+- **Timestamp**: 2026-08-20T12:23:21+0530
+- **Scope**: Exact hardcoding governance, similarity capabilities, and operational documentation
+- **Category**: Governance, Policy, Frontend Contract, Security & Documentation
+- **Author**: Codex
+- **Modified Files**:
+  - `.env.example`
+  - `.vscode/settings.json`
+  - `README.md`
+  - `run.md`
+  - `backend/.env.example`
+  - `backend/app/api/domain_knowledge.py`
+  - `backend/app/core/config.py`
+  - `backend/app/core/config_listener.py`
+  - `backend/app/core/rule_config_manager.py`
+  - `backend/app/schemas/capabilities.py`
+  - `backend/app/services/capabilities_service.py`
+  - `backend/scripts/quality/hardcoding_audit.py`
+  - `backend/scripts/quality/scan_repository_completeness.py`
+  - `backend/tests/unit/api/test_domain_knowledge_policy.py`
+  - `backend/tests/unit/core/test_hardcoding_regression_gate.py`
+  - `backend/tests/unit/services/test_capabilities_service.py`
+  - `frontend/src/app/candidates/[id].tsx`
+  - `frontend/src/app/domain-explorer.tsx`
+  - `frontend/src/components/ui/StepProgressCard.tsx`
+  - `frontend/src/constants/capabilities.ts`
+  - `frontend/src/constants/similarity.ts` (removed)
+  - `frontend/src/hooks/useCapabilities.ts`
+  - `frontend/src/types/capabilities.ts`
+  - `hardcoding-baseline.json`
+- **Summary**: Replaced category-wide hardcoding exceptions with exact fingerprints, moved similarity UI/API controls into active policy, consumed backend pipeline and polling capabilities, and sanitized repository operational configuration.
+- **Details**:
+  - The hardcoding audit now requires stable file/category/snippet fingerprints with both owner and justification; broad file/category exceptions are ignored.
+  - Added category-aware exclusions for scanner source dictionaries, synthetic credential tests, and documentation examples while retaining complete tracked-file coverage.
+  - Moved Domain Explorer thresholds, limits, and badge bands into `SimilarityPolicy`; omitted backend request values now resolve from the active immutable policy and explicit values are bounded by it.
+  - Pipeline labels and polling guidance now flow through the capabilities contract; only the stable stage-to-icon presentation mapping remains frontend-owned.
+  - Removed user-specific absolute commands and sensitive/internal connection examples from editor/run documentation, added sanitized root and backend environment templates, and documented canonical paths and capabilities.
+  - Verified 15 focused similarity/capabilities/governance tests passed; the exact-baseline audit reported zero new unapproved findings before the final commit checkpoint.

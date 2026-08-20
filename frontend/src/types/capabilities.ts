@@ -30,10 +30,21 @@ export interface PipelineStageCapability {
   description: string;
 }
 
+export interface SimilarityCapabilities {
+  default_threshold: number;
+  minimum_threshold: number;
+  maximum_threshold: number;
+  default_limit: number;
+  maximum_limit: number;
+  high_band: number;
+  medium_band: number;
+}
+
 export interface ApplicationCapabilities {
   upload: UploadCapabilities;
   batch: BatchCapabilities;
   polling: PollingCapabilities;
   implementation: ImplementationCapabilities;
   pipeline: PipelineStageCapability[];
+  similarity: SimilarityCapabilities;
 }

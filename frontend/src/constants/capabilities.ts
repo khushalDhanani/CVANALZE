@@ -1,78 +1,33 @@
 import {
-  UploadCloud,
-  FileCheck,
-  FileCode,
-  UserCheck,
-  Sparkles,
-  Target,
   Award,
   CheckCircle2,
+  FileCheck,
+  FileCode,
+  Sparkles,
+  Target,
+  UploadCloud,
+  UserCheck,
 } from 'lucide-react-native';
+import type { PipelineStageCapability } from '@/types/capabilities';
 
-export interface PipelineCapabilityStage {
-  id: string;
-  label: string;
-  description: string;
+export interface PipelineCapabilityStage extends PipelineStageCapability {
   icon: React.ElementType;
 }
 
-export const PIPELINE_CAPABILITIES = {
-  stages: [
-    {
-      id: 'upload',
-      label: 'Upload CV',
-      description: 'Transferring document to processing server',
-      icon: UploadCloud,
-    },
-    {
-      id: 'validation',
-      label: 'Validation',
-      description: 'Verifying file integrity & format compatibility',
-      icon: FileCheck,
-    },
-    {
-      id: 'parsing',
-      label: 'Document Parsing',
-      description: 'Extracting structured layout & OCR text elements',
-      icon: FileCode,
-    },
-    {
-      id: 'extraction',
-      label: 'Profile Extraction',
-      description: 'Structuring candidate profile, skills & work history',
-      icon: UserCheck,
-    },
-    {
-      id: 'ai_analysis',
-      label: 'AI Reasoning',
-      description: 'Semantic analysis & deep skill inference',
-      icon: Sparkles,
-    },
-    {
-      id: 'matching',
-      label: 'Job Matching',
-      description: 'Cross-evaluating candidate against active vacancies',
-      icon: Target,
-    },
-    {
-      id: 'ranking',
-      label: 'Score Ranking',
-      description: 'Calculating component weights & penalty thresholds',
-      icon: Award,
-    },
-    {
-      id: 'complete',
-      label: 'Analysis Ready',
-      description: 'Match scores & candidate evaluation generated',
-      icon: CheckCircle2,
-    },
-  ] as PipelineCapabilityStage[],
-
-  batchLimits: [5, 10, 20, 30] as const,
-  defaultBatchLimit: 10,
-  maxSupportedPdfPages: 25,
-  ocrEngine: 'RapidOCR',
-  documentParser: 'Docling',
-  primaryLlm: 'Ollama local LLM',
-  primaryVectorDb: 'PostgreSQL pgvector',
+const PIPELINE_STAGE_ICONS: Record<string, React.ElementType> = {
+  upload: UploadCloud,
+  validation: FileCheck,
+  parsing: FileCode,
+  extraction: UserCheck,
+  ai_analysis: Sparkles,
+  matching: Target,
+  ranking: Award,
+  complete: CheckCircle2,
 };
+
+export function buildPipelineStages(stages: PipelineStageCapability[]): PipelineCapabilityStage[] {
+  return stages.map((stage) => ({
+    ...stage,
+    icon: PIPELINE_STAGE_ICONS[stage.id] ?? FileCheck,
+  }));
+}

@@ -9,11 +9,42 @@ Usage: python hardcoding_audit.py --baseline hardcoding-baseline.json --fail-on=
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
-from scan_repository_completeness import run_completeness_scan
+try:
+    from .scan_repository_completeness import run_completeness_scan
+except ImportError:  # Direct script execution.
+    from scan_repository_completeness import run_completeness_scan
+
+
+def finding_fingerprint(finding: dict) -> str:
+    """Return a stable identity for one exact file/category/snippet occurrence."""
+    normalized_snippet = re.sub(r"\s+", " ", str(finding.get("snippet", "")).strip())
+    identity = "\0".join(
+        (
+            str(finding.get("file", "")),
+            str(finding.get("category", "")),
+            normalized_snippet,
+        )
+    )
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+
+
+def load_approved_fingerprints(baseline_path: Path) -> set[str]:
+    """Load only exact, owned, justified baseline identities."""
+    approved: set[str] = set()
+    if not baseline_path.exists():
+        return approved
+    baseline_data = json.loads(baseline_path.read_text(encoding="utf-8"))
+    for entry in baseline_data.get("allowlisted_findings", []):
+        fingerprint = str(entry.get("fingerprint", "")).strip()
+        if fingerprint and entry.get("owner") and entry.get("justification"):
+            approved.add(fingerprint)
+    return approved
 
 
 def main() -> int:
@@ -26,35 +57,20 @@ def main() -> int:
     baseline_path = repo_root / args.baseline
 
     # 1. Run fresh completeness scan
-    scan_result = run_completeness_scan(repo_root)
+    scan_result = run_completeness_scan(repo_root, write_reports=False)
     active_findings = scan_result["findings"]["findings"]
 
     # 2. Load baseline allowlist
-    approved_keys: set[tuple[str, int, str]] = set()
-    if baseline_path.exists():
-        try:
-            baseline_data = json.loads(baseline_path.read_text(encoding="utf-8"))
-            for entry in baseline_data.get("allowlisted_findings", []):
-                # Verify owner and justification exist
-                if not entry.get("owner") or not entry.get("justification"):
-                    print(f"⚠️ Warning: Baseline entry for {entry.get('file')} missing owner or justification.", file=sys.stderr)
-                file_path = entry.get("file", "")
-                cat = entry.get("category", "")
-                line = entry.get("line")
-                if line is not None:
-                    approved_keys.add((file_path, line, cat))
-                else:
-                    approved_keys.add((file_path, 0, cat))
-                    approved_keys.add((file_path, cat))
-        except Exception as exc:
-            print(f"❌ Failed to parse baseline file {baseline_path}: {exc}", file=sys.stderr)
+    try:
+        approved_fingerprints = load_approved_fingerprints(baseline_path)
+    except Exception as exc:
+        print(f"❌ Failed to parse baseline file {baseline_path}: {exc}", file=sys.stderr)
+        return 1
 
     new_unapproved: list[dict] = []
     for finding in active_findings:
-        file_path = finding["file"]
-        cat = finding["category"]
-        line = finding["line"]
-        is_approved = (file_path, line, cat) in approved_keys or (file_path, 0, cat) in approved_keys or (file_path, cat) in approved_keys
+        finding["fingerprint"] = finding_fingerprint(finding)
+        is_approved = finding["fingerprint"] in approved_fingerprints
         if not is_approved:
             new_unapproved.append(finding)
 
@@ -63,7 +79,7 @@ def main() -> int:
     print("=" * 70)
     print(f"   - Total Tracked Files Scanned: {scan_result['coverage']['total_git_tracked_files']}")
     print(f"   - Total Active Findings:       {len(active_findings)}")
-    print(f"   - Approved Baselined Findings: {len(approved_keys)}")
+    print(f"   - Approved Baseline Identities:{len(approved_fingerprints):>7}")
     print(f"   - New Unapproved Findings:     {len(new_unapproved)}")
 
     if new_unapproved:

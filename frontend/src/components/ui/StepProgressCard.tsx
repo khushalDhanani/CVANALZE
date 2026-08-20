@@ -1,13 +1,6 @@
 import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import {
-  UploadCloud,
-  FileCheck,
-  FileCode,
-  UserCheck,
-  Sparkles,
-  Target,
-  Award,
   CheckCircle2,
   AlertTriangle,
   Clock,
@@ -15,15 +8,15 @@ import {
   MinusCircle,
 } from 'lucide-react-native';
 import { COLORS } from '@/constants/colors';
-import { PIPELINE_CAPABILITIES, PipelineCapabilityStage } from '@/constants/capabilities';
+import { buildPipelineStages, PipelineCapabilityStage } from '@/constants/capabilities';
+import type { PipelineStageCapability } from '@/types/capabilities';
 import { Button } from './Button';
 
 export type ProcessingStep = PipelineCapabilityStage;
 export type StepState = 'pending' | 'active' | 'completed' | 'skipped' | 'failed';
 
-export const PIPELINE_STEPS: ProcessingStep[] = PIPELINE_CAPABILITIES.stages;
-
 export interface StepProgressCardProps {
+  pipelineStages: PipelineStageCapability[];
   currentStepIndex: number;
   stepStates: StepState[];
   elapsedSeconds: number;
@@ -48,6 +41,7 @@ export function formatElapsedTime(seconds: number): string {
 }
 
 export function StepProgressCard({
+  pipelineStages,
   currentStepIndex,
   stepStates,
   elapsedSeconds,
@@ -63,7 +57,8 @@ export function StepProgressCard({
   isComplete = false,
   className = '',
 }: StepProgressCardProps) {
-  const totalSteps = PIPELINE_STEPS.length;
+  const pipelineSteps = buildPipelineStages(pipelineStages);
+  const totalSteps = Math.max(pipelineSteps.length, 1);
   const completedCount = stepStates.filter((s) => s === 'completed' || s === 'skipped').length;
   
   // Safe progress percentage: capped strictly below 100% until explicit confirmed completion
@@ -196,7 +191,7 @@ export function StepProgressCard({
 
       {/* Step Tracker List */}
       <View className="gap-2">
-        {PIPELINE_STEPS.map((step, index) => {
+        {pipelineSteps.map((step, index) => {
           const state = stepStates[index] || 'pending';
           const isCurrent = index === currentStepIndex && isProcessing;
           const Icon = step.icon;

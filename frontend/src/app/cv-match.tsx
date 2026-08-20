@@ -396,6 +396,7 @@ export default function CvMatchScreen() {
               {/* Step-by-Step Modern Progress UI */}
               {showProgressCard && (
                 <StepProgressCard
+                  pipelineStages={capabilities?.pipeline ?? []}
                   currentStepIndex={currentStepIndex}
                   stepStates={stepStates}
                   elapsedSeconds={elapsedSeconds}

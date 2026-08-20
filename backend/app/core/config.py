@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     REDIS_SCAN_COUNT: int = 1000
     CACHE_FILE_LOCK_TIMEOUT_SECONDS: float = 5.0
     SCHEDULER_REDIS_RETRY_DELAY_SECONDS: float = 5.0
+    CONFIG_INVALIDATION_RETRY_SECONDS: float = 5.0
     API_STREAM_POLL_TIMEOUT_SECONDS: float = 1.0
     API_STREAM_IDLE_SLEEP_SECONDS: float = 0.1
     JOB_CACHE_STALENESS_TTL_SECONDS: float = 30.0
@@ -323,6 +324,7 @@ class Settings(BaseSettings):
             self.REDIS_SCAN_COUNT,
             self.CACHE_FILE_LOCK_TIMEOUT_SECONDS,
             self.SCHEDULER_REDIS_RETRY_DELAY_SECONDS,
+            self.CONFIG_INVALIDATION_RETRY_SECONDS,
             self.API_STREAM_POLL_TIMEOUT_SECONDS,
             self.API_STREAM_IDLE_SLEEP_SECONDS,
             self.JOB_CACHE_STALENESS_TTL_SECONDS,
@@ -339,6 +341,33 @@ class Settings(BaseSettings):
             raise ValueError("Queue, Redis, sync, freshness, and recovery controls must be greater than zero.")
         if self.PROCESSING_RECOVERY_LOCK_BLOCKING_TIMEOUT_SECONDS < 0:
             raise ValueError("PROCESSING_RECOVERY_LOCK_BLOCKING_TIMEOUT_SECONDS must not be negative.")
+        if self.DEFAULT_BATCH_CANDIDATE_LIMIT > self.MAX_BATCH_LIMIT:
+            raise ValueError("DEFAULT_BATCH_CANDIDATE_LIMIT must not exceed MAX_BATCH_LIMIT.")
+        if (
+            not self.BATCH_CANDIDATE_LIMIT_OPTIONS
+            or any(option <= 0 or option > self.MAX_BATCH_LIMIT for option in self.BATCH_CANDIDATE_LIMIT_OPTIONS)
+            or self.DEFAULT_BATCH_CANDIDATE_LIMIT not in self.BATCH_CANDIDATE_LIMIT_OPTIONS
+        ):
+            raise ValueError(
+                "BATCH_CANDIDATE_LIMIT_OPTIONS must contain the default and stay within MAX_BATCH_LIMIT."
+            )
+        if not self.ALLOWED_EXTENSIONS or any(
+            not self.ALLOWED_MIME_TYPES.get(extension)
+            for extension in self.ALLOWED_EXTENSIONS
+        ):
+            raise ValueError("Every allowed upload extension must have at least one configured MIME type.")
+        pipeline_ids = [stage.get("id", "").strip() for stage in self.PROCESSING_PIPELINE_STAGES]
+        if (
+            not pipeline_ids
+            or any(
+                not stage.get("id", "").strip()
+                or not stage.get("label", "").strip()
+                or not stage.get("description", "").strip()
+                for stage in self.PROCESSING_PIPELINE_STAGES
+            )
+            or len(set(pipeline_ids)) != len(pipeline_ids)
+        ):
+            raise ValueError("PROCESSING_PIPELINE_STAGES must contain unique, complete stage definitions.")
         if self.LLM_ENABLED or self.EMBEDDING_ENABLED:
             parsed_ollama_url = urlsplit(self.OLLAMA_BASE_URL.strip())
             if parsed_ollama_url.scheme not in {"http", "https"} or not parsed_ollama_url.netloc:

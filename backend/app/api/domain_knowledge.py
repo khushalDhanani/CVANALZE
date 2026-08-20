@@ -1,14 +1,16 @@
 from __future__ import annotations
+
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.core.rule_config_manager import PolicyRegistry
+from app.schemas.classification_types import NormalizedClassification
 from app.services.domain_embedding_service import DomainEmbeddingService
 from app.services.dynamic_taxonomy_service import (
     DynamicTaxonomyService,
 )
-from app.schemas.classification_types import NormalizedClassification
 
 router = APIRouter(prefix="/domain-knowledge", tags=["Domain Knowledge"])
 
@@ -19,8 +21,8 @@ class DomainEquivalentRequest(BaseModel):
         "skills",
         description="Domain category: 'skills', 'job_titles', 'departments', 'technologies', 'certifications', 'education_domains', 'industries', 'functional_areas'",
     )
-    threshold: float = Field(0.82, ge=0.0, le=1.0, description="Minimum vector similarity threshold")
-    limit: int = Field(5, ge=1, le=50, description="Maximum number of equivalent terms to return")
+    threshold: float | None = Field(None, ge=0.0, le=1.0, description="Minimum vector similarity threshold")
+    limit: int | None = Field(None, ge=1, description="Maximum number of equivalent terms to return")
 
 
 class DomainEquivalentResponse(BaseModel):
@@ -43,7 +45,7 @@ class AddDesignationRequest(BaseModel):
 class ResolveRoleRequest(BaseModel):
     role_or_summary: str = Field(..., min_length=1, description="Role title or candidate summary string")
     skills: list[str] = Field(default_factory=list, description="List of candidate skills")
-    threshold: float = Field(0.70, ge=0.0, le=1.0, description="Similarity threshold for vector match")
+    threshold: float | None = Field(None, ge=0.0, le=1.0, description="Similarity threshold for vector match")
 
 
 @router.get("/categories", response_model=list[str])
@@ -62,17 +64,22 @@ def get_semantic_equivalents(
     Resolve semantically equivalent domain terms for a given term and category.
     """
     cat = request.category.strip().lower()
+    policy = PolicyRegistry.resolve_snapshot().similarity
     if cat not in DomainEmbeddingService.CATEGORIES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid domain category '{cat}'. Supported categories: {sorted(DomainEmbeddingService.CATEGORIES)}",
         )
 
+    threshold = request.threshold if request.threshold is not None else policy.domain_default_threshold
+    limit = request.limit if request.limit is not None else policy.domain_default_limit
+    if threshold < policy.min_similarity_threshold or limit > policy.domain_max_limit:
+        raise HTTPException(status_code=422, detail="Similarity threshold or result limit is outside the active policy.")
     equivalents = DomainEmbeddingService.find_semantic_equivalents(
         term=request.term,
         category=cat,
-        threshold=request.threshold,
-        limit=request.limit,
+        threshold=threshold,
+        limit=limit,
     )
 
     return DomainEquivalentResponse(
@@ -111,8 +118,10 @@ def resolve_role_dynamically(request: ResolveRoleRequest) -> NormalizedClassific
     """
     Dynamically resolve role, domain, and job family using vector similarity and MSSQL taxonomy.
     """
+    policy = PolicyRegistry.resolve_snapshot().similarity
+    threshold = request.threshold if request.threshold is not None else policy.role_resolution_threshold
     return DynamicTaxonomyService.resolve_candidate_role_and_domain(
         role_or_summary=request.role_or_summary,
         skills=request.skills,
-        threshold=request.threshold,
+        threshold=threshold,
     )

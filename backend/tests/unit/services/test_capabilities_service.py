@@ -1,4 +1,7 @@
-from app.core.config import settings
+import pytest
+from pydantic import ValidationError
+
+from app.core.config import Settings, settings
 from app.services.capabilities_service import CapabilitiesService
 
 
@@ -49,3 +52,21 @@ def test_capabilities_filter_invalid_batch_options(monkeypatch) -> None:
     capabilities = CapabilitiesService.get_capabilities()
 
     assert capabilities.batch.limit_options == [10]
+
+
+def test_capability_settings_reject_conflicting_contracts() -> None:
+    with pytest.raises(ValidationError, match="BATCH_CANDIDATE_LIMIT_OPTIONS"):
+        Settings(
+            DEFAULT_BATCH_CANDIDATE_LIMIT=10,
+            MAX_BATCH_LIMIT=20,
+            BATCH_CANDIDATE_LIMIT_OPTIONS=[5],
+        )
+    with pytest.raises(ValidationError, match="MIME type"):
+        Settings(ALLOWED_EXTENSIONS={"pdf", "txt"})
+    with pytest.raises(ValidationError, match="unique, complete"):
+        Settings(
+            PROCESSING_PIPELINE_STAGES=[
+                {"id": "upload", "label": "Upload", "description": "Upload"},
+                {"id": "upload", "label": "Again", "description": "Duplicate"},
+            ]
+        )

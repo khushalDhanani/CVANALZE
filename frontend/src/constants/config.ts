@@ -11,3 +11,12 @@ export const API_CONFIG = {
   POLL_INTERVAL_MS: parsePositiveInteger(process.env.EXPO_PUBLIC_POLL_INTERVAL_MS, 3000),
   MAX_POLL_RETRIES: parsePositiveInteger(process.env.EXPO_PUBLIC_MAX_POLL_RETRIES, 1200),
 };
+
+export function applyServerPollingCapabilities(intervalMs: number, maxAttempts: number): void {
+  if (!process.env.EXPO_PUBLIC_POLL_INTERVAL_MS) {
+    API_CONFIG.POLL_INTERVAL_MS = parsePositiveInteger(String(intervalMs), API_CONFIG.POLL_INTERVAL_MS);
+  }
+  if (!process.env.EXPO_PUBLIC_MAX_POLL_RETRIES) {
+    API_CONFIG.MAX_POLL_RETRIES = parsePositiveInteger(String(maxAttempts), API_CONFIG.MAX_POLL_RETRIES);
+  }
+}
