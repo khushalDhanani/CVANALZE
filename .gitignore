@@ -46,6 +46,7 @@ venv.bak/
 .llm_cache/
 .pytest_cache/
 .mypy_cache/
+.worktrees/
 
 # Application Specific
 backend/uploads/
