@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-08-19T16:44:00Z",
+  "owner": "antigravity-team",
+  "description": "Baseline allowlist of approved protocol constants, system defaults, and documented fallback boundaries for Phase 0 Repository Completeness Gate.",
+  "allowlisted_findings": [
+    {
+      "file": "README.md",
+      "category": "LOCALHOST_HTTP_URL",
+      "severity": "P2",
+      "owner": "antigravity-team",
+      "justification": "Documented example CORS origin URL for local web development."
+    },
+    {
+      "file": "backend/app/core/config.py",
+      "category": "LOCALHOST_HTTP_URL",
+      "severity": "P2",
+      "owner": "antigravity-team",
+      "justification": "Standard default local service endpoint for local Ollama daemon."
+    },
+    {
+      "file": "backend/app/core/config.py",
+      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
+      "severity": "P1",
+      "owner": "antigravity-team",
+      "justification": "System default fallback threshold when PolicyRegistry is uninitialized."
+    },
+    {
+      "file": "backend/app/schemas/scoring_config.py",
+      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
+      "severity": "P1",
+      "owner": "antigravity-team",
+      "justification": "System default fallback threshold when PolicyRegistry is uninitialized."
+    },
+    {
+      "file": "backend/app/services/candidate_domain_service.py",
+      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
+      "severity": "P1",
+      "owner": "antigravity-team",
+      "justification": "System default fallback confidence when source metadata is unranked."
+    },
+    {
+      "file": "backend/app/services/candidate_search_reranker.py",
+      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
+      "severity": "P1",
+      "owner": "antigravity-team",
+      "justification": "System default fallback tier threshold for candidate search reranking."
+    },
+    {
+      "file": "backend/app/services/system_rule_config_factory.py",
+      "category": "HARDCODED_BUSINESS_DECISION_CONSTANT",
+      "severity": "P1",
+      "owner": "antigravity-team",
+      "justification": "Canonical factory default seeding PolicyRegistry rule profile."
+    },
+    {
+      "file": "frontend/src/constants/config.ts",
+      "category": "LOCALHOST_HTTP_URL",
+      "severity": "P2",
+      "owner": "antigravity-team",
+      "justification": "Default local API URL for Expo web development environment."
+    }
+  ]
+}

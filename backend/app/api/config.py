@@ -162,3 +162,83 @@ async def get_active_rule_config(
     except Exception as exc:
         logger.exception(f"Failed to retrieve active config: {exc}")
         raise HTTPException(status_code=500, detail="Failed to retrieve configuration.") from exc
+
+
+@router.get("/policy/version")
+async def get_active_policy_version(tenant_id: str | None = None):
+    """Retrieve active policy digest, version metadata, and active model status."""
+    try:
+        from app.core.model_registry import ModelRegistry
+        from app.core.rule_config_manager import PolicyRegistry, RuleConfigManager
+
+        config = RuleConfigManager.get_config(tenant_id=tenant_id)
+        digest = PolicyRegistry.get_policy_digest(tenant_id=tenant_id)
+        params = PolicyRegistry.get_scoring_parameters(tenant_id=tenant_id)
+        models = ModelRegistry.get_all_models()
+
+        return {
+            "status": "success",
+            "policy_version_digest": digest,
+            "rule_config_version": config.version,
+            "last_updated": config.last_updated,
+            "thresholds": {
+                "high_min": params.match_high_threshold,
+                "medium_min": params.match_medium_threshold,
+                "max_score_on_failure": params.max_score_on_failure,
+            },
+            "models": models,
+        }
+    except Exception as exc:
+        logger.exception(f"Failed to retrieve policy version metadata: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve policy metadata.") from exc
+
+
+@router.get("/audit/degradations")
+async def get_degradation_audit():
+    """Retrieve platform observability telemetry, model health states, and degradation status."""
+    try:
+        from app.core.model_registry import ModelRegistry
+
+        models = ModelRegistry.get_all_models()
+        unreachable_count = sum(1 for m in models if m["health_status"] == "UNREACHABLE")
+        degraded_count = sum(1 for m in models if m["health_status"] == "DEGRADED")
+
+        return {
+            "status": "success",
+            "system_health": "DEGRADED" if (unreachable_count + degraded_count) > 0 else "HEALTHY",
+            "active_models": models,
+            "unreachable_models_count": unreachable_count,
+            "degraded_models_count": degraded_count,
+        }
+    except Exception as exc:
+        logger.exception(f"Failed to retrieve degradation audit: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve degradation status.") from exc
+
+
+@router.get("/performance/observability")
+async def get_observability_dashboard():
+    """Retrieve observability dashboard quality rates, telemetry counters, and active alerts."""
+    try:
+        from app.core.observability import ObservabilityEngine
+
+        report = ObservabilityEngine.get_dashboard_report()
+        return {
+            "status": "success",
+            "dashboard": report,
+        }
+    except Exception as exc:
+        logger.exception(f"Failed to retrieve observability dashboard: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve observability dashboard.") from exc
+
+
+@router.get("/version")
+async def get_application_version():
+    """Expose canonical APP_VERSION and GIT_SHA metadata."""
+    from app.core.config import settings
+
+    return {
+        "status": "success",
+        "app_name": settings.PROJECT_NAME,
+        "app_version": settings.APP_VERSION,
+        "git_sha": settings.GIT_SHA,
+    }

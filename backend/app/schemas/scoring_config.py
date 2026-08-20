@@ -87,63 +87,22 @@ class ScoringConfig:
                 component_weights=weights,
             )
 
-        try:
-            from app.core.rule_config_manager import RuleConfigManager
-            from app.services.dynamic_scoring_prefilter_service import DynamicScoringAndPrefilterService
-
-            # Fetch from DB-backed ScoringProfileMaster
-            tenant_key = tenant_id or "DEFAULT"
-            profile = DynamicScoringAndPrefilterService.get_tenant_scoring_profile(tenant_key)
-
-            # Fetch from rule_config.json DB fallbacks
-            params = RuleConfigManager.get_scoring_parameters(tenant_id=tenant_id)
-
-            penalties = profile.get("penalties", {})
-            thresholds = profile.get("thresholds", {})
-            comp_weights = profile.get("component_weights", {})
-
-            final_weights = comp_weights if comp_weights else params.component_weights
-
-            return cls(
-                profile_code=profile.get("profile_code", "DEFAULT"),
-                profile_version=profile.get("profile_version", "v1"),
-                penalty_per_item=float(penalties.get("mandatory_failure_penalty", params.mandatory_failure_penalty)),
-                max_score_on_failure=float(penalties.get("max_score_on_failure", params.max_score_on_failure)),
-                llm_semantic_weight=float(thresholds.get("llm_semantic_weight", params.llm_semantic_weight)),
-                max_llm_boost=float(thresholds.get("max_llm_boost", params.max_llm_boost)),
-                match_high_threshold=float(thresholds.get("match_high_threshold", params.match_high_threshold)),
-                match_medium_threshold=float(thresholds.get("match_medium_threshold", params.match_medium_threshold)),
-                zero_skills_score_cap=float(penalties.get("zero_skills_score_cap", getattr(params, "zero_skills_score_cap", DEFAULT_ZERO_SKILLS_SCORE_CAP))),
-                component_weights=final_weights,
-            )
-
-        except Exception as e:
-            # Check if RuleConfigManager already has an active in-memory configuration for this tenant or globally
-            try:
-                from app.core.rule_config_manager import RuleConfigManager
-                if RuleConfigManager.is_config_loaded(tenant_id) or RuleConfigManager.is_config_loaded(None):
-                    active_params = RuleConfigManager.get_scoring_parameters(tenant_id=tenant_id)
-                    return cls(
-                        profile_code="DEFAULT",
-                        profile_version="v1",
-                        penalty_per_item=float(active_params.mandatory_failure_penalty),
-                        max_score_on_failure=float(active_params.max_score_on_failure),
-                        llm_semantic_weight=float(active_params.llm_semantic_weight),
-                        max_llm_boost=float(active_params.max_llm_boost),
-                        match_high_threshold=float(active_params.match_high_threshold),
-                        match_medium_threshold=float(active_params.match_medium_threshold),
-                        zero_skills_score_cap=float(getattr(active_params, "zero_skills_score_cap", DEFAULT_ZERO_SKILLS_SCORE_CAP)),
-                        component_weights=active_params.component_weights,
-                    )
-            except Exception:
-                pass
-
-            import logging
-            logger = logging.getLogger("cv_analyzer")
-            logger.warning(f"Failed to load dynamic scoring config: {e}. Using defaults.")
-            # Fallback to static defaults only if both DB and in-memory caches are unavailable
-            return cls(
-                profile_code="FALLBACK",
-                profile_version="v0",
-            )
+        from app.core.rule_config_manager import PolicyRegistry
+        snapshot = PolicyRegistry.resolve_snapshot(tenant_id=tenant_id)
+        scoring = snapshot.scoring
+        matching = snapshot.matching
+        return cls(
+            profile_code=snapshot.metadata.source,
+            profile_version=snapshot.metadata.version,
+            perfect_component_score=100.0,
+            penalty_per_item=matching.mandatory_failure_penalty,
+            max_score_on_failure=matching.max_score_on_failure,
+            llm_semantic_weight=scoring.llm_semantic_weight,
+            max_llm_boost=scoring.max_llm_boost,
+            match_high_threshold=scoring.match_high_threshold,
+            match_medium_threshold=scoring.match_medium_threshold,
+            zero_skills_score_cap=40.0,
+            rejection_score_epsilon=0.1,
+            component_weights=dict(scoring.component_weights),
+        )
 

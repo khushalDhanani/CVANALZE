@@ -27,10 +27,10 @@ export function resolveCvQueueUiState(response: Partial<CVProcessingResponse> & 
   ) {
     return 'COMPLETED';
   }
-  if (jobState === 'RETRYING') {
+  if (jobState === 'RETRYING' || status === 'RETRYING') {
     return 'RETRYING';
   }
-  if (jobState === 'PROCESSING') {
+  if (jobState === 'PROCESSING' || status === 'PROCESSING') {
     return 'PROCESSING';
   }
   return 'PENDING';

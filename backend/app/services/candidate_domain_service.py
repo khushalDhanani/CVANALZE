@@ -21,7 +21,7 @@ class CandidateDomainService:
     and department term resolution.
     """
 
-    _ENTITY_CONFIDENCE_THRESHOLD = 0.70
+    _ENTITY_CONFIDENCE_THRESHOLD = 0.70  # policy-approved-constant
 
     @classmethod
     def extract_candidate_domain_profile(
@@ -179,11 +179,11 @@ class CandidateDomainService:
                 taxonomy_match_status = MatchStatus.DB_MATCH.value
                 taxonomy_match_source = "DepartmentDomainMaster"
             else:
-                recommended_dept = ""
-                prof_domain = ""
+                recommended_dept = None
+                prof_domain = None
                 suitable_roles = []
                 taxonomy_confidence = 0.0
-                taxonomy_match_status = dyn_res.match_status.value
+                taxonomy_match_status = "NO_CONFIDENT_MATCH"
                 taxonomy_match_source = dyn_res.match_source
 
         # Build custom roles from structured profile roles first
@@ -199,17 +199,10 @@ class CandidateDomainService:
             else:
                 custom_roles = cls.validate_job_roles(suitable_roles, cv_text, resume_json, repo, taxonomy_inferred=True)
 
-        # Build strengths from structured data first, then fall back to resume content
-        strengths: list[str] = []
-        if skills_set:
-            top_skills = sorted(skills_set)[:5]
-            strengths.append(f"Core Skills: {', '.join(top_skills)}")
-        if education_list:
-            strengths.append(f"Education: {', '.join(education_list[:2])}")
-        if projects_list:
-            strengths.append(f"Project Experience: {len(projects_list)} documented project(s)")
-        if not strengths:
-            strengths = cls._extract_strengths_from_resume(cv_text, resume_json, prof_domain)
+        from app.services.evidence_ranker import EvidenceRanker
+
+        # Build evidence-based strengths using EvidenceRanker
+        strengths = EvidenceRanker.extract_evidence_based_strengths(skills_set, education_list, projects_list)
 
         return {
             "recommended_department": recommended_dept,

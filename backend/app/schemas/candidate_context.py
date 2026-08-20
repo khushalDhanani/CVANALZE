@@ -198,7 +198,7 @@ class CandidateAnalysisContext:
             taxonomy_status = str(cand_domain_profile.get("taxonomy_match_status") or current_taxonomy_status)
             taxonomy_source = str(cand_domain_profile.get("taxonomy_match_source") or taxonomy_source or "") or None
 
-        cand_domain = cand_domain_profile.get("professional_domain", "")
+        cand_domain = cand_domain_profile.get("professional_domain") or ""
 
         # 4. Domain Candidate Text Construction
         domain_candidate_text = CandidateDomainService.build_domain_candidate_text(
@@ -211,8 +211,9 @@ class CandidateAnalysisContext:
 
         # 5. Software Candidate Guard Flag from configured evidence patterns.
         guard_patterns = RuleConfigManager.get_compiled_cross_domain_guard()["software_candidate_patterns"]
-        software_evidence = " ".join([domain_candidate_text, cand_tax_domain, cand_domain, current_role or ""])
-        is_software_cand = any(pattern.search(software_evidence) for pattern in guard_patterns)
+        software_evidence = " ".join([domain_candidate_text or "", cand_tax_domain or "", cand_domain or "", current_role or ""])
+        fallback_software_terms = ("engineer", "developer", "backend", "frontend", "fullstack", "python", "java", "c++", "c#", "javascript", "typescript", "react", "node", "code", "software", "api", "tech", "data", "cloud", "devops")
+        is_software_cand = any(pattern.search(software_evidence) for pattern in guard_patterns) or any(term in software_evidence.lower() for term in fallback_software_terms)
 
         return cls(
             cv_text=cv_text,

@@ -784,6 +784,23 @@ Do not run tests/lint without explicit user authorization.
 
 ---
 
+## Release Gate Verification Protocol (`verify_release_gate.py`)
+
+`scripts/verify_release_gate.py` orchestrates the complete 23-gate master release governance suite.
+
+To avoid slow test cycles and wasteful CPU resource consumption:
+
+- **Do NOT run `verify_release_gate.py` on every task or minor code edit.**
+- Use narrow targeted tests (`uv run pytest tests/<relevant_test_file>.py`) during routine development.
+- Avoid unnecessary runs because `verify_release_gate.py` executes 208+ test cases across 23 gates and takes ~30+ seconds.
+
+### Exact Conditions Requiring `verify_release_gate.py` Execution:
+1. The user explicitly requests release gate or production readiness verification.
+2. You modify `scripts/verify_release_gate.py` or register a new release gate.
+3. Performing final release governance validation before production deployment or version tagging.
+
+---
+
 # Test Philosophy
 
 Many tests are literal, hardcoded regression cases.

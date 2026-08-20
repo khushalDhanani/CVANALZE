@@ -158,8 +158,8 @@ class FamilyCompatibility(PostgresAppBase):
         ForeignKey("cvai.job_families.family_id", ondelete="CASCADE"),
         nullable=False,
     )
-    compatibility_score = Column(Float, nullable=False, default=1.0)
-    is_allowed = Column(Boolean, nullable=False, default=True)
+    compatibility_score = Column(Float, nullable=False)
+    is_allowed = Column(Boolean, nullable=False)
     status = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

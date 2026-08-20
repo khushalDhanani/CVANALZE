@@ -175,37 +175,16 @@ class VacancyService:
         # contain skills, prose, headings, and examples; the source schema does
         # not declare the entries mandatory. Preserve useful terms for scoring,
         # but never manufacture hard requirements from this free-text field.
-        GARBAGE_SKILLS = {
-            "-",
-            ".",
-            "yes",
-            "no",
-            "n/a",
-            "na",
-            "nil",
-            "none",
-            "test",
-            "1",
-            "0",
-            "ok",
-            "good",
-            "e.g",
-            "e.g.",
-            "i.e",
-            "i.e.",
-            "job overview",
-            "key responsibilities",
-            "responsibilities",
-            "requirements",
-        }
+        from app.services.stopword_registry import StopwordRegistry
+
         skills = []
         if vacancy.RequestedAdditionalKnowledge:
             raw_skills = [s.strip() for s in vacancy.RequestedAdditionalKnowledge.split(",") if s.strip()]
-            skills = [s for s in raw_skills if len(s) > 1 and s.lower() not in GARBAGE_SKILLS]
+            skills = StopwordRegistry.filter_valid_skills(raw_skills)
 
-        dept_name = vacancy.department.DeptName if vacancy.department else "Unknown Department"
-        comp_name = vacancy.company.CompName if vacancy.company else "Unknown Company"
-        loc_name = vacancy.location.LocName if vacancy.location else "Unknown Location"
+        dept_name = vacancy.department.DeptName if vacancy.department else None
+        comp_name = vacancy.company.CompName if vacancy.company else None
+        loc_name = vacancy.location.LocName if vacancy.location else None
         desig_name = vacancy.designation.DesigName if vacancy.designation else None
 
         dept_id = vacancy.RequestForDeptID

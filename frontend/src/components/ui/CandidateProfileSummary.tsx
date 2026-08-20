@@ -5,6 +5,7 @@ import { Card } from './Card';
 import { Badge } from './Badge';
 import { COLORS } from '@/constants/colors';
 import { EnrichedCandidateAnalysis } from '@/types/api';
+import { cleanCandidateText } from '@/utils/candidateDetail';
 
 interface CandidateProfileSummaryProps {
   analysis: EnrichedCandidateAnalysis;
@@ -21,11 +22,18 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
     strengths,
   } = analysis;
 
-  const resolvedName = full_name || candidate_name || 'Candidate';
-  const contact = normalized_resume?.contact || {};
-  const email = contact.email;
-  const phone = contact.phone;
-  const location = contact.location;
+  const resolvedName = cleanCandidateText(full_name) || cleanCandidateText(candidate_name) || 'Candidate';
+  const contact = (normalized_resume && typeof normalized_resume === 'object' ? normalized_resume.contact : null) || {};
+  const email = cleanCandidateText(contact.email);
+  const phone = cleanCandidateText(contact.phone);
+  const location = cleanCandidateText(contact.location);
+  const domainText = cleanCandidateText(professional_domain);
+  const deptText = cleanCandidateText(recommended_department);
+  const summaryText = cleanCandidateText(ai_career_summary);
+
+  const cleanStrengths = Array.isArray(strengths)
+    ? strengths.map((s) => cleanCandidateText(s)).filter(Boolean) as string[]
+    : [];
 
   return (
     <Card className="shadow-sm border-border/60">
@@ -62,17 +70,17 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
       </View>
 
       {/* Domain & Department */}
-      {(!!professional_domain || !!recommended_department) && (
+      {(!!domainText || !!deptText) && (
         <View className="flex-row flex-wrap gap-1.5 mb-2">
-          {!!professional_domain && (
+          {!!domainText && (
             <Badge
-              label={`Domain: ${professional_domain}`}
+              label={`Domain: ${domainText}`}
               tone="info"
             />
           )}
-          {!!recommended_department && (
+          {!!deptText && (
             <Badge
-              label={`Recommended Dept: ${recommended_department}`}
+              label={`Recommended Dept: ${deptText}`}
               tone="success"
             />
           )}
@@ -80,13 +88,13 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
       )}
 
       {/* Strengths */}
-      {!!strengths && strengths.length > 0 && (
+      {cleanStrengths.length > 0 && (
         <View className="mb-2">
           <Text className="text-xs font-sans-bold text-text-muted mb-1.5 uppercase tracking-wider">
             Key Strengths
           </Text>
           <View className="flex-row flex-wrap gap-1.5">
-            {strengths.map((s, idx) => (
+            {cleanStrengths.map((s, idx) => (
               <View
                 key={idx}
                 className="px-2 py-1 border rounded-md bg-surface-elevated border-border/60"
@@ -99,7 +107,7 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
       )}
 
       {/* AI Career Summary */}
-      {!!ai_career_summary && (
+      {!!summaryText && (
         <View className="p-2.5 border rounded-md bg-primary/5 border-primary/20">
           <View className="flex-row items-center gap-1.5 mb-1.5">
             <Sparkles size={14} color={COLORS.primary} />
@@ -108,7 +116,7 @@ export function CandidateProfileSummary({ analysis }: CandidateProfileSummaryPro
             </Text>
           </View>
           <Text className="font-sans text-xs leading-relaxed text-text-secondary">
-            {ai_career_summary}
+            {summaryText}
           </Text>
         </View>
       )}

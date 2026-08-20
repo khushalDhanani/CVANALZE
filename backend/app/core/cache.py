@@ -60,6 +60,14 @@ class CacheKey:
 
 
     @classmethod
+    def from_fingerprint(cls, fingerprint: Any, domain_prefix: str = "match") -> "CacheKey":
+        """Build deterministic version-aware CacheKey directly from an AnalysisFingerprint."""
+        data = fingerprint.model_dump() if hasattr(fingerprint, "model_dump") else dict(fingerprint)
+        digest = fingerprint.compute_fingerprint_digest() if hasattr(fingerprint, "compute_fingerprint_digest") else hashlib.sha256(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
+        doc_hash = str(data.get("source_document_hash", "doc"))[:16]
+        return cls(components={"prefix": domain_prefix, "doc_hash": doc_hash, "fingerprint_digest": digest})
+
+    @classmethod
     def for_llm_match(
         cls,
         document_hash: str = "",
@@ -529,6 +537,51 @@ class CacheManager:
         _metrics.record_lookup_time(self._namespace, elapsed)
         logger.info(f"CACHE MISS [{self._namespace}] key={key} ({elapsed:.1f}ms)")
         return default
+
+    def get_with_diagnostics(self, key: str, default: Any = None) -> tuple[Any, dict[str, Any]]:
+        """
+        Retrieves a key from cache along with diagnostic provenance metadata detailing:
+        - cache_hit: bool
+        - cache_source: str (e.g. 'MemoryCache', 'RedisCache', 'FileCache', 'NONE')
+        - cache_namespace: str
+        - cache_version: str
+        - lookup_time_ms: float
+        """
+        cache_key = self._make_key(key)
+        t0 = time.monotonic()
+        providers = self.active_providers
+        for i, provider in enumerate(providers):
+            val = provider.get(cache_key)
+            if val is not None:
+                elapsed = (time.monotonic() - t0) * 1000
+                _metrics.record_hit(self._namespace)
+                _metrics.record_lookup_time(self._namespace, elapsed)
+                for j in range(i):
+                    try:
+                        providers[j].set(cache_key, val)
+                    except Exception:
+                        pass
+                logger.info(f"CACHE HIT [{self._namespace}] key={key} provider={type(provider).__name__} ({elapsed:.1f}ms)")
+                diagnostics = {
+                    "cache_hit": True,
+                    "cache_source": type(provider).__name__,
+                    "cache_namespace": self._namespace,
+                    "cache_version": getattr(settings, "CACHE_VERSION", "v1.5.0"),
+                    "lookup_time_ms": round(elapsed, 2),
+                }
+                return val, diagnostics
+        elapsed = (time.monotonic() - t0) * 1000
+        _metrics.record_miss(self._namespace)
+        _metrics.record_lookup_time(self._namespace, elapsed)
+        logger.info(f"CACHE MISS [{self._namespace}] key={key} ({elapsed:.1f}ms)")
+        diagnostics = {
+            "cache_hit": False,
+            "cache_source": "NONE",
+            "cache_namespace": self._namespace,
+            "cache_version": getattr(settings, "CACHE_VERSION", "v1.5.0"),
+            "lookup_time_ms": round(elapsed, 2),
+        }
+        return default, diagnostics
 
     def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         cache_key = self._make_key(key)

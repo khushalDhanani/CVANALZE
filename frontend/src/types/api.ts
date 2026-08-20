@@ -100,6 +100,34 @@ export interface CVMatchRequest {
   cv_text: string;
 }
 
+export type EvidenceStatus =
+  | 'VERIFIED'
+  | 'INFERRED'
+  | 'CONFLICTING'
+  | 'NOT_FOUND'
+  | 'NOT_APPLICABLE'
+  | 'NOT_ASSESSABLE'
+  | 'SYSTEM_UNAVAILABLE';
+
+export interface EvidenceRef {
+  source_section: string;
+  raw_quote: string;
+  provenance: string;
+  confidence_score: number;
+  start_char?: number | null;
+  end_char?: number | null;
+}
+
+export interface EvidenceResult<T> {
+  value: T | null;
+  status: EvidenceStatus;
+  confidence: number | null;
+  evidence: EvidenceRef[];
+  source: string;
+  policy_version: string | null;
+  model_version: string | null;
+}
+
 export type AnalysisExecutionState = 'NO_MATCH' | 'LLM_UNAVAILABLE' | 'LLM_TIMEOUT' | 'ANALYSIS_INVALID';
 
 export interface CVProcessingResponse {
@@ -357,6 +385,7 @@ export interface EnrichedJobEvaluation extends JobMatchScore {
 }
 
 export interface EnrichedCandidateAnalysis {
+  cv_key?: string | null;
   analysis_run_id?: string | null;
   analysis_version?: string | null;
   status?: string | null;

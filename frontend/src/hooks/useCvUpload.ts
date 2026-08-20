@@ -18,6 +18,21 @@ export interface FilePickerAsset {
 
 const TOTAL_STEPS = 8;
 
+const STAGE_MAP: Record<string, number> = {
+  'source_validation': 1,
+  'validation': 1,
+  'parsing': 2,
+  'docling_parsing': 2,
+  'extraction': 3,
+  'resume_extraction': 3,
+  'ai_analysis': 4,
+  'embedding': 4,
+  'matching': 5,
+  'ranking': 6,
+  'complete': 7,
+  'complete_degraded': 7,
+};
+
 function getProcessingStateLabel(response: CVProcessingResponse): string {
   switch (response.job_state) {
     case 'QUEUED':
@@ -118,6 +133,17 @@ export function useCvUpload() {
   const pollCvStatus = useCallback(
     (cvKey: string, isEnriched: boolean = false) => {
       stopPollTimer();
+      if (!cvKey || cvKey === 'undefined') {
+        stopTimer();
+        setUploading(false);
+        setError('Invalid CV key received from upload service.');
+        setStepStates((prev) => {
+          const next = [...prev];
+          next[currentStepIndexRef.current] = 'failed';
+          return next;
+        });
+        return;
+      }
       let attempts = 0;
       let consecutiveErrors = 0;
 
@@ -164,16 +190,9 @@ export function useCvUpload() {
                 setErrorDetails(failedRes.error_details || null);
                 setFailedStepName(failedRes.failed_step || null);
                 
-                const stageMap: Record<string, number> = {
-                   'parsing': 2,
-                   'extraction': 3,
-                   'ai_analysis': 4,
-                   'matching': 5,
-                   'complete': 7
-                };
                 let fIndex = currentStepIndexRef.current;
-                if (failedRes.stage && stageMap[failedRes.stage] !== undefined) {
-                    fIndex = stageMap[failedRes.stage];
+                if (failedRes.stage && STAGE_MAP[failedRes.stage] !== undefined) {
+                    fIndex = STAGE_MAP[failedRes.stage];
                 }
                 if (fIndex === 4 && !isEnriched) fIndex = 5;
                 
@@ -220,18 +239,9 @@ export function useCvUpload() {
                 const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Processing LLM match...';
                 setStatusMessage(msg);
 
-                const stageMap: Record<string, number> = {
-                   'validation': 1,
-                   'parsing': 2,
-                   'extraction': 3,
-                   'ai_analysis': 4,
-                   'matching': 5,
-                   'ranking': 6,
-                   'complete': 7
-                };
                 let nextStep = currentStepIndexRef.current;
-                if (procRes.stage && stageMap[procRes.stage] !== undefined) {
-                    nextStep = stageMap[procRes.stage];
+                if (procRes.stage && STAGE_MAP[procRes.stage] !== undefined) {
+                    nextStep = STAGE_MAP[procRes.stage];
                 } else {
                     const prog = procRes.progress || 0;
                     if (prog >= 90) nextStep = 6;
@@ -274,18 +284,9 @@ export function useCvUpload() {
                 setErrorDetails(failedRes.error_details || null);
                 setFailedStepName(failedRes.failed_step || null);
                 
-                const stageMap: Record<string, number> = {
-                   'validation': 1,
-                   'parsing': 2,
-                   'extraction': 3,
-                   'ai_analysis': 4,
-                   'matching': 5,
-                   'ranking': 6,
-                   'complete': 7
-                };
                 let fIndex = currentStepIndexRef.current;
-                if (failedRes.stage && stageMap[failedRes.stage] !== undefined) {
-                    fIndex = stageMap[failedRes.stage];
+                if (failedRes.stage && STAGE_MAP[failedRes.stage] !== undefined) {
+                    fIndex = STAGE_MAP[failedRes.stage];
                 }
                 if (fIndex === 4 && !isEnriched) fIndex = 5;
                 
@@ -325,18 +326,9 @@ export function useCvUpload() {
                 const msg = stateLabel ? `${stateLabel}: ${procRes.message}` : procRes.message || 'Parsing CV...';
                 setStatusMessage(msg);
 
-                const stageMap: Record<string, number> = {
-                   'validation': 1,
-                   'parsing': 2,
-                   'extraction': 3,
-                   'ai_analysis': 4,
-                   'matching': 5,
-                   'ranking': 6,
-                   'complete': 7
-                };
                 let nextStep = currentStepIndexRef.current;
-                if (procRes.stage && stageMap[procRes.stage] !== undefined) {
-                    nextStep = stageMap[procRes.stage];
+                if (procRes.stage && STAGE_MAP[procRes.stage] !== undefined) {
+                    nextStep = STAGE_MAP[procRes.stage];
                 } else {
                     const prog = procRes.progress || 0;
                     if (prog >= 90) nextStep = 6;
@@ -409,6 +401,10 @@ export function useCvUpload() {
       try {
         if (enrichWithLlm) {
           const res = await matchService.uploadAndAnalyze(file);
+          const targetKey = (res as any).cv_key || (res as any).scan_id || (res as any).id || (res as any).job_id;
+          if (!targetKey) {
+            throw new Error('Upload completed, but server did not return a valid CV key.');
+          }
           setStatusMessage('Document uploaded. Validating format & parsing...');
           setCurrentStepIndex(1);
           setStepStates([
@@ -421,9 +417,13 @@ export function useCvUpload() {
             'pending',
             'pending',
           ]);
-          pollCvStatus((res as any).cv_key || (res as any).scan_id || (res as any).id, true);
+          pollCvStatus(targetKey, true);
         } else {
           const res = await cvService.uploadCv(file);
+          const targetKey = (res as any).cv_key || (res as any).scan_id || (res as any).id || (res as any).job_id;
+          if (!targetKey) {
+            throw new Error('Upload completed, but server did not return a valid CV key.');
+          }
           setStatusMessage('Document uploaded. Validating format & parsing...');
           setCurrentStepIndex(1);
           setStepStates([
@@ -436,7 +436,7 @@ export function useCvUpload() {
             'pending',
             'pending',
           ]);
-          pollCvStatus((res as any).cv_key || (res as any).scan_id || (res as any).id, false);
+          pollCvStatus(targetKey, false);
         }
       } catch (err: any) {
         stopTimer();

@@ -56,6 +56,14 @@ export function useCvQueueUploads() {
     consecutiveErrors: number = 0,
   ) {
     stopPolling(clientId);
+    if (!cvKey || cvKey === 'undefined') {
+      updateItem(clientId, {
+        state: 'FAILED',
+        message: 'Failed to obtain CV job key from server.',
+        error: 'Failed to obtain CV job key from server.',
+      });
+      return;
+    }
     const timer = setTimeout(async () => {
       try {
         const response = enrichWithLlm ? await matchService.getMatchStatus(cvKey) : await cvService.getCvStatus(cvKey);

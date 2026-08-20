@@ -67,6 +67,15 @@ class DynamicGeoAndHeadingService:
         "FRONTEND", "BACKEND", "FULLSTACK", "STACK", "MOBILE", "SOFTWARE", "SENIOR", "JUNIOR",
     })
 
+    _DEFAULT_SECTION_HEADINGS: frozenset[str] = frozenset({
+        "experience", "work experience", "work history", "employment", "employment history",
+        "professional experience", "education", "academic background", "qualifications",
+        "skills", "technical skills", "core competencies", "key skills", "summary",
+        "professional summary", "career summary", "profile", "projects", "certifications",
+        "awards", "honors", "publications", "languages", "hobbies", "interests", "references",
+        "declaration", "personal details", "personal information", "contact", "contact information",
+    })
+
     _DEFAULT_LABEL_PREFIX_DENYLIST: frozenset[str] = frozenset({
         "duration", "period", "tenure", "date", "from", "to",
         "organization", "company", "employer", "institution",
@@ -77,6 +86,12 @@ class DynamicGeoAndHeadingService:
         "dob", "date of birth", "birth", "father", "father's name", "mother's name",
         "languages", "languages known", "hobbies", "declaration", "permanent address",
         "current address", "residential address", "contact no", "email", "phone",
+        "roll no", "roll no.", "roll number", "roll", "enrollment no", "enrollment no.", "enrollment number", "enrollment",
+        "registration no", "registration no.", "registration number", "reg no", "reg no.", "reg. no.", "reg. no", "reg",
+        "prn", "prn no", "prn no.", "seat no", "seat no.", "hall ticket no", "hall ticket",
+        "student id", "candidate id", "id no", "id no.", "index no", "index no.",
+        "uid", "aadhar", "aadhaar", "pan", "passport", "cpi", "cgpa", "sgpa", "percentage", "marks", "grade", "rank", "air", "gate score", "gate rank",
+        "specialization", "branch", "stream", "batch", "semester",
     })
 
     _DEFAULT_NON_NAME_FIELD_LABELS: frozenset[str] = frozenset({
@@ -84,6 +99,12 @@ class DynamicGeoAndHeadingService:
         "gender", "sex", "state", "nationality", "marital status", "marital", "date of birth", "dob",
         "pin", "pin code", "pincode", "personal data", "personal details", "resume", "cv",
         "father's name", "father name", "mother's name", "declaration", "hobbies",
+        "roll no", "roll no.", "roll number", "roll", "enrollment no", "enrollment no.", "enrollment number", "enrollment",
+        "registration no", "registration no.", "registration number", "reg no", "reg no.", "reg. no.", "reg. no", "reg",
+        "prn", "prn no", "prn no.", "seat no", "seat no.", "hall ticket no", "hall ticket",
+        "student id", "candidate id", "id no", "id no.", "index no", "index no.",
+        "uid", "aadhar", "aadhaar", "pan", "passport", "cpi", "cgpa", "sgpa", "percentage", "marks", "grade", "rank", "air", "gate score", "gate rank",
+        "specialization", "branch", "stream", "batch", "semester",
     })
 
     _DEFAULT_VERB_STARTERS: frozenset[str] = frozenset({
@@ -268,7 +289,7 @@ class DynamicGeoAndHeadingService:
         countries: set[str] = set(cls._DEFAULT_COUNTRIES)
         denylists: set[str] = set()
         tech_roles: set[str] = set(cls._DEFAULT_TECH_AND_ROLE_DENYLIST)
-        headings: set[str] = set()
+        headings: set[str] = set(cls._DEFAULT_SECTION_HEADINGS)
         label_prefixes: set[str] = set(cls._DEFAULT_LABEL_PREFIX_DENYLIST)
         non_name_labels: set[str] = set(cls._DEFAULT_NON_NAME_FIELD_LABELS)
         verb_starters: set[str] = set(cls._DEFAULT_VERB_STARTERS)

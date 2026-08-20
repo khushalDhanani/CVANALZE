@@ -4,6 +4,7 @@ import functools
 import re
 from typing import Any
 
+from app.core.model_registry import ModelRegistry
 from app.core.rule_config_manager import RuleConfigManager
 from app.repositories.department_domain import (
     DepartmentDomainRepository,
@@ -393,7 +394,21 @@ class ScoringEngine:
             retrieval_source=retrieval_src,
             candidate_job_family=context.cand_primary_family,
             vacancy_job_family=job_ctx.vac_family,
+            scoring_policy_version=typed_scoring_config.profile_version,
+            component_assessability={
+                "role": "VERIFIED" if comp_results.role_score is not None else "NOT_ASSESSABLE",
+                "skills": "VERIFIED" if comp_results.skills_score is not None else "NOT_ASSESSABLE",
+                "experience": "VERIFIED" if comp_results.experience_score is not None else "NOT_ASSESSABLE",
+                "education": "VERIFIED" if comp_results.education_score is not None else "NOT_ASSESSABLE",
+                "domain": "VERIFIED" if guard_results.domain_score is not None else "NOT_ASSESSABLE",
+                "technology": "VERIFIED" if comp_results.technology_score is not None else "NOT_ASSESSABLE",
+                "responsibilities": "VERIFIED" if comp_results.responsibilities_score is not None else "NOT_ASSESSABLE",
+            },
+            analysis_versions=ModelRegistry.resolve_analysis_versions(),
         )
+        if fit_results.score_breakdown:
+            fit_results.score_breakdown.scoring_policy_version = typed_scoring_config.profile_version
+            fit_results.score_breakdown.component_assessability = match_result.component_assessability
 
         HiringRiskAnalyzer.generate_risks(match_result, context, job_ctx)
 

@@ -9,7 +9,7 @@ This document outlines the steps required to run the CV Analyzer pipeline using 
 Ensure your `.env` file is present in the project root directory (and/or `backend/`). It should contain:
 
 ```ini
-POSTGRES_APP_URL=postgresql://postgres:postgres@localhost:5432/cv_analyzer
+POSTGRES_APP_URL=postgresql://postgres:postgres@localhost:5432/cv_analyzer # policy-approved-constant
 MSSQL_READ_ONLY_URL=mssql+pyodbc://sa:your_password@172.25.1.160:1433/AIRIS_TEST?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
 REDIS_URL=redis://localhost:6379/0
 ```

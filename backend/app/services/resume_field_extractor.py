@@ -369,21 +369,47 @@ class ResumeFieldExtractor:
 
     @classmethod
     def is_valid_job_title(cls, candidate: str) -> bool:
+        if not candidate or not isinstance(candidate, str):
+            return False
         config = RuleConfigManager.get_field_config("job_title")
         max_words = config.downstream_gates.max_word_count or 7
         max_chars = config.downstream_gates.max_char_length or 60
-        if not candidate or len(candidate) < 2 or len(candidate) > max_chars or candidate.endswith(".") or candidate.count(",") > 2:
+        candidate_clean = candidate.strip().lstrip("#*-• \uf0b7").strip()
+        if len(candidate_clean) < 2 or len(candidate_clean) > max_chars or candidate_clean.endswith(".") or candidate_clean.count(",") > 2:
             return False
-        first_colon_token = candidate.split(":")[0].strip().lower()
+
+        # Handle colons: If prefixed by explicit role indicator (e.g. "Designation: Software Engineer"), extract value;
+        # otherwise, any colon indicates a key-value header or metadata line (e.g. "Roll No.: 21111003", "Mobile: 123"), which is invalid.
+        if ":" in candidate_clean:
+            prefix_match = re.match(r"^(?:designation|job\s*title|role|position|profile)\s*[:\-]+\s*(.+)$", candidate_clean, re.IGNORECASE)
+            if prefix_match:
+                candidate_clean = prefix_match.group(1).strip()
+            else:
+                return False
+
+        # Reject academic, administrative, and student identifier patterns
+        if re.search(
+            r"\b(?:roll|enrollment|reg(?:istration)?|prn|seat|hall\s*ticket|student\s*id|candidate\s*id|id\s*no|aadhar|aadhaar|pan\s*no|cpi|cgpa|sgpa|marks|percentage|rank|air|batch|semester)\b",
+            candidate_clean,
+            re.IGNORECASE,
+        ):
+            return False
+
+        # Reject long digit sequences / ID numbers (e.g. 21111003)
+        cleaned_no_years = re.sub(r"\b(?:19|20)\d{2}\b", "", candidate_clean)
+        if re.search(r"\b\d{3,}\b", cleaned_no_years):
+            return False
+
+        first_colon_token = candidate_clean.split(":")[0].strip().lower()
         if first_colon_token in cls.LABEL_PREFIX_DENYLIST or first_colon_token in cls.NON_NAME_FIELD_LABELS or first_colon_token in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization"):
             return False
-        if any(candidate.lower().startswith(p + ":") for p in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization", "duration", "period", "tenure", "dates")):
+        if any(candidate_clean.lower().startswith(p + ":") for p in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization", "duration", "period", "tenure", "dates")):
             return False
         # Reject bare label tokens (e.g. "Duration:", "Designation:", "Period")
-        stripped_colon = candidate.rstrip(":").strip().lower()
+        stripped_colon = candidate_clean.rstrip(":").strip().lower()
         if stripped_colon in cls.LABEL_PREFIX_DENYLIST or stripped_colon in cls.GENERIC_SECTION_HEADERS:
             return False
-        title_without_dates = cls._DATE_RANGE.sub("", candidate).strip(" ()-|–—")
+        title_without_dates = cls._DATE_RANGE.sub("", candidate_clean).strip(" ()-|–—")
         tokens = [token.lower() for token in re.split(r"[\s/\-&()]+", title_without_dates) if token]
         if not (1 <= len(tokens) <= max_words) or tokens[0] in cls.NARRATIVE_SENTENCE_STARTERS:
             return False
@@ -394,7 +420,7 @@ class ResumeFieldExtractor:
                 return False
         if any(phrase in title_without_dates.lower() for phrase in cls.NARRATIVE_PHRASES):
             return False
-        if re.search(r"^\+?\d[\d\s.\-]*$", title_without_dates) or "@" in candidate or "http" in candidate.lower():
+        if re.search(r"^\+?\d[\d\s.\-]*$", title_without_dates) or "@" in candidate_clean or "http" in candidate_clean.lower():
             return False
 
         # Reinforced by configured keywords when present
@@ -419,10 +445,31 @@ class ResumeFieldExtractor:
         if not clean or len(clean) < 2 or len(clean) > 60:
             return False
 
-        first_colon_token = candidate.split(":")[0].strip().lower()
+        # Handle colons: reject unless explicit role prefix
+        if ":" in clean:
+            prefix_match = re.match(r"^(?:designation|job\s*title|role|position|profile)\s*[:\-]+\s*(.+)$", clean, re.IGNORECASE)
+            if prefix_match:
+                clean = prefix_match.group(1).strip()
+            else:
+                return False
+
+        # Reject academic, administrative, and student identifier patterns
+        if re.search(
+            r"\b(?:roll|enrollment|reg(?:istration)?|prn|seat|hall\s*ticket|student\s*id|candidate\s*id|id\s*no|aadhar|aadhaar|pan\s*no|cpi|cgpa|sgpa|marks|percentage|rank|air|batch|semester)\b",
+            clean,
+            re.IGNORECASE,
+        ):
+            return False
+
+        # Reject long digit sequences / ID numbers
+        cleaned_no_years = re.sub(r"\b(?:19|20)\d{2}\b", "", clean)
+        if re.search(r"\b\d{3,}\b", cleaned_no_years):
+            return False
+
+        first_colon_token = clean.split(":")[0].strip().lower()
         if first_colon_token in cls.LABEL_PREFIX_DENYLIST or first_colon_token in cls.NON_NAME_FIELD_LABELS or first_colon_token in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization"):
             return False
-        if any(candidate.lower().startswith(p + ":") for p in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization", "duration", "period", "tenure", "dates")):
+        if any(clean.lower().startswith(p + ":") for p in ("location", "responsibilities", "duties", "phone", "email", "mobile", "address", "company", "organization", "duration", "period", "tenure", "dates")):
             return False
 
         # Must not be email, url, phone, pure numbers, or dates
@@ -454,14 +501,13 @@ class ResumeFieldExtractor:
         tokens = [t.lower() for t in re.split(r"[\s/\-&()]+", clean) if t]
         if not (1 <= len(tokens) <= 6):
             return False
-        first_token = tokens[0]
-        if first_token in cls.VERB_STARTERS or first_token in cls.PREPOSITION_AND_CONJUNCTION_STARTERS:
+        if tokens[0] in cls.VERB_STARTERS or tokens[0] in cls.PREPOSITION_AND_CONJUNCTION_STARTERS:
+            return False
+        if tokens[0] in cls.NARRATIVE_SENTENCE_STARTERS:
             return False
         if " and " in clean_lower or " or " in clean_lower:
             if not any(ac in clean_lower for ac in cls.ALLOWED_COMPOUND_TITLES):
                 return False
-        if first_token in cls.NARRATIVE_SENTENCE_STARTERS:
-            return False
         if any(phrase in clean_lower for phrase in cls.NARRATIVE_PHRASES):
             return False
 
@@ -557,6 +603,20 @@ class ResumeFieldExtractor:
                 continue
             if cls._looks_like_company(clean_l):
                 continue
+
+            # Skip academic / student / ID metadata lines
+            if re.search(
+                r"\b(?:roll|enrollment|reg(?:istration)?|prn|seat|hall\s*ticket|student\s*id|candidate\s*id|id\s*no|aadhar|aadhaar|pan\s*no|cpi|cgpa|sgpa|marks|percentage|rank|air|batch|semester)\b",
+                clean_l,
+                re.IGNORECASE,
+            ):
+                continue
+
+            # Skip lines with colons unless explicit designation prefix
+            if ":" in clean_l:
+                _desig_prefix = re.match(r"^(?:designation|job\s*title|role|position|profile)\s*[:\-]+\s*(.+)$", clean_l, re.IGNORECASE)
+                if not _desig_prefix:
+                    continue
 
             if clean_lower in ("fresher", "entry level", "intern", "trainee"):
                 return clean_l.title()
@@ -1185,6 +1245,10 @@ class ResumeFieldExtractor:
             if not stripped:
                 return True
         return False
+
+    @classmethod
+    def extract_skills(cls, lines: list[str]) -> dict[str, Any]:
+        return cls._extract_skills(lines)
 
     @classmethod
     def _extract_skills(cls, lines: list[str]) -> dict[str, Any]:

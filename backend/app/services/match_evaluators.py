@@ -66,18 +66,18 @@ def _share_root_family(candidate_family: str | None, vacancy_family: str | None)
 def _education_requirement_matches(
     context: CandidateAnalysisContext,
     education_requirement: str,
-    extract_term_matches_fn: Callable[[str, list[str]], tuple[list[str], list[str]]],
+    extract_term_matches_fn: Callable[[str, list[str]], tuple[list[str], list[str]]] | None = None,
 ) -> bool:
-    alternatives = [item.strip() for item in re.split(r"\s*(?:/|,|\bor\b)\s*", education_requirement, flags=re.IGNORECASE) if item.strip()]
-    candidate_education = " ".join(context.education_evidence)
+    from app.services.education_resolver import EducationRequirementResolver, EducationMatchStatus
+
+    cand_edu: list[Any] = list(context.education_evidence)
+    if isinstance(context.resume_json, dict):
+        cand_edu.extend(context.resume_json.get("education", []) or [])
     if context.optimized_profile:
-        candidate_education = " ".join([candidate_education, *context.optimized_profile.education_domains])
-    for alternative in alternatives or [education_requirement]:
-        cv_matches, _ = extract_term_matches_fn(context.norm_text, [alternative])
-        education_matches, _ = extract_term_matches_fn(candidate_education.lower(), [alternative]) if candidate_education else ([], [])
-        if cv_matches or education_matches:
-            return True
-    return False
+        cand_edu.extend(context.optimized_profile.education_domains)
+
+    outcome = EducationRequirementResolver.evaluate_education_requirement(cand_edu, education_requirement)
+    return outcome.status in (EducationMatchStatus.EXACT, EducationMatchStatus.EQUIVALENT)
 
 
 def _has_relevant_experience(
@@ -300,8 +300,20 @@ class RequirementEvaluator:
     """Evaluates mandatory skills, experience, education, certification, CTC budget, preferred keywords, and max experience."""
 
     @staticmethod
-    def _create_evidence(cv_ev: str, vac_ev: str) -> DualEvidence:
-        return DualEvidence(cv_evidence=cv_ev, vacancy_evidence=vac_ev)
+    def _create_evidence(
+        cv_ev: str,
+        vac_ev: str,
+        confidence_score: float = 1.0,
+        provenance: str = "VERIFIED_CV",
+        source_section: str | None = None,
+    ) -> DualEvidence:
+        return DualEvidence(
+            cv_evidence=cv_ev,
+            vacancy_evidence=vac_ev,
+            confidence_score=confidence_score,
+            provenance=provenance,
+            source_section=source_section,
+        )
 
     @staticmethod
     def _create_requirement(
@@ -337,7 +349,6 @@ class RequirementEvaluator:
             score_impact=penalty,
         )
 
-
     @classmethod
     def evaluate(
         cls,
@@ -347,6 +358,7 @@ class RequirementEvaluator:
         scoring_config: ScoringConfig | dict[str, Any] | None = None,
         extract_term_matches_fn: Callable[[str, list[str]], tuple[list[str], list[str]]] | None = None,
         penalty_per_item: float | None = None,
+        mode: str = "FULL",
         **kwargs: Any,
     ) -> RequirementEvaluationResults:
         job_ctx = job if isinstance(job, JobEvaluationContext) else JobEvaluationContext.create(job)
@@ -395,7 +407,7 @@ class RequirementEvaluator:
                     provenance = "GROUNDED_LLM"
                     cv_ev = f"[{provenance}] LLM core skill grounded in explicit CV text: '{skill}'"
                 
-                ev = cls._create_evidence(cv_ev, vac_ev)
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=1.0, provenance=provenance, source_section="skills")
                 target_requirements = results.mandatory_reqs if skills_are_mandatory else results.preferred_reqs
                 target_requirements.append(
                     cls._create_requirement(
@@ -412,7 +424,7 @@ class RequirementEvaluator:
                 provenance = "INFERRED_LLM" if skill in llm_inferred_matched else "UNVERIFIED_LLM"
                 if skills_are_mandatory:
                     cv_ev = f"[{provenance}] LLM generated skill '{skill}', but cannot satisfy mandatory requirement."
-                    ev = cls._create_evidence(cv_ev, vac_ev)
+                    ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.0, provenance=provenance, source_section="skills")
                     reason = f"Candidate CV lacks explicit/grounded evidence for mandatory skill '{skill}'."
                     results.mandatory_reqs.append(
                         cls._create_requirement(
@@ -429,7 +441,7 @@ class RequirementEvaluator:
                     results.missing_criteria.append(f"Mandatory Skill ({skill})")
                 else:
                     cv_ev = f"[{provenance}] LLM generated skill: '{skill}'"
-                    ev = cls._create_evidence(cv_ev, vac_ev)
+                    ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.7, provenance=provenance, source_section="llm_inferred")
                     results.preferred_reqs.append(
                         cls._create_requirement(
                             req_id,
@@ -450,7 +462,7 @@ class RequirementEvaluator:
                             results.unverified_skills.append(skill)
             else:
                 cv_ev = f"[MISSING] CV missing required skill: '{skill}'"
-                ev = cls._create_evidence(cv_ev, vac_ev)
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.0, provenance="NO_EVIDENCE", source_section=None)
                 reason = f"Candidate CV lacks documented skill '{skill}'."
                 target_requirements = results.mandatory_reqs if skills_are_mandatory else results.preferred_reqs
                 target_requirements.append(
@@ -480,7 +492,7 @@ class RequirementEvaluator:
             vac_ev = f"Preferred Keyword Requirement: {kw}"
             if kw in matched_keywords:
                 cv_ev = f"CV contains preferred keyword: '{kw}'"
-                ev = cls._create_evidence(cv_ev, vac_ev)
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=1.0, provenance="VERIFIED_CV", source_section="skills")
                 results.preferred_reqs.append(
                     cls._create_requirement(
                         req_id,
@@ -499,7 +511,7 @@ class RequirementEvaluator:
             vac_ev = f"Mandatory Minimum Experience: {min_exp} years"
             if context.candidate_experience is not None and context.candidate_experience >= min_exp:
                 cv_ev = f"Candidate experience {context.candidate_experience} years meets minimum requirement ({min_exp} years)"
-                ev = cls._create_evidence(cv_ev, vac_ev)
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=1.0, provenance="VERIFIED_TIMELINE", source_section="employment")
                 results.mandatory_reqs.append(
                     cls._create_requirement(
                         req_id,
@@ -511,15 +523,28 @@ class RequirementEvaluator:
                 )
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Min Experience ({min_exp} years)")
-            else:
-                exp_val = context.candidate_experience if context.candidate_experience is not None else 0.0
-                cv_ev = f"Candidate experience {exp_val} years is below minimum required ({min_exp} years)"
-                reason = (
-                    f"Candidate lacks any relevant experience; {exp_val} years total experience is below minimum ({min_exp} years)."
-                    if context.candidate_experience is not None and context.candidate_experience >= min_exp
-                    else f"Candidate experience ({exp_val} yrs) is less than required minimum ({min_exp} yrs)."
+            elif context.candidate_experience is None:
+                cv_ev = f"Candidate experience is unquantifiable or missing from CV (NOT_ASSESSABLE, required: {min_exp} years)"
+                reason = f"Candidate experience details are unavailable/unquantifiable for required minimum ({min_exp} yrs)."
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.0, provenance="NO_EVIDENCE", source_section="employment")
+                results.mandatory_reqs.append(
+                    cls._create_requirement(
+                        req_id,
+                        f"Min Experience: {min_exp} years",
+                        RequirementTier.MANDATORY,
+                        RequirementStatus.NOT_ASSESSABLE,
+                        ev,
+                        failure_reason=reason,
+                    )
                 )
-                ev = cls._create_evidence(cv_ev, vac_ev)
+                results.evidence_map[req_id] = ev
+                results.mandatory_failures.append(cls._create_failure("EXPERIENCE_UNKNOWN", req_id, f"Min Experience: {min_exp} years", reason, penalty))
+                results.missing_criteria.append(f"Min Experience ({min_exp} years)")
+            else:
+                exp_val = context.candidate_experience
+                cv_ev = f"Candidate experience {exp_val} years is below minimum required ({min_exp} years)"
+                reason = f"Candidate experience ({exp_val} yrs) is less than required minimum ({min_exp} yrs)."
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.0, provenance="VERIFIED_TIMELINE", source_section="employment")
                 results.mandatory_reqs.append(
                     cls._create_requirement(
                         req_id,
@@ -534,19 +559,31 @@ class RequirementEvaluator:
                 results.mandatory_failures.append(cls._create_failure("MIN_EXPERIENCE_FAILED", req_id, f"Min Experience: {min_exp} years", reason, penalty))
                 results.missing_criteria.append(f"Min Experience ({min_exp} years)")
 
-        # 4. Education alignment is scored and surfaced as a conflict, but it
-        # does not erase an otherwise strong evidence-based professional match.
+        # 4. Education Requirement Evaluation
         if education_req:
             req_id = "req_education"
-            vac_ev = f"Mandatory Education Requirement: {education_req}"
-            if _education_requirement_matches(context, str(education_req), extract_term_matches_fn):
-                cv_ev = f"CV satisfies education requirement: '{education_req}'"
-                ev = cls._create_evidence(cv_ev, vac_ev)
-                results.preferred_reqs.append(
+            vac_ev = f"Education Requirement: {education_req}"
+            from app.services.education_resolver import EducationRequirementResolver, EducationMatchStatus
+
+            cand_edu: list[Any] = list(context.education_evidence)
+            if isinstance(context.resume_json, dict):
+                cand_edu.extend(context.resume_json.get("education", []) or [])
+            if context.optimized_profile:
+                cand_edu.extend(context.optimized_profile.education_domains)
+
+            edu_outcome = EducationRequirementResolver.evaluate_education_requirement(cand_edu, str(education_req))
+            is_mandatory_edu = getattr(job_ctx, "education_is_mandatory", False)
+            tier = RequirementTier.MANDATORY if is_mandatory_edu else RequirementTier.PREFERRED
+
+            if edu_outcome.status in (EducationMatchStatus.EXACT, EducationMatchStatus.EQUIVALENT):
+                cv_ev = f"[{edu_outcome.status}] {edu_outcome.reason}"
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=edu_outcome.confidence, provenance="VERIFIED_CV", source_section="education")
+                target_reqs = results.mandatory_reqs if is_mandatory_edu else results.preferred_reqs
+                target_reqs.append(
                     cls._create_requirement(
                         req_id,
-                        f"Education Match: {education_req}",
-                        RequirementTier.PREFERRED,
+                        f"Education: {education_req}",
+                        tier,
                         RequirementStatus.SATISFIED,
                         ev,
                     )
@@ -554,31 +591,52 @@ class RequirementEvaluator:
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Education ({education_req})")
             else:
-                cv_ev = f"CV education does not match vacancy requirement: '{education_req}'"
-                ev = cls._create_evidence(cv_ev, vac_ev)
-                reason = f"Candidate's documented education does not satisfy vacancy requirement '{education_req}'."
-                results.preferred_reqs.append(
+                cv_ev = f"[{edu_outcome.status}] {edu_outcome.reason}"
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.0, provenance="NO_EVIDENCE", source_section="education")
+                reason = edu_outcome.reason
+                target_reqs = results.mandatory_reqs if is_mandatory_edu else results.preferred_reqs
+                target_reqs.append(
                     cls._create_requirement(
                         req_id,
-                        f"Education Mismatch: {education_req}",
-                        RequirementTier.PREFERRED,
+                        f"Education: {education_req}",
+                        tier,
                         RequirementStatus.FAILED,
                         ev,
                         failure_reason=reason,
                     )
                 )
                 results.evidence_map[req_id] = ev
-                results.missing_criteria.append(f"Education Mismatch ({education_req})")
+                fail_code = edu_outcome.failure_code or "MISSING_EDUCATION"
+                if is_mandatory_edu:
+                    results.mandatory_failures.append(
+                        cls._create_failure(
+                            fail_code,
+                            req_id,
+                            f"Mandatory Education: {education_req}",
+                            reason,
+                            penalty,
+                        )
+                    )
+                    results.missing_criteria.append(f"Mandatory Education ({education_req})")
+                else:
+                    results.missing_criteria.append(f"Education Mismatch ({education_req})")
 
-        # 5. Mandatory Certification
+        # 5. Mandatory Certification Requirement Evaluation
         if certification_req:
             req_id = "req_certification"
             vac_ev = f"Mandatory Certification Requirement: {certification_req}"
-            cert_matched, _ = extract_term_matches_fn(context.norm_text, [str(certification_req)])
-            has_profile_cert = bool(context.optimized_profile and context.optimized_profile.certifications)
-            if cert_matched or has_profile_cert:
-                cv_ev = f"CV satisfies certification requirement: '{certification_req}'"
-                ev = cls._create_evidence(cv_ev, vac_ev)
+            from app.services.certification_resolver import CertificationResolver, CertificationMatchStatus
+
+            cand_certs: list[str] = list(context.education_evidence)
+            if context.optimized_profile and context.optimized_profile.certifications:
+                cand_certs.extend(context.optimized_profile.certifications)
+            if isinstance(context.resume_json, dict):
+                cand_certs.extend(context.resume_json.get("certifications", []) or [])
+
+            cert_outcome = CertificationResolver.match_certification(cand_certs, str(certification_req))
+            if cert_outcome.status in (CertificationMatchStatus.EXACT, CertificationMatchStatus.EQUIVALENT):
+                cv_ev = f"[{cert_outcome.status}] {cert_outcome.reason}"
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=cert_outcome.confidence, provenance="VERIFIED_CV", source_section="certifications")
                 results.mandatory_reqs.append(
                     cls._create_requirement(
                         req_id,
@@ -591,9 +649,9 @@ class RequirementEvaluator:
                 results.evidence_map[req_id] = ev
                 results.matched_criteria.append(f"Certification ({certification_req})")
             else:
-                cv_ev = f"CV missing certification requirement: '{certification_req}'"
-                ev = cls._create_evidence(cv_ev, vac_ev)
-                reason = f"Candidate CV lacks required certification '{certification_req}'."
+                cv_ev = f"[NOT_MATCHED] {cert_outcome.reason}"
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.0, provenance="NO_EVIDENCE", source_section="certifications")
+                reason = cert_outcome.reason
                 results.mandatory_reqs.append(
                     cls._create_requirement(
                         req_id,
@@ -621,7 +679,7 @@ class RequirementEvaluator:
             req_id = "req_max_ctc"
             vac_ev = f"Mandatory Maximum Budget CTC: {max_ctc}"
             cv_ev = f"Candidate CTC {context.candidate_ctc} exceeds maximum budget ({max_ctc})"
-            ev = cls._create_evidence(cv_ev, vac_ev)
+            ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.0, provenance="CANDIDATE_CTC", source_section="salary")
             reason = f"Candidate CTC requirement ({context.candidate_ctc}) exceeds maximum budget ({max_ctc})."
             results.mandatory_reqs.append(
                 cls._create_requirement(
@@ -643,7 +701,7 @@ class RequirementEvaluator:
             vac_ev = f"Preferred Upper Experience Limit: {max_exp} years"
             if context.candidate_experience <= max_exp:
                 cv_ev = f"Candidate experience {context.candidate_experience} years is within preferred upper bound ({max_exp} years)"
-                ev = cls._create_evidence(cv_ev, vac_ev)
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=1.0, provenance="VERIFIED_TIMELINE", source_section="employment")
                 results.preferred_reqs.append(
                     cls._create_requirement(
                         req_id,
@@ -657,7 +715,7 @@ class RequirementEvaluator:
                 results.matched_criteria.append(f"Max Experience ({max_exp} years)")
             else:
                 cv_ev = f"Candidate experience {context.candidate_experience} years exceeds preferred upper bound ({max_exp} years)"
-                ev = cls._create_evidence(cv_ev, vac_ev)
+                ev = cls._create_evidence(cv_ev, vac_ev, confidence_score=0.5, provenance="VERIFIED_TIMELINE", source_section="employment")
                 results.preferred_reqs.append(
                     cls._create_requirement(
                         req_id,
@@ -818,8 +876,16 @@ class ComponentScoreEvaluator:
         certification_score = None
         if certification_req:
             certification_score = typed_config.perfect_component_score
-            cert_matched, _ = extract_term_matches_fn(context.norm_text, [str(certification_req)])
-            if not cert_matched and not (context.optimized_profile and context.optimized_profile.certifications):
+            from app.services.certification_resolver import CertificationResolver, CertificationMatchStatus
+
+            cand_certs: list[str] = list(context.education_evidence)
+            if context.optimized_profile and context.optimized_profile.certifications:
+                cand_certs.extend(context.optimized_profile.certifications)
+            if isinstance(context.resume_json, dict):
+                cand_certs.extend(context.resume_json.get("certifications", []) or [])
+
+            cert_outcome = CertificationResolver.match_certification(cand_certs, str(certification_req))
+            if cert_outcome.status not in (CertificationMatchStatus.EXACT, CertificationMatchStatus.EQUIVALENT):
                 certification_score = 0.0
 
         # 6. Domain Score (Pre-compiled Regex Matching)
@@ -990,9 +1056,16 @@ class CrossDomainGuardEvaluator:
         # cross-domain cap even when taxonomy domain/family metadata is missing
         # ("Unknown").
         if context.is_software_cand and not is_tax_compat:
-            vacancy_evidence = " ".join([vac_tax_domain or "", job_ctx.department, job_ctx.title])
+            req_skills_str = " ".join(job_ctx.required_skills) if job_ctx.required_skills else ""
+            pref_kw_str = " ".join(job_ctx.preferred_keywords) if job_ctx.preferred_keywords else ""
+            vacancy_evidence = " ".join([vac_tax_domain or "", job_ctx.department, job_ctx.title, req_skills_str, pref_kw_str])
             software_patterns = RuleConfigManager.get_compiled_cross_domain_guard()["software_requirement_patterns"]
-            is_software_vacancy = job_ctx.has_software_req or any(pattern.search(vacancy_evidence) for pattern in software_patterns)
+            fallback_software_terms = ("engineer", "developer", "backend", "frontend", "fullstack", "python", "java", "c++", "c#", "javascript", "typescript", "react", "node", "code", "software", "api", "tech", "data", "cloud", "devops")
+            is_software_vacancy = (
+                job_ctx.has_software_req
+                or any(pattern.search(vacancy_evidence) for pattern in software_patterns)
+                or any(term in vacancy_evidence.lower() for term in fallback_software_terms)
+            )
             if not is_software_vacancy:
                 domain_mismatch = True
 

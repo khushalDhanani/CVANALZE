@@ -603,6 +603,25 @@ Never claim tests passed if they were not executed.
 
 ---
 
+# Release Gate Verification Protocol (`verify_release_gate.py`)
+
+`backend/scripts/verify_release_gate.py` is the comprehensive master release governance script containing all 23 release gates.
+
+To optimize execution speed and avoid wasteful CPU resource consumption:
+
+- **Do NOT run `verify_release_gate.py` on every task or minor change.**
+- Run standard targeted unit/integration tests first (e.g. `uv run pytest tests/unit/...`) for localized edits.
+- Avoid unnecessary runs because `verify_release_gate.py` executes 208+ test cases across 23 release gates and takes ~30+ seconds.
+
+### Exact Conditions Requiring `verify_release_gate.py` Execution
+
+Run `verify_release_gate.py` ONLY when:
+1. The user explicitly requests release gate or production readiness verification.
+2. You modify `verify_release_gate.py` or register a new release gate.
+3. Performing final release governance validation for production deployment or version release.
+
+---
+
 # Root-Level Setup and Commands
 
 Backend setup:

@@ -288,12 +288,14 @@ class VacancyPreFilter:
             stage0_jobs = sorted(stage0_jobs, key=lambda item: item.job_id)
             for rank, j in enumerate(stage0_jobs, start=1):
                 job_dict = dict(j.raw_job) if isinstance(j.raw_job, dict) and j.raw_job else dict(j.__dict__)
-                job_dict["_prefilter_score"] = 100.0
+                job_dict["_prefilter_score"] = None
+                job_dict["_prefilter_status"] = "BYPASSED_SMALL_SET"
                 job_dict["_rrf_details"] = {
-                    "rrf_score": 1.0,
+                    "rrf_score": None,
                     "prefilter_rank": rank,
                     "stage0_compatible": candidate_taxonomy_confident,
-                    "retrieval_path": "taxonomy" if candidate_taxonomy_confident else "confidence_fallback",
+                    "retrieval_path": "BYPASSED_SMALL_SET",
+                    "quality_flag": "BYPASSED_SMALL_SET",
                     "taxonomy_confidence": cand_ctx.taxonomy_confidence,
                 }
                 j.raw_job = job_dict
@@ -323,7 +325,7 @@ class VacancyPreFilter:
 
         # Extract precompiled vector ranks dict from the single query result
         vec_ranks = {vid: rank for vid, rank, _dist in vector_results_tuple[:top_n]} if vector_results_tuple else {}
-        vec_distances = {vid: dist for vid, _rank, dist in vector_results_tuple[:top_n]} if vector_results_tuple else {}
+        vec_distances = {vid: dist for vid, _rank, dist in vector_results_tuple[:top_n] if dist is not None} if vector_results_tuple else {}
 
         # Compute Lexical Scores using Fast Token Set Intersections
         lexical_scored: list[tuple[float, JobEvaluationContext]] = []

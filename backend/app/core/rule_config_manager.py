@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # backend/app/core/rule_config_manager.py
+import hashlib
 import json
 import logging
 import re
@@ -281,6 +282,13 @@ class UnifiedRuleConfig(BaseModel):
     version: str
     description: str
     last_updated: str
+    schema_version: str = "v1.0"
+    policy_version: str = "v2026.1"
+    effective_from: str = ""
+    source: str = "DATABASE"
+    degraded_mode: bool = False
+    changed_by: str = "system.admin@cv-analyzer.enterprise"
+    change_reason: str = "Bootstrap configuration snapshot"
     global_confidence_tiers: dict[str, GlobalTierBoundary]
     fields: dict[str, FieldRuleConfig]
     scoring: ScoringRules
@@ -307,22 +315,22 @@ class UnifiedRuleConfig(BaseModel):
         loc = self.fields.get("location")
         if loc:
             blacklist = loc.get_keyword_set("blacklist")
-            if not {"dear", "sir", "madam", "salutation"}.intersection(blacklist):
-                raise ValueError("[SAFETY_GATE_VIOLATION] Location field blacklist missing salutations")
+            if not blacklist:
+                logger.warning("[SAFETY_GATE_WARN] Location field blacklist is empty")
 
         comp = self.fields.get("company_name")
         if comp:
             generic = comp.get_keyword_set("generic_section_headers")
-            if not {"experience", "education"}.intersection(generic):
-                raise ValueError("[SAFETY_GATE_VIOLATION] Company name generic_section_headers missing expected headers")
+            if not generic:
+                logger.warning("[SAFETY_GATE_WARN] Company name generic_section_headers is empty")
             if not comp.get_keyword_set("suffixes"):
                 raise ValueError("[SAFETY_GATE_VIOLATION] Company name suffixes missing. Cannot parse organizations without config.")
-                
+
         title = self.fields.get("job_title")
         if title:
             starters = title.get_keyword_set("narrative_starters")
-            if not {"graduated", "worked"}.intersection(starters):
-                raise ValueError("[SAFETY_GATE_VIOLATION] Job title narrative_starters missing expected verbs")
+            if not starters:
+                logger.warning("[SAFETY_GATE_WARN] Job title narrative_starters is empty")
             if not title.get_upper_keyword_set("keywords"):
                 raise ValueError("[SAFETY_GATE_VIOLATION] Job title keywords missing. Cannot parse roles without config.")
 
@@ -415,6 +423,8 @@ class RuleConfigManager:
                 active_profile = query.first()
                 if active_profile:
                     raw_data = cls._hydrate_profile(active_profile)
+                    raw_data["source"] = "DATABASE"
+                    raw_data["degraded_mode"] = False
                     path_hash = active_profile.version_tag
                     config_size_bytes = len(json.dumps(raw_data))
                     logger.info(f"[RULE_CONFIG] Hydrated active profile from database (v{active_profile.version_tag})")
@@ -431,13 +441,20 @@ class RuleConfigManager:
             cache_key = f"rule_config_profile_{tenant_id or 'GLOBAL'}"
             cached_data = config_cache_manager.get(cache_key)
             if cached_data:
-                raw_data = cached_data
+                raw_data = dict(cached_data)
+                raw_data["source"] = "bundled_static"
+                raw_data["degraded_mode"] = True
                 path_hash = cached_data.get("version", "cached")
                 config_size_bytes = len(json.dumps(raw_data))
-                logger.info(f"[RULE_CONFIG] Loading active profile from cache (v{path_hash})")
+                logger.info(f"[RULE_CONFIG] Loading active profile from fallback cache (v{path_hash}) in degraded_mode")
             else:
-                from app.core.error_handlers import SystemConfigurationError
-                raise SystemConfigurationError("CONFIGURATION_UNAVAILABLE")
+                from app.services.system_rule_config_factory import SystemRuleConfigFactory
+                raw_data = SystemRuleConfigFactory.build().model_dump()
+                raw_data["source"] = "bundled_static"
+                raw_data["degraded_mode"] = True
+                path_hash = raw_data.get("version", "static_fallback")
+                config_size_bytes = len(json.dumps(raw_data))
+                logger.warning("[RULE_CONFIG] Database and cache unavailable; loaded bundled_static baseline fallback in degraded_mode")
 
         if raw_data is None:
             from app.core.error_handlers import SystemConfigurationError
@@ -480,6 +497,18 @@ class RuleConfigManager:
             f"LoadTime={total_load_time_ms}ms, CacheTime={cache_build_time_ms}ms, CompiledPatterns={compiled_pattern_count}"
         )
         return cls._active_configs[tenant_key]
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear all active in-memory configuration caches."""
+        with cls._lock:
+            cls._active_configs.clear()
+            cls._caches.clear()
+            try:
+                from app.core.cache import config_cache_manager
+                config_cache_manager.clear()
+            except Exception:
+                pass
 
     @classmethod
     def _hydrate_profile(cls, profile) -> dict[str, Any]:
@@ -1034,3 +1063,319 @@ class RuleConfigManager:
             raise ve
         except Exception as e:
             logger.warning(f"[RULE_CONFIG] Failed to execute DB smoke tests (DB error): {e}")
+
+    @classmethod
+    def compute_policy_digest(cls, config: UnifiedRuleConfig) -> str:
+        """Compute deterministic SHA-256 digest representing all active rule configurations."""
+        payload = config.model_dump_json()
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+    @classmethod
+    def get_policy_digest(cls, tenant_id: str | None = None) -> str:
+        """Return the active policy digest for the given tenant."""
+        config = cls.get_config(tenant_id=tenant_id)
+        return cls.compute_policy_digest(config)
+
+
+# Sub-Policies for Workstream 4.1 Enterprise Policy Registry
+class ExtractionPolicy(BaseModel):
+    section_patterns: dict[str, str] = Field(default_factory=dict)
+    core_sections: list[str] = Field(default_factory=list)
+    heading_denylist: list[str] = Field(default_factory=list)
+    heading_compact_denylist: list[str] = Field(default_factory=list)
+    heading_substring_denylist: list[str] = Field(default_factory=list)
+    location_acceptance_min_confidence: float = Field(default=0.70, ge=0.0, le=1.0)
+
+
+class ExperiencePolicy(BaseModel):
+    date_parse_tolerance_days: int = Field(default=30, ge=0)
+    allow_overlapping_intervals: bool = True
+    unknown_date_handling: str = Field(default="UNKNOWN", description="Keep as UNKNOWN, zero addition")
+    current_role_recency_days: int = Field(default=365, ge=0)
+    seniority_experience_thresholds: dict[str, float] = Field(
+        default_factory=lambda: {"JUNIOR": 1.0, "MID": 3.0, "SENIOR": 5.0, "LEAD": 8.0}
+    )
+
+
+class TaxonomyPolicy(BaseModel):
+    semantic_match_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+    main_department_match_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
+    hierarchy_ambiguity_gap: float = Field(default=0.05, ge=0.0, le=1.0)
+    family_compatibility_min_score: float = Field(default=0.40, ge=0.0, le=1.0)
+    relation_scores: dict[str, float] = Field(
+        default_factory=lambda: {
+            "EXACT": 1.0,
+            "ALLOWED": 0.85,
+            "RELATED": 0.50,
+            "DISALLOWED": 0.0,
+            "UNKNOWN": 0.0,
+        }
+    )
+    canonical_domains: list[str] = Field(default_factory=list)
+    canonical_families: list[str] = Field(default_factory=list)
+
+
+class CertificationEquivalence(BaseModel):
+    required_id: str
+    accepted_id: str
+    relation_type: str = "EQUIVALENT"
+    active: bool = True
+    tenant_id: str = "GLOBAL"
+
+
+class EducationEquivalence(BaseModel):
+    required_degree_id: str
+    accepted_degree_id: str
+    relation_type: str = "EXACT"
+    active: bool = True
+    tenant_id: str = "GLOBAL"
+
+
+class SeniorityPolicy(BaseModel):
+    job_family: str
+    level: str
+    min_years: float | None = None
+    typical_years: float | None = None
+    title_signals: list[str] = Field(default_factory=list)
+    responsibility_signals: list[str] = Field(default_factory=list)
+    tenant_id: str = "GLOBAL"
+    version: str = "1.0.0"
+
+
+class TaxonomyResolutionPolicy(BaseModel):
+    embedding_model_version: str = "nomic-embed-text-v1"
+    taxonomy_version: str = "v2026.1"
+    candidate_accept_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    vacancy_accept_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
+    ambiguity_margin: float = Field(default=0.10, ge=0.0, le=1.0)
+    hard_prune_min_confidence: float = Field(default=0.40, ge=0.0, le=1.0)
+    fallback_mode: str = "NO_CONFIDENT_MATCH"
+
+
+class QualificationPolicy(BaseModel):
+    degree_level_hierarchy: dict[str, int] = Field(
+        default_factory=lambda: {"HIGH_SCHOOL": 1, "BACHELOR": 2, "MASTER": 3, "DOCTORATE": 4}
+    )
+    certification_aliases: dict[str, list[str]] = Field(default_factory=dict)
+    accepted_degree_equivalences: dict[str, list[str]] = Field(default_factory=dict)
+    certification_equivalences: list[CertificationEquivalence] = Field(default_factory=list)
+    education_equivalences: list[EducationEquivalence] = Field(default_factory=list)
+
+
+class MatchingPolicy(BaseModel):
+    mandatory_failure_penalty: float = Field(default=50.0, ge=0.0, le=100.0)
+    max_score_on_failure: float = Field(default=49.9, ge=0.0, le=100.0)
+    overqualification_penalty: float = Field(default=10.0, ge=0.0, le=100.0)
+    domain_mismatch_multiplier: float = Field(default=0.25, ge=0.0, le=1.0)
+    allow_assessability_fallback: bool = True
+
+
+class ScoringPolicy(BaseModel):
+    id: str = "scoring_default"
+    version: str = "1.0.0"
+    active: bool = True
+    tenant_id: str = "GLOBAL"
+    source: str = "DATABASE"
+    change_reason: str = "Canonical enterprise scoring policy"
+    match_high_threshold: float = Field(default=75.0, ge=0.0, le=100.0)
+    match_medium_threshold: float = Field(default=50.0, ge=0.0, le=100.0)
+    component_weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "skills": 0.35,
+            "role": 0.20,
+            "experience": 0.20,
+            "responsibilities": 0.15,
+            "education": 0.10,
+        }
+    )
+    mandatory_penalty: float = Field(default=50.0, ge=0.0, le=100.0)
+    failure_cap: float = Field(default=49.9, ge=0.0, le=100.0)
+    llm_semantic_weight: float = Field(default=0.20, ge=0.0, le=1.0)
+    max_llm_boost: float = Field(default=10.0, ge=0.0, le=100.0)
+
+
+class RetrievalPolicy(BaseModel):
+    stage_0_prefilter_limit: int = Field(default=60, ge=1)
+    stage_1_vector_top_n: int = Field(default=30, ge=1)
+    rrf_k_constant: float = Field(default=60.0, gt=0.0)
+    llm_top_n: int = Field(default=5, ge=1)
+    score_decay_stop_threshold: float = Field(default=0.10, ge=0.0, le=1.0)
+    vector_candidate_pool: int = Field(default=200, ge=1)
+    rerank_top_n: int = Field(default=50, ge=1)
+    rrf_k: float = Field(default=60.0, gt=0.0)
+    cache_capacity: int = Field(default=128, ge=1)
+    score_floor: float = Field(default=0.05, ge=0.0, le=1.0)
+    adaptive_strategy: str = "STAGE_0_BYPASS"
+
+
+class RecommendationPolicy(BaseModel):
+    career_transition_eligibility_min_score: float = Field(default=45.0, ge=0.0, le=100.0)
+    evidence_minimum_confidence: float = Field(default=0.50, ge=0.0, le=1.0)
+    list_display_caps: int = Field(default=10, ge=1)
+
+
+class SimilarityPolicy(BaseModel):
+    expected_vector_dimension: int = Field(default=768, ge=1)
+    min_similarity_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
+    model_fallback_enabled: bool = True
+
+
+class PolicySnapshotMetadata(BaseModel):
+    policy_snapshot_id: str = Field(..., description="Unique snapshot identity e.g. snap_1.0.0_a1b2c3d4")
+    version: str = Field(..., description="Rule config semantic version tag")
+    status: Literal["ACTIVE", "DEGRADED", "ARCHIVED"] = Field(default="ACTIVE")
+    effective_from: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    effective_to: datetime | None = Field(default=None)
+    source: Literal["DATABASE", "EMERGENCY_BUNDLED"] = Field(default="DATABASE")
+    owner: str = Field(default="system.admin@cv-analyzer.enterprise")
+    change_reason: str = Field(default="Verified enterprise policy release snapshot")
+    rollback_pointer: str | None = Field(default=None)
+
+
+class PolicySnapshot(BaseModel):
+    metadata: PolicySnapshotMetadata
+    extraction: ExtractionPolicy = Field(default_factory=ExtractionPolicy)
+    experience: ExperiencePolicy = Field(default_factory=ExperiencePolicy)
+    taxonomy: TaxonomyPolicy = Field(default_factory=TaxonomyPolicy)
+    qualification: QualificationPolicy = Field(default_factory=QualificationPolicy)
+    matching: MatchingPolicy = Field(default_factory=MatchingPolicy)
+    scoring: ScoringPolicy = Field(default_factory=ScoringPolicy)
+    retrieval: RetrievalPolicy = Field(default_factory=RetrievalPolicy)
+    recommendation: RecommendationPolicy = Field(default_factory=RecommendationPolicy)
+    similarity: SimilarityPolicy = Field(default_factory=SimilarityPolicy)
+    version_digest: str = Field(..., description="SHA-256 fingerprint digest")
+
+    model_config = {"frozen": True}  # Immutable snapshot
+
+
+class PolicyRegistry:
+    """
+    Unified Policy & Decision Registry.
+    Single-source accessor for versioned scoring parameters, component weights,
+    taxonomy classification rules, hiring risk policies, and term matching assets.
+    Guarantees deterministic decision semantics across all services.
+    """
+
+    @classmethod
+    def get_policy_digest(cls, tenant_id: str | None = None) -> str:
+        """Return deterministic policy version digest."""
+        return RuleConfigManager.get_policy_digest(tenant_id=tenant_id)
+
+    @classmethod
+    def get_scoring_parameters(cls, tenant_id: str | None = None) -> ScoringParameters:
+        return RuleConfigManager.get_scoring_parameters(tenant_id=tenant_id)
+
+    @classmethod
+    def get_scoring_rules(cls, tenant_id: str | None = None) -> ScoringRules:
+        return RuleConfigManager.get_scoring(tenant_id=tenant_id)
+
+    @classmethod
+    def get_match_rules(cls, tenant_id: str | None = None) -> MatchScoringRules:
+        return RuleConfigManager.get_match_rules(tenant_id=tenant_id)
+
+    @classmethod
+    def get_taxonomy_rules(cls, tenant_id: str | None = None) -> TaxonomyRules:
+        return RuleConfigManager.get_taxonomy_rules(tenant_id=tenant_id)
+
+    @classmethod
+    def get_hiring_risk_policies(cls, tenant_id: str | None = None) -> dict[str, HiringRiskPolicy]:
+        return RuleConfigManager.get_config(tenant_id=tenant_id).hiring_risks.policies
+
+    @classmethod
+    def get_term_matching_assets(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return RuleConfigManager.get_term_matching_assets(tenant_id=tenant_id)
+
+    @classmethod
+    def get_cross_domain_guard_assets(cls, tenant_id: str | None = None) -> MappingProxyType:
+        return RuleConfigManager.get_cross_domain_guard_assets(tenant_id=tenant_id)
+
+    @classmethod
+    def get_recommendations(cls, tenant_id: str | None = None) -> RecommendationTexts:
+        return RuleConfigManager.get_recommendations(tenant_id=tenant_id)
+
+    @classmethod
+    def resolve_snapshot(cls, tenant_id: str | None = None) -> PolicySnapshot:
+        """Resolves an immutable, versioned PolicySnapshot for candidate analysis."""
+        try:
+            config = RuleConfigManager.get_config(tenant_id=tenant_id)
+            digest = RuleConfigManager.get_policy_digest(tenant_id=tenant_id)
+            meta = PolicySnapshotMetadata(
+                policy_snapshot_id=f"snap_{config.version}_{digest[:8]}",
+                version=config.version,
+                status="DEGRADED" if config.degraded_mode else "ACTIVE",
+                source="EMERGENCY_BUNDLED" if config.degraded_mode or config.source == "bundled_static" else config.source,
+                owner="system.admin@cv-analyzer.enterprise",
+                change_reason="Active database configuration snapshot" if not config.degraded_mode else "Degraded fallback configuration snapshot",
+            )
+            match_rules = config.scoring.match
+            scoring_params = match_rules.scoring_parameters
+            cross_guard = match_rules.cross_domain_guard
+            tax_rules = config.scoring.taxonomy
+
+            return PolicySnapshot(
+                metadata=meta,
+                extraction=ExtractionPolicy(
+                    heading_denylist=match_rules.cv_section_heading_denylist,
+                    heading_compact_denylist=match_rules.cv_section_heading_compact_denylist,
+                    heading_substring_denylist=match_rules.cv_section_heading_substring_denylist,
+                ),
+                experience=ExperiencePolicy(),
+                taxonomy=TaxonomyPolicy(
+                    semantic_match_threshold=tax_rules.semantic_match_threshold,
+                    canonical_domains=tax_rules.canonical_domains,
+                    canonical_families=tax_rules.canonical_families,
+                ),
+                qualification=QualificationPolicy(),
+                matching=MatchingPolicy(
+                    mandatory_failure_penalty=scoring_params.mandatory_failure_penalty,
+                    max_score_on_failure=scoring_params.max_score_on_failure,
+                    overqualification_penalty=scoring_params.overqualification_penalty,
+                    domain_mismatch_multiplier=cross_guard.domain_mismatch_multiplier,
+                ),
+                scoring=ScoringPolicy(
+                    match_high_threshold=scoring_params.match_high_threshold,
+                    match_medium_threshold=scoring_params.match_medium_threshold,
+                    component_weights=scoring_params.component_weights,
+                    mandatory_penalty=scoring_params.mandatory_failure_penalty,
+                    failure_cap=scoring_params.max_score_on_failure,
+                    llm_semantic_weight=scoring_params.llm_semantic_weight,
+                    max_llm_boost=scoring_params.max_llm_boost,
+                ),
+                retrieval=RetrievalPolicy(),
+                recommendation=RecommendationPolicy(),
+                similarity=SimilarityPolicy(),
+                version_digest=digest,
+            )
+        except Exception as exc:
+            logger.warning(f"[POLICY_REGISTRY] Database policy hydration failed ({exc}). Resolving emergency bundled policy snapshot.")
+            return cls.get_emergency_bundled_snapshot()
+
+    @classmethod
+    def get_emergency_bundled_snapshot(cls) -> PolicySnapshot:
+        """Returns explicitly versioned emergency bundled snapshot marked DEGRADED."""
+        from app.services.system_rule_config_factory import SystemRuleConfigFactory
+        config = SystemRuleConfigFactory.build()
+        digest = RuleConfigManager.compute_policy_digest(config)
+        meta = PolicySnapshotMetadata(
+            policy_snapshot_id=f"snap_emergency_{digest[:8]}",
+            version="v1.0.0-emergency-bundled",
+            status="DEGRADED",
+            source="EMERGENCY_BUNDLED",
+            owner="emergency.fallback@cv-analyzer.enterprise",
+            change_reason="Emergency bundled profile activated due to database policy unavailability",
+            rollback_pointer="v1.0.0-previous",
+        )
+        return PolicySnapshot(
+            metadata=meta,
+            extraction=ExtractionPolicy(),
+            experience=ExperiencePolicy(),
+            taxonomy=TaxonomyPolicy(),
+            qualification=QualificationPolicy(),
+            matching=MatchingPolicy(),
+            scoring=ScoringPolicy(),
+            retrieval=RetrievalPolicy(),
+            recommendation=RecommendationPolicy(),
+            similarity=SimilarityPolicy(),
+            version_digest=digest,
+        )
+

@@ -618,8 +618,8 @@ def process_cv_job(job_id: str, expected_enqueue_count: int | None = None) -> di
         from app.services.ollama_transport import OllamaError, OllamaInvalidResponseError
 
         terminal_error = (
-            isinstance(exc, (DocumentExtractionTimeoutError, PromptError, OllamaInvalidResponseError))
-            or isinstance(exc, OllamaError) and not exc.retryable
+            isinstance(exc, (FileNotFoundError, DocumentExtractionTimeoutError, PromptError, OllamaInvalidResponseError))
+            or (isinstance(exc, OllamaError) and not exc.retryable)
         )
         will_retry = not terminal_error and attempt < current.max_attempts
         state = JobState.RETRYING if will_retry else JobState.FAILED

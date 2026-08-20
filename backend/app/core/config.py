@@ -1,18 +1,21 @@
 from __future__ import annotations
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 from urllib.parse import urlsplit
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    PROJECT_NAME: str = "CV Analyzer"
-    VERSION: str = "0.1.0"
+    PROJECT_NAME: str = "CV Analyzer Enterprise"
+    VERSION: str = "3.0.0"
+    APP_VERSION: str = "3.0.0"
+    GIT_SHA: str = "c6eb7f2"
     ALLOWED_ORIGINS: List[str] = []
     CORS_ALLOW_CREDENTIALS: bool = False
     APP_ENVIRONMENT: str = "development"
@@ -82,8 +85,11 @@ class Settings(BaseSettings):
     RAW_UPLOAD_RETENTION_DAYS: int = 30
     RAW_UPLOAD_DELETE_ON_SUCCESS: bool = False
     RAW_UPLOAD_DELETE_ON_FAILURE: bool = False
-    UPLOADS_DIR: Path = Path("uploads")
-    RESULTS_DIR: Path = Path("uploads/results")
+    APP_DATA_ROOT: Path = Field(default_factory=lambda: Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))).resolve())
+    UPLOADS_DIR: Path = Field(default_factory=lambda: Path(os.getenv("UPLOADS_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "uploads"))).resolve())
+    RESULTS_DIR: Path = Field(default_factory=lambda: Path(os.getenv("RESULTS_DIR", str(Path(os.getenv("UPLOADS_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "uploads"))) / "results"))).resolve())
+    LOCK_DIR: Path = Field(default_factory=lambda: Path(os.getenv("LOCK_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "locks"))).resolve())
+    TRAINING_DATA_DIR: Path = Field(default_factory=lambda: Path(os.getenv("TRAINING_DATA_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "training_data"))).resolve())
 
     # Cutover Configuration
     MSSQL_CUTOVER_COMPLETE: bool = False
@@ -103,6 +109,8 @@ class Settings(BaseSettings):
     CACHE_TTL_MATCH_RESULT_SECONDS: int = 604800
     CACHE_TTL_VACANCY_SECONDS: int = 3600
     CACHE_TTL_MASTER_DATA_SECONDS: int = 3600
+    CACHE_LRU_CAPACITY: int = 128
+    CACHE_VERSION: str = "v1.5.0"
     PERFORMANCE_L1_CACHE_MAX_SIZE: int = 5000
     PERFORMANCE_L1_CACHE_TTL_SECONDS: float = 3600.0
     EXTRACTION_TIMEOUT_SECONDS: float = 900.0
@@ -139,7 +147,7 @@ class Settings(BaseSettings):
     OLLAMA_MAX_CONNECTIONS: int = 1
     OLLAMA_MAX_KEEPALIVE_CONNECTIONS: int = 1
     OLLAMA_MAX_RESPONSE_BYTES: int = 4 * 1024 * 1024
-    OLLAMA_LOCK_FILE: Path = Path("uploads/.locks/ollama.lock")
+    OLLAMA_LOCK_FILE: Path = Field(default_factory=lambda: Path(os.getenv("OLLAMA_LOCK_FILE", str(Path(os.getenv("LOCK_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "locks"))) / "ollama.lock"))).resolve())
     OLLAMA_LOCK_TIMEOUT_SECONDS: float = 1800.0
     OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 3
     OLLAMA_CIRCUIT_BREAKER_RESET_SECONDS: float = 60.0
@@ -165,7 +173,7 @@ class Settings(BaseSettings):
     LLM_TRACE_ENABLED: bool = True
     LLM_TRACE_RETENTION_DAYS: int = 30
     LLM_SHADOW_QUALITY_ENABLED: bool = True
-    LLM_CONFIDENCE_CALIBRATION_PATH: Path = Path("app/data/evaluations/confidence_calibration.json")
+    LLM_CONFIDENCE_CALIBRATION_PATH: Path = Field(default_factory=lambda: Path(os.getenv("LLM_CONFIDENCE_CALIBRATION_PATH", str(Path(__file__).resolve().parent.parent / "data" / "evaluations" / "confidence_calibration.json"))).resolve())
     OPTIMIZED_PROMPT_VERSION: str = "4.0"
     MAX_CONCURRENT_LLM_WORKERS: int = 1
 
@@ -198,14 +206,25 @@ class Settings(BaseSettings):
     }
 
     # Training Data Configuration
-    TRAINING_DATA_DIR: Path = Path("uploads/training_data")
+    TRAINING_DATA_DIR: Path = Field(default_factory=lambda: Path(os.getenv("TRAINING_DATA_DIR", str(Path(os.getenv("APP_DATA_ROOT", str(Path(__file__).resolve().parent.parent.parent / "uploads"))) / "training_data"))).resolve())
 
     # Database Configuration (MSSQL Read-Only)
     MSSQL_READ_ONLY_URL: str = ""
     MSSQL_READONLY_ENFORCEMENT: bool = True
+    MSSQL_POOL_SIZE: int = 10
+    MSSQL_MAX_OVERFLOW: int = 20
+    MSSQL_POOL_TIMEOUT: float = 30.0
 
     # Database Configuration (Postgres App Data)
     POSTGRES_APP_URL: str = ""
+    POSTGRES_POOL_SIZE: int = 10
+    POSTGRES_MAX_OVERFLOW: int = 20
+    POSTGRES_POOL_TIMEOUT: float = 30.0
+    POSTGRES_SSL_MODE: str = "prefer"
+
+    # Frontend Lifecycle Polling Configuration
+    FRONTEND_POLL_INTERVAL_MS: int = 2000
+    FRONTEND_RETRY_AFTER_MS: int = 2000
 
     # Migration Configuration
     AUTO_MIGRATE: bool = False
@@ -285,6 +304,23 @@ class Settings(BaseSettings):
                 raise ValueError("MSSQL_READ_ONLY_URL is required for enterprise source data.")
             if not self.POSTGRES_APP_URL:
                 raise ValueError("POSTGRES_APP_URL is required for CV Analyzer application data.")
+            if self.AUTH_ENABLED and (not self.AUTH_SESSION_SIGNING_KEY or self.AUTH_SESSION_SIGNING_KEY.strip().lower() in {"change_me", "default_secret_key", "secret", "123456"}):
+                raise ValueError("AUTH_SESSION_SIGNING_KEY must be configured with a secure non-default secret in production.")
+
+            insecure_patterns = {"postgres:postgres@localhost", "postgres:postgres@127.0.0.1", "redis://localhost:6379", "redis://127.0.0.1:6379"}
+            if any(p in self.POSTGRES_APP_URL for p in insecure_patterns):
+                raise ValueError("POSTGRES_APP_URL must not use default local development credentials in production.")
+            if any(p in self.REDIS_URL for p in insecure_patterns):
+                raise ValueError("REDIS_URL must not use default local development endpoint in production.")
+            if any(p in self.MSSQL_READ_ONLY_URL for p in insecure_patterns):
+                raise ValueError("MSSQL_READ_ONLY_URL must not use default local development credentials in production.")
+            if self.POSTGRES_SSL_MODE in {"disable", "allow"}:
+                raise ValueError("POSTGRES_SSL_MODE must require encryption (require, verify-ca, or verify-full) in production.")
+        try:
+            self.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+            self.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         return self
 
 

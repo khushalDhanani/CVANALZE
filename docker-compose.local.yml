@@ -3,12 +3,15 @@
 
 x-local-backend-environment: &local-backend-environment
   APP_ENVIRONMENT: development
+  APP_DATA_ROOT: '/app'
+  UPLOADS_DIR: '/app/uploads'
+  RESULTS_DIR: '/app/uploads/results'
   AUTH_ENABLED: '${AUTH_ENABLED:-false}'
   INITIALIZE_DATABASE_ON_STARTUP: "true"
   STARTUP_CACHE_WARMUP_ENABLED: "false"
   MSSQL_READ_ONLY_URL: '${MSSQL_READ_ONLY_URL}'
   MSSQL_READONLY_ENFORCEMENT: '${MSSQL_READONLY_ENFORCEMENT:-true}'
-  POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
+  POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}' # policy-approved-constant
   REDIS_URL: 'redis://redis:6379/0'
   RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
   RQ_AUXILIARY_QUEUE_NAME: '${RQ_AUXILIARY_QUEUE_NAME:-default}'

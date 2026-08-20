@@ -38,6 +38,8 @@ class SystemRuleConfigFactory:
     def build(cls) -> UnifiedRuleConfig:
         config = UnifiedRuleConfig(
             version=cls.VERSION,
+            source="bundled_static",
+            degraded_mode=False,
             description="System-generated conservative baseline. Review all rules before activation.",
             last_updated=datetime.now(timezone.utc).isoformat(),
             global_confidence_tiers={
@@ -218,14 +220,14 @@ class SystemRuleConfigFactory:
                     },
                 ),
                 fallback_defaults=FallbackDefaults(
-                    recommended_department="General Operations",
-                    professional_domain="General Operations",
+                    recommended_department="",
+                    professional_domain="",
                     suitable_roles=[],
                 ),
                 cross_domain_guard=CrossDomainGuard(
-                    software_candidate_keywords=["software"],
+                    software_candidate_keywords=["software", "developer", "engineer", "python", "java", "c++", "c#", "javascript", "typescript", "react", "node", "backend", "frontend", "fullstack", "devops", "fastapi", "django", "postgresql", "sql", "docker", "kubernetes", "aws", "git", "coding", "programming"],
                     non_it_job_keywords=["operations"],
-                    software_requirement_keywords=["software"],
+                    software_requirement_keywords=["software", "developer", "engineer", "python", "java", "c++", "c#", "javascript", "typescript", "react", "node", "backend", "frontend", "fullstack", "devops", "fastapi", "django", "postgresql", "sql", "docker", "kubernetes", "aws", "git", "coding", "programming"],
                     domain_guard_terms={},
                     domain_mismatch_multiplier=0.25,
                     domain_mismatch_score_cap=25.0,

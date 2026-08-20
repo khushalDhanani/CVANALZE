@@ -14,6 +14,7 @@ from app.schemas.classification_types import (
     MainDepartmentClassificationResult,
     HierarchyClassificationResult,
 )
+from app.schemas.analysis_versions import AnalysisVersions
 from app.schemas.match import JobMatchResult
 from app.schemas.normalized_resume import NormalizedResume
 
@@ -220,6 +221,8 @@ class EnrichedJobMatchResult(JobMatchResult):
 
 
 class EnrichedCandidateAnalysis(BaseModel):
+    cv_key: str | None = Field(default=None, description="Canonical CV key")
+    scan_id: str | None = Field(default=None, description="Scan / candidate analysis identifier")
     analysis_run_id: str | None = Field(default=None, description="End-to-end analysis execution identifier")
     analysis_version: str | None = Field(default=None, description="Version identifier for the current candidate analysis")
     status: str | None = Field(default="COMPLETED", description="Status of processing job")
@@ -305,6 +308,11 @@ class EnrichedCandidateAnalysis(BaseModel):
         default=None,
         description="A snapshot of the original source payload for auditing",
     )
+    policy_snapshot_id: str | None = Field(default=None, description="Identifier of PolicySnapshot resolved at analysis start")
+    policy_digest: str | None = Field(default=None, description="SHA-256 fingerprint digest of active PolicySnapshot")
+    scoring_policy_version: str | None = Field(default=None, description="Active scoring policy version used for calculation")
+    component_assessability: dict[str, str] = Field(default_factory=dict, description="Assessability state per component")
+    analysis_versions: AnalysisVersions | None = Field(default=None, description="Complete analysis version provenance")
     experience_gap_analysis: ExperienceGapAnalysis | None = Field(
         default=None,
         description="Dynamic Experience Gap Analysis for HR",
@@ -350,6 +358,10 @@ class TrainingExample(BaseModel):
     hr_corrected_classification: str | None
     hr_feedback: str
     timestamp: str
+
+
+EnrichedJobMatchResult.model_rebuild()
+EnrichedCandidateAnalysis.model_rebuild()
 
 
 EnrichedCandidateAnalysis.model_rebuild()

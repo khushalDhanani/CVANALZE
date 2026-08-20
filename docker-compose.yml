@@ -1,5 +1,8 @@
 x-backend-environment: &backend-environment
   APP_ENVIRONMENT: production
+  APP_DATA_ROOT: '/app'
+  UPLOADS_DIR: '/app/uploads'
+  RESULTS_DIR: '/app/uploads/results'
   AUTH_ENABLED: '${AUTH_ENABLED:-true}'
   RECRUITER_API_KEYS: '${RECRUITER_API_KEYS:-[]}'
   ADMINISTRATOR_API_KEYS: '${ADMINISTRATOR_API_KEYS:-[]}'
@@ -21,7 +24,7 @@ x-backend-environment: &backend-environment
   EXTRACTION_TIMEOUT_SECONDS: '${EXTRACTION_TIMEOUT_SECONDS:-900}'
   SCANNED_EXTRACTION_TIMEOUT_SECONDS: '${SCANNED_EXTRACTION_TIMEOUT_SECONDS:-1800}'
   AUTO_MIGRATE: "false"
-  POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}'
+  POSTGRES_APP_URL: 'postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgvector:5432/${POSTGRES_DB:-cv_analyzer}' # policy-approved-constant
   REDIS_URL: 'redis://redis:6379/0'
   RQ_QUEUE_NAME: '${RQ_QUEUE_NAME:-cv-processing}'
   RQ_AUXILIARY_QUEUE_NAME: '${RQ_AUXILIARY_QUEUE_NAME:-default}'

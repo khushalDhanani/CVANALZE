@@ -19,7 +19,14 @@ def _redis_connection() -> Redis:
     current_job = get_current_job()
     if current_job is not None:
         return current_job.connection
-    return Redis.from_url(settings.REDIS_URL or "redis://localhost:6379/0")
+    return Redis.from_url(
+        settings.REDIS_URL or "redis://localhost:6379/0",
+        socket_timeout=30.0,
+        socket_connect_timeout=10.0,
+        socket_keepalive=True,
+        retry_on_timeout=True,
+        health_check_interval=30,
+    )
 
 
 def _run_with_lock(lock_key: str, task: Callable[[], dict[str, Any]]) -> dict[str, Any]:

@@ -13,6 +13,35 @@ class MatchStatus(str, Enum):
     NO_ACTIVE_VACANCIES = "NO_ACTIVE_VACANCIES"
 
 
+class TaxonomyRelationType(str, Enum):
+    EXACT = "EXACT"
+    ALLOWED = "ALLOWED"
+    RELATED = "RELATED"
+    DISALLOWED = "DISALLOWED"
+    UNKNOWN = "UNKNOWN"
+
+
+class TaxonomyMatchType(str, Enum):
+    EXACT = "EXACT"
+    ALIAS = "ALIAS"
+    SEMANTIC = "SEMANTIC"
+    RELATED = "RELATED"
+    NO_MATCH = "NO_MATCH"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class TaxonomyResolution(BaseModel):
+    canonical_id: Optional[str] = Field(None, description="Canonical database designation or domain identifier")
+    status: str = Field(default="NO_SUITABLE_MATCH", description="Match status")
+    match_type: TaxonomyMatchType = Field(default=TaxonomyMatchType.NO_MATCH, description="Typed match classification strategy")
+    similarity: Optional[float] = Field(None, description="Dense vector similarity score if semantic lookup")
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Overall match confidence")
+    evidence: List[ClassificationEvidence] = Field(default_factory=list, description="Classification evidence list")
+    taxonomy_version: str = Field(default="v2026.1", description="Active taxonomy schema version")
+    model_version: str = Field(default="nomic-embed-text", description="Embedding model tag")
+    source: str = Field(default="MSSQL_TAXONOMY", description="Source data repository origin")
+
+
 class ClassificationEvidence(BaseModel):
     """Evidence for a single match component.
 
@@ -31,7 +60,7 @@ class ClassificationEvidence(BaseModel):
 class AISuggestion(BaseModel):
     """AI‑generated career suggestion used when no DB match is found."""
     suggested_role: str = Field(..., description="Suggested role name")
-    suggested_domain: str = Field(..., description="Suggested domain name")
+    suggested_domain: Optional[str] = Field(None, description="Suggested domain name")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence for the suggestion")
     evidence: List[ClassificationEvidence] = Field(default_factory=list, description="Evidence supporting the suggestion")
     missing_requirements: List[str] = Field(default_factory=list, description="What is needed to increase confidence")

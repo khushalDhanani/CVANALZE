@@ -1,7 +1,7 @@
 [project]
 name = "cv-analyzer"
-version = "0.1.0"
-description = "Add your description here"
+version = "3.0.0"
+description = "CV Analyzer Enterprise Program Backend API"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

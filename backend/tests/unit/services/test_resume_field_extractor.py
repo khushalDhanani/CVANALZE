@@ -58,10 +58,38 @@ def test_split_sections_routing() -> None:
 
 
 def test_extract_skills_from_text() -> None:
-    skills_lines = [
-        "Programming Languages: Python, JavaScript, Go",
-        "Databases & Frameworks: PostgreSQL, Docker, FastAPI",
+    lines = ["Python", "FastAPI", "PostgreSQL", "Docker"]
+    skills = ResumeFieldExtractor._extract_skills(lines)
+    assert isinstance(skills, dict)
+    assert len(skills) > 0
+
+
+def test_job_title_rejects_roll_number_and_academic_ids() -> None:
+    # Academic/administrative roll numbers and ID lines must strictly be rejected
+    assert not ResumeFieldExtractor.is_valid_job_title("Roll No.: 21111003")
+    assert not ResumeFieldExtractor.is_valid_job_title("Enrollment No: 19827341")
+    assert not ResumeFieldExtractor.is_valid_job_title("PRN No. 20210123")
+    assert not ResumeFieldExtractor.is_valid_job_title("CPI: 8.57/10")
+    assert not ResumeFieldExtractor.is_valid_job_title("Mobile: +91 9999999999")
+    assert not ResumeFieldExtractor.is_valid_job_title("Reg. No.: 449102")
+
+    assert not ResumeFieldExtractor.is_structural_job_title_noun_phrase("Roll No.: 21111003")
+    assert not ResumeFieldExtractor.is_structural_job_title_noun_phrase("PRN: 20210091")
+
+    # Valid job titles should pass
+    assert ResumeFieldExtractor.is_valid_job_title("Senior Software Engineer")
+    assert ResumeFieldExtractor.is_valid_job_title("Designation: Billing Executive")
+
+
+def test_extract_title_from_summary_or_header_rejects_roll_number() -> None:
+    lines = [
+        "ABHISHEK DNYANESHWAR REVSKAR",
+        "Roll No.: 21111003",
+        "Indian Institute of Technology, Kanpur",
+        "M.Tech Computer Science & Engineering",
     ]
-    skills_result = ResumeFieldExtractor._extract_skills(skills_lines)
-    assert isinstance(skills_result, dict)
-    assert "all_skills" in skills_result or len(skills_result) > 0
+    title = ResumeFieldExtractor.extract_title_from_summary_or_header(
+        [], lines, candidate_name="ABHISHEK DNYANESHWAR REVSKAR"
+    )
+    assert title != "Roll No.: 21111003"
+    assert title is None or "Roll" not in str(title)

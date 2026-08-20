@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.analysis_versions import AnalysisVersions
+
 
 class RequirementTier(str, Enum):
     MANDATORY = "MANDATORY"
@@ -16,12 +18,15 @@ class RequirementStatus(str, Enum):
     PARTIALLY_SATISFIED = "PARTIALLY_SATISFIED"
     FAILED = "FAILED"
     UNVERIFIED = "UNVERIFIED"
+    NOT_ASSESSABLE = "NOT_ASSESSABLE"
 
 
 class DualEvidence(BaseModel):
-    cv_evidence: str = Field(..., description="Extract/quote or verified fact from candidate CV")
+    cv_evidence: str = Field(..., description="Extract/quote or verified fact from candidate CV. When absent or unverified, is 'NO_VERIFIED_EVIDENCE_FOUND'")
     vacancy_evidence: str = Field(..., description="Target requirement description or text from vacancy")
     confidence_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    provenance: str = Field(default="VERIFIED_CV", description="Evidence provenance: VERIFIED_CV, GROUNDED_LLM, INFERRED_LLM, VERIFIED_TIMELINE, or NO_EVIDENCE")
+    source_section: str | None = Field(default=None, description="Section from which candidate evidence was extracted (e.g. skills, employment, education)")
 
 
 class RequirementEvaluation(BaseModel):
@@ -34,6 +39,16 @@ class RequirementEvaluation(BaseModel):
         None,
         description="Detailed explanation if requirement failed or partially satisfied",
     )
+
+
+class RequirementAssessment(BaseModel):
+    requirement_id: str = Field(..., description="Unique requirement identifier")
+    requirement_type: str = Field(..., description="Requirement domain type (skill, certification, education, experience)")
+    status: str = Field(..., description="Evaluation status: SATISFIED, FAILED, or NOT_ASSESSABLE")
+    matched_evidence: list[DualEvidence] = Field(default_factory=list, description="Verified matched evidence items")
+    missing_evidence: list[str] = Field(default_factory=list, description="Missing requirement elements")
+    conclusion: str = Field(..., description="Deterministic requirement evaluation conclusion")
+    policy_version: str | None = Field(default=None, description="Resolved policy digest or rule version")
 
 
 class MandatoryFailureDetails(BaseModel):
@@ -81,6 +96,8 @@ class VacancyFitScoreBreakdown(BaseModel):
     hierarchy_mismatch_penalty: float = Field(default=0.0, description="Penalty deduction applied for hierarchy mismatch")
     is_hierarchy_valid: bool | None = Field(default=True, description="Whether MSSQL parent-child hierarchy validation passed; null when validation was unavailable")
     match_status: str = Field(default="MATCHED", description="MATCHED, POTENTIAL_MATCH, or NO_STRONG_VACANCY_MATCH")
+    scoring_policy_version: str | None = Field(default=None, description="Active scoring policy version used for breakdown")
+    component_assessability: dict[str, str] = Field(default_factory=dict, description="Assessability state per component (VERIFIED, INFERRED, NOT_ASSESSABLE)")
 
 
 from enum import Enum
@@ -206,6 +223,11 @@ class JobMatchResult(BaseModel):
     candidate_job_family: str | None = Field(default=None, description="Classified job family of the candidate")
     vacancy_job_family: str | None = Field(default=None, description="Classified job family of the target vacancy")
     hiring_risks: list[HiringRisk] = Field(default_factory=list, description="Generated hiring risks and concerns")
+    policy_snapshot_id: str | None = Field(default=None, description="Identifier of PolicySnapshot resolved at evaluation start")
+    policy_digest: str | None = Field(default=None, description="SHA-256 fingerprint digest of active PolicySnapshot")
+    scoring_policy_version: str | None = Field(default=None, description="Active scoring policy version used for calculation")
+    component_assessability: dict[str, str] = Field(default_factory=dict, description="Assessability state per component (VERIFIED, INFERRED, NOT_ASSESSABLE)")
+    analysis_versions: AnalysisVersions | None = Field(default=None, description="Complete analysis version provenance")
 
     @model_validator(mode="after")
     def synchronize_canonical_score_and_status(self) -> "JobMatchResult":
@@ -236,3 +258,12 @@ class CandidateMatchAnalysis(BaseModel):
         default="Candidates are NEVER automatically rejected based on LOW match scores. HR review is always recommended.",
         description="Policy enforcement note regarding LOW score candidate retention",
     )
+    policy_snapshot_id: str | None = Field(default=None, description="Identifier of PolicySnapshot resolved at analysis start")
+    policy_digest: str | None = Field(default=None, description="SHA-256 fingerprint digest of active PolicySnapshot")
+    scoring_policy_version: str | None = Field(default=None, description="Active scoring policy version used for calculation")
+    component_assessability: dict[str, str] = Field(default_factory=dict, description="Assessability state per component (VERIFIED, INFERRED, NOT_ASSESSABLE)")
+    analysis_versions: AnalysisVersions | None = Field(default=None, description="Complete analysis version provenance")
+
+
+JobMatchResult.model_rebuild()
+CandidateMatchAnalysis.model_rebuild()

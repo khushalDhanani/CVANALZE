@@ -96,8 +96,9 @@ def main() -> None:
     redis_url = settings.REDIS_URL or "redis://localhost:6379/0"
     redis_conn = Redis.from_url(
         redis_url,
-        socket_timeout=10.0,
-        socket_connect_timeout=5.0,
+        socket_timeout=30.0,
+        socket_connect_timeout=10.0,
+        socket_keepalive=True,
         retry_on_timeout=True,
         health_check_interval=30,
     )

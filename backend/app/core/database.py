@@ -9,8 +9,9 @@ if settings.MSSQL_READ_ONLY_URL:
     mssql_read_engine = create_engine(
         settings.MSSQL_READ_ONLY_URL,
         pool_pre_ping=True,  # Enable connection health checks
-        pool_size=10,
-        max_overflow=20,
+        pool_size=getattr(settings, "MSSQL_POOL_SIZE", 10),
+        max_overflow=getattr(settings, "MSSQL_MAX_OVERFLOW", 20),
+        pool_timeout=getattr(settings, "MSSQL_POOL_TIMEOUT", 30.0),
         fast_executemany=True,  # Optimization for pyodbc
     )
     MssqlReadSession = sessionmaker(autocommit=False, autoflush=False, bind=mssql_read_engine)
@@ -20,7 +21,13 @@ else:
 
 # Create the PG engine for App Data
 if settings.POSTGRES_APP_URL:
-    postgres_app_engine = create_engine(settings.POSTGRES_APP_URL, pool_pre_ping=True, pool_size=10, max_overflow=20)
+    postgres_app_engine = create_engine(
+        settings.POSTGRES_APP_URL,
+        pool_pre_ping=True,
+        pool_size=getattr(settings, "POSTGRES_POOL_SIZE", 10),
+        max_overflow=getattr(settings, "POSTGRES_MAX_OVERFLOW", 20),
+        pool_timeout=getattr(settings, "POSTGRES_POOL_TIMEOUT", 30.0),
+    )
     PostgresAppSession = sessionmaker(autocommit=False, autoflush=False, bind=postgres_app_engine)
 else:
     postgres_app_engine = None

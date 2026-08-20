@@ -36,3 +36,23 @@ def test_compiled_regex_cache_built() -> None:
     assets = RuleConfigManager.get_cross_domain_guard_assets()
     assert assets is not None
     assert isinstance(assets, dict) or hasattr(assets, "get")
+
+
+def test_policy_registry_accessors() -> None:
+    from app.core.rule_config_manager import PolicyRegistry
+
+    digest = PolicyRegistry.get_policy_digest()
+    assert isinstance(digest, str)
+    assert len(digest) == 16
+
+    params = PolicyRegistry.get_scoring_parameters()
+    assert params is not None
+    assert params.match_high_threshold > 0
+
+    tax_rules = PolicyRegistry.get_taxonomy_rules()
+    assert tax_rules is not None
+    assert tax_rules.default_domain
+
+    term_assets = PolicyRegistry.get_term_matching_assets()
+    assert "noise_words" in term_assets
+

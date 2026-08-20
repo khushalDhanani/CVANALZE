@@ -9,6 +9,7 @@ from app.core.cache import CacheIndex, CacheKey, match_result_cache_manager
 from app.core.config import settings
 from app.core.cv_identity import normalize_source_candidate_id
 from app.core.logging import logger
+from app.core.model_registry import ModelRegistry
 from app.core.profiler import PipelineProfiler
 from app.core.rule_config_manager import RuleConfigManager
 from app.prompts.optimized_match import build_optimized_match_prompt
@@ -17,6 +18,7 @@ from app.repositories.llm_cache import LLMCacheRepository
 from app.repositories.department_domain import department_domain_repository
 from app.repositories.result import ResultRepository
 from app.schemas.analysis import EnrichedCandidateAnalysis, EnrichedJobMatchResult
+from app.schemas.analysis_fingerprint import AnalysisFingerprint
 from app.schemas.candidate_context import CandidateAnalysisContext
 from app.schemas.classification_types import AISuggestion, ClassificationEvidence, MatchStatus, NormalizedClassification
 from app.schemas.job_context import JobEvaluationContext
@@ -53,6 +55,7 @@ class MatchService:
         resume_json: dict[str, Any] | None = None,
         normalized_resume: NormalizedResume | None = None,
         deterministic_experience: float | None = None,
+        tenant_id: str | None = None,
         force_reanalysis: bool = False,
         _shadow_run: bool = False,
     ) -> EnrichedCandidateAnalysis:
@@ -68,13 +71,20 @@ class MatchService:
         if "<!-- image -->" in cv_stripped and len(cv_stripped) < 50:
             raise ValueError("CV document is a scanned image with no extractable text. OCR could not extract any meaningful content.")
 
+        quality_gate = MatchingQualityGate()
+        from app.core.rule_config_manager import PolicyRegistry
+        policy_snapshot = PolicyRegistry.resolve_snapshot(tenant_id=tenant_id)
+        if policy_snapshot.metadata.source == "EMERGENCY_BUNDLED" or policy_snapshot.metadata.status == "DEGRADED":
+            quality_gate.record("policy_source", "DEGRADED", policy_source=policy_snapshot.metadata.source)
+
         document_hash = (document_hash or "").strip() or hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
         cv_key = str(cv_key or candidate_id).strip()
         analysis_run_id = get_analysis_run_id()
-        logger.info(f"analysis_run_id={analysis_run_id} candidate={cv_key or 'not_available'} operation=match_analysis status=START")
+        logger.info(f"analysis_run_id={analysis_run_id} candidate={cv_key or 'not_available'} operation=match_analysis status=START policy_snapshot={policy_snapshot.metadata.policy_snapshot_id}")
         source_candidate_id = normalize_source_candidate_id(source_candidate_id)
         extraction_version = f"{settings.EXTRACTION_PARSER_VERSION}:{settings.EXTRACTION_SCHEMA_VERSION}"
-        quality_gate = MatchingQualityGate()
+
+        analysis_versions = ModelRegistry.resolve_analysis_versions(policy_snapshot.metadata.policy_snapshot_id)
 
         # 2. JSON Loading stage timing (parsing CV text input)
         with profiler.time_stage("resume_json"):
@@ -143,8 +153,16 @@ class MatchService:
 
         vacancy_ids = sorted(str(job.get("vacancy_id") or job.get("id") or "") for job in openings if job.get("vacancy_id") is not None or job.get("id") is not None)
         vacancy_version = JobRepository.compute_matching_vacancy_version(openings)
+        fingerprint = AnalysisFingerprint.create(
+            source_document_hash=document_hash,
+            candidate_revision=f"rev_{cv_key or '1'}",
+            vacancy_revision=f"vac_rev_{vacancy_version or '1'}",
+            policy_snapshot_id=policy_snapshot.metadata.policy_snapshot_id,
+            versions_obj=analysis_versions,
+        )
         rule_config = RuleConfigManager.get_config()
-        rule_version = rule_config.version
+        policy_digest = RuleConfigManager.get_policy_digest()
+        rule_version = f"{rule_config.version}:{policy_digest}"
         hiring_risk_policy_version = HiringRiskAnalyzer.get_policy_version(rule_config)
         taxonomy_version = department_domain_repository.get_version()
         hiring_risk_prompt_version = PromptService.get_active_prompt_version(HiringRiskAnalyzer.PROMPT_NAME) or "missing"
@@ -359,13 +377,17 @@ class MatchService:
             )
 
             # 5. Single Optimized LLM Call + Pydantic Validation (with cache check & retries)
-            optimized_response = await asyncio.to_thread(
-                OllamaLLMService.run_optimized_match,
-                prompt,
-                settings.OPTIMIZED_PROMPT_VERSION,
-                cache_key,
-                profiler,
-            )
+            try:
+                optimized_response = await asyncio.to_thread(
+                    OllamaLLMService.run_optimized_match,
+                    prompt,
+                    settings.OPTIMIZED_PROMPT_VERSION,
+                    cache_key,
+                    profiler,
+                )
+            except OllamaError as exc:
+                logger.warning(f"[OLLAMA] Ollama service call failed: {exc}. Gracefully falling back to deterministic scoring.")
+                optimized_response = None
 
             if optimized_response:
                 raw_llm_lineage = {
@@ -466,6 +488,8 @@ class MatchService:
                     has_vector = retrieval_provenance.get("vector_rank") is not None
                     retrieval_source = "both" if has_lexical and has_vector else "vector" if has_vector else "keyword"
                     quality_flags = []
+                    if not llm_skipped and optimized_response is None:
+                        quality_flags.append("LLM_UNAVAILABLE_FALLBACK")
                     if calibration.review_recommended:
                         quality_flags.append("LOW_CALIBRATED_CONFIDENCE")
                     if grounding_report.unsupported_claims:
@@ -530,6 +554,10 @@ class MatchService:
                         calibration_version=calibration.calibration_version,
                         quality_flags=quality_flags,
                         retrieval_provenance=retrieval_provenance,
+                        policy_snapshot_id=policy_snapshot.metadata.policy_snapshot_id,
+                        policy_digest=policy_snapshot.version_digest,
+                        scoring_policy_version=job_match.scoring_policy_version,
+                        component_assessability=job_match.component_assessability,
                         llm_classified_requirements=llm_match.classified_requirements if llm_match else [],
                         llm_evidence_snippets=llm_match.evidence_snippets if llm_match else {},
                         llm_requirement_assessments=llm_match.requirement_assessments if llm_match else [],
@@ -802,9 +830,16 @@ class MatchService:
             experience_gap_analysis=gap_analysis,
             freshness_status=vacancy_freshness,
             source_watermark=vacancy_version,
+            policy_snapshot_id=policy_snapshot.metadata.policy_snapshot_id,
+            policy_digest=policy_snapshot.version_digest,
+            scoring_policy_version=scoring_config.profile_version if isinstance(scoring_config, ScoringConfig) else "v1",
+            component_assessability=best_match.component_assessability if best_match else {},
+            analysis_versions=ModelRegistry.resolve_analysis_versions(policy_snapshot.metadata.policy_snapshot_id),
             quality_metadata={
                 "matching_version": settings.MATCHING_VERSION,
                 "model_identifier_hash": hashlib.sha256(settings.OLLAMA_MODEL.encode("utf-8")).hexdigest(),
+                "cache_hit": profiler.metrics.cache_hit,
+                "fingerprint_digest": fingerprint.compute_fingerprint_digest(),
                 "grounding_ratio": round(grounding_report.ratio, 4),
                 "grounded_assertions": grounding_report.grounded_assertions,
                 "grounding_assertions": grounding_report.assertions,

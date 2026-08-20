@@ -222,6 +222,7 @@ async def get_match_status(cv_key: str):
 
         match_analysis = result.get("match_analysis")
         if match_analysis and is_completed:
+            match_analysis["cv_key"] = cv_key
             match_analysis["scan_id"] = result.get("scan_id", result.get("id"))
             match_analysis["parsed_at"] = result.get("parsed_at", result.get("scanned_at"))
             match_analysis["status"] = "COMPLETED_DEGRADED" if persistence_degraded else result.get("status", "COMPLETED")
