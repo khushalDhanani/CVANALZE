@@ -483,6 +483,14 @@ export interface CandidateResumeJson {
   certifications?: Array<string | Record<string, unknown>> | null;
 }
 
+export interface ExtractionIntegrity {
+  policy_version: string;
+  accepted_counts?: Record<string, number>;
+  rejected_counts?: Record<string, number>;
+  duplicate_counts?: Record<string, number>;
+  source_sections_found?: Record<string, boolean>;
+}
+
 export interface CVUploadResponse {
   scan_id: string;
   filename: string;
@@ -557,6 +565,7 @@ export interface CVUploadResponse {
   certifications?: Array<string | Record<string, unknown>> | Record<string, unknown> | null;
   resume_json?: CandidateResumeJson | null;
   normalized_resume?: Record<string, unknown> | null;
+  extraction_integrity?: ExtractionIntegrity | null;
   quality_metadata?: Record<string, unknown> | null;
   similar_candidates?: Array<Record<string, any>> | null;
   match_analysis?: CandidateMatchAnalysis | null;

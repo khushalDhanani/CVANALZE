@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 
@@ -46,6 +47,18 @@ class NormalizedEducation(BaseModel):
     interval: NormalizedDateInterval | None = None
     grade: NormalizedStringField | None = None
     evidence: list[str] = Field(default_factory=list)
+    source_section: str | None = None
+    source_heading: str | None = None
+
+
+class NormalizedProject(BaseModel):
+    name: NormalizedStringField = Field(default_factory=NormalizedStringField)
+    description: NormalizedStringField = Field(default_factory=NormalizedStringField)
+    technologies: list[str] = Field(default_factory=list)
+    bullet_points: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    source_section: str | None = None
+    source_heading: str | None = None
 
 
 class NormalizedContact(BaseModel):
@@ -69,5 +82,6 @@ class NormalizedResume(BaseModel):
     contact: NormalizedContact = Field(default_factory=NormalizedContact)
     skills: list[NormalizedSkill] = Field(default_factory=list)
     education: list[NormalizedEducation] = Field(default_factory=list)
+    projects: list[NormalizedProject] = Field(default_factory=list)
     employment: list[NormalizedEmployment] = Field(default_factory=list)
     experience: NormalizedExperienceSummary = Field(default_factory=NormalizedExperienceSummary)

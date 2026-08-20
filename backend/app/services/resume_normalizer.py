@@ -11,6 +11,7 @@ from app.schemas.normalized_resume import (
     NormalizedEducation,
     NormalizedEmployment,
     NormalizedExperienceSummary,
+    NormalizedProject,
     NormalizedResume,
     NormalizedSkill,
     NormalizedStringField,
@@ -61,10 +62,17 @@ class ResumeNormalizer:
                 phone=cls._normalize_phone(contact_info.get("phone")),
             ),
             skills=cls._normalize_skills(raw_skills),
-            education=[cls._normalize_education(item) for item in resume_json.get("education") or []],
+            education=[cls._normalize_education(item) for item in cls._record_collection(resume_json.get("education"))],
+            projects=[cls._normalize_project(item) for item in cls._record_collection(resume_json.get("projects"))],
             employment=employment,
             experience=cls._experience_summary_from_canonical(canonical_exp),
         )
+
+    @staticmethod
+    def _record_collection(value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        return [item for item in value[:256] if isinstance(item, dict)]
 
     @staticmethod
     def _normalize_email(raw_value: Any) -> NormalizedStringField:
@@ -158,7 +166,7 @@ class ResumeNormalizer:
         evidence = [value for value in (degree_raw, institution_raw, dates_raw, grade_raw) if value]
 
         return NormalizedEducation(
-            degree=cls._string_field(degree_raw, degree, 0.9 if degree_raw else 0.0),
+            degree=cls._string_field(degree_raw, degree, 0.9 if degree else 0.0),
             domain=cls._string_field(degree_raw, domain, 0.8 if domain else 0.0),
             institution=cls._string_field(
                 institution_raw,
@@ -168,6 +176,49 @@ class ResumeNormalizer:
             interval=cls._normalize_interval(dates_raw) if dates_raw else None,
             grade=cls._string_field(grade_raw, cls._clean_whitespace(grade_raw), 0.9) if grade_raw else None,
             evidence=evidence,
+            source_section=cls._as_string(item.get("source_section")),
+            source_heading=cls._as_string(item.get("source_heading")),
+        )
+
+    @classmethod
+    def _normalize_project(cls, item: Any) -> NormalizedProject:
+        if not isinstance(item, dict):
+            name = cls._as_string(item)
+            return NormalizedProject(
+                name=cls._string_field(name, cls._clean_whitespace(name), 0.5 if name else 0.0),
+                evidence=[name] if name else [],
+            )
+        name = (cls._as_string(item.get("name") or item.get("title")) or "")[:500] or None
+        description = (cls._as_string(item.get("description") or item.get("details")) or "")[:10_000] or None
+        raw_technologies = item.get("technologies") or item.get("tech_stack") or []
+        if isinstance(raw_technologies, str):
+            raw_technologies = re.split(r"[,|]+", raw_technologies)
+        raw_bullets = item.get("bullet_points") or item.get("responsibilities") or []
+        if isinstance(raw_bullets, str):
+            raw_bullets = [raw_bullets]
+        technologies = [
+            cls._clean_whitespace(str(value))[:500]
+            for value in raw_technologies[:64]
+            if cls._clean_whitespace(str(value))
+        ]
+        bullet_points = [
+            cls._clean_whitespace(str(value))[:2_000]
+            for value in raw_bullets[:128]
+            if cls._clean_whitespace(str(value))
+        ]
+        evidence = [value for value in [name, description, *technologies, *bullet_points] if value][:128]
+        return NormalizedProject(
+            name=cls._string_field(name, cls._clean_whitespace(name), 0.95 if name else 0.0),
+            description=cls._string_field(
+                description,
+                cls._clean_whitespace(description),
+                0.9 if description else 0.0,
+            ),
+            technologies=list(dict.fromkeys(technologies)),
+            bullet_points=list(dict.fromkeys(bullet_points)),
+            evidence=evidence,
+            source_section=cls._as_string(item.get("source_section")),
+            source_heading=cls._as_string(item.get("source_heading")),
         )
 
     @classmethod
@@ -235,7 +286,11 @@ class ResumeNormalizer:
     def _canonical_degree(cls, value: str | None) -> str | None:
         if not value:
             return None
+        if re.search(r"(?<![A-Za-z])MArch(?![A-Za-z])", value):
+            return "M.Arch"
         checks = (
+            (r"\bh\.?\s*s\.?\s*c\.?\b|\bhigher secondary\b|\bclass\s+(?:xii|12)\b|\b12th\b", "H.S.C"),
+            (r"\bs\.?\s*s\.?\s*c\.?\b|\bsecondary school\b|\bclass\s+(?:x|10)\b|\b10th\b", "S.S.C"),
             (r"\b(b\.?\s*tech|bachelor of technology)\b", "B.Tech"),
             (r"\b(b\.?\s*e\.?|bachelor of engineering)\b", "B.E."),
             (r"\b(b\.?\s*sc\.?|bachelor of science)\b", "B.Sc."),
@@ -256,7 +311,7 @@ class ResumeNormalizer:
             (r"\b(m\.?\s*com\.?|mcom|master of commerce)\b", "M.Com"),
             (r"\b(m\.?\s*a\.?|master of arts)\b", "M.A."),
             (r"\b(m\.?\s*pharm|master of pharmacy)\b", "M.Pharm"),
-            (r"\b(m\.?\s*arch|master of architecture)\b", "M.Arch"),
+            (r"\b(m(?:\.\s*|\s+)arch\.?|master of architecture)\b", "M.Arch"),
             (r"\b(m\.?\s*des|master of design)\b", "M.Des"),
             (r"\b(m\.?\s*ed|master of education)\b", "M.Ed"),
             (r"\b(l\.?l\.?m|master of laws?)\b", "LLM"),
@@ -272,7 +327,7 @@ class ResumeNormalizer:
         for pattern, canonical in checks:
             if re.search(pattern, value, re.IGNORECASE):
                 return canonical
-        return cls._clean_whitespace(value)
+        return None
 
     @staticmethod
     def _education_domain(value: str | None) -> str | None:

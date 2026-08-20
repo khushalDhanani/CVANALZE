@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import asyncio
 import hashlib
 from contextlib import asynccontextmanager
-from datetime import timezone, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -541,6 +542,7 @@ async def process_cv_file(
                 "quality_metrics": quality_metrics,
                 "resume_json": resume_json,
                 "normalized_resume": normalized_resume.model_dump(mode="json"),
+                "extraction_integrity": resume_json.get("extraction_integrity"),
                 "characters": len(extraction.markdown),
                 "page_count": extraction.page_count,
                 "is_scanned": extraction.is_scanned,

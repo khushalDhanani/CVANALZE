@@ -2440,3 +2440,146 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Reused terminal-result synchronization for exhausted abandoned jobs, generic failed RQ jobs, and terminal workhorse crashes.
   - Added three regression tests covering exhausted abandonment, recoverable abandonment, and terminal workhorse-result synchronization.
   - Verified the complete focused queue/batch unit file passed with 8 tests and both changed Python files passed Ruff.
+
+---
+
+### Entry #073
+- **Timestamp**: 2026-08-20T13:20:07+0530
+- **Scope**: PostgreSQL application connection-capacity alignment
+- **Category**: Backend Reliability, Infrastructure Configuration & Tests
+- **Author**: Codex
+- **Modified Files**:
+  - `docker-compose.yml`
+  - `docker-compose.local.yml`
+  - `backend/tests/unit/core/test_compose_configuration_contract.py`
+  - `workstats.md`
+- **Summary**: Bounded each backend process's PostgreSQL connection pool and increased the local database connection ceiling with explicit operational headroom.
+- **Details**:
+  - Set shared PostgreSQL pool defaults to three persistent connections, two overflow connections, and a five-second pool checkout timeout for production and local Compose environments.
+  - Increased the local PostgreSQL `max_connections` setting from 20 to 40, allowing the four runtime backend services a maximum aggregate pool budget of 20 connections while reserving 20 for migrations, administration, health checks, and temporary overlap.
+  - Added a Compose contract regression test that derives the aggregate runtime pool budget from configured defaults and enforces the reserved-capacity invariant.
+- Confirmed the focused diff has no whitespace errors with `git diff --check`; test execution was not authorized and was not performed.
+
+---
+
+### Entry #074
+- **Timestamp**: 2026-08-20T13:46:08+0530
+- **Scope**: Resume Projects/Education integrity architecture
+- **Category**: Design & Documentation
+- **Author**: Codex
+- **Modified Files**:
+  - `docs/superpowers/specs/2026-08-20-resume-section-integrity-design.md`
+  - `workstats.md`
+- **Summary**: Defined the production architecture for deterministic section classification, evidence-backed Projects/Education extraction, cross-field validation, canonical storage/API consumption, defensive frontend rendering, and recommendation integrity at bulk scale.
+- **Details**:
+  - Documented the confirmed cross-layer failure chain, including full-document fallbacks, cross-mapped records, normalization collisions, frontend source unioning, and recommendation contamination.
+  - Defined canonical section provenance, accepted/rejected record diagnostics, bounded PII-safe logging, semantic version invalidation, and resumable dry-run-first reprocessing.
+  - Specified compatibility behavior and a multi-format regression matrix spanning parsing, normalization, API contracts, frontend mapping, and Interview Focus generation.
+
+---
+
+### Entry #075
+- **Timestamp**: 2026-08-20T13:46:08+0530
+- **Scope**: Resume Projects/Education integrity implementation planning
+- **Category**: Planning & Documentation
+- **Author**: Codex
+- **Modified Files**:
+  - `docs/superpowers/plans/2026-08-20-resume-section-integrity.md`
+  - `workstats.md`
+- **Summary**: Converted the approved resume-section integrity design into a sequential test-driven implementation plan covering classification, extraction, normalization, versioning, recommendations, frontend rendering, and bulk-safe operations.
+- **Details**:
+  - Defined red/green verification checkpoints and exact cross-task interfaces for canonical section provenance and integrity diagnostics.
+  - Included multi-format backend and frontend regressions, cache-version invalidation, PII-safe logging, and dry-run-first stored-result auditing.
+  - Preserved the shared dirty checkout constraint and explicitly excluded unrelated PostgreSQL-capacity changes from the implementation scope.
+
+---
+
+### Entry #076
+- **Timestamp**: 2026-08-20T14:35:57+0530
+- **Scope**: Production resume section integrity across extraction, API, UI, recommendations, and bulk operations
+- **Category**: Backend, Frontend, Reliability, Compatibility, Tests & Operations
+- **Author**: Codex
+- **Modified Files**:
+  - `README.md`
+  - `backend/app/core/config.py`
+  - `backend/app/schemas/cv.py`
+  - `backend/app/schemas/normalized_resume.py`
+  - `backend/app/services/cv_service.py`
+  - `backend/app/services/recommendation_service.py`
+  - `backend/app/services/resume_field_extractor.py`
+  - `backend/app/services/resume_normalizer.py`
+  - `backend/app/services/resume_quality.py`
+  - `backend/app/services/resume_sections.py`
+  - `backend/scripts/audit_resume_section_integrity.py`
+  - `backend/tests/unit/scripts/test_audit_resume_section_integrity.py`
+  - `backend/tests/unit/services/test_recommendation_section_integrity.py`
+  - `backend/tests/unit/services/test_resume_section_integrity.py`
+  - `frontend/src/__tests__/candidateDetailEnrichment.test.ts`
+  - `frontend/src/app/candidates/[id].tsx`
+  - `frontend/src/types/api.ts`
+  - `frontend/src/utils/candidateDetail.ts`
+  - `workstats.md`
+- **Summary**: Replaced full-document Projects/Education fallbacks with bounded section-aware extraction, propagated validated provenance through storage/API/UI/recommendations, and added a dry-run-first integrity audit for safe bulk rollout.
+- **Details**:
+  - Added a canonical section detector with normalized aliases, unknown-section boundaries, compatibility mapping, and document/section/line caps shared by extraction and quality scoring.
+  - Added pipe, repeated-whitespace, inline, multiline, explicit embedded, Markdown, bold, and plain-title extraction coverage with cross-field validators, stable rejection/duplicate diagnostics, evidence bounds, and PII-safe aggregate logging.
+  - Fixed the `March`/`M.Arch` collision, normalized H.S.C/S.S.C, preserved project and education provenance, rejected malformed scalar collections, and bumped parser/schema versions to `1.1.0`/`2.1.0` for cache invalidation.
+  - Added typed API integrity metadata and persisted it with canonical raw and normalized projections.
+  - Made frontend source selection version/count/provenance-aware, retained defensive legacy filtering/deduplication, rendered project bullets, and corrected compact-mode counts/expansion behavior.
+  - Gated project strengths and talent pools on validated evidence, deduplicated semantic gaps, preserved acronyms including P&ID, and grounded education/department Interview Focus in validated evidence and review state.
+  - Added a bounded, resumable audit that skips historical artifacts, checks versions, counts, provenance, semantic records, and normalized parity, and delegates optional reprocessing to the existing administrator API without rewriting result files.
+  - Verified the reported stored candidate's legacy output was 15 education records and 9 projects; deterministic re-extraction now yields exactly B.E. Chemical/GTU/2019/7.59 CGPA, H.S.C/GHSEB/2015/63%, S.S.C/GSEB/2013/67.5%, and zero projects.
+  - Passed 48 targeted backend tests, focused Ruff checks, the candidate-detail TypeScript runtime regression, TypeScript `--noEmit`, the read-only audit smoke run, and `git diff --check`.
+  - Frontend Expo lint was not completed because the checkout has no ESLint configuration and its Node 18 runtime is below Expo's required Node 20.19.4; the attempted automatic dependency edit was stopped and reverted. No production reprocessing, migration, Docker build, or full release gate was run.
+
+---
+
+### Entry #077
+- **Timestamp**: 2026-08-20T15:08:14+0530
+- **Scope**: CV skill extraction and legacy Recovery Stats containment
+- **Category**: Backend, Frontend, Reliability, Compatibility, Tests & Operations
+- **Author**: Codex
+- **Modified Files**:
+  - `README.md`
+  - `backend/app/core/config.py`
+  - `backend/app/core/rule_config_manager.py`
+  - `backend/app/services/resume_field_extractor.py`
+  - `backend/app/services/resume_sections.py`
+  - `backend/scripts/audit_resume_section_integrity.py`
+  - `backend/tests/unit/scripts/test_audit_resume_section_integrity.py`
+  - `backend/tests/unit/services/test_resume_section_integrity.py`
+  - `backend/tests/unit/services/test_resume_skill_integrity.py`
+  - `frontend/src/__tests__/candidateDetailEnrichment.test.ts`
+  - `frontend/src/utils/candidateDetail.ts`
+  - `workstats.md`
+- **Summary**: Removed unsafe authoritative skill recovery, made skill extraction section-aware and bounded, and contained legacy `Recovered Context Skills`/`Recovery Stats` payloads across audit and UI layers.
+- **Details**:
+  - Confirmed the root cause was the zero-skill fallback promoting capitalized phrases from work experience and projects into authoritative persisted skills.
+  - Expanded canonical skill-heading aliases for professional, computer, software, tools, technology, proficiency, expertise, and instrument/equipment formats.
+  - Removed contextual capitalized-term recovery from the persisted extraction path while preserving downstream inferred recommendation behavior as a separate non-authoritative concern.
+  - Added contact-, employment-, temporal-, wrong-section-, malformed-, and limit diagnostics for explicit skill sections without rejecting valid phrases such as Email Marketing or Address Verification.
+  - Bounded skill-section lines, total accepted skills, and per-category skills through typed extraction policy settings for predictable bulk-processing resource usage.
+  - Added skill accepted counts and source-section presence to extraction integrity metadata and bumped the parser version to `1.2.0` to invalidate incompatible cached results.
+  - Updated the read-only bounded audit to detect recovered/recovery skill or stats categories, missing skill-integrity contracts, raw count mismatches, and normalized projection mismatches.
+  - Quarantined legacy recovered-category values in candidate-detail mapping, including duplicate values reintroduced through normalized projections.
+  - Added multi-layout, missing-section, malformed-field, legacy-payload, and oversized-section regression coverage.
+  - Confirmed the focused diff has no whitespace errors with `git diff --check`; post-fix tests and linters were not executed because this task did not include explicit execution authorization.
+
+---
+
+### Entry #078
+- **Timestamp**: 2026-08-20T15:12:08+0530
+- **Scope**: Skill validator precision hardening after focused review
+- **Category**: Backend Reliability & Regression Tests
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/app/services/resume_field_extractor.py`
+  - `backend/tests/unit/services/test_resume_skill_integrity.py`
+  - `workstats.md`
+- **Summary**: Tightened employment/contact-shaped skill rejection without suppressing valid technology and competency names.
+- **Details**:
+  - Replaced broad `@` rejection with email/phone value-shape checks so scoped packages such as `@angular/core` remain valid.
+  - Distinguished job-title structures from competencies containing role words, preserving Operator Training and Executive Coaching.
+  - Rejected seniority-prefixed, Roman/numeric-suffixed, contract-qualified, and ASCII/en-dash/em-dash-qualified job titles inside malformed Skills blocks.
+  - Added regression examples for valid contact-word competencies and multiple qualified employment-title layouts.
+  - Confirmed the final focused diff has no whitespace errors with `git diff --check`; tests and linters were not executed without explicit authorization.

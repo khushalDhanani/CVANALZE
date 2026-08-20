@@ -238,6 +238,164 @@ assertEquals(buildCandidateSkillsSummaryPresentation(missingDataEvidence.skills)
 
 assertEquals(humanizeRecruiterText('mandatory_failure'), 'Mandatory Requirement Gap');
 assertEquals(humanizeRecruiterText('domain_alignment'), 'Domain Match');
+
+const integrityCandidate = buildCandidateDetailViewModel({
+  scan_id: 'candidate-integrity',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-20',
+  markdown: '',
+  parser_version: '1.1.0',
+  schema_version: '2.1.0',
+  extraction_integrity: {
+    policy_version: 'section-integrity-1.0.0',
+    accepted_counts: { education: 3, projects: 0 },
+    rejected_counts: {},
+    duplicate_counts: {},
+    source_sections_found: { education: true, projects: false },
+  },
+  resume_json: {
+    education: [{ degree: 'raw duplicate', institution: 'must not render' }],
+    projects: [{ name: 'raw duplicate', description: 'must not render' }],
+  },
+  normalized_resume: {
+    education: [
+      { degree: { normalized_value: 'B.E.' }, institution: { normalized_value: 'GTU' }, interval: { raw_value: '2019' }, grade: { normalized_value: '7.59 CGPA' }, source_section: 'education' },
+      { degree: { normalized_value: 'H.S.C' }, institution: { normalized_value: 'GHSEB' }, interval: { raw_value: '2015' }, grade: { normalized_value: '63%' }, source_section: 'education' },
+      { degree: { normalized_value: 'S.S.C' }, institution: { normalized_value: 'GSEB' }, interval: { raw_value: '2013' }, grade: { normalized_value: '67.5%' }, source_section: 'education' },
+    ],
+    projects: [],
+  },
+});
+assertEquals(integrityCandidate.education, [
+  { degree: 'B.E.', institution: 'GTU', dates: '2019', grade: '7.59 CGPA' },
+  { degree: 'H.S.C', institution: 'GHSEB', dates: '2015', grade: '63%' },
+  { degree: 'S.S.C', institution: 'GSEB', dates: '2013', grade: '67.5%' },
+]);
+assertEquals(integrityCandidate.projects, []);
+
+const authoritativeDescriptionProject = buildCandidateDetailViewModel({
+  scan_id: 'candidate-description-project',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-20',
+  markdown: '',
+  parser_version: '1.1.0',
+  schema_version: '2.1.0',
+  extraction_integrity: {
+    policy_version: 'section-integrity-1.0.0',
+    accepted_counts: { education: 1, projects: 1 },
+  },
+  normalized_resume: {
+    education: [{ degree: { normalized_value: 'Chartered Accountant' }, source_section: 'education' }],
+    projects: [{ name: { normalized_value: 'Forecasting' }, description: { normalized_value: 'Built a demand model.' }, source_section: 'projects' }],
+  },
+});
+assertEquals(authoritativeDescriptionProject.education.map((item) => item.degree), ['Chartered Accountant']);
+assertEquals(authoritativeDescriptionProject.projects.map((item) => item.name), ['Forecasting']);
+
+const integrityFallbackCandidate = buildCandidateDetailViewModel({
+  scan_id: 'candidate-integrity-fallback',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-20',
+  markdown: '',
+  parser_version: '1.1.0',
+  schema_version: '2.1.0',
+  extraction_integrity: {
+    policy_version: 'section-integrity-1.0.0',
+    accepted_counts: { education: 2, projects: 0 },
+  },
+  resume_json: {
+    education: [
+      { degree: 'B.E. Chemical', institution: 'GTU', dates: '2019', source_section: 'education' },
+      { degree: 'H.S.C', institution: 'GHSEB', dates: '2015', source_section: 'education' },
+    ],
+    projects: [],
+  },
+  normalized_resume: {
+    education: [{ degree: { normalized_value: 'B.E.' }, institution: { normalized_value: 'GTU' } }],
+    projects: [],
+  },
+});
+assertEquals(integrityFallbackCandidate.education.map((item) => item.degree), ['B.E. Chemical', 'H.S.C']);
+
+const malformedIntegrityCandidate = buildCandidateDetailViewModel({
+  scan_id: 'candidate-malformed-integrity',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-20',
+  markdown: '',
+  parser_version: '1.1.0',
+  schema_version: '2.1.0',
+  extraction_integrity: {
+    policy_version: 'section-integrity-1.0.0',
+    accepted_counts: { education: 1, projects: 1 },
+  },
+  normalized_resume: {
+    education: [{ degree: { normalized_value: 'March 2025' }, institution: { normalized_value: 'Work Experience' }, source_section: 'experience' }],
+    projects: [{ name: { normalized_value: 'Shift Engineer' }, description: { normalized_value: 'Example Ltd | March 2021 – March 2024' }, source_section: 'experience' }],
+  },
+});
+assertEquals(malformedIntegrityCandidate.education, []);
+assertEquals(malformedIntegrityCandidate.projects, []);
+
+const missingIntegrityCountsCandidate = buildCandidateDetailViewModel({
+  scan_id: 'candidate-missing-counts',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-20',
+  markdown: '',
+  parser_version: '1.1.0',
+  schema_version: '2.1.0',
+  extraction_integrity: { policy_version: 'section-integrity-1.0.0' },
+  normalized_resume: {
+    education: [{ degree: { normalized_value: 'Unconfigured Qualification' }, source_section: 'education' }],
+    projects: [{ name: { normalized_value: 'Forecasting' }, description: { normalized_value: 'Built a model.' }, source_section: 'projects' }],
+  },
+});
+assertEquals(missingIntegrityCountsCandidate.education, []);
+assertEquals(missingIntegrityCountsCandidate.projects, []);
+
+const legacyCrossMappedCandidate = buildCandidateDetailViewModel({
+  scan_id: 'candidate-legacy',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-20',
+  markdown: '',
+  resume_json: {
+    education: [
+      { institution: 'Safety & Compliance' },
+      { degree: '(B.E. Chemical)', institution: 'SAMPLE CANDIDATE NAME' },
+      { institution: 'Work Experience', degree: 'Example Ltd | March 2025 – till date' },
+    ],
+    projects: [
+      { name: 'Professional Profile Summary', description: 'Summary text' },
+      { name: 'Shift Engineer', description: 'Example Ltd | March 2021 – March 2024' },
+      { name: 'Declaration', description: 'Declaration text' },
+    ],
+  },
+});
+assertEquals(legacyCrossMappedCandidate.education, []);
+assertEquals(legacyCrossMappedCandidate.projects, []);
+
+const legacyRecoveredSkillsCandidate = buildCandidateDetailViewModel({
+  scan_id: 'candidate-recovered-skills',
+  filename: 'candidate.pdf',
+  parsed_at: '2026-08-20',
+  markdown: '',
+  resume_json: {
+    skills: {
+      all_skills: ['Sample Candidate', 'Address', 'SAP'],
+      categorized: {
+        'Recovered Context Skills': ['Sample Candidate', 'Address'],
+        'Recovery Stats': ['SAP'],
+      },
+    },
+  },
+  normalized_resume: {
+    skills: [
+      { normalized_value: 'Sample Candidate' },
+      { normalized_value: 'Address' },
+      { normalized_value: 'SAP' },
+    ],
+  },
+});
+assertEquals(legacyRecoveredSkillsCandidate.skills, []);
 assertEquals(humanizeRecruiterText('cross_domain_guard'), 'Role/Domain Conflict');
 assertEquals(humanizeRecruiterText('experience_gap'), 'Experience Gap');
 assertEquals(humanizeRecruiterText('education_conflict'), 'Education Concern');

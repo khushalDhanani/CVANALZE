@@ -327,12 +327,21 @@ from PostgreSQL. `seed_taxonomy_from_json.py` retains its historical name but re
 The following commands are manual evaluation or reprocessing operations and are not application startup steps:
 
 ```bash
+uv run python scripts/audit_resume_section_integrity.py --results-dir uploads/results --batch-size 100
 uv run python scripts/reprocess_all_cvs.py
 uv run python scripts/reprocess_matching_quality_fixtures.py
 uv run python scripts/run_llm_reliability_evaluations.py
 ```
 
+The section-integrity audit is read-only by default. Its `next_cursor` output supports bounded continuation with
+`--cursor <filename>`. To queue only affected candidates through the existing identity-safe API, add
+`--reprocess --api-base-url http://127.0.0.1:8000` and set `CV_AUDIT_API_KEY` to an administrator API key when authentication is enabled.
+The audit also marks legacy `Recovered Context Skills`/`Recovery Stats` payloads and incomplete skill-integrity
+metadata for reprocessing; authoritative extraction never promotes work-history or contact text into stored skills.
 Run reprocessing only during an approved maintenance window because it queues or recomputes persisted candidate results.
+During rollout, monitor the audit reason counts, RQ queue depth, terminal processing failures, and API/database health between
+batches. Stop the batch on sustained failures; rollback consists of stopping reprocessing and redeploying the prior application
+artifact with its prior extraction-version configuration. The command never rewrites stored result JSON directly.
 
 Start the API and worker in separate terminals from `backend/` so they share the same configured paths:
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from datetime import datetime
 from typing import Any
 
@@ -8,6 +9,14 @@ from app.core.config import settings
 from app.schemas.match import CandidateMatchAnalysis
 from app.schemas.normalized_resume import NormalizedResume
 from app.schemas.profile import DynamicCandidateProfile
+
+
+class ExtractionIntegrity(BaseModel):
+    policy_version: str
+    accepted_counts: dict[str, int] = Field(default_factory=dict)
+    rejected_counts: dict[str, int] = Field(default_factory=dict)
+    duplicate_counts: dict[str, int] = Field(default_factory=dict)
+    source_sections_found: dict[str, bool] = Field(default_factory=dict)
 
 
 class CVProcessingResponse(BaseModel):
@@ -107,6 +116,10 @@ class CVUploadResponse(BaseModel):
     normalized_resume: NormalizedResume | None = Field(
         None,
         description="Typed additive resume normalization with raw values, confidence, and evidence",
+    )
+    extraction_integrity: ExtractionIntegrity | None = Field(
+        default=None,
+        description="Deterministic accepted/rejected extraction counts without raw CV content",
     )
     full_name: str | None = Field(None, description="Extracted candidate full name")
     candidate_name: str | None = Field(None, description="Extracted candidate name")

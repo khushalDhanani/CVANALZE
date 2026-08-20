@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import re
 from typing import Any
 
 from app.core.rule_config_manager import RuleConfigManager
 from app.services.resume_field_extractor import ResumeFieldExtractor
+from app.services.resume_sections import ResumeSectionDetector, SectionKind
 
 
 class ResumeQualityMetrics:
@@ -19,8 +21,14 @@ class ResumeQualityMetrics:
         clean_text = text.strip()
         words = re.findall(r"\b[a-zA-Z0-9_+-]+\b", clean_text)
         resume_quality = RuleConfigManager.get_resume_quality_rules()
-        text_lower = clean_text.lower()
-        sections_detected = [name for name, pattern in RuleConfigManager.get_compiled_section_patterns().items() if pattern.search(text_lower)]
+        detected = ResumeSectionDetector.detect(clean_text.splitlines())
+        sections_detected = list(
+            dict.fromkeys(
+                section.kind.value
+                for section in detected.sections
+                if section.kind not in {SectionKind.GENERAL, SectionKind.UNKNOWN}
+            )
+        )
 
         core_sections = set(resume_quality.core_sections)
         section_score = len([section for section in sections_detected if section in core_sections]) * resume_quality.section_weight

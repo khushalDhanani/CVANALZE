@@ -789,6 +789,7 @@ export default function CandidateDetailScreen() {
 
   const renderCvTab = () => {
     const projectItems = candidateView?.projects || [];
+    const visibleProjects = showAllCvDetails ? projectItems : projectItems.slice(0, visibleLimit);
     const focusItems = showAllCvDetails ? interviewFocusAreas : interviewFocusAreas.slice(0, 3);
     const similarItems = showAllCvDetails ? data?.similar_candidates || [] : (data?.similar_candidates || []).slice(0, 3);
     return (
@@ -824,7 +825,7 @@ export default function CandidateDetailScreen() {
           </Card>
           <Card className="gap-2.5 shadow-none border-border lg:flex-1">
             <Text className="text-xs tracking-wider uppercase font-sans-bold text-text-primary">Projects ({projectItems.length}) & Interview Focus</Text>
-            {projectItems.length ? projectItems.map((project, index) => (
+            {visibleProjects.length ? visibleProjects.map((project, index) => (
               <View key={`${project.name || 'project'}-${index}`} className="gap-1 py-1 border-b border-border/40 last:border-b-0">
                 <Text className="text-xs font-sans-bold text-text-primary">{project.name || `Project ${index + 1}`}</Text>
                 {project.description ? (
@@ -834,6 +835,13 @@ export default function CandidateDetailScreen() {
                   <View className="flex-row flex-wrap gap-1 mt-0.5">
                     {project.technologies.map((tech) => (
                       <Badge key={tech} label={tech} tone="neutral" />
+                    ))}
+                  </View>
+                ) : null}
+                {project.bulletPoints?.length ? (
+                  <View className="gap-0.5 mt-0.5">
+                    {project.bulletPoints.map((bullet) => (
+                      <Text key={bullet} className="text-[11px] leading-4 text-text-primary">• {bullet}</Text>
                     ))}
                   </View>
                 ) : null}
@@ -877,7 +885,7 @@ export default function CandidateDetailScreen() {
             </View>
           </Card>
         ) : null}
-        {(candidateView?.projects.length || interviewFocusAreas.length || suggestedRoles.length > visibleLimit
+        {(projectItems.length > visibleLimit || interviewFocusAreas.length > 3 || suggestedRoles.length > visibleLimit
           || talentPools.length > visibleLimit || (data?.similar_candidates?.length || 0) > 3) ? (
           <View className="items-start">
             <Button

@@ -1,11 +1,13 @@
 from __future__ import annotations
+
+import re
 from typing import Any
 
 from app.core.config import settings
 from app.repositories.job import JobRepository
 from app.repositories.result import ResultRepository
 from app.schemas.scoring_config import ScoringConfig
-from app.services.domain_embedding_service import DomainEmbeddingService
+from app.services.resume_sections import ResumeSectionDetector
 
 
 class RecommendationService:
@@ -29,6 +31,150 @@ class RecommendationService:
     def _is_strong_match(match: dict[str, Any], threshold: float) -> bool:
         from app.services.match_evaluators import VacancyFitEvaluator
         return VacancyFitEvaluator.is_eligible_match(match, high_threshold=threshold)
+
+    @staticmethod
+    def _deduplicate_missing_qualifications(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        deduplicated: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in items:
+            requirement = str(item.get("requirement") or "").strip()
+            semantic_key = re.sub(
+                r"\b(?:missing\s+skill|skill\s+gap|criterion|mandatory\s+constraint)\b",
+                " ",
+                requirement,
+                flags=re.IGNORECASE,
+            )
+            semantic_key = re.sub(r"[^a-z0-9]+", " ", semantic_key.casefold()).strip()
+            if not semantic_key or semantic_key in seen:
+                continue
+            seen.add(semantic_key)
+            deduplicated.append(item)
+        return deduplicated
+
+    @staticmethod
+    def _skill_display(value: str) -> str:
+        acronyms = {"sap": "SAP", "dcs": "DCS", "scada": "SCADA", "hazop": "HAZOP", "hira": "HIRA", "pssr": "PSSR", "jsa": "JSA"}
+        if value.strip().casefold() in {"p&id", "p and id", "pid"}:
+            return "P&ID"
+        words = re.split(r"(\W+)", value.strip())
+        return "".join(acronyms.get(word.casefold(), word) if word.isalnum() else word for word in words)
+
+    @staticmethod
+    def _is_authoritative_department(
+        *,
+        department_id: Any,
+        department_name: str,
+        confidence: float,
+        manual_review_required: bool,
+    ) -> bool:
+        return bool(
+            department_id is not None
+            and department_name
+            and department_name != "NO_STRONG_MAIN_DEPARTMENT_MATCH"
+            and confidence >= 0.5
+            and not manual_review_required
+        )
+
+    @classmethod
+    def _build_interview_focus(
+        cls,
+        *,
+        missing_qualifications: list[dict[str, Any]],
+        candidate_skills: list[str],
+        primary_department: str,
+        authoritative_department: bool,
+        education_evidence: list[str] | None = None,
+    ) -> list[str]:
+        focus: list[str] = []
+        if missing_qualifications:
+            focus.append(
+                f"Probe deeply on gaps: {missing_qualifications[0].get('requirement', 'Technical requirements')}"
+            )
+        education_gap = next(
+            (
+                item
+                for item in missing_qualifications
+                if "education" in str(item.get("type") or item.get("category") or "").casefold()
+                or re.search(r"\b(?:degree|education|bachelor|master|diploma)\b", str(item.get("requirement") or ""), re.IGNORECASE)
+            ),
+            None,
+        )
+        if education_gap:
+            evidence_summary = ", ".join((education_evidence or [])[:2]) or "no validated candidate degree"
+            focus.append(
+                f"Verify validated education ({evidence_summary}) against: "
+                f"{education_gap.get('requirement', 'vacancy education requirement')}."
+            )
+        if candidate_skills:
+            first = cls._skill_display(candidate_skills[0])
+            second = cls._skill_display(candidate_skills[1]) if len(candidate_skills) > 1 else "core domain tools"
+            focus.append(f"Validate claimed expertise in {first} and {second}.")
+        if primary_department:
+            if authoritative_department:
+                focus.append(f"Assess cultural and departmental fit for {primary_department}.")
+            else:
+                focus.append(f"Clarify departmental fit before assigning {primary_department}.")
+        return focus
+
+    @staticmethod
+    def _validated_project_count(
+        resume_json: dict[str, Any],
+        extraction_integrity: dict[str, Any] | None,
+    ) -> int:
+        projects = resume_json.get("projects") or []
+        if not isinstance(projects, list):
+            return 0
+        policy_version = str((extraction_integrity or {}).get("policy_version") or "")
+        if policy_version.startswith("section-integrity-"):
+            return sum(1 for item in projects if isinstance(item, dict) and item.get("source_section") == "projects")
+
+        count = 0
+        employment_range = re.compile(
+            r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\s*"
+            r"(?:-|–|—|to|till|until)\s*(?:present|current|till date|"
+            r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4})\b",
+            re.IGNORECASE,
+        )
+        for item in projects:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or item.get("title") or "").strip()
+            description = str(item.get("description") or "")
+            if not name or ResumeSectionDetector.classify_heading(name) is not None:
+                continue
+            if employment_range.search(description) or re.search(r"[@☎📞✉🏠]|\b(?:phone|email|address)\b", description, re.IGNORECASE):
+                continue
+            has_explicit_evidence = bool(
+                item.get("technologies")
+                or item.get("tech_stack")
+                or item.get("bullet_points")
+                or item.get("responsibilities")
+                or re.search(r"\bproject\b", name, re.IGNORECASE)
+            )
+            if has_explicit_evidence:
+                count += 1
+        return count
+
+    @staticmethod
+    def _validated_education_degrees(
+        resume_json: dict[str, Any],
+        extraction_integrity: dict[str, Any] | None,
+    ) -> list[str]:
+        policy_version = str((extraction_integrity or {}).get("policy_version") or "")
+        if not policy_version.startswith("section-integrity-"):
+            return []
+        education = resume_json.get("education")
+        if not isinstance(education, list):
+            return []
+        return list(
+            dict.fromkeys(
+                str(item.get("degree") or "").strip()
+                for item in education
+                if isinstance(item, dict)
+                and item.get("source_section") == "education"
+                and str(item.get("degree") or "").strip()
+            )
+        )
 
     @classmethod
     def get_candidate_recommendations(cls, candidate_id: str) -> dict[str, Any]:
@@ -185,8 +331,6 @@ class RecommendationService:
         if not candidate_skills:
             candidate_skills = cls._extract_skills_from_work_experience(resume_json, r.get("text") or r.get("markdown") or "", all_jobs)
 
-        cand_skills_lower_set = {s.lower() for s in candidate_skills}
-
         # Extract candidate existing certifications
         raw_certs = resume_json.get("certifications") or resume_json.get("licenses_certifications") or []
         existing_certs = []
@@ -208,6 +352,10 @@ class RecommendationService:
             exp_yrs = (r.get("quality_metrics") or {}).get("experience_years") or 0.0
             if exp_yrs > 0:
                 strengths.append(f"Professional Experience: {exp_yrs} years in {prof_domain}")
+        validated_project_count = cls._validated_project_count(resume_json, r.get("extraction_integrity"))
+        strengths = [value for value in strengths if not str(value).startswith("Project Experience:")]
+        if validated_project_count:
+            strengths.append(f"Project Experience: {validated_project_count} documented project(s)")
 
         best_vacancies = []
         for vac in eligible_openings[: settings.MAX_RECOMMENDED_VACANCIES]:
@@ -346,14 +494,6 @@ class RecommendationService:
                 f"Strong alignment for {primary_dept or 'relevant'} roles based on {prof_domain or 'candidate'} experience."
             )
 
-        # Generate Interview Focus Areas
-        interview_focus_areas = []
-        if missing_quals:
-            interview_focus_areas.append(f"Probe deeply on gaps: {missing_quals[0].get('requirement', 'Technical requirements')}")
-        if candidate_skills:
-            interview_focus_areas.append(f"Validate claimed expertise in {candidate_skills[0].title()} and {candidate_skills[1].title() if len(candidate_skills) > 1 else 'core domain tools'}.")
-        interview_focus_areas.append(f"Assess cultural and departmental fit for {primary_dept}.")
-
         # Generate Risk Flags
         risk_flags = []
         for qual in missing_quals:
@@ -448,6 +588,31 @@ class RecommendationService:
         main_dept_name = main_dept_cls.get("main_department_name") or "NO_STRONG_MAIN_DEPARTMENT_MATCH"
         main_dept_conf = float(main_dept_cls.get("confidence") or 0.0)
         main_dept_reason = main_dept_cls.get("reasoning") or "No main department classification reasoning provided."
+        manual_department_review = bool(
+            main_dept_cls.get("manual_review_required")
+            or main_dept_cls.get("requires_manual_review")
+            or match_analysis.get("department_review_required")
+            or str(match_analysis.get("match_status") or "").upper() == "MANUAL_REVIEW"
+        )
+        authoritative_department = cls._is_authoritative_department(
+            department_id=main_dept_id,
+            department_name=main_dept_name,
+            confidence=main_dept_conf,
+            manual_review_required=manual_department_review,
+        )
+        missing_quals = cls._deduplicate_missing_qualifications(missing_quals)
+        interview_focus_areas = cls._build_interview_focus(
+            missing_qualifications=missing_quals,
+            candidate_skills=candidate_skills,
+            primary_department=primary_dept,
+            authoritative_department=authoritative_department,
+            education_evidence=cls._validated_education_degrees(
+                resume_json,
+                r.get("extraction_integrity"),
+            ),
+        )
+        if not authoritative_department:
+            talent_pools = []
 
         return {
             "candidate_id": cv_key,

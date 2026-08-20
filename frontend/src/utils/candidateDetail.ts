@@ -479,9 +479,75 @@ const mapEducation = (value: unknown): CandidateEducationView | undefined => {
     institution: firstCandidateText(value.institution, value.university, value.school),
     dates: firstCandidateText(isRecord(value.interval) ? value.interval.raw_value : undefined, value.dates, formatCandidateDateRange(value), value.passing_year, value.year),
     grade: firstCandidateText(value.grade, value.score, value.gpa),
-    details: firstCandidateText(value.details, value.description),
+    details: firstCandidateText(value.details, value.description) || cleanList(value.details).join(' • ') || undefined,
   };
   return Object.values(item).some(Boolean) ? item : undefined;
+};
+
+const normalizeFingerprintPart = (value: string | undefined): string => (value || '').toLocaleLowerCase().replace(/[^a-z0-9]+/g, '');
+
+const LEGACY_SECTION_LABELS = new Set([
+  'contact', 'profile', 'profile summary', 'professional profile summary', 'objective', 'summary',
+  'education', 'educational background', 'work experience', 'experience', 'technical skills', 'skills',
+  'safety & compliance', 'safety and compliance', 'core competencies', 'languages', 'interests', 'declaration',
+]);
+const EDUCATION_QUALIFICATION = /\b(?:b\.?\s*e\.?|b\.?\s*tech|b\.?\s*sc|bca|bba|b\.?\s*com|b\.?\s*a\.?|b\.?\s*pharm|b\.?\s*arch|m\.?\s*e\.?|m\.?\s*tech|m\.?\s*sc|mca|mba|m\.?\s*com|m\.?\s*a\.?|m\.?\s*pharm|m(?:\.\s*|\s+)arch|master of architecture|ph\.?\s*d|diploma|iti|h\.?\s*s\.?\s*c|s\.?\s*s\.?\s*c|10th|12th|bachelor|master|doctorate)\b/i;
+const EMPLOYMENT_DATE_RANGE = /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\s*(?:-|–|—|to|till|until)\s*(?:present|current|till date|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4})\b/i;
+
+const isLegacyEducationView = (item: CandidateEducationView): boolean => {
+  const institution = (item.institution || '').trim();
+  if (!item.degree || !(EDUCATION_QUALIFICATION.test(item.degree) || /(^|[^A-Za-z])MArch([^A-Za-z]|$)/.test(item.degree))) return false;
+  if (LEGACY_SECTION_LABELS.has(institution.toLocaleLowerCase())) return false;
+  if (institution && institution === institution.toLocaleUpperCase() && institution.split(/\s+/).length >= 3) return false;
+  if (EMPLOYMENT_DATE_RANGE.test(item.degree)) return false;
+  return Boolean(institution || item.dates || item.grade);
+};
+
+const canonicalEducationFingerprint = (item: CandidateEducationView): string => {
+  const institution = normalizeFingerprintPart(item.institution);
+  const dates = normalizeFingerprintPart(item.dates);
+  if (institution && dates) return `${institution}|${dates}`;
+  const degree = normalizeFingerprintPart(item.degree)
+    .replace(/bachelorofengineering|bechemical|be$/, 'be')
+    .replace(/highersecondary|hsc$/, 'hsc')
+    .replace(/secondaryschool|ssc$/, 'ssc');
+  return `${degree}|${institution}|${dates}|${normalizeFingerprintPart(item.grade)}`;
+};
+
+const isLegacyProjectView = (item: CandidateProjectView): boolean => {
+  const name = (item.name || '').trim();
+  if (!name || LEGACY_SECTION_LABELS.has(name.toLocaleLowerCase())) return false;
+  if (EMPLOYMENT_DATE_RANGE.test(item.description || '')) return false;
+  if (/[@☎📞✉🏠]|\b(?:phone|email|address)\b/i.test(item.description || '')) return false;
+  return Boolean(item.technologies.length || item.bulletPoints.length || /\bproject\b/i.test(name));
+};
+
+const selectIntegrityCollection = (
+  normalizedValue: unknown,
+  rawValue: unknown,
+  expectedCount: unknown,
+  sourceSection: 'education' | 'projects',
+): unknown[] => {
+  const validatedItems = (value: unknown): unknown[] | undefined => (
+    Array.isArray(value)
+      ? value.filter((item) => isRecord(item) && cleanCandidateText(item.source_section) === sourceSection)
+      : undefined
+  );
+  const normalizedItems = validatedItems(normalizedValue);
+  const rawItems = validatedItems(rawValue);
+  if (typeof expectedCount === 'number' && Number.isInteger(expectedCount) && expectedCount >= 0) {
+    if (normalizedItems?.length === expectedCount) return normalizedItems;
+    if (rawItems?.length === expectedCount) return rawItems;
+    return [];
+  }
+  return normalizedItems || rawItems || [];
+};
+
+const versionAtLeast = (value: unknown, minimum: [number, number]): boolean => {
+  const match = cleanCandidateText(value)?.match(/^(\d+)\.(\d+)\./);
+  if (!match) return false;
+  const current: [number, number] = [Number(match[1]), Number(match[2])];
+  return current[0] > minimum[0] || (current[0] === minimum[0] && current[1] >= minimum[1]);
 };
 
 const mergeEducationSources = (...sources: unknown[]): CandidateEducationView[] => {
@@ -491,14 +557,8 @@ const mergeEducationSources = (...sources: unknown[]): CandidateEducationView[] 
     for (const rawItem of source) {
       const item = mapEducation(rawItem);
       if (!item) continue;
-      const existing = merged.find((candidate) => {
-        const sameDegree = item.degree && candidate.degree?.toLocaleLowerCase() === item.degree.toLocaleLowerCase();
-        const sameInstitution = item.institution && candidate.institution?.toLocaleLowerCase() === item.institution.toLocaleLowerCase();
-        const sameDetails = item.details && candidate.details?.toLocaleLowerCase() === item.details.toLocaleLowerCase();
-        const compatibleInstitution = sameInstitution || !item.institution || !candidate.institution;
-        const compatibleDegree = sameDegree || !item.degree || !candidate.degree;
-        return Boolean((sameDegree && compatibleInstitution) || (sameInstitution && compatibleDegree) || sameDetails);
-      });
+      const fingerprint = canonicalEducationFingerprint(item);
+      const existing = merged.find((candidate) => canonicalEducationFingerprint(candidate) === fingerprint);
       if (!existing) {
         merged.push(item);
         continue;
@@ -547,11 +607,37 @@ const mergeProjectSources = (...sources: unknown[]): CandidateProjectView[] => {
   return merged;
 };
 
+const isRecoveredSkillCategory = (category: string): boolean => (
+  /^recover(?:ed|y)\b.*\b(?:skills?|stats?)\b/i.test(category.trim())
+);
+
 const collectSkills = (value: unknown): string[] => {
   if (Array.isArray(value)) return cleanList(value);
   if (!isRecord(value)) return [];
-  const categorized = isRecord(value.categorized) ? Object.values(value.categorized).flatMap(cleanList) : [];
-  return unique([...cleanList(value.all_skills), ...cleanList(value.skills), ...categorized]);
+  const categorizedEntries = isRecord(value.categorized) ? Object.entries(value.categorized) : [];
+  const rejected = new Set(
+    categorizedEntries
+      .filter(([category]) => isRecoveredSkillCategory(category))
+      .flatMap(([, items]) => cleanList(items))
+      .map((item) => normalizeFingerprintPart(item)),
+  );
+  const categorized = categorizedEntries
+    .filter(([category]) => !isRecoveredSkillCategory(category))
+    .flatMap(([, items]) => cleanList(items));
+  return unique([...cleanList(value.all_skills), ...cleanList(value.skills), ...categorized])
+    .filter((skill) => !rejected.has(normalizeFingerprintPart(skill)));
+};
+
+const recoveredContextSkillFingerprints = (...values: unknown[]): Set<string> => {
+  const rejected = new Set<string>();
+  for (const value of values) {
+    if (!isRecord(value) || !isRecord(value.categorized)) continue;
+    for (const [category, items] of Object.entries(value.categorized)) {
+      if (!isRecoveredSkillCategory(category)) continue;
+      cleanList(items).forEach((item) => rejected.add(normalizeFingerprintPart(item)));
+    }
+  }
+  return rejected;
 };
 
 const collectCertifications = (value: unknown): string[] => {
@@ -572,10 +658,39 @@ export const buildCandidateDetailViewModel = (data: CVUploadResponse): Candidate
   const normalizedContact = isRecord(normalized.contact) ? normalized.contact : {};
   const experience = mergeExperienceSources(data.work_experience, resume.work_experience, resume.experience, normalized.employment);
   const currentExperience = experience.find((item) => item.title || item.company);
-  const education = mergeEducationSources(resume.education, normalized.education, data.education);
+  const integrityCounts = isRecord(data.extraction_integrity?.accepted_counts)
+    ? data.extraction_integrity.accepted_counts
+    : {};
+  const hasIntegrityContract = versionAtLeast(data.parser_version, [1, 1])
+    && versionAtLeast(data.schema_version, [2, 1])
+    && isRecord(data.extraction_integrity)
+    && cleanCandidateText(data.extraction_integrity.policy_version)?.startsWith('section-integrity-')
+    && Number.isInteger(integrityCounts.education)
+    && Number(integrityCounts.education) >= 0
+    && Number.isInteger(integrityCounts.projects)
+    && Number(integrityCounts.projects) >= 0;
+  const educationSource = hasIntegrityContract
+    ? selectIntegrityCollection(
+      normalized.education,
+      resume.education,
+      data.extraction_integrity?.accepted_counts?.education,
+      'education',
+    )
+    : [resume.education, normalized.education, data.education].flatMap((value) => (Array.isArray(value) ? value : []));
+  const education = mergeEducationSources(educationSource).filter((item) => hasIntegrityContract || isLegacyEducationView(item));
   const certifications = unique([...collectCertifications(resume.certifications), ...collectCertifications(normalized.certifications), ...collectCertifications(data.certifications)]);
-  const skills = unique([...collectSkills(resume.skills), ...collectSkills(normalized.skills), ...collectSkills(data.skills)]);
-  const projects = mergeProjectSources(resume.projects, normalized.projects, data.projects);
+  const rejectedRecoveredSkills = recoveredContextSkillFingerprints(resume.skills, data.skills);
+  const skills = unique([...collectSkills(resume.skills), ...collectSkills(normalized.skills), ...collectSkills(data.skills)])
+    .filter((skill) => !rejectedRecoveredSkills.has(normalizeFingerprintPart(skill)));
+  const projectSource = hasIntegrityContract
+    ? selectIntegrityCollection(
+      normalized.projects,
+      resume.projects,
+      data.extraction_integrity?.accepted_counts?.projects,
+      'projects',
+    )
+    : [resume.projects, normalized.projects, data.projects].flatMap((value) => (Array.isArray(value) ? value : []));
+  const projects = mergeProjectSources(projectSource).filter((item) => hasIntegrityContract || isLegacyProjectView(item));
 
   return {
     name: firstCandidateText(data.full_name, data.candidate_name, topLevelContact.full_name, topLevelContact.name, contact.full_name, contact.name, normalizedContact.full_name, normalizedContact.name),

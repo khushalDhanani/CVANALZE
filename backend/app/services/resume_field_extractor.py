@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import re
+import time
+from collections import Counter
 from typing import Any
 
 from app.core.logging import logger
 from app.core.rule_config_manager import ExtractionPolicy, PolicyRegistry, RuleConfigManager
 from app.services.dynamic_geo_heading_service import DynamicGeoAndHeadingService
 from app.services.resume_normalizer import ResumeNormalizer
+from app.services.resume_sections import ResumeSectionDetector, SectionDetectionResult, SectionKind
 
 # Field-label tokens that should never be treated as a job title.
 # Dynamically sourced from DynamicGeoAndHeadingService.
@@ -700,23 +704,41 @@ class ResumeFieldExtractor:
     ) -> dict[str, Any]:
         if not text:
             return {}
-        text_lines = text.splitlines()
+        validation_started = time.perf_counter()
+        document_ref = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:12]
+        text_lines = [
+            line[: ResumeSectionDetector.MAX_LINE_CHARS]
+            for line in text.splitlines()[: ResumeSectionDetector.MAX_TOTAL_LINES]
+        ]
         email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text)
         phone_match = re.search(r"(\+?\d{1,4}[\s.-]?)?\(?\d{3,5}\)?[\s.-]?\d{3,5}[\s.-]?\d{3,5}", text)
         email = email_match.group(0) if email_match else None
         phone = phone_match.group(0).strip() if phone_match else None
         location, location_confidence = cls.extract_location(text_lines, email, phone)
         name, name_confidence, confidence_level, name_source = cls.extract_candidate_name(text_lines, email, phone, location, filename)
-        logger.info(f"[NAME_EXTRACTION] Extracted '{name}' (confidence={name_confidence:.2f}, level='{confidence_level}', source='{name_source}')")
+        logger.info(
+            "[NAME_EXTRACTION] "
+            f"present={bool(name)} confidence={name_confidence:.2f} "
+            f"level='{confidence_level}' source='{name_source}'"
+        )
 
-        sections = cls._split_sections(text_lines)
+        detected_sections = ResumeSectionDetector.detect(text_lines)
+        sections = cls._sections_to_legacy_mapping(detected_sections)
         exp_lines = sections.get("experience", [])
         extracted_exp = cls._extract_employment(exp_lines)
         if not extracted_exp and sections.get("general"):
             gen_lines = sections.get("general", [])
             if any(cls._DATE_RANGE.search(line) for line in gen_lines):
                 extracted_exp = cls._extract_employment(gen_lines)
-        extracted_education = cls._extract_education(sections.get("education", []) or text_lines)
+        education_blocks = detected_sections.blocks(SectionKind.EDUCATION)
+        extracted_education = [
+            item
+            for block in education_blocks
+            for item in cls._extract_education(list(block.lines), source_heading=block.heading)
+        ]
+        extracted_education, education_rejections = cls._validate_education_records(extracted_education)
+        extracted_education, education_duplicates = cls._deduplicate_education(extracted_education)
+        extracted_education = extracted_education[:256]
         cls._recover_orphan_employment_dates(text, extracted_exp, extracted_education)
 
         latest_job = cls.resolve_latest_employment(extracted_exp)
@@ -727,6 +749,56 @@ class ResumeFieldExtractor:
             extracted_job_title = cls.extract_title_from_summary_or_header(
                 sections.get("summary", []), text_lines, candidate_name=name
             )
+
+        project_blocks = detected_sections.blocks(SectionKind.PROJECTS)
+        extracted_projects = [
+            item
+            for block in project_blocks
+            for item in cls._extract_projects(list(block.lines), source_heading=block.heading)
+        ]
+        if not extracted_projects:
+            extracted_projects = cls._extract_projects_from_text(text_lines)
+        extracted_projects, project_rejections = cls._validate_project_records(extracted_projects)
+        extracted_projects, project_duplicates = cls._deduplicate_projects(extracted_projects)
+        extracted_projects = extracted_projects[:256]
+        skill_blocks = (
+            *detected_sections.blocks(SectionKind.SKILLS),
+            *detected_sections.blocks(SectionKind.COMPETENCIES),
+        )
+        skill_rejections: Counter[str] = Counter()
+        extracted_skills = cls._extract_skills(
+            sections.get("skills", []),
+            rejected=skill_rejections,
+        )
+        rejected_counts = {
+            **{f"education.{reason}": count for reason, count in education_rejections.items()},
+            **{f"projects.{reason}": count for reason, count in project_rejections.items()},
+            **{f"skills.{reason}": count for reason, count in skill_rejections.items()},
+        }
+        if (
+            education_blocks
+            and not extracted_education
+            and not education_rejections
+            and any(line.strip() for block in education_blocks for line in block.lines)
+        ):
+            rejected_counts["education.INSUFFICIENT_EVIDENCE"] = 1
+        if (
+            project_blocks
+            and not extracted_projects
+            and not project_rejections
+            and any(line.strip() for block in project_blocks for line in block.lines)
+        ):
+            rejected_counts["projects.INSUFFICIENT_EVIDENCE"] = 1
+        if education_duplicates:
+            rejected_counts["education.DUPLICATE"] = education_duplicates
+        if project_duplicates:
+            rejected_counts["projects.DUPLICATE"] = project_duplicates
+        if (
+            skill_blocks
+            and not extracted_skills["all_skills"]
+            and any(line.strip() for block in skill_blocks for line in block.lines)
+        ):
+            rejected_counts["skills.INSUFFICIENT_EVIDENCE"] = 1
 
         result = {
             "contact_info": {
@@ -755,16 +827,36 @@ class ResumeFieldExtractor:
             "summary": "\n".join(sections.get("summary", [])).strip(),
             "work_experience": extracted_exp,
             "education": extracted_education,
-            "skills": cls._extract_skills(sections.get("skills", [])),
-            "projects": cls._extract_projects(sections.get("projects", [])) or cls._extract_projects_from_text(text_lines),
+            "skills": extracted_skills,
+            "projects": extracted_projects,
             "certifications": [line.lstrip("-• ").strip() for line in sections.get("certifications", []) if line.strip()],
             "quality_metrics": metrics or {},
+            "extraction_integrity": {
+                "policy_version": ResumeSectionDetector.POLICY_VERSION,
+                "accepted_counts": {
+                    "education": len(extracted_education),
+                    "projects": len(extracted_projects),
+                    "skills": len(extracted_skills["all_skills"]),
+                },
+                "rejected_counts": rejected_counts,
+                "duplicate_counts": {"education": education_duplicates, "projects": project_duplicates, "skills": 0},
+                "source_sections_found": {
+                    "education": bool(education_blocks),
+                    "projects": bool(project_blocks),
+                    "skills": bool(skill_blocks),
+                },
+            },
         }
-        
-        # Zero-skill recovery fallback
-        if not result["skills"]["all_skills"]:
-            result["skills"] = cls._recover_skills_from_context(result["work_experience"], result["projects"])
 
+        logger.info(
+            "[EXTRACTION_INTEGRITY] "
+            f"document_ref={document_ref} policy_version={ResumeSectionDetector.POLICY_VERSION} "
+            f"education_accepted={len(extracted_education)} projects_accepted={len(extracted_projects)} "
+            f"skills_accepted={len(extracted_skills['all_skills'])} "
+            f"education_duplicates={education_duplicates} projects_duplicates={project_duplicates} "
+            f"rejected_counts={rejected_counts} "
+            f"validation_duration_ms={(time.perf_counter() - validation_started) * 1000:.2f}"
+        )
         result["normalized"] = ResumeNormalizer.normalize(result, text).model_dump(mode="json")
         return result
 
@@ -802,38 +894,14 @@ class ResumeFieldExtractor:
 
     @classmethod
     def _split_sections(cls, lines: list[str]) -> dict[str, list[str]]:
-        sections: dict[str, list[str]] = {"general": []}
-        current = "general"
-        for line in lines:
-            stripped_line = line.strip()
-            # If line is an explicit field key-value pair, it belongs to the current section content
-            if re.match(r"^(?:company|organization|employer|designation|job\s*title|role|position|duration|period|tenure|location|responsibilities|languages?|frameworks?|tools?|databases?|technologies?|libraries?)\s*[:\-]+\s*\S+", stripped_line, re.IGNORECASE):
-                sections.setdefault(current, []).append(line)
-                continue
+        return cls._sections_to_legacy_mapping(ResumeSectionDetector.detect(lines))
 
-            match = cls._SECTION_HEADING.match(stripped_line)
-            if not match:
-                sections.setdefault(current, []).append(line)
-                continue
-            heading = match.group(1).upper()
-            if "PROJECT" in heading:
-                current = "projects"
-            elif any(k in heading for k in ("EXPERIENCE", "EMPLOYMENT", "EXPOSURE", "CAREER", "WORK HISTORY", "BACKGROUND", "WORK RECORD", "RECORD")) and "ACADEMIC" not in heading and "EDUCATION" not in heading:
-                current = "experience"
-            elif any(k in heading for k in ("EDUCATION", "ACADEMIC", "ACADEMICS", "QUALIFICATION")):
-                current = "education"
-            elif any(k in heading for k in ("SKILL", "COMPETENC")):
-                current = "skills"
-            elif "SUMMARY" in heading or "PROFILE" in heading or "OBJECTIVE" in heading:
-                current = "summary"
-            elif "CERTIFICATION" in heading or "CERTIFICATE" in heading:
-                current = "certifications"
-            else:
-                current = heading.lower()
-            sections.setdefault(current, [])
-            inline_content = stripped_line[match.end():].strip().lstrip(":-–—").strip()
-            if inline_content:
-                sections[current].append(inline_content)
+    @staticmethod
+    def _sections_to_legacy_mapping(detected: SectionDetectionResult) -> dict[str, list[str]]:
+        sections: dict[str, list[str]] = {"general": []}
+        for block in detected.sections:
+            target = "skills" if block.kind == SectionKind.COMPETENCIES else block.kind.value
+            sections.setdefault(target, []).extend(block.lines)
         return sections
 
     @classmethod
@@ -1196,42 +1264,252 @@ class ResumeFieldExtractor:
         commit()
         return jobs
 
+    @staticmethod
+    def _table_cells(line: str) -> list[str]:
+        stripped = line.strip()
+        if "|" not in stripped:
+            return []
+        return [cell.strip() for cell in stripped.strip("|").split("|")]
+
+    @staticmethod
+    def _is_table_separator(cells: list[str]) -> bool:
+        return bool(cells) and all(re.fullmatch(r":?-{2,}:?", cell.replace(" ", "")) for cell in cells)
+
     @classmethod
-    def _extract_education(cls, lines: list[str]) -> list[dict[str, Any]]:
+    def _has_education_qualification(cls, value: str) -> bool:
+        return bool(
+            cls.DEGREE_PATTERN.search(value)
+            or re.search(
+                r"\b(?:s\.?s\.?c|h\.?s\.?c|secondary school|higher secondary|high school|class\s+(?:x|xii|10|12)|10th|12th)\b",
+                value,
+                re.IGNORECASE,
+            )
+        )
+
+    @classmethod
+    def _extract_education(
+        cls,
+        lines: list[str],
+        *,
+        source_heading: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Extract evidence-backed education records from an education section only."""
         education: list[dict[str, Any]] = []
         current: dict[str, Any] = {}
-        degree_pattern = cls.DEGREE_PATTERN
+        table_headers: list[str] | None = None
+
+        def with_source(item: dict[str, Any]) -> dict[str, Any]:
+            item["source_section"] = "education"
+            if source_heading:
+                item["source_heading"] = source_heading
+            return item
 
         def commit() -> None:
             nonlocal current
-            if current.get("institution") or current.get("degree"):
-                education.append(current)
+            degree = str(current.get("degree") or "").strip()
+            institution = str(current.get("institution") or "").strip()
+            has_degree = bool(degree and cls._has_education_qualification(degree))
+            has_support = bool(institution or current.get("dates") or current.get("grade"))
+            if has_degree and has_support:
+                education.append(with_source(current))
             current = {}
+
+        def append_delimited_record(cells: list[str]) -> bool:
+            if len(cells) < 2 or not cls._has_education_qualification(cells[0]):
+                return False
+            item: dict[str, Any] = {"degree": cells[0]}
+            for value in cells[1:]:
+                if not value:
+                    continue
+                if not item.get("grade") and re.search(
+                    r"(?:\b(?:CPI|GPA|CGPA|Grade|Percentage|Score)\b|%)",
+                    value,
+                    re.IGNORECASE,
+                ):
+                    item["grade"] = value
+                elif not item.get("dates") and (
+                    cls._DATE_RANGE.search(value) or re.fullmatch(r"(?:19|20)\d{2}", value)
+                ):
+                    item["dates"] = value
+                elif not item.get("institution"):
+                    item["institution"] = value
+            if not (item.get("institution") or item.get("dates") or item.get("grade")):
+                return False
+            education.append(with_source(item))
+            return True
 
         for raw_line in lines:
             line = raw_line.strip()
             if not line:
                 continue
-            date_match = cls._DATE_RANGE.search(line) or re.search(r"\b(?:19|20)\d{2}\b", line)
-            if line.startswith("#"):
-                commit()
-                current["institution"] = line.replace("#", "").strip()
-            elif degree_pattern.search(line):
-                if current.get("degree"):
+            if "|" not in line:
+                delimited_cells = [
+                    value.strip()
+                    for value in re.split(r"(?:\t+|\s{2,}|,\s*)", line)
+                    if value.strip()
+                ]
+                if len(delimited_cells) >= 2 and cls._has_education_qualification(delimited_cells[0]):
                     commit()
+                    if append_delimited_record(delimited_cells):
+                        continue
+            cells = cls._table_cells(line)
+            if cells:
+                if cls._is_table_separator(cells):
+                    continue
+                normalized_cells = [re.sub(r"\s+", " ", cell).strip() for cell in cells]
+                header_text = " ".join(normalized_cells).casefold()
+                if any(token in header_text for token in ("course", "degree", "qualification")) and any(
+                    token in header_text for token in ("university", "institution", "board", "college")
+                ):
+                    table_headers = [cell.casefold() for cell in normalized_cells]
+                    continue
+                if table_headers and len(normalized_cells) >= 2:
+                    values = dict(zip(table_headers, normalized_cells, strict=False))
+
+                    def table_value(*tokens: str) -> str | None:
+                        return next((value for key, value in values.items() if any(token in key for token in tokens) and value), None)
+
+                    degree = table_value("course", "degree", "qualification", "program")
+                    institution = table_value("university", "institution", "board", "college", "school")
+                    dates = table_value("year", "passing", "date", "duration")
+                    grade = table_value("grade", "cgpa", "gpa", "percentage", "score", "result")
+                    if degree and cls._has_education_qualification(degree) and (institution or dates or grade):
+                        education.append(
+                            with_source(
+                                {
+                                    "degree": degree,
+                                    **({"institution": institution} if institution else {}),
+                                    **({"dates": dates} if dates else {}),
+                                    **({"grade": grade} if grade else {}),
+                                }
+                            )
+                        )
+                    continue
+                if len(normalized_cells) >= 2 and cls._has_education_qualification(normalized_cells[0]):
+                    education.append(
+                        with_source(
+                            {
+                                "degree": normalized_cells[0],
+                                "institution": normalized_cells[1],
+                                **({"dates": normalized_cells[2]} if len(normalized_cells) > 2 and normalized_cells[2] else {}),
+                                **({"grade": normalized_cells[3]} if len(normalized_cells) > 3 and normalized_cells[3] else {}),
+                            }
+                        )
+                    )
+                    continue
+
+            date_match = cls._DATE_RANGE.search(line) or re.search(r"\b(?:19|20)\d{2}\b", line)
+            if cls._has_education_qualification(line):
+                commit()
                 current["degree"] = line.lstrip("-• ").strip()
                 if date_match:
                     current["dates"] = date_match.group(0)
-            elif re.search(r"\b(CPI|GPA|CGPA|Grade)\b", line, re.IGNORECASE):
+            elif current and re.search(r"\b(CPI|GPA|CGPA|Grade|Percentage|Score)\b", line, re.IGNORECASE):
                 current["grade"] = line.lstrip("-• ").strip()
-            elif date_match:
-                current["dates"] = line
-            elif line.startswith(("-", "•")):
-                current.setdefault("details", []).append(line.lstrip("-• ").strip())
-            elif not current.get("institution"):
+            elif current and date_match:
+                current["dates"] = date_match.group(0)
+            elif current and not current.get("institution") and not line.startswith(("-", "•", "#")):
                 current["institution"] = line
+            elif current and line.startswith(("-", "•")):
+                current.setdefault("details", []).append(line.lstrip("-• ").strip())
         commit()
         return education
+
+    @staticmethod
+    def _deduplicate_education(items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+        deduplicated: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str, str]] = set()
+        duplicates = 0
+        for item in items:
+            fingerprint = tuple(
+                re.sub(r"\W+", "", str(item.get(field) or "").casefold())
+                for field in ("degree", "institution", "dates", "grade")
+            )
+            if fingerprint in seen:
+                duplicates += 1
+                continue
+            seen.add(fingerprint)
+            deduplicated.append(item)
+        return deduplicated, duplicates
+
+    @classmethod
+    def _validate_education_records(
+        cls, items: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, int]]:
+        accepted: list[dict[str, Any]] = []
+        rejected: Counter[str] = Counter()
+        institution_terms = re.compile(
+            r"\b(?:university|college|institute|institution|school|board|academy|polytechnic)\b",
+            re.IGNORECASE,
+        )
+        for item in items:
+            degree = str(item.get("degree") or "").strip()
+            institution = str(item.get("institution") or "").strip()
+            combined = " ".join(str(item.get(key) or "") for key in ("degree", "institution", "details"))
+            if re.search(r"[@☎📞✉🏠]|\b(?:phone|email|address)\b", combined, re.IGNORECASE):
+                rejected["CONTACT_SHAPED"] += 1
+                continue
+            if cls._DATE_RANGE.search(institution) or ResumeSectionDetector.classify_heading(institution) in {
+                SectionKind.EXPERIENCE,
+                SectionKind.PROJECTS,
+                SectionKind.SKILLS,
+                SectionKind.SAFETY,
+                SectionKind.DECLARATION,
+            }:
+                rejected["EMPLOYMENT_SHAPED"] += 1
+                continue
+            institution_words = institution.split()
+            leading_token = re.sub(r"\W", "", institution_words[0]) if institution_words else ""
+            has_leading_acronym = leading_token.isupper() and 2 <= len(leading_token) <= 4
+            if (
+                len(institution_words) >= 3
+                and not institution_terms.search(institution)
+                and not has_leading_acronym
+            ):
+                rejected["MALFORMED_VALUE"] += 1
+                continue
+            if not cls._has_education_qualification(degree):
+                rejected["MALFORMED_VALUE"] += 1
+                continue
+            accepted.append(item)
+        return accepted, dict(rejected)
+
+    @classmethod
+    def _validate_project_records(
+        cls, items: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, int]]:
+        accepted: list[dict[str, Any]] = []
+        rejected: Counter[str] = Counter()
+        for item in items:
+            title = str(item.get("name") or item.get("title") or "").strip()
+            evidence = " ".join(
+                [
+                    str(item.get("description") or ""),
+                    *[str(value) for value in item.get("bullet_points") or []],
+                    *[str(value) for value in item.get("technologies") or []],
+                ]
+            )
+            if ResumeSectionDetector.classify_heading(title) is not None:
+                rejected["SECTION_HEADING_ONLY"] += 1
+                continue
+            if re.search(r"[@☎📞✉🏠]|\b(?:phone|email|address)\b", evidence, re.IGNORECASE):
+                rejected["CONTACT_SHAPED"] += 1
+                continue
+            if cls._DATE_RANGE.search(evidence) and (
+                cls._looks_like_title(title) or cls.is_valid_job_title(title)
+            ):
+                rejected["EMPLOYMENT_SHAPED"] += 1
+                continue
+            if cls._has_education_qualification(title) or re.search(
+                r"\b(?:degree|university|college|cgpa|percentage)\b", evidence, re.IGNORECASE
+            ):
+                rejected["WRONG_SECTION"] += 1
+                continue
+            if not title or not evidence.strip():
+                rejected["INSUFFICIENT_EVIDENCE"] += 1
+                continue
+            accepted.append(item)
+        return accepted, dict(rejected)
 
     @classmethod
     def _is_junk_skill(cls, item: str) -> bool:
@@ -1267,30 +1545,154 @@ class ResumeFieldExtractor:
         return cls._extract_skills(lines)
 
     @classmethod
-    def _extract_skills(cls, lines: list[str]) -> dict[str, Any]:
+    def _extract_skills(
+        cls,
+        lines: list[str],
+        *,
+        rejected: Counter[str] | None = None,
+    ) -> dict[str, Any]:
         categorized: dict[str, list[str]] = {}
         all_skills: list[str] = []
+        policy = cls._policy()
         date_only_pattern = re.compile(
             r"(?i)^(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*)?(?:19|20)\d{2}\s*(?:-|to|till|until|–|—)\s*(?:present|current|now|(?:19|20)\d{2})$"
         )
-        for raw_line in lines:
+
+        def reject(reason: str) -> None:
+            if rejected is not None:
+                rejected[reason] += 1
+
+        def rejection_reason(item: str) -> str | None:
+            candidate = item.strip()
+            if (
+                re.search(r"[☎📞✉🏠]", candidate)
+                or re.search(
+                    r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",
+                    candidate,
+                    re.IGNORECASE,
+                )
+                or re.fullmatch(r"\+?\d[\d\s().-]{6,}\d", candidate)
+                or re.match(
+                    r"^(?:phone|mobile|email|address)\s*[:=-]",
+                    candidate,
+                    re.IGNORECASE,
+                )
+            ):
+                return "CONTACT_SHAPED"
+            if date_only_pattern.fullmatch(candidate) or cls._DATE_RANGE.fullmatch(candidate):
+                return "TEMPORAL_SHAPED"
+            tokens = [token for token in re.split(r"[\s/\-&()–—]+", candidate) if token]
+            first_token = tokens[0].casefold() if tokens else ""
+            employment_role_tokens = {
+                "administrator", "analyst", "architect", "assistant", "chemist",
+                "consultant", "coordinator", "designer", "developer", "director",
+                "engineer", "executive", "head", "inspector", "lead", "manager",
+                "officer", "operator", "programmer", "scientist", "specialist",
+                "supervisor", "technician",
+            }
+            normalized_tokens = [token.casefold() for token in tokens]
+            role_indexes = [
+                index
+                for index, token in enumerate(normalized_tokens)
+                if token in employment_role_tokens
+            ]
+            title_prefixes = {
+                "assistant", "associate", "chief", "deputy", "junior", "lead",
+                "principal", "senior", "staff",
+            }
+            title_suffixes = {
+                "backend", "contract", "contractor", "frontend", "grade", "level",
+                "permanent", "temporary",
+            }
+            trailing_title_qualifier = bool(
+                role_indexes
+                and role_indexes[-1] < len(normalized_tokens) - 1
+                and (
+                    normalized_tokens[role_indexes[-1] + 1] in title_suffixes
+                    or re.fullmatch(r"(?:\d+|[ivx]+)", normalized_tokens[role_indexes[-1] + 1])
+                )
+            )
+            job_title_shaped = bool(
+                role_indexes
+                and (
+                    role_indexes[-1] == len(normalized_tokens) - 1
+                    or normalized_tokens[0] in title_prefixes
+                    or trailing_title_qualifier
+                )
+            )
+            if (
+                first_token in cls.NARRATIVE_SENTENCE_STARTERS
+                or first_token in cls.VERB_STARTERS
+                or (len(tokens) >= 5 and re.search(r"(?:ed|ing)$", first_token))
+                or job_title_shaped
+            ):
+                return "EMPLOYMENT_SHAPED"
+            if cls._is_junk_skill(candidate):
+                return "MALFORMED_VALUE"
+            return None
+
+        if len(lines) > policy.skill_max_lines:
+            reject("LIMIT_EXCEEDED")
+        for raw_line in lines[: policy.skill_max_lines]:
+            if len(all_skills) >= policy.skill_max_items:
+                reject("LIMIT_EXCEEDED")
+                break
             line = raw_line.lstrip("-• ").strip()
             if not line:
                 continue
             if ":" in line:
                 category, values = line.split(":", 1)
-                items = [
-                    item.strip().lstrip('"').strip() for item in re.split(r"[,;&|]+", values)
-                    if item.strip() and not date_only_pattern.match(item.strip()) and not cls._DATE_RANGE.fullmatch(item.strip()) and not cls._is_junk_skill(item.strip())
-                ]
+                category = category.strip()
+                if re.fullmatch(
+                    r"(?:name|full name|candidate name|address|location|phone|mobile|email|"
+                    r"nationality|gender|marital status|date of birth|dob|company|employer|"
+                    r"designation|job title|duration|institution|university|degree|declaration|references?)",
+                    category,
+                    re.IGNORECASE,
+                ):
+                    is_contact_category = re.search(
+                        r"name|address|location|phone|mobile|email|nationality|gender|marital|birth|dob",
+                        category,
+                        re.IGNORECASE,
+                    )
+                    reject("CONTACT_SHAPED" if is_contact_category else "WRONG_SECTION")
+                    continue
+                items = []
+                for raw_item in re.split(r"[,;&|]+", values, maxsplit=policy.skill_max_items):
+                    if len(all_skills) + len(items) >= policy.skill_max_items:
+                        reject("LIMIT_EXCEEDED")
+                        break
+                    item = raw_item.strip().lstrip('"').strip()
+                    if not item:
+                        continue
+                    reason = rejection_reason(item)
+                    if reason:
+                        reject(reason)
+                        continue
+                    items.append(item)
                 if items:
-                    categorized[category.strip()] = items
+                    category_items = categorized.setdefault(category, [])
+                    remaining = policy.skill_max_items_per_category - len(category_items)
+                    if len(items) > remaining:
+                        reject("LIMIT_EXCEEDED")
+                    accepted_items = items[:max(0, remaining)]
+                    category_items.extend(accepted_items)
+                    all_skills.extend(accepted_items)
             else:
-                items = [
-                    item.strip().lstrip('"').strip() for item in re.split(r"[,;&|]+", line)
-                    if item.strip() and not date_only_pattern.match(item.strip()) and not cls._DATE_RANGE.fullmatch(item.strip()) and not cls._is_junk_skill(item.strip())
-                ]
-            all_skills.extend(items)
+                items = []
+                for raw_item in re.split(r"[,;&|]+", line, maxsplit=policy.skill_max_items):
+                    if len(all_skills) + len(items) >= policy.skill_max_items:
+                        reject("LIMIT_EXCEEDED")
+                        break
+                    item = raw_item.strip().lstrip('"').strip()
+                    if not item:
+                        continue
+                    reason = rejection_reason(item)
+                    if reason:
+                        reject(reason)
+                        continue
+                    items.append(item)
+                all_skills.extend(items)
         deduplicated: list[str] = []
         seen: set[str] = set()
         for skill in all_skills:
@@ -1303,39 +1705,15 @@ class ResumeFieldExtractor:
         return {"categorized": categorized, "all_skills": deduplicated}
 
     @classmethod
-    def _recover_skills_from_context(cls, work_experience: list[dict[str, Any]], projects: list[dict[str, Any]]) -> dict[str, Any]:
-        """Synthesize baseline skills from responsibilities and projects when a formal skills section is missing."""
-        recovered_skills: set[str] = set()
-        
-        # We look for Capitalized Words or common technical terms in bullet points
-        # to avoid dumping entire sentences into skills
-        def extract_terms(text: str) -> list[str]:
-            text = re.sub(r"[,;&|\.]+", " ", text)
-            # Find contiguous capitalized words (e.g., "Quality Control", "React Native", "Gas Chromatography")
-            # or known specific terms if they were lowercased
-            capitalized = re.findall(r"\b[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*\b", text)
-            return [
-                term.strip()
-                for term in capitalized
-                if len(term) >= cls._policy().recovered_skill_min_chars
-                and not cls._is_junk_skill(term.lower())
-            ]
-
-        for exp in work_experience:
-            for resp in exp.get("responsibilities", []):
-                recovered_skills.update(extract_terms(resp))
-        for proj in projects:
-            if proj.get("description"):
-                recovered_skills.update(extract_terms(proj["description"]))
-                
-        deduped = sorted(list(recovered_skills))
-        category = cls._policy().recovered_skills_category
-        return {"categorized": {category: deduped} if deduped else {}, "all_skills": deduped}
-
-    @staticmethod
-    def _extract_projects(lines: list[str]) -> list[dict[str, Any]]:
+    def _extract_projects(
+        cls,
+        lines: list[str],
+        *,
+        source_heading: str | None = None,
+    ) -> list[dict[str, Any]]:
         projects: list[dict[str, Any]] = []
         current: dict[str, Any] = {}
+        after_blank = False
 
         def commit() -> None:
             nonlocal current
@@ -1346,35 +1724,76 @@ class ResumeFieldExtractor:
                 clean_title = parts[0] if parts else raw_name
                 current["title"] = clean_title
                 current["name"] = clean_title
+                current["source_section"] = "projects"
+                if source_heading:
+                    current["source_heading"] = source_heading
                 if len(parts) > 1 and not current.get("description"):
                     current["description"] = " | ".join(parts[1:])
                 projects.append(current)
             current = {}
 
-        for raw_line in lines:
+        for index, raw_line in enumerate(lines):
             line = raw_line.strip()
             if not line:
+                after_blank = True
                 continue
+            starts_after_blank = after_blank
+            after_blank = False
             if line.startswith(("##", "###")):
                 commit()
                 current = {"name": line.replace("#", "").strip()}
+            elif line.startswith("**") and line.endswith("**"):
+                commit()
+                current = {"name": line.strip("* ")}
+            elif (
+                not current
+                or (
+                    starts_after_blank
+                    and bool(current.get("bullet_points") or current.get("description") or current.get("technologies"))
+                )
+            ) and (
+                len(line) <= cls._policy().project_title_max_chars
+                and len(line.split()) <= 12
+                and index + 1 < len(lines)
+            ):
+                if current:
+                    commit()
+                current = {"name": line.strip("* ")}
             elif line.lower().startswith("tech:") or line.lower().startswith("technologies:"):
                 tech_str = line.split(":", 1)[1].strip()
-                current["technologies"] = [t.strip() for t in re.split(r"[,|]+", tech_str) if t.strip()]
+                current["technologies"] = [t.strip()[:500] for t in re.split(r"[,|]+", tech_str) if t.strip()][:64]
             elif "|" in line and not line.startswith(("-", "•", "·")):
-                current["technologies"] = [value.strip() for value in line.split("|") if value.strip()]
+                current["technologies"] = [value.strip()[:500] for value in line.split("|") if value.strip()][:64]
             elif line.startswith(("-", "•", "·")):
-                current.setdefault("bullet_points", []).append(line.lstrip("-•· ").strip())
+                if len(current.setdefault("bullet_points", [])) < 128:
+                    current["bullet_points"].append(line.lstrip("-•· ").strip()[:2_000])
             else:
-                current["description"] = " ".join(filter(None, (current.get("description"), line)))
+                current["description"] = " ".join(filter(None, (current.get("description"), line)))[:10_000]
         commit()
         return projects
+
+    @staticmethod
+    def _deduplicate_projects(items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+        deduplicated: list[dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+        duplicates = 0
+        for item in items:
+            name = re.sub(r"\W+", "", str(item.get("name") or item.get("title") or "").casefold())
+            evidence = " ".join(
+                [str(item.get("description") or ""), *[str(value) for value in item.get("bullet_points") or []]]
+            )
+            fingerprint = (name, re.sub(r"\W+", "", evidence.casefold()))
+            if fingerprint in seen:
+                duplicates += 1
+                continue
+            seen.add(fingerprint)
+            deduplicated.append(item)
+        return deduplicated, duplicates
 
     @classmethod
     def _extract_projects_from_text(cls, text_lines: list[str]) -> list[dict[str, Any]]:
         """
-        Extract projects from CV text when a dedicated 'PROJECTS' section heading is absent
-        or when projects are embedded under 'WORK HISTORY' / 'EXPERIENCE' section blocks.
+        Extract only explicitly labelled embedded projects when a dedicated section is absent.
         """
         projects: list[dict[str, Any]] = []
         current_proj: dict[str, Any] = {}
@@ -1390,7 +1809,7 @@ class ResumeFieldExtractor:
             ):
                 current_proj = {}
                 return
-            # Reject employment date lines, candidates' names, or section headers
+            # Reject employment date lines and section headers.
             if cls._DATE_RANGE.search(raw_title) or cls._SECTION_HEADING.match(raw_title):
                 current_proj = {}
                 return
@@ -1402,6 +1821,8 @@ class ResumeFieldExtractor:
             if has_details:
                 current_proj["title"] = raw_title
                 current_proj["name"] = raw_title
+                current_proj["source_section"] = "projects"
+                current_proj["source_heading"] = "Embedded Project"
                 projects.append(current_proj)
             current_proj = {}
 
@@ -1410,11 +1831,27 @@ class ResumeFieldExtractor:
             if not clean:
                 continue
 
-            proj_highlight = re.search(r"(?:Project\s+Highlights?|Project\s+Title|Project\s+Name)\s*[:\-]*\s*(.*)", clean, re.IGNORECASE)
-            is_subheading = clean.startswith(("##", "###")) and not cls._SECTION_HEADING.match(clean)
+            if current_proj and ResumeSectionDetector.classify_heading(clean) is not None:
+                commit_proj()
+                continue
 
+            proj_highlight = re.search(
+                r"(?P<label>Project\s+Highlights?|Project\s+Title|Project\s+Name)\s*[:\-]*\s*(?P<value>.*)",
+                clean,
+                re.IGNORECASE,
+            )
             if proj_highlight:
-                highlight_val = proj_highlight.group(1).strip()
+                label = proj_highlight.group("label").casefold()
+                highlight_val = proj_highlight.group("value").strip()
+                if label in {"project title", "project name"} and highlight_val:
+                    commit_proj()
+                    current_proj = {
+                        "title": highlight_val[:500],
+                        "name": highlight_val[:500],
+                        "description": "",
+                        "bullet_points": [],
+                    }
+                    continue
                 if not current_proj:
                     prev_line = text_lines[i - 1].strip().lstrip("#*-• ").strip() if i > 0 else ""
                     policy = cls._policy()
@@ -1428,29 +1865,29 @@ class ResumeFieldExtractor:
                     current_proj = {
                         "title": title_candidate,
                         "name": title_candidate,
-                        "description": highlight_val,
+                        "description": highlight_val[:10_000],
                         "bullet_points": [],
                     }
                 else:
                     if highlight_val:
-                        current_proj["description"] = " ".join(filter(None, (current_proj.get("description"), highlight_val)))
-            elif is_subheading:
-                commit_proj()
-                header_val = clean.lstrip("#* ").strip()
-                current_proj = {
-                    "title": header_val,
-                    "name": header_val,
-                    "description": "",
-                    "bullet_points": [],
-                }
+                        current_proj["description"] = " ".join(
+                            filter(None, (current_proj.get("description"), highlight_val))
+                        )[:10_000]
             elif current_proj:
                 if clean.lower().startswith("tech:") or clean.lower().startswith("technologies:"):
                     tech_str = clean.split(":", 1)[1].strip()
-                    current_proj["technologies"] = [t.strip() for t in re.split(r"[,|]+", tech_str) if t.strip()]
+                    current_proj["technologies"] = [
+                        value.strip()[:500]
+                        for value in re.split(r"[,|]+", tech_str)
+                        if value.strip()
+                    ][:64]
                 elif clean.startswith(("-", "•", "·")):
-                    current_proj.setdefault("bullet_points", []).append(clean.lstrip("-•· ").strip())
+                    if len(current_proj.setdefault("bullet_points", [])) < 128:
+                        current_proj["bullet_points"].append(clean.lstrip("-•· ").strip()[:2_000])
                 elif not clean.startswith("#"):
-                    current_proj["description"] = " ".join(filter(None, (current_proj.get("description"), clean)))
+                    current_proj["description"] = " ".join(
+                        filter(None, (current_proj.get("description"), clean))
+                    )[:10_000]
                 else:
                     commit_proj()
 
