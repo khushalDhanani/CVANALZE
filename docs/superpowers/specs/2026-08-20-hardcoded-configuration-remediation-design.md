@@ -124,3 +124,25 @@ After implementation, the narrowest relevant backend and frontend tests, hardcod
 - Replacing the current configuration architecture wholesale.
 - Changing extraction or matching product semantics beyond honoring the configured zero-skills cap.
 - Running the full release gate unless separately requested by the user.
+
+## Full-audit extension
+
+The repository-wide audit identified material hardcoding beyond deployment configuration. The remediation therefore also covers extraction heuristics, operational result caps, frontend/backend capability drift, and audit completeness. This extension preserves the original compatibility and emergency-fallback decisions.
+
+### Extraction policy and registries
+
+`ResumeFieldExtractor` will resolve one immutable `ExtractionPolicy` at the start of an extraction. Layout windows, candidate/name/title/company length gates, score bonuses, fallback confidences, result caps, and junk-item thresholds will come from that snapshot. Section aliases, field-label aliases, present-role terms, honorifics, seniority prefixes, academic/identity labels, project/skill labels, synthetic filename terms, and supported social-link patterns will come from governed rule configuration or versioned baseline data exposed through `DynamicGeoAndHeadingService`.
+
+Stable syntax remains code-owned: regular-expression operators, JSON field names, schema keys, Markdown delimiters, email/URL protocol grammar, and date parsing primitives. Fabricated entity values such as `Position`, `Organization`, and `Project` will be replaced by nullable values plus explicit extraction provenance.
+
+### Operational and presentation policy
+
+Search, taxonomy, recommendation, talent-graph, cache, pagination, prompt-context, and evidence-display caps will use typed policy/settings fields rather than call-site literals. Human-readable recruiter guidance remains versioned presentation policy and is not parsed downstream.
+
+### Backend capabilities contract
+
+The backend will expose an additive authenticated capabilities response containing upload formats and size, job timeout and polling guidance, similarity bounds and bands, batch choices, enabled pipeline stages, parser/model metadata, and build metadata. The frontend will consume this response when available and retain only explicit development/emergency fallbacks. Public routes and existing successful fields remain unchanged.
+
+### Complete hardcoding governance
+
+The audit will scan backend application/core/services, frontend runtime code, Compose and environment profiles, while excluding tests, migrations, generated artifacts, protocol constants, and versioned emergency policy through exact identities. Baseline approvals require file, line, category, normalized snippet fingerprint, owner, and justification. Scanner execution must use the repository Python 3.12 environment.

@@ -2180,3 +2180,21 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Confirmed tests, release governance, scripts, and documentation reference the root outputs rather than the backend-local copies.
   - Removed obsolete plan instructions that regenerated and staged the deleted backend-local findings artifact.
   - Preserved runtime datasets, test fixtures, IDE/tool manifests, package metadata, Expo assets, and the required hardcoding baseline.
+
+---
+
+### Entry #062
+- **Timestamp**: 2026-08-20T11:49:58+0530
+- **Scope**: Full repository hardcoding-remediation design and plan extension
+- **Category**: Architecture & Implementation Planning
+- **Author**: Codex
+- **Modified Files**:
+  - `docs/superpowers/specs/2026-08-20-hardcoded-configuration-remediation-design.md`
+  - `docs/superpowers/plans/2026-08-20-hardcoded-configuration-remediation.md`
+  - `workstats.md`
+- **Summary**: Extended the approved remediation architecture and implementation plan to cover all material audit findings beyond deployment configuration.
+- **Details**:
+  - Added governed resume-extraction heuristics and vocabulary registries while preserving protocol grammar and response contracts.
+  - Added policy-backed backend operational caps, recruiter presentation policy, and an authoritative capabilities contract.
+  - Added frontend capability consumption and complete category-aware hardcoding governance tasks.
+  - Recorded the authorized test-first, lint, type-check, scanner, and Compose verification workflow; the full release gate remains outside this task's execution conditions.
