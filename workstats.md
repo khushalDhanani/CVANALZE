@@ -2404,3 +2404,19 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Removed the completed implementation plan and design specification.
   - Removed the empty `docs/superpowers` and `docs` directory structure.
   - Preserved historical append-only references in `workstats.md`.
+
+---
+
+### Entry #071
+- **Timestamp**: 2026-08-20T12:38:44+0530
+- **Scope**: Merged remediation branch cleanup
+- **Category**: Version Control Maintenance
+- **Author**: Codex
+- **Modified Files**:
+  - `workstats.md`
+- **Summary**: Deleted the fully merged hardcoding-remediation branches locally and from the `origin` remote.
+- **Details**:
+  - Confirmed both branch tips were ancestors of `v_1.0.0_MJ01` before deletion.
+  - Confirmed the local branches had already been removed during post-merge cleanup.
+  - Deleted `origin/codex/hardcoding-remediation-full`.
+  - Deleted `origin/codex/hardcoding-remediation`.
