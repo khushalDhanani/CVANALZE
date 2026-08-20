@@ -2420,3 +2420,23 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Confirmed the local branches had already been removed during post-merge cleanup.
   - Deleted `origin/codex/hardcoding-remediation-full`.
   - Deleted `origin/codex/hardcoding-remediation`.
+
+---
+
+### Entry #072
+- **Timestamp**: 2026-08-20T12:54:41+0530
+- **Scope**: RQ abandoned-job recovery and terminal result consistency
+- **Category**: Backend Reliability, Queue Processing & Tests
+- **Author**: Codex
+- **Modified Files**:
+  - `backend/app/services/processing_queue.py`
+  - `backend/tests/unit/services/test_queue_and_batch_service.py`
+  - `workstats.md`
+- **Summary**: Classified abandoned RQ executions as worker-loss failures, recovered them while attempts remain, and synchronized terminal job failures into the preserved CV result projection.
+- **Details**:
+  - Read sanitized RQ result metadata to identify `AbandonedJobError` without persisting raw traceback text.
+  - Routed recoverable abandoned jobs through the existing locked re-enqueue path with `WORKER_LOST` metadata.
+  - Added a centralized terminal-failure transition that preserves partial extraction data and generation identity while updating result status, progress, stage, and structured error fields.
+  - Reused terminal-result synchronization for exhausted abandoned jobs, generic failed RQ jobs, and terminal workhorse crashes.
+  - Added three regression tests covering exhausted abandonment, recoverable abandonment, and terminal workhorse-result synchronization.
+  - Verified the complete focused queue/batch unit file passed with 8 tests and both changed Python files passed Ruff.

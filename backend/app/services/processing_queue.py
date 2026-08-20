@@ -258,16 +258,22 @@ class ProcessingQueueService:
                         message="CV processing was cancelled.",
                     )
                 if rq_status == "failed":
+                    failure_type = cls._rq_failure_type(rq_job)
+                    if failure_type == "AbandonedJobError":
+                        return cls._recover_or_fail(
+                            record,
+                            connection,
+                            ErrorCode.WORKER_LOST,
+                            failure_type=failure_type,
+                        )
                     error = CanonicalError(
                         code=ErrorCode.PROCESSING_FAILED,
                         message="CV processing failed abruptly during background execution.",
                         retryable=False,
                         correlation_id=record.rq_job_id,
                     )
-                    return ProcessingJobRepository.transition(
-                        record.job_id,
-                        JobState.FAILED,
-                        progress=100,
+                    return cls._transition_terminal_failure(
+                        record,
                         stage="failed",
                         message=error.message,
                         error=error,
@@ -386,7 +392,90 @@ class ProcessingQueueService:
         return max(normalized) if normalized else None
 
     @classmethod
-    def _recover_or_fail(cls, record: ProcessingJobRecord, connection: Redis, reason: ErrorCode) -> ProcessingJobRecord:
+    def _rq_failure_type(cls, rq_job: Any) -> str | None:
+        """Return a sanitized RQ failure identity without retaining traceback text."""
+        try:
+            latest_result = rq_job.latest_result()
+        except Exception as exc:
+            logger.warning(
+                "Could not inspect the retained RQ failure for %s: %s",
+                getattr(rq_job, "id", "unknown"),
+                type(exc).__name__,
+            )
+            return None
+        failure_text = str(getattr(latest_result, "exc_string", "") or "")
+        if "AbandonedJobError" in failure_text:
+            return "AbandonedJobError"
+        return None
+
+    @classmethod
+    def _transition_terminal_failure(
+        cls,
+        record: ProcessingJobRecord,
+        *,
+        stage: str,
+        message: str,
+        error: CanonicalError,
+    ) -> ProcessingJobRecord:
+        transitioned = ProcessingJobRepository.transition(
+            record.job_id,
+            JobState.FAILED,
+            progress=100,
+            stage=stage,
+            message=message,
+            error=error,
+        )
+        cls._synchronize_failed_result(transitioned)
+        return transitioned
+
+    @staticmethod
+    def _synchronize_failed_result(record: ProcessingJobRecord) -> None:
+        """Keep the durable/cache result projection aligned with terminal job state."""
+        try:
+            result_data = dict(ResultRepository.resolve_result(record.cv_key) or {})
+            now_iso = datetime.now(timezone.utc).isoformat()
+            result_data.setdefault("id", record.cv_key)
+            result_data.setdefault("scan_id", record.cv_key)
+            result_data.setdefault("filename", record.filename)
+            result_data.setdefault("storage_filename", record.storage_filename)
+            result_data.setdefault("cv_hash", record.content_hash)
+            result_data.setdefault("created_at", record.created_at.isoformat())
+            result_data.update(
+                {
+                    "analysis_run_id": record.rq_job_id or record.job_id,
+                    "updated_at": now_iso,
+                    "status": "FAILED",
+                    "progress": 100,
+                    "is_complete": False,
+                    "stage": record.stage,
+                    "failed_step": record.stage,
+                    "error": "CV processing failed.",
+                    "message": record.message,
+                    "error_details": None,
+                    "error_code": record.error.code.value if record.error else ErrorCode.PROCESSING_FAILED.value,
+                    "error_message": record.error.message if record.error else record.message,
+                    "error_retryable": record.error.retryable if record.error else False,
+                    "correlation_id": record.error.correlation_id if record.error else None,
+                    "failure_metadata": dict(record.error.details) if record.error else {},
+                }
+            )
+            ResultRepository.atomic_save_result(f"{record.cv_key}.json", result_data)
+        except Exception as exc:
+            logger.exception(
+                "Could not synchronize terminal failure result for %s: %s",
+                record.job_id,
+                type(exc).__name__,
+            )
+
+    @classmethod
+    def _recover_or_fail(
+        cls,
+        record: ProcessingJobRecord,
+        connection: Redis,
+        reason: ErrorCode,
+        *,
+        failure_type: str | None = None,
+    ) -> ProcessingJobRecord:
         lock = connection.lock(
             f"lock:cv-processing:recovery:{record.job_id}",
             timeout=settings.PROCESSING_RECOVERY_LOCK_TIMEOUT_SECONDS,
@@ -404,11 +493,10 @@ class ProcessingQueueService:
                     message="CV processing stopped after its worker became unavailable.",
                     retryable=False,
                     correlation_id=current.rq_job_id,
+                    details={"failure_type": failure_type} if failure_type else {},
                 )
-                return ProcessingJobRepository.transition(
-                    current.job_id,
-                    JobState.FAILED,
-                    progress=100,
+                return cls._transition_terminal_failure(
+                    current,
                     stage="worker_lost" if reason == ErrorCode.WORKER_LOST else "stuck_job",
                     message=error.message,
                     error=error,
@@ -421,6 +509,7 @@ class ProcessingQueueService:
                 message="CV processing is being recovered after its previous queue execution stopped.",
                 retryable=True,
                 correlation_id=current.rq_job_id,
+                details={"failure_type": failure_type} if failure_type else {},
             )
             recovered_state = JobState.QUEUED if current.state == JobState.QUEUED else JobState.RETRYING
             recovered = ProcessingJobRepository.transition(
@@ -725,16 +814,25 @@ def handle_work_horse_killed(job, _retpid, _ret_val, _rusage) -> None:
         return
     will_retry = bool(getattr(job, "retries_left", 0))
     error = CanonicalError(
-        code=ErrorCode.PROCESSING_FAILED,
+        code=ErrorCode.WORKER_LOST,
         message="The CV processing workhorse terminated unexpectedly.",
         retryable=will_retry,
         correlation_id=str(getattr(job, "id", "") or "") or None,
+        details={"failure_type": "WorkHorseTerminated"},
     )
-    ProcessingJobRepository.transition(
-        job_id,
-        JobState.RETRYING if will_retry else JobState.FAILED,
-        progress=record.progress if will_retry else 100,
-        stage="retry_wait" if will_retry else "worker_crash",
-        message="CV processing will retry after a worker crash." if will_retry else "CV processing failed after a worker crash.",
+    if will_retry:
+        ProcessingJobRepository.transition(
+            job_id,
+            JobState.RETRYING,
+            progress=record.progress,
+            stage="retry_wait",
+            message="CV processing will retry after a worker crash.",
+            error=error,
+        )
+        return
+    ProcessingQueueService._transition_terminal_failure(
+        record,
+        stage="worker_crash",
+        message="CV processing failed after a worker crash.",
         error=error,
     )
