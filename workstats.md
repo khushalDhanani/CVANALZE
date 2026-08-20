@@ -2180,3 +2180,18 @@ Permanent, append-only work log for all frontend and backend work across the CV 
   - Confirmed tests, release governance, scripts, and documentation reference the root outputs rather than the backend-local copies.
   - Removed obsolete plan instructions that regenerated and staged the deleted backend-local findings artifact.
   - Preserved runtime datasets, test fixtures, IDE/tool manifests, package metadata, Expo assets, and the required hardcoding baseline.
+
+---
+
+### Entry #062
+- **Timestamp**: 2026-08-20T11:52:52+0530
+- **Scope**: Root JSON artifact cleanup
+- **Category**: Maintenance
+- **Author**: Antigravity
+- **Modified Files**:
+  - `coverage.json` (removed)
+  - `hardcoding_findings.json` (removed)
+  - `workstats.md`
+- **Summary**: Removed root-level duplicates of backend scanner outputs.
+- **Details**:
+  - Deleted `coverage.json` and `hardcoding_findings.json` from the repository root to complete the cleanup of redundant artifacts that were previously only removed from the `backend/` directory.
